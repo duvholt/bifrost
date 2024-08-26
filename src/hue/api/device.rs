@@ -10,6 +10,8 @@ pub struct Device {
     pub product_data: DeviceProductData,
     pub metadata: Metadata,
     pub services: Vec<ResourceLink>,
+    #[serde(default)]
+    pub identify: Identify,
 }
 
 impl Device {
@@ -18,6 +20,9 @@ impl Device {
         self.services.iter().find(|rl| rl.rtype == RType::Light)
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Identify {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceProductData {

@@ -23,9 +23,9 @@ use crate::hue;
 use crate::hue::api::{
     Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature, ColorTemperatureUpdate,
     ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming, DimmingUpdate, GroupedLight,
-    Light, LightColor, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
-    RoomMetadata, Scene, SceneAction, SceneActionElement, SceneMetadata, SceneStatus,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    Identify, Light, LightColor, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
+    RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement, SceneMetadata,
+    SceneRecall, SceneStatus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 
 use crate::error::{ApiError, ApiResult};
@@ -90,6 +90,7 @@ impl Client {
             product_data,
             metadata: metadata.clone(),
             services: vec![link_light],
+            identify: Identify {},
         };
 
         self.map.insert(name.to_string(), link_light.rid);
@@ -132,6 +133,7 @@ impl Client {
             product_data: DeviceProductData::guess_from_device(dev),
             metadata: Metadata::new(DeviceArchetype::UnknownArchetype, "foo"),
             services: vec![link_button, link_zbc],
+            identify: Identify {},
         };
 
         self.map.insert(name.to_string(), link_button.rid);
@@ -221,6 +223,11 @@ impl Client {
                     "effects": [],
                 }),
                 speed: 0.5,
+                recall: SceneRecall {
+                    action: None,
+                    dimming: None,
+                    duration: None,
+                },
                 status: Some(SceneStatus::Inactive),
             };
 
