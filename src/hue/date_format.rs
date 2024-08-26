@@ -1,4 +1,4 @@
-const FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
+const FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 const UPDATE_FORMAT: &str = "%+";
 
 pub mod update_utc {
@@ -23,7 +23,7 @@ pub mod utc {
     where
         S: Serializer,
     {
-        let s = format!("{}Z", date.format(super::FORMAT));
+        let s = format!("{}", date.format(super::FORMAT));
         serializer.serialize_str(&s)
     }
 
@@ -45,7 +45,7 @@ pub mod local {
     where
         S: Serializer,
     {
-        let s = format!("{}Z", date.format(super::FORMAT));
+        let s = format!("{}", date.format(super::FORMAT));
         serializer.serialize_str(&s)
     }
 
