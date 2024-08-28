@@ -335,6 +335,7 @@ impl Resources {
             /* No id v1 */
             Resource::BehaviorInstance(_)
             | Resource::DevicePower(_)
+            | Resource::DeviceSoftwareUpdate(_)
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
             | Resource::Button(_)
@@ -342,6 +343,8 @@ impl Resources {
             | Resource::EntertainmentConfiguration(_)
             | Resource::GeofenceClient(_)
             | Resource::Geolocation(_)
+            | Resource::GroupedMotion(_)
+            | Resource::GroupedLightLevel(_)
             | Resource::Homekit(_)
             | Resource::LightLevel(_)
             | Resource::Matter(_)
