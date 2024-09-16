@@ -15,7 +15,7 @@ pub use light::{
     DimmingUpdate, GamutType, Light, LightColor, LightMetadata, LightUpdate, MirekSchema, On,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
-pub use room::{Room, RoomArchetype, RoomMetadata};
+pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
 pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
