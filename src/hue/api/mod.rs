@@ -7,7 +7,8 @@ mod scene;
 mod stubs;
 mod update;
 
-pub use device::{Device, DeviceArchetype, DeviceProductData, Identify};
+pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
+
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
@@ -24,8 +25,9 @@ pub use stubs::{
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
     Entertainment, EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments,
     GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
-    Metadata, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene, Taurus, Temperature,
-    TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, Zone,
+    Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
+    Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscovery, Zone,
 };
 pub use update::{Update, UpdateRecord};
 

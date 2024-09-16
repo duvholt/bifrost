@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::hue::api::{Metadata, RType, ResourceLink, Stub};
+use crate::hue::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
 use crate::hue::version::SwVersion;
 use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
 use crate::z2m;
@@ -14,6 +14,12 @@ pub struct Device {
     pub usertest: Option<UserTest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identify: Option<Stub>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct DeviceUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<MetadataUpdate>,
 }
 
 impl Device {
@@ -82,6 +88,23 @@ impl DeviceProductData {
             certified,
             software_version,
             hardware_platform_type: None,
+        }
+    }
+}
+
+impl DeviceUpdate {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_metadata(self, metadata: Metadata) -> Self {
+        Self {
+            metadata: Some(MetadataUpdate {
+                archetype: Some(metadata.archetype),
+                name: Some(metadata.name),
+            }),
         }
     }
 }
