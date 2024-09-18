@@ -548,6 +548,7 @@ pub struct ApiScene {
     #[serde(rename = "type")]
     scene_type: ApiSceneType,
     lights: Vec<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     lightstates: HashMap<String, ApiLightStateUpdate>,
     owner: Uuid,
     recycle: bool,
@@ -557,6 +558,7 @@ pub struct ApiScene {
     #[serde(with = "date_format::legacy_utc")]
     lastupdated: DateTime<Utc>,
     version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     image: Option<Uuid>,
     group: String,
 }
