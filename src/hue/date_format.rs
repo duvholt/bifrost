@@ -1,5 +1,6 @@
 const FORMAT: &str = "%Y-%m-%dT%H:%M:%SZ";
 const FORMAT_MS: &str = "%Y-%m-%dT%H:%M:%S%.3fZ";
+const FORMAT_LOCAL: &str = "%Y-%m-%dT%H:%M:%S";
 const UPDATE_FORMAT: &str = "%+";
 
 pub mod utc_ms {
@@ -77,7 +78,7 @@ pub mod local {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let dt = NaiveDateTime::parse_from_str(&s, super::FORMAT).map_err(Error::custom)?;
+        let dt = NaiveDateTime::parse_from_str(&s, super::FORMAT_LOCAL).map_err(Error::custom)?;
         dt.and_local_timezone(Local)
             .single()
             .ok_or_else(|| Error::custom("Localtime conversion failed"))
