@@ -428,8 +428,10 @@ pub struct ApiLight {
     config: Value,
     uniqueid: String,
     swversion: String,
-    swconfigid: String,
-    productid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    swconfigid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    productid: Option<String>,
 }
 
 impl ApiLight {
@@ -474,7 +476,7 @@ impl ApiLight {
             modelid: product_data.product_name,
             manufacturername: product_data.manufacturer_name,
             productname: "Hue color spot".to_string(),
-            productid: product_data.model_id,
+            productid: Some(product_data.model_id),
             capabilities: json!({
                 "certified": true,
                 "control": {
@@ -508,7 +510,7 @@ impl ApiLight {
             light_type: "Extended color light".to_string(),
             uniqueid: uuid.as_simple().to_string(),
             swversion: product_data.software_version,
-            swconfigid: String::new(),
+            swconfigid: None,
         }
     }
 }
