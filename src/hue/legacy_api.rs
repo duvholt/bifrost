@@ -550,7 +550,7 @@ pub struct ApiScene {
     lights: Vec<String>,
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     lightstates: HashMap<String, ApiLightStateUpdate>,
-    owner: Uuid,
+    owner: String,
     recycle: bool,
     locked: bool,
     appdata: ApiSceneAppData,
@@ -590,7 +590,7 @@ impl ApiScene {
             scene_type: ApiSceneType::GroupScene,
             lights,
             lightstates,
-            owner,
+            owner: owner.to_string(),
             recycle: false,
             locked: false,
             /* Some clients (e.g. Hue Essentials) require .appdata */
