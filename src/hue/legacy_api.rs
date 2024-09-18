@@ -277,12 +277,18 @@ pub enum ApiAlert {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupAction {
     on: bool,
-    bri: u32,
-    hue: u32,
-    sat: u32,
-    effect: ApiEffect,
-    xy: [f64; 2],
-    ct: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bri: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hue: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sat: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect: Option<ApiEffect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xy: Option<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ct: Option<u32>,
     alert: ApiAlert,
     #[serde(skip_serializing_if = "Option::is_none")]
     colormode: Option<LightColorMode>,
@@ -327,15 +333,12 @@ impl ApiGroup {
             lights,
             action: ApiGroupAction {
                 on: glight.on.is_some_and(|on| on.on),
-                bri: glight
-                    .dimming
-                    .map(|dim| (dim.brightness * 2.54) as u32)
-                    .unwrap_or_default(),
-                hue: 0,
-                sat: 0,
-                effect: ApiEffect::None,
-                xy: [0.0, 0.0],
-                ct: 0,
+                bri: glight.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                hue: None,
+                sat: None,
+                effect: None,
+                xy: None,
+                ct: None,
                 alert: ApiAlert::None,
                 colormode: None,
             },
