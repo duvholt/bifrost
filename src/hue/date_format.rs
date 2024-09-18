@@ -7,7 +7,7 @@ macro_rules! date_serializer {
     ($type:ty, $fmt:expr) => {
         pub fn serialize<S>(date: &$type, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: Serializer,
+            S: serde::Serializer,
         {
             let s = format!("{}", date.format($fmt));
             serializer.serialize_str(&s)
@@ -15,20 +15,25 @@ macro_rules! date_serializer {
     };
 }
 
+macro_rules! date_deserializer_utc {
+    ($type:ty, $fmt:expr) => {
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<$type, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            use serde::{self, de::Error, Deserialize};
+            let s = String::deserialize(deserializer)?;
+            let dt = chrono::NaiveDateTime::parse_from_str(&s, $fmt).map_err(Error::custom)?;
+            Ok(<$type>::from_naive_utc_and_offset(dt, Utc))
+        }
+    };
+}
+
 pub mod utc_ms {
-    use chrono::{DateTime, NaiveDateTime, Utc};
-    use serde::{self, de::Error, Deserialize, Deserializer, Serializer};
+    use chrono::{DateTime, Utc};
 
     date_serializer!(DateTime<Utc>, super::FORMAT_MS);
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let dt = NaiveDateTime::parse_from_str(&s, super::FORMAT_MS).map_err(Error::custom)?;
-        Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
-    }
+    date_deserializer_utc!(DateTime<Utc>, super::FORMAT_MS);
 }
 
 pub mod update_utc {
@@ -46,24 +51,15 @@ pub mod update_utc {
 }
 
 pub mod utc {
-    use chrono::{DateTime, NaiveDateTime, Utc};
-    use serde::{self, de::Error, Deserialize, Deserializer, Serializer};
+    use chrono::{DateTime, Utc};
 
     date_serializer!(DateTime<Utc>, super::FORMAT);
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let dt = NaiveDateTime::parse_from_str(&s, super::FORMAT).map_err(Error::custom)?;
-        Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
-    }
+    date_deserializer_utc!(DateTime<Utc>, super::FORMAT);
 }
 
 pub mod local {
     use chrono::{DateTime, Local, NaiveDateTime};
-    use serde::{self, de::Error, Deserialize, Deserializer, Serializer};
+    use serde::{self, de::Error, Deserialize, Deserializer};
 
     date_serializer!(DateTime<Local>, super::FORMAT_LOCAL);
 
