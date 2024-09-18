@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::Ipv4Addr};
 
 use chrono::{DateTime, Local, Utc};
 use mac_address::MacAddress;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -28,12 +28,25 @@ pub enum HueResult<T> {
     Error(HueError),
 }
 
+pub fn serialize_lower_case_mac<S>(mac: &MacAddress, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let m = mac.bytes();
+    let addr = format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        m[0], m[1], m[2], m[3], m[4], m[5]
+    );
+    serializer.serialize_str(&addr)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiShortConfig {
     pub apiversion: String,
     pub bridgeid: String,
     pub datastoreversion: String,
     pub factorynew: bool,
+    #[serde(serialize_with = "serialize_lower_case_mac")]
     pub mac: MacAddress,
     pub modelid: String,
     pub name: String,
