@@ -38,7 +38,7 @@ fn extract<'a, R: Read + 'a>(
         .enumerate()
 }
 
-fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<bool> {
+fn compare(before: &Value, after: &Value, msg: ResourceRecord, report: bool) -> ApiResult<bool> {
     let diffs = compare_serde_values(before, after, true, &[]).unwrap();
     let all_diffs = diffs.all_diffs();
 
@@ -47,6 +47,11 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<bool
         .any(|x| x.1.values.map(|q| !false_positive(&q)).unwrap_or(true))
     {
         return Ok(true);
+    }
+
+    /* in report mode, hide diff details */
+    if report {
+        return Ok(false);
     }
 
     log::error!("Difference detected on {:?}", msg.obj.rtype());
@@ -81,7 +86,7 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<bool
     Ok(false)
 }
 
-fn process_file(reader: impl Read, name: &str, width: usize) -> ApiResult<()> {
+fn process_file(reader: impl Read, name: &str, width: usize, report: bool) -> ApiResult<()> {
     let stream = Deserializer::from_reader(reader).into_iter::<Value>();
 
     let mut items = 0;
@@ -95,22 +100,22 @@ fn process_file(reader: impl Read, name: &str, width: usize) -> ApiResult<()> {
         let Ok(msg) = data else {
             errors += 1;
             let err = data.unwrap_err();
-            log::error!("Parse error {err:?} (object index {})", index);
+            log::error!("{name:width$} | >> Parse error {err} (object index {})", index);
             eprintln!("{}", &serde_json::to_string(&before)?);
             continue;
         };
 
         let after = serde_json::to_value(&msg)?;
 
-        if !compare(&before, &after, msg)? {
+        if !compare(&before, &after, msg, report)? {
             errors += 1;
         }
     }
 
     if errors > 0 {
-        log::warn!("{name:width$} | {items:5} items | {errors:5} errors");
+        log::warn!("{name:width$} | {items:5} items | {errors:5} errors |");
     } else {
-        log::info!("{name:width$} | {items:5} items OK");
+        log::info!("{name:width$} | {items:5} items |           OK |");
     }
 
     Ok(())
@@ -122,6 +127,10 @@ struct Args {
     /// input files
     #[arg(name = "files", default_values_t = [Utf8PathBuf::from("-")])]
     files: Vec<Utf8PathBuf>,
+
+    /// show only per-file summary
+    #[arg(short, name = "report", default_value_t = false)]
+    report: bool,
 }
 
 impl Args {
@@ -145,9 +154,9 @@ fn main() -> ApiResult<()> {
 
     for file in args.files {
         if file == "-" {
-            process_file(stdin(), "stdin", width)?;
+            process_file(stdin(), "stdin", width, args.report)?;
         } else {
-            process_file(File::open(&file)?, file.as_ref(), width)?;
+            process_file(File::open(&file)?, file.as_ref(), width, args.report)?;
         }
     }
 
