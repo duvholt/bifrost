@@ -560,7 +560,8 @@ pub struct ApiScene {
     version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     image: Option<Uuid>,
-    group: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    group: Option<String>,
 }
 
 impl ApiScene {
@@ -601,7 +602,7 @@ impl ApiScene {
             lastupdated: Utc::now(),
             version: ApiSceneVersion::V2 as u32,
             image: scene.metadata.image.map(|rl| rl.rid),
-            group: room_id.to_string(),
+            group: Some(room_id.to_string()),
         })
     }
 }
