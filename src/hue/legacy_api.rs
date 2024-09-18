@@ -647,7 +647,28 @@ pub struct ApiSchedule {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiSensor {}
+pub struct ApiSensor {
+    #[serde(rename = "type")]
+    pub sensor_type: String,
+    pub config: Value,
+    pub name: String,
+    pub state: Value,
+    pub manufacturername: String,
+    pub modelid: String,
+    pub swversion: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swupdate: Option<SwUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uniqueid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diversityid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub productname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recycle: Option<bool>,
+    #[serde(skip_serializing_if = "Value::is_null", default)]
+    pub capabilities: Value,
+}
 
 #[allow(clippy::zero_sized_map_values)]
 #[derive(Debug, Serialize, Deserialize)]
