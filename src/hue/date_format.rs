@@ -122,6 +122,13 @@ pub mod local_opt {
     date_deserializer_local_opt!(DateTime<Local>, super::FORMAT_LOCAL);
 }
 
+pub mod legacy_utc {
+    use chrono::{DateTime, Utc};
+
+    date_serializer!(DateTime<Utc>, super::FORMAT_LOCAL);
+    date_deserializer_utc!(DateTime<Utc>, super::FORMAT_LOCAL);
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, TimeZone, Utc};
