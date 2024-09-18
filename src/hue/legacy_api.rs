@@ -536,8 +536,10 @@ pub enum ApiSceneVersion {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiSceneAppData {
-    pub data: String,
-    pub version: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -590,8 +592,8 @@ impl ApiScene {
             locked: false,
             /* Some clients (e.g. Hue Essentials) require .appdata */
             appdata: ApiSceneAppData {
-                data: format!("xxxxx_r{room_id}"),
-                version: 1,
+                data: Some(format!("xxxxx_r{room_id}")),
+                version: Some(1),
             },
             picture: String::new(),
             lastupdated: Utc::now(),
