@@ -176,7 +176,7 @@ pub struct DeviceTypes {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SwUpdate {
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     lastinstall: DateTime<Utc>,
     state: SwUpdateState,
 }
@@ -201,7 +201,7 @@ pub struct SoftwareUpdate2 {
     autoinstall: Value,
     bridge: SwUpdate,
     checkforupdate: bool,
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     lastchange: DateTime<Utc>,
     state: SwUpdateState,
 }
@@ -225,9 +225,9 @@ impl SoftwareUpdate2 {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Whitelist {
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     pub create_date: DateTime<Utc>,
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     pub last_use_date: DateTime<Utc>,
     pub name: String,
 }
@@ -253,9 +253,9 @@ pub struct ApiConfig {
     pub netmask: Ipv4Addr,
     pub gateway: Ipv4Addr,
     pub timezone: String,
-    #[serde(with = "date_format::utc", rename = "UTC")]
+    #[serde(with = "date_format::legacy_utc", rename = "UTC")]
     pub utc: DateTime<Utc>,
-    #[serde(with = "date_format::local")]
+    #[serde(with = "date_format::legacy_local")]
     pub localtime: DateTime<Local>,
     pub whitelist: HashMap<Uuid, Whitelist>,
 }
@@ -531,7 +531,7 @@ pub struct ApiScene {
     locked: bool,
     appdata: ApiSceneAppData,
     picture: String,
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     lastupdated: DateTime<Utc>,
     version: u32,
     image: Option<Uuid>,

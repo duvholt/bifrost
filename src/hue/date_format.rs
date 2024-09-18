@@ -66,16 +66,33 @@ macro_rules! date_deserializer_local_opt {
             D: serde::Deserializer<'de>,
         {
             use serde::{self, de::Error, Deserialize};
-            match Option::<String>::deserialize(deserializer)? {
-                None => Ok(None),
-                Some(s) => Ok(Some(
-                    chrono::NaiveDateTime::parse_from_str(&s, super::FORMAT_LOCAL)
-                        .map_err(Error::custom)?
-                        .and_local_timezone(Local)
-                        .single()
-                        .ok_or_else(|| Error::custom("Localtime conversion failed"))?,
-                )),
-            }
+            let Some(s) = Option::<String>::deserialize(deserializer)? else {
+                return Ok(None);
+            };
+
+            Ok(Some(
+                chrono::NaiveDateTime::parse_from_str(&s, super::FORMAT_LOCAL)
+                    .map_err(Error::custom)?
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or_else(|| Error::custom("Localtime conversion failed"))?,
+            ))
+        }
+    };
+}
+
+macro_rules! date_deserializer_utc_opt {
+    ($type:ty, $fmt:expr) => {
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<$type>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            use serde::{self, de::Error, Deserialize};
+            let Some(s) = Option::<String>::deserialize(deserializer)? else {
+                return Ok(None);
+            };
+            let dt = chrono::NaiveDateTime::parse_from_str(&s, $fmt).map_err(Error::custom)?;
+            Ok(Some(<$type>::from_naive_utc_and_offset(dt, Utc)))
         }
     };
 }
@@ -108,14 +125,14 @@ pub mod utc {
     date_deserializer_utc!(DateTime<Utc>, super::FORMAT);
 }
 
-pub mod local {
+pub mod legacy_local {
     use chrono::{DateTime, Local};
 
     date_serializer!(DateTime<Local>, super::FORMAT_LOCAL);
     date_deserializer_local!(DateTime<Local>, super::FORMAT_LOCAL);
 }
 
-pub mod local_opt {
+pub mod legacy_local_opt {
     use chrono::{DateTime, Local};
 
     date_serializer_opt!(DateTime<Local>, super::FORMAT_LOCAL);
@@ -127,6 +144,13 @@ pub mod legacy_utc {
 
     date_serializer!(DateTime<Utc>, super::FORMAT_LOCAL);
     date_deserializer_utc!(DateTime<Utc>, super::FORMAT_LOCAL);
+}
+
+pub mod legacy_utc_opt {
+    use chrono::{DateTime, Utc};
+
+    date_serializer_opt!(DateTime<Utc>, super::FORMAT_LOCAL);
+    date_deserializer_utc_opt!(DateTime<Utc>, super::FORMAT_LOCAL);
 }
 
 #[cfg(test)]
