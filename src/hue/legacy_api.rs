@@ -271,6 +271,7 @@ pub enum ApiEffect {
 #[serde(rename_all = "lowercase")]
 pub enum ApiAlert {
     None,
+    Select,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -288,8 +289,10 @@ pub struct ApiGroupAction {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ApiGroupType {
-    Room,
+    Entertainment,
     LightGroup,
+    Room,
+    Zone,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
