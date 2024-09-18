@@ -226,9 +226,9 @@ impl SoftwareUpdate2 {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Whitelist {
-    #[serde(with = "date_format::legacy_utc")]
+    #[serde(with = "date_format::legacy_utc", rename = "create date")]
     pub create_date: DateTime<Utc>,
-    #[serde(with = "date_format::legacy_utc")]
+    #[serde(with = "date_format::legacy_utc", rename = "last use date")]
     pub last_use_date: DateTime<Utc>,
     pub name: String,
 }
