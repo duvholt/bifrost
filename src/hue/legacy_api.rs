@@ -194,6 +194,7 @@ impl Default for SwUpdate {
 #[serde(rename_all = "lowercase")]
 pub enum SwUpdateState {
     NoUpdates,
+    Transferring,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
