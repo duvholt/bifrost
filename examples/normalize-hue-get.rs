@@ -124,6 +124,16 @@ struct Args {
     files: Vec<Utf8PathBuf>,
 }
 
+impl Args {
+    pub fn longest_filename(&self) -> usize {
+        self.files
+            .iter()
+            .map(|b| b.as_str().len().max(5))
+            .max()
+            .unwrap_or(5)
+    }
+}
+
 fn main() -> ApiResult<()> {
     pretty_env_logger::formatted_builder()
         .filter_level(log::LevelFilter::Debug)
@@ -131,12 +141,7 @@ fn main() -> ApiResult<()> {
         .init();
 
     let args = Args::parse();
-    let width = args
-        .files
-        .iter()
-        .map(|b| b.as_str().len().max(5))
-        .max()
-        .unwrap();
+    let width = args.longest_filename();
 
     for file in args.files {
         if file == "-" {
