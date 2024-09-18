@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use std::io::{stdin, Stdin};
+use std::io::{stdin, Read};
 
 use bifrost::error::ApiResult;
 use bifrost::hue::api::ResourceRecord;
@@ -20,9 +20,9 @@ fn false_positive((a, b): &(&Value, &Value)) -> bool {
  * and if found, iterate over that. Otherwise, assume the whole object is what
  * we are parsing.
  */
-fn extract(
-    stream: StreamDeserializer<IoRead<Stdin>, Value>,
-) -> impl Iterator<Item = (usize, Value)> + '_ {
+fn extract<'a, R: Read + 'a>(
+    stream: StreamDeserializer<'a, IoRead<R>, Value>,
+) -> impl Iterator<Item = (usize, Value)> + 'a {
     stream
         .flat_map(|val| {
             val.as_ref()
@@ -78,13 +78,8 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<()> 
     Ok(())
 }
 
-fn main() -> ApiResult<()> {
-    pretty_env_logger::formatted_builder()
-        .filter_level(log::LevelFilter::Debug)
-        .parse_default_env()
-        .init();
-
-    let stream = Deserializer::from_reader(stdin()).into_iter::<Value>();
+fn process_file(reader: impl Read) -> ApiResult<()> {
+    let stream = Deserializer::from_reader(reader).into_iter::<Value>();
 
     for (index, obj) in extract(stream) {
         let before = obj;
@@ -101,6 +96,17 @@ fn main() -> ApiResult<()> {
 
         compare(&before, &after, msg)?;
     }
+
+    Ok(())
+}
+
+fn main() -> ApiResult<()> {
+    pretty_env_logger::formatted_builder()
+        .filter_level(log::LevelFilter::Debug)
+        .parse_default_env()
+        .init();
+
+    process_file(stdin())?;
 
     Ok(())
 }
