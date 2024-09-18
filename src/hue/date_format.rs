@@ -3,17 +3,23 @@ const FORMAT_MS: &str = "%Y-%m-%dT%H:%M:%S%.3fZ";
 const FORMAT_LOCAL: &str = "%Y-%m-%dT%H:%M:%S";
 const UPDATE_FORMAT: &str = "%+";
 
+macro_rules! date_serializer {
+    ($type:ty, $fmt:expr) => {
+        pub fn serialize<S>(date: &$type, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let s = format!("{}", date.format($fmt));
+            serializer.serialize_str(&s)
+        }
+    };
+}
+
 pub mod utc_ms {
     use chrono::{DateTime, NaiveDateTime, Utc};
     use serde::{self, de::Error, Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = format!("{}", date.format(date_format::FORMAT_MS));
-        serializer.serialize_str(&s)
-    }
+    date_serializer!(DateTime<Utc>, super::FORMAT_MS);
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     where
@@ -43,13 +49,7 @@ pub mod utc {
     use chrono::{DateTime, NaiveDateTime, Utc};
     use serde::{self, de::Error, Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = format!("{}", date.format(super::FORMAT));
-        serializer.serialize_str(&s)
-    }
+    date_serializer!(DateTime<Utc>, super::FORMAT);
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     where
@@ -65,13 +65,7 @@ pub mod local {
     use chrono::{DateTime, Local, NaiveDateTime};
     use serde::{self, de::Error, Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = format!("{}", date.format(super::FORMAT));
-        serializer.serialize_str(&s)
-    }
+    date_serializer!(DateTime<Local>, super::FORMAT_LOCAL);
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
     where
