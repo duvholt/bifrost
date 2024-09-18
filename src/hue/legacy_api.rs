@@ -304,6 +304,13 @@ pub struct ApiGroup {
     #[serde(rename = "type")]
     group_type: ApiGroupType,
     class: String,
+    recycle: bool,
+    sensors: Vec<Value>,
+    state: Value,
+    #[serde(skip_serializing_if = "Value::is_null", default)]
+    stream: Value,
+    #[serde(skip_serializing_if = "Value::is_null", default)]
+    locations: Value,
 }
 
 impl ApiGroup {
