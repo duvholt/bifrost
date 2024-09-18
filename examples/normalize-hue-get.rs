@@ -1,10 +1,13 @@
-#![allow(unused_variables)]
-
-use std::io::{stdin, Read};
+use std::{
+    fs::File,
+    io::{stdin, Read},
+};
 
 use bifrost::error::ApiResult;
 use bifrost::hue::api::ResourceRecord;
 
+use camino::Utf8PathBuf;
+use clap::Parser;
 use json_diff_ng::compare_serde_values;
 use serde_json::{de::IoRead, Deserializer, StreamDeserializer, Value};
 
@@ -35,7 +38,7 @@ fn extract<'a, R: Read + 'a>(
         .enumerate()
 }
 
-fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<()> {
+fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<bool> {
     let diffs = compare_serde_values(before, after, true, &[]).unwrap();
     let all_diffs = diffs.all_diffs();
 
@@ -43,7 +46,7 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<()> 
         .iter()
         .any(|x| x.1.values.map(|q| !false_positive(&q)).unwrap_or(true))
     {
-        return Ok(());
+        return Ok(true);
     }
 
     log::error!("Difference detected on {:?}", msg.obj.rtype());
@@ -75,17 +78,22 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<()> 
     }
     eprintln!();
 
-    Ok(())
+    Ok(false)
 }
 
-fn process_file(reader: impl Read) -> ApiResult<()> {
+fn process_file(reader: impl Read, name: &str, width: usize) -> ApiResult<()> {
     let stream = Deserializer::from_reader(reader).into_iter::<Value>();
 
+    let mut items = 0;
+    let mut errors = 0;
+
     for (index, obj) in extract(stream) {
+        items += 1;
         let before = obj;
         let data: Result<ResourceRecord, _> = serde_json::from_value(before.clone());
 
         let Ok(msg) = data else {
+            errors += 1;
             let err = data.unwrap_err();
             log::error!("Parse error {err:?} (object index {})", index);
             eprintln!("{}", &serde_json::to_string(&before)?);
@@ -94,10 +102,26 @@ fn process_file(reader: impl Read) -> ApiResult<()> {
 
         let after = serde_json::to_value(&msg)?;
 
-        compare(&before, &after, msg)?;
+        if !compare(&before, &after, msg)? {
+            errors += 1;
+        }
+    }
+
+    if errors > 0 {
+        log::warn!("{name:width$} | {items:5} items | {errors:5} errors");
+    } else {
+        log::info!("{name:width$} | {items:5} items OK");
     }
 
     Ok(())
+}
+
+#[derive(Parser, Debug)]
+#[command(about, long_about = None)]
+struct Args {
+    /// input files
+    #[arg(name = "files", default_values_t = [Utf8PathBuf::from("-")])]
+    files: Vec<Utf8PathBuf>,
 }
 
 fn main() -> ApiResult<()> {
@@ -106,7 +130,21 @@ fn main() -> ApiResult<()> {
         .parse_default_env()
         .init();
 
-    process_file(stdin())?;
+    let args = Args::parse();
+    let width = args
+        .files
+        .iter()
+        .map(|b| b.as_str().len().max(5))
+        .max()
+        .unwrap();
+
+    for file in args.files {
+        if file == "-" {
+            process_file(stdin(), "stdin", width)?;
+        } else {
+            process_file(File::open(&file)?, file.as_ref(), width)?;
+        }
+    }
 
     Ok(())
 }
