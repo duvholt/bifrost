@@ -258,7 +258,7 @@ pub struct ApiConfig {
     pub utc: DateTime<Utc>,
     #[serde(with = "date_format::legacy_local")]
     pub localtime: DateTime<Local>,
-    pub whitelist: HashMap<Uuid, Whitelist>,
+    pub whitelist: HashMap<String, Whitelist>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

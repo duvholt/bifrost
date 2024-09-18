@@ -103,7 +103,7 @@ impl AppState {
             gateway: self.conf.bridge.gateway,
             timezone: self.conf.bridge.timezone.clone(),
             whitelist: HashMap::from([(
-                username,
+                username.to_string(),
                 Whitelist {
                     create_date: Utc::now(),
                     last_use_date: Utc::now(),
