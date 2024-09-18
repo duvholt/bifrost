@@ -78,8 +78,7 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord) -> ApiResult<()> 
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> ApiResult<()> {
+fn main() -> ApiResult<()> {
     pretty_env_logger::formatted_builder()
         .filter_level(log::LevelFilter::Debug)
         .parse_default_env()
