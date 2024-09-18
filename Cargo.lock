@@ -308,6 +308,7 @@ dependencies = [
  "camino",
  "chrono",
  "clap",
+ "clap-stdin",
  "config",
  "der",
  "ecdsa",
@@ -443,6 +444,15 @@ checksum = "a8eb5e908ef3a6efbe1ed62520fb7287959888c88485abe072543190ecc66783"
 dependencies = [
  "clap_builder",
  "clap_derive",
+]
+
+[[package]]
+name = "clap-stdin"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "471df7896633bfc1e7d3da5b598422891e4cb8931210168ec63ea586e285803f"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]

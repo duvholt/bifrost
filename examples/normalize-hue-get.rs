@@ -1,14 +1,12 @@
-use std::{
-    fs::File,
-    io::{stdin, Read},
-};
+use std::io::Read;
 
-use bifrost::error::ApiResult;
 use bifrost::hue::api::ResourceRecord;
+use bifrost::{error::ApiResult, hue::legacy_api::ApiUserConfig};
 
-use camino::Utf8PathBuf;
 use clap::Parser;
+use clap_stdin::FileOrStdin;
 use json_diff_ng::compare_serde_values;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{de::IoRead, Deserializer, StreamDeserializer, Value};
 
 fn false_positive((a, b): &(&Value, &Value)) -> bool {
@@ -38,7 +36,7 @@ fn extract<'a, R: Read + 'a>(
         .enumerate()
 }
 
-fn compare(before: &Value, after: &Value, msg: ResourceRecord, report: bool) -> ApiResult<bool> {
+fn compare(before: &Value, after: &Value, report: bool) -> ApiResult<bool> {
     let diffs = compare_serde_values(before, after, true, &[]).unwrap();
     let all_diffs = diffs.all_diffs();
 
@@ -54,11 +52,11 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord, report: bool) -> 
         return Ok(false);
     }
 
-    log::error!("Difference detected on {:?}", msg.obj.rtype());
+    log::error!("Difference detected");
     eprintln!("--------------------------------------------------------------------------------");
     println!("{}", serde_json::to_string(before)?);
     eprintln!("--------------------------------------------------------------------------------");
-    println!("{}", serde_json::to_string(&msg)?);
+    println!("{}", serde_json::to_string(after)?);
     eprintln!("--------------------------------------------------------------------------------");
     for (d_type, d_path) in all_diffs {
         if let Some(ref ab) = d_path.values {
@@ -86,8 +84,16 @@ fn compare(before: &Value, after: &Value, msg: ResourceRecord, report: bool) -> 
     Ok(false)
 }
 
-fn process_file(reader: impl Read, name: &str, width: usize, report: bool) -> ApiResult<()> {
-    let stream = Deserializer::from_reader(reader).into_iter::<Value>();
+fn process_file<T>(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()>
+where
+    T: DeserializeOwned + Serialize + std::fmt::Debug,
+{
+    let name = if file.is_stdin() {
+        "<stdin>"
+    } else {
+        &file.filename().to_string()
+    };
+    let stream = Deserializer::from_reader(file.into_reader().unwrap()).into_iter::<Value>();
 
     let mut items = 0;
     let mut errors = 0;
@@ -95,19 +101,22 @@ fn process_file(reader: impl Read, name: &str, width: usize, report: bool) -> Ap
     for (index, obj) in extract(stream) {
         items += 1;
         let before = obj;
-        let data: Result<ResourceRecord, _> = serde_json::from_value(before.clone());
+        let data: Result<T, _> = serde_json::from_value(before.clone());
 
         let Ok(msg) = data else {
             errors += 1;
             let err = data.unwrap_err();
-            log::error!("{name:width$} | >> Parse error {err} (object index {})", index);
-            eprintln!("{}", &serde_json::to_string(&before)?);
+            log::error!(
+                "{name:width$} | >> Parse error {err} (object index {})",
+                index
+            );
+            /* eprintln!("{}", &serde_json::to_string(&before)?); */
             continue;
         };
 
         let after = serde_json::to_value(&msg)?;
 
-        if !compare(&before, &after, msg, report)? {
+        if !compare(&before, &after, report)? {
             errors += 1;
         }
     }
@@ -125,19 +134,23 @@ fn process_file(reader: impl Read, name: &str, width: usize, report: bool) -> Ap
 #[command(about, long_about = None)]
 struct Args {
     /// input files
-    #[arg(name = "files", default_values_t = [Utf8PathBuf::from("-")])]
-    files: Vec<Utf8PathBuf>,
+    #[arg(name = "files")]
+    files: Vec<FileOrStdin>,
 
     /// show only per-file summary
     #[arg(short, name = "report", default_value_t = false)]
     report: bool,
+
+    /// input is v1 api objects (default: v2)
+    #[arg(short = '1', name = "v1", default_value_t = false)]
+    v1: bool,
 }
 
 impl Args {
     pub fn longest_filename(&self) -> usize {
         self.files
             .iter()
-            .map(|b| b.as_str().len().max(5))
+            .map(|b| b.filename().len().max(5))
             .max()
             .unwrap_or(5)
     }
@@ -153,10 +166,10 @@ fn main() -> ApiResult<()> {
     let width = args.longest_filename();
 
     for file in args.files {
-        if file == "-" {
-            process_file(stdin(), "stdin", width, args.report)?;
+        if args.v1 {
+            process_file::<ApiUserConfig>(file, width, args.report)?;
         } else {
-            process_file(File::open(&file)?, file.as_ref(), width, args.report)?;
+            process_file::<ResourceRecord>(file, width, args.report)?;
         }
     }
 
