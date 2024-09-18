@@ -15,6 +15,20 @@ macro_rules! date_serializer {
     };
 }
 
+macro_rules! date_serializer_opt {
+    ($type:ty, $fmt:expr) => {
+        pub fn serialize<S>(date: &Option<$type>, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            match date {
+                Some(d) => serializer.serialize_str(&format!("{}", d.format($fmt))),
+                None => serializer.serialize_none(),
+            }
+        }
+    };
+}
+
 macro_rules! date_deserializer_utc {
     ($type:ty, $fmt:expr) => {
         pub fn deserialize<'de, D>(deserializer: D) -> Result<$type, D::Error>
@@ -41,6 +55,27 @@ macro_rules! date_deserializer_local {
             dt.and_local_timezone(Local)
                 .single()
                 .ok_or_else(|| Error::custom("Localtime conversion failed"))
+        }
+    };
+}
+
+macro_rules! date_deserializer_local_opt {
+    ($type:ty, $fmt:expr) => {
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<$type>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            use serde::{self, de::Error, Deserialize};
+            match Option::<String>::deserialize(deserializer)? {
+                None => Ok(None),
+                Some(s) => Ok(Some(
+                    chrono::NaiveDateTime::parse_from_str(&s, super::FORMAT_LOCAL)
+                        .map_err(Error::custom)?
+                        .and_local_timezone(Local)
+                        .single()
+                        .ok_or_else(|| Error::custom("Localtime conversion failed"))?,
+                )),
+            }
         }
     };
 }
@@ -78,6 +113,13 @@ pub mod local {
 
     date_serializer!(DateTime<Local>, super::FORMAT_LOCAL);
     date_deserializer_local!(DateTime<Local>, super::FORMAT_LOCAL);
+}
+
+pub mod local_opt {
+    use chrono::{DateTime, Local};
+
+    date_serializer_opt!(DateTime<Local>, super::FORMAT_LOCAL);
+    date_deserializer_local_opt!(DateTime<Local>, super::FORMAT_LOCAL);
 }
 
 #[cfg(test)]
