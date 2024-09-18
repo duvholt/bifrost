@@ -528,7 +528,18 @@ pub struct ApiResourceLink {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiRule {}
+pub struct ApiRule {
+    pub name: String,
+    pub recycle: bool,
+    pub status: String,
+    pub conditions: Vec<Value>,
+    pub actions: Vec<Value>,
+    pub owner: Uuid,
+    pub timestriggered: u32,
+    #[serde(with = "date_format::legacy_utc")]
+    pub created: DateTime<Utc>,
+    pub lasttriggered: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ApiSceneType {
