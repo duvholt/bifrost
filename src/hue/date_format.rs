@@ -29,6 +29,22 @@ macro_rules! date_deserializer_utc {
     };
 }
 
+macro_rules! date_deserializer_local {
+    ($type:ty, $fmt:expr) => {
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<$type, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            use serde::{self, de::Error, Deserialize};
+            let s = String::deserialize(deserializer)?;
+            let dt = chrono::NaiveDateTime::parse_from_str(&s, $fmt).map_err(Error::custom)?;
+            dt.and_local_timezone(Local)
+                .single()
+                .ok_or_else(|| Error::custom("Localtime conversion failed"))
+        }
+    };
+}
+
 pub mod utc_ms {
     use chrono::{DateTime, Utc};
 
@@ -58,21 +74,10 @@ pub mod utc {
 }
 
 pub mod local {
-    use chrono::{DateTime, Local, NaiveDateTime};
-    use serde::{self, de::Error, Deserialize, Deserializer};
+    use chrono::{DateTime, Local};
 
     date_serializer!(DateTime<Local>, super::FORMAT_LOCAL);
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let dt = NaiveDateTime::parse_from_str(&s, super::FORMAT_LOCAL).map_err(Error::custom)?;
-        dt.and_local_timezone(Local)
-            .single()
-            .ok_or_else(|| Error::custom("Localtime conversion failed"))
-    }
+    date_deserializer_local!(DateTime<Local>, super::FORMAT_LOCAL);
 }
 
 #[cfg(test)]
