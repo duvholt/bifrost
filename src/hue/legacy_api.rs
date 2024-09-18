@@ -355,6 +355,7 @@ pub struct ApiGroupState {
 pub enum LightColorMode {
     Ct,
     Xy,
+    Hs,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
