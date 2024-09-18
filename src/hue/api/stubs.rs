@@ -147,7 +147,7 @@ pub struct EntertainmentConfigurationLocations {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationServiceLocations {
-    pub equalization_factor: u32,
+    pub equalization_factor: f64,
     pub position: EntertainmentConfigurationPosition,
     pub positions: Vec<EntertainmentConfigurationPosition>,
     pub service: ResourceLink,
