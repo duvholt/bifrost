@@ -284,7 +284,8 @@ pub struct ApiGroupAction {
     xy: [f64; 2],
     ct: u32,
     alert: ApiAlert,
-    colormode: LightColorMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    colormode: Option<LightColorMode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -336,7 +337,7 @@ impl ApiGroup {
                 xy: [0.0, 0.0],
                 ct: 0,
                 alert: ApiAlert::None,
-                colormode: LightColorMode::Xy,
+                colormode: None,
             },
             class: "Bedroom".to_string(),
             group_type: ApiGroupType::Room,
@@ -373,7 +374,8 @@ pub struct ApiLightState {
     xy: [f64; 2],
     ct: u32,
     alert: String,
-    colormode: LightColorMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    colormode: Option<LightColorMode>,
     mode: String,
     reachable: bool,
 }
@@ -467,7 +469,7 @@ impl ApiLight {
                     .and_then(|ct| ct.mirek)
                     .unwrap_or_default(),
                 alert: String::new(),
-                colormode,
+                colormode: Some(colormode),
                 mode: "homeautomation".to_string(),
                 reachable: true,
             },
