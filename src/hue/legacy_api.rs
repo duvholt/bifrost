@@ -340,6 +340,11 @@ impl ApiGroup {
             },
             class: "Bedroom".to_string(),
             group_type: ApiGroupType::Room,
+            recycle: false,
+            sensors: vec![],
+            state: json!({}),
+            stream: Value::Null,
+            locations: Value::Null,
         }
     }
 }
