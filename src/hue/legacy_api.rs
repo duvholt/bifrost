@@ -670,7 +670,6 @@ pub struct ApiSensor {
     pub capabilities: Value,
 }
 
-#[allow(clippy::zero_sized_map_values)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiUserConfig {
     pub config: ApiConfig,
