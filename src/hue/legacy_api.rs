@@ -370,12 +370,18 @@ pub enum LightColorMode {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiLightState {
     on: bool,
-    bri: u32,
-    hue: u32,
-    sat: u32,
-    effect: String,
-    xy: [f64; 2],
-    ct: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bri: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hue: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sat: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xy: Option<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ct: Option<u32>,
     alert: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     colormode: Option<LightColorMode>,
@@ -454,23 +460,12 @@ impl ApiLight {
         Self {
             state: ApiLightState {
                 on: light.on.on,
-                bri: light
-                    .dimming
-                    .map(|dim| (dim.brightness * 2.54) as u32)
-                    .unwrap_or_default(),
-                hue: 0,
-                sat: 0,
-                effect: String::new(),
-                xy: light
-                    .color
-                    .clone()
-                    .map(|col| col.xy.into())
-                    .unwrap_or_default(),
-                ct: light
-                    .color_temperature
-                    .clone()
-                    .and_then(|ct| ct.mirek)
-                    .unwrap_or_default(),
+                bri: light.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                hue: None,
+                sat: None,
+                effect: None,
+                xy: light.color.clone().map(|col| col.xy.into()),
+                ct: light.color_temperature.clone().and_then(|ct| ct.mirek),
                 alert: String::new(),
                 colormode: Some(colormode),
                 mode: "homeautomation".to_string(),
