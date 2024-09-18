@@ -516,7 +516,16 @@ impl ApiLight {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiResourceLink {}
+pub struct ApiResourceLink {
+    #[serde(rename = "type")]
+    pub link_type: String,
+    pub name: String,
+    pub description: String,
+    pub classid: u32,
+    pub owner: Uuid,
+    pub recycle: bool,
+    pub links: Vec<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiRule {}
