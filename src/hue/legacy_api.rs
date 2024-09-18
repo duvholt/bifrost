@@ -626,7 +626,25 @@ impl ApiScene {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiSchedule {}
+pub struct ApiSchedule {
+    pub recycle: bool,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub autodelete: Option<bool>,
+    pub description: String,
+    pub command: Value,
+    #[serde(with = "date_format::legacy_utc")]
+    pub created: DateTime<Utc>,
+    #[serde(
+        with = "date_format::legacy_utc_opt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub starttime: Option<DateTime<Utc>>,
+    pub time: String,
+    pub localtime: String,
+    pub status: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiSensor {}
