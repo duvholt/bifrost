@@ -1,39 +1,38 @@
-use std::io::Read;
+use std::collections::HashMap;
 
+use bifrost::error::ApiResult;
 use bifrost::hue::api::ResourceRecord;
-use bifrost::{error::ApiResult, hue::legacy_api::ApiUserConfig};
+use bifrost::hue::legacy_api::{ApiConfig, ApiGroup, ApiLight, ApiResourceLink, ApiRule, ApiScene, ApiSchedule, ApiSensor};
 
 use clap::Parser;
 use clap_stdin::FileOrStdin;
 use json_diff_ng::compare_serde_values;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::{de::IoRead, Deserializer, StreamDeserializer, Value};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_json::{Deserializer, Value};
 
 fn false_positive((a, b): &(&Value, &Value)) -> bool {
     a.is_number() && b.is_number() && a.as_f64() == b.as_f64()
 }
 
-/*
- * Handle both "raw" hue bridge dumps, and the "linedump" format that is
- * generally easier to work with.
- *
- * For each element in the input, if it is an object, look for a ".data" array,
- * and if found, iterate over that. Otherwise, assume the whole object is what
- * we are parsing.
- */
-fn extract<'a, R: Read + 'a>(
-    stream: StreamDeserializer<'a, IoRead<R>, Value>,
-) -> impl Iterator<Item = (usize, Value)> + 'a {
-    stream
-        .flat_map(|val| {
-            val.as_ref()
-                .unwrap()
-                .as_object()
-                .and_then(|obj| obj.get("data"))
-                .map(|data| data.as_array().unwrap().to_owned())
-                .unwrap_or_else(|| vec![val.unwrap()])
-        })
-        .enumerate()
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum Input {
+    V1 {
+        config: Value,
+        groups: HashMap<String, Value>,
+        lights: HashMap<String, Value>,
+        resourcelinks: HashMap<String, Value>,
+        rules: HashMap<String, Value>,
+        scenes: HashMap<String, Value>,
+        schedules: HashMap<String, Value>,
+        sensors: HashMap<String, Value>,
+    },
+    V2 {
+        errors: Vec<Value>,
+        data: Vec<Value>,
+    },
+    V2Flat(Value),
 }
 
 fn compare(before: &Value, after: &Value, report: bool) -> ApiResult<bool> {
@@ -84,10 +83,83 @@ fn compare(before: &Value, after: &Value, report: bool) -> ApiResult<bool> {
     Ok(false)
 }
 
-fn process_file<T>(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()>
-where
-    T: DeserializeOwned + Serialize + std::fmt::Debug,
-{
+pub struct Normalizer<'a> {
+    name: &'a str,
+    items: usize,
+    errors: usize,
+    width: usize,
+    index: usize,
+    report: bool,
+}
+
+impl<'a> Normalizer<'a> {
+    pub fn new(name: &'a str, width: usize, report: bool) -> Self {
+        Self {
+            name,
+            index: 0,
+            items: 0,
+            errors: 0,
+            width,
+            report,
+        }
+    }
+
+    pub fn error(&mut self) {
+        self.errors += 1;
+    }
+
+    pub fn parse<T>(&mut self, obj: Value) -> ApiResult<T>
+    where
+        T: DeserializeOwned + std::fmt::Debug,
+    {
+        let data: Result<T, _> = serde_json::from_value(obj);
+        Ok(data.inspect_err(|err| {
+            self.errors += 1;
+            log::error!(
+                "{name:width$} | >> Parse error {err} (object index {index})",
+                name = self.name,
+                width = self.width,
+                index = self.index
+            );
+            /* eprintln!("{}", &serde_json::to_string(&before)?); */
+        })?)
+    }
+
+    fn roundtrip<T>(&mut self, item: &Value) -> ApiResult<()>
+    where
+        T: Serialize + DeserializeOwned + std::fmt::Debug,
+    {
+        let value = self.parse::<T>(item.clone())?;
+        self.items += 1;
+        let after = serde_json::to_value(&value)?;
+
+        if !compare(&item, &after, self.report)? {
+            self.errors += 1;
+        }
+        Ok(())
+    }
+
+    fn test<T>(&mut self, item: &Value)
+    where
+        T: Serialize + DeserializeOwned + std::fmt::Debug,
+    {
+        let _ = self.roundtrip::<T>(item);
+    }
+
+    pub fn summary(&self) {
+        let errors = self.errors;
+        let items = self.items;
+        let name = self.name;
+        let width = self.width;
+        if errors > 0 {
+            log::error!("{name:width$} | {items:5} items | {errors:5} errors |");
+        } else {
+            log::info!("{name:width$} | {items:5} items |           OK |");
+        }
+    }
+}
+
+fn process_file(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()> {
     let name = if file.is_stdin() {
         "<stdin>"
     } else {
@@ -95,37 +167,63 @@ where
     };
     let stream = Deserializer::from_reader(file.into_reader().unwrap()).into_iter::<Value>();
 
-    let mut items = 0;
-    let mut errors = 0;
+    let mut nml = Normalizer::new(name, width, report);
 
-    for (index, obj) in extract(stream) {
-        items += 1;
-        let before = obj;
-        let data: Result<T, _> = serde_json::from_value(before.clone());
+    for obj in stream {
+        let obj = obj?;
 
-        let Ok(msg) = data else {
-            errors += 1;
-            let err = data.unwrap_err();
-            log::error!(
-                "{name:width$} | >> Parse error {err} (object index {})",
-                index
-            );
-            /* eprintln!("{}", &serde_json::to_string(&before)?); */
+        let Ok(msg) = nml.parse::<Input>(obj) else {
             continue;
         };
 
-        let after = serde_json::to_value(&msg)?;
+        match msg {
+            Input::V1 {
+                config,
+                groups,
+                lights,
+                resourcelinks,
+                rules,
+                scenes,
+                schedules,
+                sensors,
+            } => {
+                nml.test::<ApiConfig>(&config);
 
-        if !compare(&before, &after, report)? {
-            errors += 1;
+                for item in groups.values() {
+                    nml.test::<ApiGroup>(item);
+                }
+                for item in lights.values() {
+                    nml.test::<ApiLight>(item);
+                }
+                for item in resourcelinks.values() {
+                    nml.test::<ApiResourceLink>(item);
+                }
+                for item in rules.values() {
+                    nml.test::<ApiRule>(item);
+                }
+                for item in scenes.values() {
+                    nml.test::<ApiScene>(item);
+                }
+                for item in schedules.values() {
+                    nml.test::<ApiSchedule>(item);
+                }
+                for item in sensors.values() {
+                    nml.test::<ApiSensor>(item);
+                }
+            }
+            Input::V2 { data, .. } => {
+                /* log::info!("v2 detected"); */
+                for item in data {
+                    nml.test::<ResourceRecord>(&item);
+                }
+            }
+            Input::V2Flat(item) => {
+                nml.test::<ResourceRecord>(&item);
+            }
         }
     }
 
-    if errors > 0 {
-        log::warn!("{name:width$} | {items:5} items | {errors:5} errors |");
-    } else {
-        log::info!("{name:width$} | {items:5} items |           OK |");
-    }
+    nml.summary();
 
     Ok(())
 }
@@ -140,10 +238,6 @@ struct Args {
     /// show only per-file summary
     #[arg(short, name = "report", default_value_t = false)]
     report: bool,
-
-    /// input is v1 api objects (default: v2)
-    #[arg(short = '1', name = "v1", default_value_t = false)]
-    v1: bool,
 }
 
 impl Args {
@@ -166,11 +260,7 @@ fn main() -> ApiResult<()> {
     let width = args.longest_filename();
 
     for file in args.files {
-        if args.v1 {
-            process_file::<ApiUserConfig>(file, width, args.report)?;
-        } else {
-            process_file::<ResourceRecord>(file, width, args.report)?;
-        }
+        process_file(file, width, args.report)?;
     }
 
     Ok(())
