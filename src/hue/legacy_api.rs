@@ -44,16 +44,16 @@ pub struct ApiShortConfig {
 impl Default for ApiShortConfig {
     fn default() -> Self {
         Self {
-            apiversion: "1.66.0".to_string(),
+            apiversion: "1.67.0".to_string(),
             bridgeid: "0000000000000000".to_string(),
-            datastoreversion: "163".to_string(),
+            datastoreversion: "126".to_string(),
             factorynew: false,
             mac: MacAddress::default(),
             modelid: crate::hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
             name: "Bifrost Bridge".to_string(),
             replacesbridgeid: None,
             starterkitid: String::new(),
-            swversion: "1966060010".to_string(),
+            swversion: "1967054020".to_string(),
         }
     }
 }
