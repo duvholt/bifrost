@@ -445,10 +445,6 @@ impl Client {
     }
 
     async fn handle_device_message(&mut self, msg: RawMessage) -> ApiResult<()> {
-        if msg.topic.contains('/') {
-            return Ok(());
-        }
-
         let Some(ref val) = self.map.get(&msg.topic).copied() else {
             if !self.ignore.contains(&msg.topic) {
                 log::warn!(
