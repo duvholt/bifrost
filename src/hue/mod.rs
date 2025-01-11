@@ -7,6 +7,8 @@ pub mod legacy_api;
 pub mod scene_icons;
 
 pub const HUE_BRIDGE_V2_MODEL_ID: &str = "BSB002";
+pub const HUE_BRIDGE_V2_DEFAULT_SWVERSION: u64 = 1_968_096_020;
+pub const HUE_BRIDGE_V2_DEFAULT_APIVERSION: &str = "1.68.0";
 
 #[must_use]
 pub fn best_guess_timezone() -> String {
