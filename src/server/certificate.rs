@@ -27,22 +27,7 @@ use x509_cert::time::Validity;
 use x509_cert::Certificate;
 
 use crate::error::{ApiError, ApiResult};
-
-#[must_use]
-pub fn hue_bridge_id_raw(mac: MacAddress) -> [u8; 8] {
-    let b = mac.bytes();
-    [b[0], b[1], b[2], 0xFF, 0xFE, b[3], b[4], b[5]]
-}
-
-#[must_use]
-#[allow(clippy::format_collect)]
-pub fn hue_bridge_id(mac: MacAddress) -> String {
-    let bytes = hue_bridge_id_raw(mac);
-    bytes
-        .into_iter()
-        .map(|b| format!("{b:02x}"))
-        .collect::<String>()
-}
+use crate::hue;
 
 /// Generate a self-signed X509 certificate, closely matching the type and style
 /// used by a real Philips Hue bridge.
@@ -68,14 +53,14 @@ pub fn hue_bridge_id(mac: MacAddress) -> String {
 pub fn generate(secret_key: &p256::SecretKey, mac: MacAddress) -> ApiResult<CertificateInner> {
     let public_key = secret_key.public_key();
 
-    let bridge_id = hue_bridge_id(mac);
+    let bridge_id = hue::bridge_id(mac);
 
     let subject = Name::from_str(&format!("CN={bridge_id},O=Philips Hue,C=NL"))?;
 
     /* self-signed certificate, so subject == issuer */
     let issuer = subject.clone();
 
-    let serial_number = SerialNumber::new(&hue_bridge_id_raw(mac))?;
+    let serial_number = SerialNumber::new(&hue::bridge_id_raw(mac))?;
 
     /* Philips Hue seems to start their certificates at the beginning of 2017.. */
     let not_before = GeneralizedTime::from_date_time(DateTime::new(2017, 1, 1, 0, 0, 0)?).into();
@@ -168,7 +153,7 @@ pub fn generate_and_save(certpath: &Utf8Path, mac: MacAddress) -> ApiResult<()> 
 
 pub fn check_certificate(certpath: &Utf8Path, mac: MacAddress) -> ApiResult<()> {
     let cn = extract_common_name(File::open(certpath)?)?;
-    let id = hue_bridge_id(mac);
+    let id = hue::bridge_id(mac);
     match cn {
         Some(cn) => {
             if cn == id {

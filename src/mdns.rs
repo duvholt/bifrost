@@ -5,7 +5,6 @@ use mdns_sd::{ServiceDaemon, ServiceInfo};
 
 use crate::error::ApiResult;
 use crate::hue;
-use crate::server::certificate;
 
 pub fn register_mdns(mac: MacAddress, ip: Ipv4Addr) -> ApiResult<ServiceDaemon> {
     /* Create a new mDNS daemon. */
@@ -24,7 +23,7 @@ pub fn register_mdns(mac: MacAddress, ip: Ipv4Addr) -> ApiResult<ServiceDaemon> 
 
     let properties = [
         ("modelid", hue::HUE_BRIDGE_V2_MODEL_ID),
-        ("bridgeid", &certificate::hue_bridge_id(mac)),
+        ("bridgeid", &hue::bridge_id(mac)),
     ];
 
     let service_info = ServiceInfo::new(

@@ -55,7 +55,7 @@ impl AppState {
         } else {
             log::debug!("No state file found, initializing..");
             res = Resources::new(State::new());
-            res.init(&server::certificate::hue_bridge_id(config.bridge.mac))?;
+            res.init(&hue::bridge_id(config.bridge.mac))?;
         }
 
         let conf = Arc::new(config);
