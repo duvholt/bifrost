@@ -1,6 +1,7 @@
 pub mod appstate;
 pub mod banner;
 pub mod certificate;
+pub mod updater;
 
 use std::fs::File;
 use std::io::Write;
