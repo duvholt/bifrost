@@ -5,6 +5,7 @@ pub mod date_format;
 pub mod event;
 pub mod legacy_api;
 pub mod scene_icons;
+pub mod version;
 
 pub const HUE_BRIDGE_V2_MODEL_ID: &str = "BSB002";
 pub const HUE_BRIDGE_V2_DEFAULT_SWVERSION: u64 = 1_968_096_020;
