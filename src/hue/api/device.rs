@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hue::api::{Metadata, RType, ResourceLink};
+use crate::hue::version::SwVersion;
+use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
 use crate::z2m;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,14 +33,14 @@ impl DeviceProductData {
     const SIGNIFY_MANUFACTURER_NAME: &'static str = "Signify Netherlands B.V.";
 
     #[must_use]
-    pub fn hue_bridge_v2() -> Self {
+    pub fn hue_bridge_v2(version: &SwVersion) -> Self {
         Self {
             certified: true,
             manufacturer_name: Self::SIGNIFY_MANUFACTURER_NAME.to_string(),
-            model_id: "BSB002".to_string(),
+            model_id: HUE_BRIDGE_V2_MODEL_ID.to_string(),
             product_archetype: DeviceArchetype::BridgeV2,
             product_name: "Hue Bridge".to_string(),
-            software_version: "1.66.1966060010".to_string(),
+            software_version: version.get_apiversion(),
         }
     }
 

@@ -28,7 +28,7 @@ use crate::{
 };
 
 async fn get_api_config(State(state): State<AppState>) -> impl IntoResponse {
-    Json(state.api_short_config())
+    Json(state.api_short_config().await)
 }
 
 async fn post_api(bytes: Bytes) -> ApiResult<impl IntoResponse> {
@@ -108,7 +108,7 @@ async fn get_api_user(
     let lock = state.res.lock().await;
 
     Ok(Json(ApiUserConfig {
-        config: state.api_config(username),
+        config: state.api_config(username).await,
         groups: get_groups(&lock)?,
         lights: get_lights(&lock)?,
         resourcelinks: HashMap::new(),
@@ -125,7 +125,7 @@ async fn get_api_user_resource(
 ) -> ApiResult<Json<Value>> {
     let lock = &state.res.lock().await;
     match resource {
-        ApiResourceType::Config => Ok(Json(json!(state.api_config(username)))),
+        ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await))),
         ApiResourceType::Lights => Ok(Json(json!(get_lights(lock)?))),
         ApiResourceType::Groups => Ok(Json(json!(get_groups(lock)?))),
         ApiResourceType::Scenes => Ok(Json(json!(get_scenes(&username, lock)?))),

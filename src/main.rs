@@ -104,7 +104,7 @@ async fn run() -> ApiResult<()> {
     let config = config::parse("config.yaml".into())?;
     log::debug!("Configuration loaded successfully");
 
-    let appstate = AppState::from_config(config)?;
+    let appstate = AppState::from_config(config).await?;
 
     let mut tasks = build_tasks(appstate).await?;
 

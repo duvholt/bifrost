@@ -15,12 +15,14 @@ use crate::hue::api::{
 };
 use crate::hue::api::{GroupedLightUpdate, LightUpdate, SceneUpdate, Update};
 use crate::hue::event::EventBlock;
+use crate::hue::version::SwVersion;
 use crate::model::state::{AuxData, State};
 use crate::z2m::request::ClientRequest;
 
 #[derive(Clone, Debug)]
 pub struct Resources {
     state: State,
+    version: SwVersion,
     state_updates: Arc<Notify>,
     pub hue_updates: Sender<EventBlock>,
     pub z2m_updates: Sender<Arc<ClientRequest>>,
@@ -31,9 +33,10 @@ impl Resources {
 
     #[allow(clippy::new_without_default)]
     #[must_use]
-    pub fn new(state: State) -> Self {
+    pub fn new(version: SwVersion, state: State) -> Self {
         Self {
             state,
+            version,
             state_updates: Arc::new(Notify::new()),
             hue_updates: Sender::new(32),
             z2m_updates: Sender::new(32),
@@ -194,7 +197,7 @@ impl Resources {
         let link_zbc = RType::ZigbeeConnectivity.deterministic(link_bridge.rid);
 
         let bridge_dev = Device {
-            product_data: DeviceProductData::hue_bridge_v2(),
+            product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost"),
             services: vec![link_bridge, link_zbdd, link_zbc],
         };
@@ -206,7 +209,7 @@ impl Resources {
         };
 
         let bridge_home_dev = Device {
-            product_data: DeviceProductData::hue_bridge_v2(),
+            product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost Bridge Home"),
             services: vec![link_bridge],
         };
