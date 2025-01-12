@@ -62,7 +62,7 @@ impl SwVersion {
     ///
     /// Legacy version is constructed from the version number.
     ///
-    /// ```
+    /// ```text
     /// Example:
     ///   1968096020
     ///
