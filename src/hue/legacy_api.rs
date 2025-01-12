@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
+use crate::hue::version::SwVersion;
 use crate::hue::{self, api, best_guess_timezone};
 use crate::resource::Resources;
 
@@ -54,6 +55,19 @@ impl Default for ApiShortConfig {
             replacesbridgeid: None,
             starterkitid: String::new(),
             swversion: hue::HUE_BRIDGE_V2_DEFAULT_SWVERSION.to_string(),
+        }
+    }
+}
+
+impl ApiShortConfig {
+    #[must_use]
+    pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
+        Self {
+            bridgeid: hue::bridge_id(mac),
+            apiversion: version.get_legacy_apiversion(),
+            swversion: version.get_apiversion(),
+            mac,
+            ..Self::default()
         }
     }
 }
