@@ -339,7 +339,7 @@ impl Resources {
     }
 
     fn make_resource_record(&self, id: &Uuid, res: &Resource) -> ResourceRecord {
-        ResourceRecord::new(*id, self.id_v1_scope(id, res), res)
+        ResourceRecord::new(*id, self.id_v1_scope(id, res), res.clone())
     }
 
     pub fn get_resource(&self, ty: RType, id: &Uuid) -> ApiResult<ResourceRecord> {
