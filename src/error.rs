@@ -78,6 +78,9 @@ pub enum ApiError {
     #[error(transparent)]
     P256Pkcs8Error(#[from] p256::pkcs8::Error),
 
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
+
     /* zigbee2mqtt errors */
     #[error("Unexpected eof on z2m socket")]
     UnexpectedZ2mEof,
@@ -101,6 +104,9 @@ pub enum ApiError {
 
     #[error("Resource {0} not found")]
     NotFound(Uuid),
+
+    #[error("Failed to get firmware version reply from update server")]
+    NoUpdateInformation,
 
     #[error("Resource type wrong: expected {0:?} but found {1:?}")]
     WrongType(RType, RType),
