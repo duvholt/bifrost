@@ -48,7 +48,13 @@ impl SwVersion {
 
     #[must_use]
     pub fn get_legacy_apiversion(&self) -> String {
-        self.name.to_string()
+        let version = format!("{:05}", self.version);
+        format!("{}.{}.0", &version[0..1], &version[2..4])
+    }
+
+    #[must_use]
+    pub fn get_legacy_swversion(&self) -> String {
+        format!("{}", &self.version)
     }
 
     #[must_use]
@@ -65,7 +71,7 @@ impl SwVersion {
     ///   1.68.1968096020
     ///     ^^^^^^^^^^ append whole version number at the end
     /// ```
-    pub fn get_apiversion(&self) -> String {
+    pub fn get_software_version(&self) -> String {
         let version = format!("{:05}", self.version);
         format!("{}.{}.{}", &version[0..1], &version[2..4], version)
     }

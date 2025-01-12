@@ -65,7 +65,7 @@ impl ApiShortConfig {
         Self {
             bridgeid: hue::bridge_id(mac),
             apiversion: version.get_legacy_apiversion(),
-            swversion: version.get_apiversion(),
+            swversion: version.get_legacy_swversion(),
             mac,
             ..Self::default()
         }

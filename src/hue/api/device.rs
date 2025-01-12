@@ -40,7 +40,7 @@ impl DeviceProductData {
             model_id: HUE_BRIDGE_V2_MODEL_ID.to_string(),
             product_archetype: DeviceArchetype::BridgeV2,
             product_name: "Hue Bridge".to_string(),
-            software_version: version.get_apiversion(),
+            software_version: version.get_software_version(),
         }
     }
 
