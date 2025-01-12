@@ -43,6 +43,12 @@ impl Resources {
         }
     }
 
+    pub fn update_bridge_version(&mut self, version: SwVersion) {
+        self.version = version;
+        self.state.patch_bridge_version(&self.version);
+        self.state_updates.notify_one();
+    }
+
     pub fn read(&mut self, rdr: impl Read) -> ApiResult<()> {
         self.state = State::from_reader(rdr)?;
         Ok(())
