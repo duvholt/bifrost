@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::response::{IntoResponse, Response};
 use axum::Router;
 use hue::error::HueError;
@@ -76,4 +77,5 @@ pub fn router(appstate: AppState) -> Router<()> {
         .nest("/clip/v2/resource", clip::router())
         .nest("/eventstream", eventstream::router())
         .with_state(appstate)
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
 }
