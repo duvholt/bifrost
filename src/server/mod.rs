@@ -21,7 +21,7 @@ use camino::Utf8PathBuf;
 use hyper::body::Incoming;
 use tokio::select;
 use tokio::sync::Mutex;
-use tokio::time::sleep_until;
+use tokio::time::{sleep_until, MissedTickBehavior};
 use tower::Layer;
 use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 use tower_http::trace::TraceLayer;
@@ -30,7 +30,8 @@ use tracing::{info_span, Span};
 use crate::error::ApiResult;
 use crate::resource::Resources;
 use crate::routes;
-use appstate::AppState;
+use crate::server::appstate::AppState;
+use crate::server::updater::VersionUpdater;
 
 fn trace_layer_on_response(response: &Response<Body>, latency: Duration, span: &Span) {
     span.record(
@@ -132,5 +133,31 @@ pub async fn config_writer(res: Arc<Mutex<Resources>>, filename: Utf8PathBuf) ->
         std::fs::rename(&tmp, &filename)?;
 
         old_state = new_state;
+    }
+}
+
+#[allow(clippy::significant_drop_tightening)]
+pub async fn version_updater(
+    res: Arc<Mutex<Resources>>,
+    upd: Arc<Mutex<VersionUpdater>>,
+) -> ApiResult<()> {
+    const INTERVAL: Duration = Duration::from_secs(60);
+    let mut interval = tokio::time::interval(INTERVAL);
+    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+    let mut version = upd.lock().await.get().await.clone();
+
+    res.lock().await.update_bridge_version(version.clone());
+
+    loop {
+        interval.tick().await;
+
+        let mut lock = upd.lock().await;
+        let new_version = lock.get().await;
+        if new_version != &version {
+            log::info!("New version detected! Patching state database with new version numbers..");
+            version.clone_from(new_version);
+            res.lock().await.update_bridge_version(version.clone());
+        }
     }
 }
