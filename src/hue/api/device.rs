@@ -67,7 +67,7 @@ impl DeviceProductData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceArchetype {
     BridgeV2,
