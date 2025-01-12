@@ -81,6 +81,10 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
         tls_config,
     ));
     tasks.spawn(server::config_writer(appstate.res.clone(), state_file));
+    tasks.spawn(server::version_updater(
+        appstate.res.clone(),
+        appstate.updater(),
+    ));
 
     for (name, server) in &appstate.config().z2m.servers {
         let client = z2m::Client::new(
