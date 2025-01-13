@@ -157,9 +157,12 @@ pub struct Config {
     pub advanced: ConfigAdvanced,
     #[serde(default)]
     pub availability: Value,
+    #[serde(default)]
+    pub version: Value,
     pub blocklist: Vec<Option<Value>>,
     pub device_options: Value,
     pub devices: HashMap<String, Value>,
+    #[serde(default)]
     pub external_converters: Vec<Option<Value>>,
     pub frontend: Value,
     pub groups: HashMap<String, GroupValue>,
