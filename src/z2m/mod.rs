@@ -400,6 +400,7 @@ impl Client {
             Message::BridgeEvent(ref obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeDefinitions(ref obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeState(ref obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeConverters(ref obj) => { /* println!("{obj:#?}"); */ }
 
             Message::BridgeDevices(ref obj) => {
                 for dev in obj {

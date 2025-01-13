@@ -63,6 +63,9 @@ async fn main() -> ApiResult<()> {
                 Message::BridgeEvent(ref obj) => {
                     println!("{obj:#?}");
                 },
+                Message::BridgeConverters(ref obj) => {
+                    println!("{obj:#?}");
+                },
             }
 
             continue;

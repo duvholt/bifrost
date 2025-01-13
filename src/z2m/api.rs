@@ -41,6 +41,9 @@ pub enum Message {
 
     #[serde(rename = "bridge/extensions")]
     BridgeExtensions(Value),
+
+    #[serde(rename = "bridge/converters")]
+    BridgeConverters(Value),
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]
