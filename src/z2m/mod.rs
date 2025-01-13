@@ -685,22 +685,21 @@ impl Client {
         }
     }
 
-    fn sanitize_url(url: &str) -> String {
-        match url.find("token=") {
-            Some(offset) => {
-                format!("{}token={}", &url[..offset], "x".repeat(url.len() - offset))
-            }
-            None => url.to_string()
-        }
-    }
-
     pub async fn run_forever(mut self) -> ApiResult<()> {
         let mut chan = self.state.lock().await.z2m_channel();
+
         // let's not include auth tokens in log output
-        let sanitized_url = Self::sanitize_url(&self.server.url);
+        let sanitized_url = self.server.get_sanitized_url();
+        let url = self.server.get_url();
+
+        if url != self.server.url {
+            log::info!("[{}] Rewrote url for compatibility with z2m 2.x.", self.name);
+            log::info!("[{}] Consider updating websocket url to {}", self.name, sanitized_url);
+        }
+
         loop {
             log::info!("[{}] Connecting to {}", self.name, &sanitized_url);
-            match connect_async(&self.server.url).await {
+            match connect_async(url.as_str()).await {
                 Ok((socket, _)) => {
                     let res = self.event_loop(&mut chan, socket).await;
                     if let Err(err) = res {
