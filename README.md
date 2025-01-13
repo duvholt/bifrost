@@ -14,10 +14,13 @@ Questions, feedback, comments? Join us on discord
 
 ## Installation guide
 
-There are currently two ways you can install Bifrost.
+There are currently three ways you can install Bifrost:
 
-1.  [Install manualy](#manual) from source (for now, this is the preferred method)
-2.  [Install it via Docker](#docker) (still WIP, some aspects may not be optimal for now)
+1.  [Install manually](#manual) from source (recommended)
+2.  [Install it via Docker](#docker) for container-based deployment.
+3.  Install as Home Assistant Add-on. Please see the
+    [bifrost-hassio](https://github.com/chrivers/bifrost-hassio) project for
+    more information.
 
 ### Manual
 
