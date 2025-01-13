@@ -172,7 +172,6 @@ pub struct Config {
     pub mqtt: Value,
     pub ota: Value,
     pub passlist: Vec<Option<Value>>,
-    pub permit_join: bool,
     pub serial: ConfigSerial,
 }
 
@@ -202,10 +201,6 @@ pub struct Coordinator {
 pub struct ConfigAdvanced {
     pub adapter_concurrent: Option<Value>,
     pub adapter_delay: Option<Value>,
-    pub availability_blacklist: Vec<Value>,
-    pub availability_blocklist: Vec<Value>,
-    pub availability_passlist: Vec<Value>,
-    pub availability_whitelist: Vec<Value>,
     pub cache_state: bool,
     pub cache_state_persistent: bool,
     pub cache_state_send_on_startup: bool,
@@ -214,8 +209,6 @@ pub struct ConfigAdvanced {
     pub ext_pan_id: Vec<i64>,
     pub homeassistant_legacy_entity_attributes: Option<bool>,
     pub last_seen: String,
-    pub legacy_api: bool,
-    pub legacy_availability_payload: bool,
     pub log_debug_namespace_ignore: String,
     pub log_debug_to_mqtt_frontend: bool,
     pub log_directory: String,
@@ -228,8 +221,6 @@ pub struct ConfigAdvanced {
     pub log_syslog: Value,
     pub output: String,
     pub pan_id: i64,
-    pub report: bool,
-    pub soft_reset_timeout: i64,
     pub timestamp_format: String,
 }
 
@@ -256,8 +247,6 @@ pub struct ConfigSerial {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigHomeassistant {
     pub discovery_topic: String,
-    pub legacy_entity_attributes: bool,
-    pub legacy_triggers: bool,
     pub status_topic: String,
 }
 
