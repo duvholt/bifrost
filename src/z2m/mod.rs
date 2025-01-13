@@ -684,10 +684,21 @@ impl Client {
         }
     }
 
+    fn sanitize_url(url: &str) -> String {
+        match url.find("token=") {
+            Some(offset) => {
+                format!("{}token={}", &url[..offset], "x".repeat(url.len() - offset))
+            }
+            None => url.to_string()
+        }
+    }
+
     pub async fn run_forever(mut self) -> ApiResult<()> {
         let mut chan = self.state.lock().await.z2m_channel();
+        // let's not include auth tokens in log output
+        let sanitized_url = Self::sanitize_url(&self.server.url);
         loop {
-            log::info!("[{}] Connecting to {}", self.name, self.server.url);
+            log::info!("[{}] Connecting to {}", self.name, &sanitized_url);
             match connect_async(&self.server.url).await {
                 Ok((socket, _)) => {
                     let res = self.event_loop(&mut chan, socket).await;
