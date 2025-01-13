@@ -4,6 +4,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use config::{Config, ConfigError};
 use mac_address::MacAddress;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::hue::api::RoomArchetype;
 
@@ -33,7 +34,7 @@ pub struct Z2mConfig {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Z2mServer {
-    pub url: String,
+    pub url: Url,
     pub group_prefix: Option<String>,
 }
 
@@ -50,6 +51,54 @@ pub struct AppConfig {
     pub bifrost: BifrostConfig,
     #[serde(default)]
     pub rooms: HashMap<String, RoomConfig>,
+}
+
+impl Z2mServer {
+    pub fn get_url(&self) -> Url {
+        let mut url = self.url.clone();
+        // z2m version 1.x allows both / and /api as endpoints for the
+        // websocket, but version 2.x only allows /api. By adding /api (if
+        // missing), we ensure compatibility with both versions.
+        if !url.path().ends_with("/api") {
+            if let Ok(mut path) = url.path_segments_mut() {
+                path.push("api");
+            }
+        }
+
+        // z2m version 2.x requires an auth token on the websocket. If one is
+        // not specified in the z2m configuration, the literal string
+        // `your-secret-token` is used!
+        //
+        // To be compatible, we mirror this behavior here. If "token" is set
+        // manually by the user, we do nothing.
+        if !url.query_pairs().any(|(key, _)| key == "token") {
+            url.query_pairs_mut()
+                .append_pair("token", "your-secret-token");
+        }
+
+        url
+    }
+
+    fn sanitize_url(url: &str) -> String {
+        match url.find("token=") {
+            Some(offset) => {
+                let token = &url[offset + "token=".len()..];
+                if token == "your-secret-token" {
+                    // this is the standard "blank" token, it's safe to show
+                    url.to_string()
+                } else {
+                    // this is an actual secret token, blank it out with a
+                    // standard-length placeholder.
+                    format!("{}token={}", &url[..offset], "<<REDACTED>>")
+                }
+            }
+            None => url.to_string(),
+        }
+    }
+
+    pub fn get_sanitized_url(&self) -> String {
+        Self::sanitize_url(self.get_url().as_str())
+    }
 }
 
 pub fn parse(filename: &Utf8Path) -> Result<AppConfig, ConfigError> {
