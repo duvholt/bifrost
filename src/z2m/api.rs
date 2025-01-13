@@ -158,7 +158,7 @@ pub struct Config {
     #[serde(default)]
     pub availability: Value,
     pub blocklist: Vec<Option<Value>>,
-    pub device_options: ConfigDeviceOptions,
+    pub device_options: Value,
     pub devices: HashMap<String, Value>,
     pub external_converters: Vec<Option<Value>>,
     pub frontend: Value,
@@ -256,11 +256,6 @@ pub struct ConfigHomeassistant {
     pub legacy_entity_attributes: bool,
     pub legacy_triggers: bool,
     pub status_topic: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigDeviceOptions {
-    pub legacy: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
