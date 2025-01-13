@@ -60,6 +60,9 @@ z2m:
 Please adjust this as needed. Particularly, make **sure** the "mac:" field
 matches a mac address on the network interface you want to serve requests from.
 
+Make sure to read the [configuration reference](doc/config-reference.md) to
+learn how to adjust the configuration file.
+
 This mac address if used to generate a self-signed certificate, so the Hue App
 will recognize this as a "real" Hue Bridge. If the mac address is incorrect,
 this will not work. [How to find your mac address](doc/how-to-find-mac-linux.md).
