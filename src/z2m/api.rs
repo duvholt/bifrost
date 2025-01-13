@@ -246,6 +246,12 @@ pub struct ConfigSerial {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigHomeassistant {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub experimental_event_entities: Option<Value>,
+    #[serde(default)]
+    pub legacy_action_sensor: Option<Value>,
     pub discovery_topic: String,
     pub status_topic: String,
 }
