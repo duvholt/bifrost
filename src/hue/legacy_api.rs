@@ -7,7 +7,8 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
-use crate::hue::{api, best_guess_timezone};
+use crate::hue::version::SwVersion;
+use crate::hue::{self, api, best_guess_timezone};
 use crate::resource::Resources;
 
 use super::date_format;
@@ -44,16 +45,29 @@ pub struct ApiShortConfig {
 impl Default for ApiShortConfig {
     fn default() -> Self {
         Self {
-            apiversion: "1.66.0".to_string(),
+            apiversion: hue::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
             bridgeid: "0000000000000000".to_string(),
             datastoreversion: "163".to_string(),
             factorynew: false,
             mac: MacAddress::default(),
-            modelid: crate::hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
+            modelid: hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
             name: "Bifrost Bridge".to_string(),
             replacesbridgeid: None,
             starterkitid: String::new(),
-            swversion: "1966060010".to_string(),
+            swversion: hue::HUE_BRIDGE_V2_DEFAULT_SWVERSION.to_string(),
+        }
+    }
+}
+
+impl ApiShortConfig {
+    #[must_use]
+    pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
+        Self {
+            bridgeid: hue::bridge_id(mac),
+            apiversion: version.get_legacy_apiversion(),
+            swversion: version.get_legacy_swversion(),
+            mac,
+            ..Self::default()
         }
     }
 }

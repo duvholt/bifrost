@@ -568,11 +568,11 @@ impl Client {
         Ok(())
     }
 
-    async fn websocket_send<'a>(
+    async fn websocket_send(
         &self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
         topic: &str,
-        payload: Z2mRequest<'a>,
+        payload: Z2mRequest<'_>,
     ) -> ApiResult<()> {
         let Some(uuid) = self.map.get(topic) else {
             log::trace!(

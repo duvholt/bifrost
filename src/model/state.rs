@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_yml::Value;
 use uuid::Uuid;
 
-use crate::{
-    error::{ApiError, ApiResult},
-    hue::api::{Resource, ResourceLink},
-};
+use crate::error::{ApiError, ApiResult};
+use crate::hue;
+use crate::hue::api::{DeviceArchetype, Resource, ResourceLink};
+use crate::hue::version::SwVersion;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct AuxData {
@@ -123,6 +123,36 @@ impl State {
         }
 
         Err(ApiError::StateVersionNotFound)
+    }
+
+    pub fn patch_bridge_version(&mut self, version: &SwVersion) {
+        let software_version = version.get_legacy_apiversion();
+        for (uuid, value) in &mut self.res {
+            let Resource::Device(dev) = value else {
+                continue;
+            };
+
+            let pd = &mut dev.product_data;
+
+            if pd.model_id != hue::HUE_BRIDGE_V2_MODEL_ID {
+                continue;
+            }
+
+            if pd.product_archetype != DeviceArchetype::BridgeV2 {
+                continue;
+            }
+
+            if pd.software_version == software_version {
+                log::info!("Bridge device {uuid} already on newest firmware version");
+            } else {
+                log::info!(
+                    "Bridge device {uuid} on older firmware {}. Updating to {}",
+                    pd.software_version,
+                    &software_version
+                );
+                pd.software_version.clone_from(&software_version);
+            }
+        }
     }
 
     pub fn from_v0(state: Value) -> ApiResult<Self> {

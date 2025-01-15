@@ -70,12 +70,8 @@ pub struct ResourceRecord {
 
 impl ResourceRecord {
     #[must_use]
-    pub fn new(id: Uuid, id_v1: Option<String>, res: &Resource) -> Self {
-        Self {
-            id,
-            id_v1,
-            obj: res.clone(),
-        }
+    pub const fn new(id: Uuid, id_v1: Option<String>, obj: Resource) -> Self {
+        Self { id, id_v1, obj }
     }
 }
 

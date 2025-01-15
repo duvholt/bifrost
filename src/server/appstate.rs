@@ -10,19 +10,22 @@ use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::error::{ApiError, ApiResult};
+use crate::hue;
 use crate::hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use crate::model::state::{State, StateVersion};
 use crate::resource::Resources;
-use crate::server::{self, certificate};
+use crate::server::certificate;
+use crate::server::updater::VersionUpdater;
 
 #[derive(Clone)]
 pub struct AppState {
     conf: Arc<AppConfig>,
+    upd: Arc<Mutex<VersionUpdater>>,
     pub res: Arc<Mutex<Resources>>,
 }
 
 impl AppState {
-    pub fn from_config(config: AppConfig) -> ApiResult<Self> {
+    pub async fn from_config(config: AppConfig) -> ApiResult<Self> {
         let certfile = &config.bifrost.cert_file;
 
         let certpath = Utf8Path::new(certfile);
@@ -34,6 +37,8 @@ impl AppState {
         }
 
         let mut res;
+        let upd = Arc::new(Mutex::new(VersionUpdater::new()));
+        let swversion = upd.lock().await.get().await.clone();
 
         if let Ok(fd) = File::open(&config.bifrost.state_file) {
             log::debug!("Existing state file found, loading..");
@@ -51,17 +56,17 @@ impl AppState {
                     State::from_v1(yaml)?
                 }
             };
-            res = Resources::new(state);
+            res = Resources::new(swversion, state);
         } else {
             log::debug!("No state file found, initializing..");
-            res = Resources::new(State::new());
-            res.init(&server::certificate::hue_bridge_id(config.bridge.mac))?;
+            res = Resources::new(swversion, State::new());
+            res.init(&hue::bridge_id(config.bridge.mac))?;
         }
 
         let conf = Arc::new(config);
         let res = Arc::new(Mutex::new(res));
 
-        Ok(Self { conf, res })
+        Ok(Self { conf, upd, res })
     }
 
     pub async fn tls_config(&self) -> ApiResult<RustlsConfig> {
@@ -79,19 +84,20 @@ impl AppState {
     }
 
     #[must_use]
-    pub fn api_short_config(&self) -> ApiShortConfig {
-        let mac = self.conf.bridge.mac;
-        ApiShortConfig {
-            bridgeid: certificate::hue_bridge_id(mac),
-            mac,
-            ..Default::default()
-        }
+    pub fn updater(&self) -> Arc<Mutex<VersionUpdater>> {
+        self.upd.clone()
     }
 
     #[must_use]
-    pub fn api_config(&self, username: Uuid) -> ApiConfig {
+    pub async fn api_short_config(&self) -> ApiShortConfig {
+        let mac = self.conf.bridge.mac;
+        ApiShortConfig::from_mac_and_version(mac, self.upd.lock().await.get().await)
+    }
+
+    #[must_use]
+    pub async fn api_config(&self, username: Uuid) -> ApiConfig {
         ApiConfig {
-            short_config: self.api_short_config(),
+            short_config: self.api_short_config().await,
             ipaddress: self.conf.bridge.ipaddress,
             netmask: self.conf.bridge.netmask,
             gateway: self.conf.bridge.gateway,

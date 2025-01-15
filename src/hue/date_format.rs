@@ -1,4 +1,19 @@
 const FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
+const UPDATE_FORMAT: &str = "%+";
+
+pub mod update_utc {
+    use chrono::{DateTime, NaiveDateTime, Utc};
+    use serde::{self, de::Error, Deserialize, Deserializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let dt = NaiveDateTime::parse_from_str(&s, super::UPDATE_FORMAT).map_err(Error::custom)?;
+        Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+    }
+}
 
 pub mod utc {
     use chrono::{DateTime, NaiveDateTime, Utc};

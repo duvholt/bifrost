@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hue::api::{Metadata, RType, ResourceLink};
+use crate::hue::version::SwVersion;
+use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
 use crate::z2m;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,28 +33,28 @@ impl DeviceProductData {
     const SIGNIFY_MANUFACTURER_NAME: &'static str = "Signify Netherlands B.V.";
 
     #[must_use]
-    pub fn hue_bridge_v2() -> Self {
+    pub fn hue_bridge_v2(version: &SwVersion) -> Self {
         Self {
             certified: true,
             manufacturer_name: Self::SIGNIFY_MANUFACTURER_NAME.to_string(),
-            model_id: "BSB002".to_string(),
+            model_id: HUE_BRIDGE_V2_MODEL_ID.to_string(),
             product_archetype: DeviceArchetype::BridgeV2,
             product_name: "Hue Bridge".to_string(),
-            software_version: "1.66.1966060010".to_string(),
+            software_version: version.get_software_version(),
         }
     }
 
     #[must_use]
     pub fn guess_from_device(dev: &z2m::api::Device) -> Self {
-        fn str_or_unknown(name: &Option<String>) -> String {
-            name.clone().unwrap_or_else(|| String::from("<unknown>"))
+        fn str_or_unknown(name: Option<&String>) -> String {
+            name.cloned().unwrap_or_else(|| String::from("<unknown>"))
         }
 
-        let product_name = str_or_unknown(&dev.model_id);
-        let model_id = str_or_unknown(&dev.definition.as_ref().map(|def| def.model.clone()));
-        let manufacturer_name = str_or_unknown(&dev.manufacturer);
+        let product_name = str_or_unknown(dev.model_id.as_ref());
+        let model_id = str_or_unknown(dev.definition.as_ref().map(|def| &def.model));
+        let manufacturer_name = str_or_unknown(dev.manufacturer.as_ref());
         let certified = manufacturer_name == Self::SIGNIFY_MANUFACTURER_NAME;
-        let software_version = str_or_unknown(&dev.software_build_id);
+        let software_version = str_or_unknown(dev.software_build_id.as_ref());
 
         let product_archetype = DeviceArchetype::SpotBulb;
 
@@ -67,7 +69,7 @@ impl DeviceProductData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceArchetype {
     BridgeV2,
