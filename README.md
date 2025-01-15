@@ -10,7 +10,7 @@ might like to read the [comparison with DiyHue](doc/comparison-with-diyhue.md).
 
 Questions, feedback, comments? Join us on discord
 
-[![](https://dcbadge.limes.pink/api/server/YvBKjHBJpA)](https://discord.gg/YvBKjHBJpA)
+[![Join Valhalla on Discord](https://discordapp.com/api/guilds/1276604041727578144/widget.png?style=banner2)](https://discord.gg/YvBKjHBJpA)
 
 ## Installation guide
 
@@ -173,7 +173,7 @@ broken when they shouldn't be.
 
 Consider joining us on discord:
 
-[![](https://dcbadge.limes.pink/api/server/YvBKjHBJpA)](https://discord.gg/YvBKjHBJpA)
+[![Join Valhalla on Discord](https://discordapp.com/api/guilds/1276604041727578144/widget.png?style=banner2)](https://discord.gg/YvBKjHBJpA)
 
 If you have any problems, questions or suggestions, feel free to [create an
 issue](https://github.com/chrivers/bifrost/issues) on this project.
