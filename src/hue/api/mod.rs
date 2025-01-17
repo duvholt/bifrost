@@ -7,14 +7,15 @@ mod scene;
 mod stubs;
 mod update;
 
-pub use device::{Device, DeviceArchetype, DeviceProductData, Identify};
+pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
+
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
     DimmingUpdate, GamutType, Light, LightColor, LightMetadata, LightUpdate, MirekSchema, On,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
-pub use room::{Room, RoomArchetype, RoomMetadata};
+pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
 pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
@@ -24,8 +25,9 @@ pub use stubs::{
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
     Entertainment, EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments,
     GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
-    Metadata, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene, Taurus, Temperature,
-    TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, Zone,
+    Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
+    Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscovery, Zone,
 };
 pub use update::{Update, UpdateRecord};
 
