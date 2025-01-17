@@ -6,6 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::hue::api::MirekSchema;
+use crate::z2m::serde_util;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -40,6 +41,9 @@ pub enum Message {
 
     #[serde(rename = "bridge/extensions")]
     BridgeExtensions(Value),
+
+    #[serde(rename = "bridge/converters")]
+    BridgeConverters(Value),
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]
@@ -76,13 +80,11 @@ pub enum BridgeOnlineState {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct BridgeState {
     pub state: BridgeOnlineState,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct BridgeEvent {
     /* FIXME: needs proper mapping */
     /* See: <zigbee2mqtt>/lib/extension/bridge.ts */
@@ -92,7 +94,6 @@ pub struct BridgeEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct BridgeLogging {
     pub level: String,
     pub message: String,
@@ -102,7 +103,6 @@ pub struct BridgeLogging {
 type BridgeGroups = Vec<Group>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct Group {
     pub friendly_name: String,
     pub id: u32,
@@ -111,27 +111,23 @@ pub struct Group {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct EndpointLink {
     pub endpoint: u32,
     pub ieee_address: IeeeAddress,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct GroupLink {
     pub id: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct Scene {
     pub id: u32,
     pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BridgeInfo {
     pub commit: String,
     pub config: Config,
@@ -147,7 +143,6 @@ pub struct BridgeInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BridgeConfigSchema {
     pub definitions: Value,
     #[serde(default)]
@@ -158,34 +153,34 @@ pub struct BridgeConfigSchema {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     pub advanced: ConfigAdvanced,
     #[serde(default)]
     pub availability: Value,
+    #[serde(default)]
+    pub version: Value,
     pub blocklist: Vec<Option<Value>>,
-    pub device_options: ConfigDeviceOptions,
+    pub device_options: Value,
     pub devices: HashMap<String, Value>,
+    #[serde(default)]
     pub external_converters: Vec<Option<Value>>,
     pub frontend: Value,
     pub groups: HashMap<String, GroupValue>,
-    pub homeassistant: ConfigHomeassistant,
+    #[serde(with = "serde_util::struct_or_false")]
+    pub homeassistant: Option<ConfigHomeassistant>,
     pub map_options: Value,
     pub mqtt: Value,
     pub ota: Value,
     pub passlist: Vec<Option<Value>>,
-    pub permit_join: bool,
     pub serial: ConfigSerial,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Version {
     pub version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Network {
     pub channel: i64,
     pub extended_pan_id: Value,
@@ -193,7 +188,6 @@ pub struct Network {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Coordinator {
     pub ieee_address: IeeeAddress,
     /* stict parsing disabled for now, format too volatile between versions */
@@ -207,10 +201,6 @@ pub struct Coordinator {
 pub struct ConfigAdvanced {
     pub adapter_concurrent: Option<Value>,
     pub adapter_delay: Option<Value>,
-    pub availability_blacklist: Vec<Value>,
-    pub availability_blocklist: Vec<Value>,
-    pub availability_passlist: Vec<Value>,
-    pub availability_whitelist: Vec<Value>,
     pub cache_state: bool,
     pub cache_state_persistent: bool,
     pub cache_state_send_on_startup: bool,
@@ -219,8 +209,6 @@ pub struct ConfigAdvanced {
     pub ext_pan_id: Vec<i64>,
     pub homeassistant_legacy_entity_attributes: Option<bool>,
     pub last_seen: String,
-    pub legacy_api: bool,
-    pub legacy_availability_payload: bool,
     pub log_debug_namespace_ignore: String,
     pub log_debug_to_mqtt_frontend: bool,
     pub log_directory: String,
@@ -233,8 +221,6 @@ pub struct ConfigAdvanced {
     pub log_syslog: Value,
     pub output: String,
     pub pan_id: i64,
-    pub report: bool,
-    pub soft_reset_timeout: i64,
     pub timestamp_format: String,
 }
 
@@ -255,26 +241,23 @@ pub struct CoordinatorMeta {
 pub struct ConfigSerial {
     pub adapter: Option<String>,
     pub disable_led: bool,
-    pub port: String,
+    #[serde(default)]
+    pub port: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ConfigHomeassistant {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub experimental_event_entities: Option<Value>,
+    #[serde(default)]
+    pub legacy_action_sensor: Option<Value>,
     pub discovery_topic: String,
-    pub legacy_entity_attributes: bool,
-    pub legacy_triggers: bool,
     pub status_topic: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ConfigDeviceOptions {
-    pub legacy: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GroupValue {
     #[serde(default)]
     pub devices: Vec<String>,
@@ -520,7 +503,6 @@ pub struct Endpoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ConfiguredReporting {
     pub attribute: String,
     pub cluster: String,
@@ -531,15 +513,13 @@ pub struct ConfiguredReporting {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Preset {
     pub description: String,
     pub name: String,
-    pub value: u16,
+    pub value: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Binding {
     pub cluster: String,
     pub target: BindingTarget,
@@ -553,7 +533,6 @@ pub enum BindingTarget {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Clusters {
     pub input: Vec<String>,
     pub output: Vec<String>,

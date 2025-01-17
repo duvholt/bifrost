@@ -189,6 +189,7 @@ pub enum OnLevel {
 #[serde(rename_all = "snake_case")]
 pub enum DeviceColorMode {
     ColorTemp,
+    Hs,
     Xy,
 }
 

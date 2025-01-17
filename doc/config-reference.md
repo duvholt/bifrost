@@ -54,6 +54,13 @@ bridge:
 # if you have more than one server.
 z2m:
   some-server:
+    # The websocket url for z2m, starting with "ws://".
+    #
+    # For z2m version 2.x, the url must end in `/api?token=<token>`.
+    # For z2m version 1.x, this is optional, but supported.
+    #
+    # Therefore, Bifrost will adjust the urls if needed.
+    # A message will be logged with the rewritten url if this happens.
     url: ws://10.00.0.100:8080
   other-server:
     url: ws://10.10.0.102:8080

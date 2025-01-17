@@ -1,5 +1,6 @@
 pub mod api;
 pub mod request;
+pub mod serde_util;
 pub mod update;
 
 use std::collections::{HashMap, HashSet};
@@ -399,6 +400,7 @@ impl Client {
             Message::BridgeEvent(ref obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeDefinitions(ref obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeState(ref obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeConverters(ref obj) => { /* println!("{obj:#?}"); */ }
 
             Message::BridgeDevices(ref obj) => {
                 for dev in obj {
@@ -685,9 +687,19 @@ impl Client {
 
     pub async fn run_forever(mut self) -> ApiResult<()> {
         let mut chan = self.state.lock().await.z2m_channel();
+
+        // let's not include auth tokens in log output
+        let sanitized_url = self.server.get_sanitized_url();
+        let url = self.server.get_url();
+
+        if url != self.server.url {
+            log::info!("[{}] Rewrote url for compatibility with z2m 2.x.", self.name);
+            log::info!("[{}] Consider updating websocket url to {}", self.name, sanitized_url);
+        }
+
         loop {
-            log::info!("[{}] Connecting to {}", self.name, self.server.url);
-            match connect_async(&self.server.url).await {
+            log::info!("[{}] Connecting to {}", self.name, &sanitized_url);
+            match connect_async(url.as_str()).await {
                 Ok((socket, _)) => {
                     let res = self.event_loop(&mut chan, socket).await;
                     if let Err(err) = res {
