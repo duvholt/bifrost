@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::hue::api::{Metadata, RType, ResourceLink};
+use crate::hue::api::{Metadata, RType, ResourceLink, Stub};
 use crate::hue::version::SwVersion;
 use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
 use crate::z2m;
@@ -10,6 +10,10 @@ pub struct Device {
     pub product_data: DeviceProductData,
     pub metadata: Metadata,
     pub services: Vec<ResourceLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usertest: Option<UserTest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identify: Option<Stub>,
 }
 
 impl Device {
@@ -17,6 +21,15 @@ impl Device {
     pub fn light_service(&self) -> Option<&ResourceLink> {
         self.services.iter().find(|rl| rl.rtype == RType::Light)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Identify {}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct UserTest {
+    status: String,
+    usertest: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -27,6 +40,8 @@ pub struct DeviceProductData {
     pub product_archetype: DeviceArchetype,
     pub certified: bool,
     pub software_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardware_platform_type: Option<String>,
 }
 
 impl DeviceProductData {
@@ -41,6 +56,7 @@ impl DeviceProductData {
             product_archetype: DeviceArchetype::BridgeV2,
             product_name: "Hue Bridge".to_string(),
             software_version: version.get_software_version(),
+            hardware_platform_type: None,
         }
     }
 
@@ -65,6 +81,7 @@ impl DeviceProductData {
             product_archetype,
             certified,
             software_version,
+            hardware_platform_type: None,
         }
     }
 }

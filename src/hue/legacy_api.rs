@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::Ipv4Addr};
 
 use chrono::{DateTime, Local, Utc};
 use mac_address::MacAddress;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -28,12 +28,25 @@ pub enum HueResult<T> {
     Error(HueError),
 }
 
+pub fn serialize_lower_case_mac<S>(mac: &MacAddress, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let m = mac.bytes();
+    let addr = format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        m[0], m[1], m[2], m[3], m[4], m[5]
+    );
+    serializer.serialize_str(&addr)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiShortConfig {
     pub apiversion: String,
     pub bridgeid: String,
     pub datastoreversion: String,
     pub factorynew: bool,
+    #[serde(serialize_with = "serialize_lower_case_mac")]
     pub mac: MacAddress,
     pub modelid: String,
     pub name: String,
@@ -163,7 +176,7 @@ pub struct DeviceTypes {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SwUpdate {
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     lastinstall: DateTime<Utc>,
     state: SwUpdateState,
 }
@@ -181,6 +194,7 @@ impl Default for SwUpdate {
 #[serde(rename_all = "lowercase")]
 pub enum SwUpdateState {
     NoUpdates,
+    Transferring,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -188,7 +202,7 @@ pub struct SoftwareUpdate2 {
     autoinstall: Value,
     bridge: SwUpdate,
     checkforupdate: bool,
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     lastchange: DateTime<Utc>,
     state: SwUpdateState,
 }
@@ -212,9 +226,9 @@ impl SoftwareUpdate2 {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Whitelist {
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc", rename = "create date")]
     pub create_date: DateTime<Utc>,
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc", rename = "last use date")]
     pub last_use_date: DateTime<Utc>,
     pub name: String,
 }
@@ -240,11 +254,11 @@ pub struct ApiConfig {
     pub netmask: Ipv4Addr,
     pub gateway: Ipv4Addr,
     pub timezone: String,
-    #[serde(with = "date_format::utc", rename = "UTC")]
+    #[serde(with = "date_format::legacy_utc", rename = "UTC")]
     pub utc: DateTime<Utc>,
-    #[serde(with = "date_format::local")]
+    #[serde(with = "date_format::legacy_local")]
     pub localtime: DateTime<Local>,
-    pub whitelist: HashMap<Uuid, Whitelist>,
+    pub whitelist: HashMap<String, Whitelist>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -257,25 +271,35 @@ pub enum ApiEffect {
 #[serde(rename_all = "lowercase")]
 pub enum ApiAlert {
     None,
+    Select,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupAction {
     on: bool,
-    bri: u32,
-    hue: u32,
-    sat: u32,
-    effect: ApiEffect,
-    xy: [f64; 2],
-    ct: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bri: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hue: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sat: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect: Option<ApiEffect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xy: Option<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ct: Option<u32>,
     alert: ApiAlert,
-    colormode: LightColorMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    colormode: Option<LightColorMode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ApiGroupType {
-    Room,
+    Entertainment,
     LightGroup,
+    Room,
+    Zone,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -287,6 +311,13 @@ pub struct ApiGroup {
     #[serde(rename = "type")]
     group_type: ApiGroupType,
     class: String,
+    recycle: bool,
+    sensors: Vec<Value>,
+    state: Value,
+    #[serde(skip_serializing_if = "Value::is_null", default)]
+    stream: Value,
+    #[serde(skip_serializing_if = "Value::is_null", default)]
+    locations: Value,
 }
 
 impl ApiGroup {
@@ -302,20 +333,22 @@ impl ApiGroup {
             lights,
             action: ApiGroupAction {
                 on: glight.on.is_some_and(|on| on.on),
-                bri: glight
-                    .dimming
-                    .map(|dim| (dim.brightness * 2.54) as u32)
-                    .unwrap_or_default(),
-                hue: 0,
-                sat: 0,
-                effect: ApiEffect::None,
-                xy: [0.0, 0.0],
-                ct: 0,
+                bri: glight.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                hue: None,
+                sat: None,
+                effect: None,
+                xy: None,
+                ct: None,
                 alert: ApiAlert::None,
-                colormode: LightColorMode::Xy,
+                colormode: None,
             },
             class: "Bedroom".to_string(),
             group_type: ApiGroupType::Room,
+            recycle: false,
+            sensors: vec![],
+            state: json!({}),
+            stream: Value::Null,
+            locations: Value::Null,
         }
     }
 }
@@ -331,19 +364,27 @@ pub struct ApiGroupState {
 pub enum LightColorMode {
     Ct,
     Xy,
+    Hs,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiLightState {
     on: bool,
-    bri: u32,
-    hue: u32,
-    sat: u32,
-    effect: String,
-    xy: [f64; 2],
-    ct: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bri: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hue: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sat: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xy: Option<[f64; 2]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ct: Option<u32>,
     alert: String,
-    colormode: LightColorMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    colormode: Option<LightColorMode>,
     mode: String,
     reachable: bool,
 }
@@ -398,8 +439,10 @@ pub struct ApiLight {
     config: Value,
     uniqueid: String,
     swversion: String,
-    swconfigid: String,
-    productid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    swconfigid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    productid: Option<String>,
 }
 
 impl ApiLight {
@@ -417,25 +460,14 @@ impl ApiLight {
         Self {
             state: ApiLightState {
                 on: light.on.on,
-                bri: light
-                    .dimming
-                    .map(|dim| (dim.brightness * 2.54) as u32)
-                    .unwrap_or_default(),
-                hue: 0,
-                sat: 0,
-                effect: String::new(),
-                xy: light
-                    .color
-                    .clone()
-                    .map(|col| col.xy.into())
-                    .unwrap_or_default(),
-                ct: light
-                    .color_temperature
-                    .clone()
-                    .and_then(|ct| ct.mirek)
-                    .unwrap_or_default(),
+                bri: light.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                hue: None,
+                sat: None,
+                effect: None,
+                xy: light.color.clone().map(|col| col.xy.into()),
+                ct: light.color_temperature.clone().and_then(|ct| ct.mirek),
                 alert: String::new(),
-                colormode,
+                colormode: Some(colormode),
                 mode: "homeautomation".to_string(),
                 reachable: true,
             },
@@ -444,7 +476,7 @@ impl ApiLight {
             modelid: product_data.product_name,
             manufacturername: product_data.manufacturer_name,
             productname: "Hue color spot".to_string(),
-            productid: product_data.model_id,
+            productid: Some(product_data.model_id),
             capabilities: json!({
                 "certified": true,
                 "control": {
@@ -478,16 +510,36 @@ impl ApiLight {
             light_type: "Extended color light".to_string(),
             uniqueid: uuid.as_simple().to_string(),
             swversion: product_data.software_version,
-            swconfigid: String::new(),
+            swconfigid: None,
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiResourceLink {}
+pub struct ApiResourceLink {
+    #[serde(rename = "type")]
+    pub link_type: String,
+    pub name: String,
+    pub description: String,
+    pub classid: u32,
+    pub owner: Uuid,
+    pub recycle: bool,
+    pub links: Vec<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiRule {}
+pub struct ApiRule {
+    pub name: String,
+    pub recycle: bool,
+    pub status: String,
+    pub conditions: Vec<Value>,
+    pub actions: Vec<Value>,
+    pub owner: Uuid,
+    pub timestriggered: u32,
+    #[serde(with = "date_format::legacy_utc")]
+    pub created: DateTime<Utc>,
+    pub lasttriggered: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ApiSceneType {
@@ -502,8 +554,10 @@ pub enum ApiSceneVersion {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiSceneAppData {
-    pub data: String,
-    pub version: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -512,17 +566,20 @@ pub struct ApiScene {
     #[serde(rename = "type")]
     scene_type: ApiSceneType,
     lights: Vec<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     lightstates: HashMap<String, ApiLightStateUpdate>,
-    owner: Uuid,
+    owner: String,
     recycle: bool,
     locked: bool,
     appdata: ApiSceneAppData,
     picture: String,
-    #[serde(with = "date_format::utc")]
+    #[serde(with = "date_format::legacy_utc")]
     lastupdated: DateTime<Utc>,
     version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     image: Option<Uuid>,
-    group: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    group: Option<String>,
 }
 
 impl ApiScene {
@@ -551,30 +608,68 @@ impl ApiScene {
             scene_type: ApiSceneType::GroupScene,
             lights,
             lightstates,
-            owner,
+            owner: owner.to_string(),
             recycle: false,
             locked: false,
             /* Some clients (e.g. Hue Essentials) require .appdata */
             appdata: ApiSceneAppData {
-                data: format!("xxxxx_r{room_id}"),
-                version: 1,
+                data: Some(format!("xxxxx_r{room_id}")),
+                version: Some(1),
             },
             picture: String::new(),
             lastupdated: Utc::now(),
             version: ApiSceneVersion::V2 as u32,
             image: scene.metadata.image.map(|rl| rl.rid),
-            group: room_id.to_string(),
+            group: Some(room_id.to_string()),
         })
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiSchedule {}
+pub struct ApiSchedule {
+    pub recycle: bool,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub autodelete: Option<bool>,
+    pub description: String,
+    pub command: Value,
+    #[serde(with = "date_format::legacy_utc")]
+    pub created: DateTime<Utc>,
+    #[serde(
+        with = "date_format::legacy_utc_opt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub starttime: Option<DateTime<Utc>>,
+    pub time: String,
+    pub localtime: String,
+    pub status: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ApiSensor {}
+pub struct ApiSensor {
+    #[serde(rename = "type")]
+    pub sensor_type: String,
+    pub config: Value,
+    pub name: String,
+    pub state: Value,
+    pub manufacturername: String,
+    pub modelid: String,
+    pub swversion: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swupdate: Option<SwUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uniqueid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diversityid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub productname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recycle: Option<bool>,
+    #[serde(skip_serializing_if = "Value::is_null", default)]
+    pub capabilities: Value,
+}
 
-#[allow(clippy::zero_sized_map_values)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiUserConfig {
     pub config: ApiConfig,

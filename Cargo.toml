@@ -70,3 +70,7 @@ termcolor = { version = "1.4.1", optional = true }
 itertools = { version = "0.13.0", optional = true }
 reqwest = { version = "0.12.8", default-features = false, features = ["__tls", "json", "rustls-tls"] }
 url = { version = "2.5.4", features = ["serde"] }
+clap-stdin = "0.5.1"
+
+[dev-dependencies]
+json_diff_ng = { version = "0.6.0", default-features = false }
