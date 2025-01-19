@@ -22,7 +22,7 @@ pub enum Message {
     BridgeInfo(BridgeInfo),
 
     #[serde(rename = "bridge/state")]
-    BridgeState(BridgeState),
+    BridgeState(Value),
 
     #[serde(rename = "bridge/event")]
     BridgeEvent(BridgeEvent),
