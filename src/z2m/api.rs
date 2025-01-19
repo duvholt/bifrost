@@ -430,7 +430,7 @@ pub struct ExposeEnum {
     pub description: Option<String>,
 
     pub category: Option<String>,
-    pub values: Vec<String>,
+    pub values: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
