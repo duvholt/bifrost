@@ -666,9 +666,9 @@ impl Client {
                     .ok_or(ApiError::NotFound(scene.rid))?;
                 drop(lock);
 
-                if let Some(topic) = self.rmap.get(&room).cloned() {
+                if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::SceneRemove(index);
-                    self.websocket_send(socket, &topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
         }
@@ -703,8 +703,15 @@ impl Client {
         let url = self.server.get_url();
 
         if url != self.server.url {
-            log::info!("[{}] Rewrote url for compatibility with z2m 2.x.", self.name);
-            log::info!("[{}] Consider updating websocket url to {}", self.name, sanitized_url);
+            log::info!(
+                "[{}] Rewrote url for compatibility with z2m 2.x.",
+                self.name
+            );
+            log::info!(
+                "[{}] Consider updating websocket url to {}",
+                self.name,
+                sanitized_url
+            );
         }
 
         loop {
