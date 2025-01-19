@@ -19,7 +19,7 @@ pub struct RawMessage {
 #[serde(tag = "topic", content = "payload")]
 pub enum Message {
     #[serde(rename = "bridge/info")]
-    BridgeInfo(BridgeInfo),
+    BridgeInfo(Box<BridgeInfo>),
 
     #[serde(rename = "bridge/state")]
     BridgeState(Value),
