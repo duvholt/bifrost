@@ -22,7 +22,7 @@ pub enum Message {
     BridgeInfo(BridgeInfo),
 
     #[serde(rename = "bridge/state")]
-    BridgeState(BridgeState),
+    BridgeState(Value),
 
     #[serde(rename = "bridge/event")]
     BridgeEvent(BridgeEvent),
@@ -430,7 +430,7 @@ pub struct ExposeEnum {
     pub description: Option<String>,
 
     pub category: Option<String>,
-    pub values: Vec<String>,
+    pub values: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
