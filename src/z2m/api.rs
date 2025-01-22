@@ -365,6 +365,8 @@ pub struct DeviceDefinition {
     pub options: Vec<Expose>,
     pub supports_ota: bool,
     pub vendor: String,
+    #[serde(default)]
+    pub icon: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
