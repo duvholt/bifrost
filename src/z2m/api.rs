@@ -1,6 +1,7 @@
 #![allow(clippy::struct_excessive_bools)]
 
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
