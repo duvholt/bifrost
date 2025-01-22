@@ -103,6 +103,8 @@ type BridgeGroups = Vec<Group>;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Group {
     pub friendly_name: String,
+    #[serde(default)]
+    pub description: Option<String>,
     pub id: u32,
     pub members: Vec<GroupMember>,
     pub scenes: Vec<Scene>,
