@@ -359,12 +359,12 @@ impl Device {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceDefinition {
+    pub model: String,
+    pub vendor: String,
     pub description: String,
     pub exposes: Vec<Expose>,
-    pub model: String,
-    pub options: Vec<Expose>,
     pub supports_ota: bool,
-    pub vendor: String,
+    pub options: Vec<Expose>,
     #[serde(default)]
     pub icon: String,
 }
