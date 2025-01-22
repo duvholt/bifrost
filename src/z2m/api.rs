@@ -348,8 +348,8 @@ impl Device {
     #[must_use]
     pub fn expose_action(&self) -> bool {
         self.exposes().iter().any(|exp| {
-            if let Expose::Enum(ExposeEnum { name, .. }) = exp {
-                name == "action"
+            if let Expose::Enum(ExposeEnum { base, .. }) = exp {
+                base.name.as_deref() == Some("action")
             } else {
                 false
             }
@@ -376,47 +376,77 @@ pub enum Expose {
     Composite(ExposeComposite),
     Enum(ExposeEnum),
     Light(ExposeLight),
-    List(Value),
     Lock(ExposeLock),
     Numeric(ExposeNumeric),
     Switch(ExposeSwitch),
 
     /* FIXME: Not modelled yet */
-    Text(Value),
-    Cover(Value),
-    Fan(Value),
-    Climate(Value),
+    List(ExposeGeneric),
+    Text(ExposeGeneric),
+    Cover(ExposeGeneric),
+    Fan(ExposeGeneric),
+    Climate(ExposeGeneric),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExposeGeneric {
+    #[serde(flatten)]
+    pub base: ExposeBase,
+    #[serde(flatten)]
+    pub other: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExposeCategory {
+    Config,
+    Diagnostic,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExposeBase {
+    pub name: Option<String>,
+    pub label: Option<String>,
+    #[serde(default)]
+    pub access: u8,
+    pub endpoint: Option<String>,
+    pub property: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub features: Vec<Expose>,
+    pub category: Option<ExposeCategory>,
 }
 
 impl Expose {
     #[must_use]
-    pub fn name(&self) -> Option<&str> {
+    pub const fn base(&self) -> &ExposeBase {
+        #[allow(clippy::match_same_arms)]
         match self {
-            Self::Binary(obj) => Some(obj.name.as_str()),
-            Self::Composite(obj) => Some(obj.name.as_str()),
-            Self::Enum(obj) => Some(obj.name.as_str()),
-            Self::Numeric(obj) => Some(obj.name.as_str()),
-            Self::Light(_)
-            | Self::List(_)
-            | Self::Switch(_)
-            | Self::Lock(_)
-            | Self::Text(_)
-            | Self::Cover(_)
-            | Self::Fan(_)
-            | Self::Climate(_) => None,
+            Self::Binary(exp) => &exp.base,
+            Self::Composite(exp) => &exp.base,
+            Self::Enum(exp) => &exp.base,
+            Self::Light(exp) => &exp.base,
+            Self::List(exp) => &exp.base,
+            Self::Lock(exp) => &exp.base,
+            Self::Numeric(exp) => &exp.base,
+            Self::Switch(exp) => &exp.base,
+            Self::Text(exp) => &exp.base,
+            Self::Cover(exp) => &exp.base,
+            Self::Fan(exp) => &exp.base,
+            Self::Climate(exp) => &exp.base,
         }
+    }
+
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.base().name.as_deref()
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeBinary {
-    pub access: u8,
-    pub property: String,
-
-    pub name: String,
-    pub label: Option<String>,
-    pub description: Option<String>,
-
+    #[serde(flatten)]
+    pub base: ExposeBase,
     pub value_off: Value,
     pub value_on: Value,
     pub value_toggle: Option<String>,
@@ -424,64 +454,52 @@ pub struct ExposeBinary {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeComposite {
-    pub access: Option<u8>,
-    pub property: String,
-
-    pub name: String,
-    pub label: Option<String>,
-    pub description: Option<String>,
-
-    pub category: Option<String>,
-
-    #[serde(default)]
-    pub features: Vec<Expose>,
+    #[serde(flatten)]
+    pub base: ExposeBase,
+    // FIXME
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeEnum {
-    pub access: u8,
-    pub property: String,
-
-    pub name: String,
-    pub label: Option<String>,
-    pub description: Option<String>,
-
-    pub category: Option<String>,
+    #[serde(flatten)]
+    pub base: ExposeBase,
     pub values: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeLight {
-    pub features: Vec<Expose>,
+    #[serde(flatten)]
+    pub base: ExposeBase,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeLock {
-    pub features: Vec<Expose>,
-    pub label: Option<String>,
+    #[serde(flatten)]
+    pub base: ExposeBase,
 }
 
 impl ExposeLight {
     #[must_use]
     pub fn feature(&self, name: &str) -> Option<&Expose> {
-        self.features.iter().find(|exp| exp.name() == Some(name))
+        self.base
+            .features
+            .iter()
+            .find(|exp| exp.name() == Some(name))
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExposeList {}
+pub struct ExposeList {
+    #[serde(flatten)]
+    pub base: ExposeBase,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeNumeric {
-    pub access: u8,
-    pub property: String,
-    pub name: String,
-    pub label: Option<String>,
-
-    pub description: Option<String>,
+    #[serde(flatten)]
+    pub base: ExposeBase,
 
     pub unit: Option<String>,
-    pub category: Option<String>,
     pub value_max: Option<f64>,
     pub value_min: Option<f64>,
     pub value_step: Option<f64>,
@@ -492,7 +510,8 @@ pub struct ExposeNumeric {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExposeSwitch {
-    pub features: Vec<Expose>,
+    #[serde(flatten)]
+    pub base: ExposeBase,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
