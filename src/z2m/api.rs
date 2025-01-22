@@ -507,8 +507,8 @@ pub struct DeviceEndpoint {
 pub struct DeviceEndpointConfiguredReporting {
     pub attribute: Value,
     pub cluster: String,
-    pub maximum_report_interval: i32,
-    pub minimum_report_interval: i32,
+    pub maximum_report_interval: i64,
+    pub minimum_report_interval: i64,
     #[serde(default)]
     pub reportable_change: Value,
 }
