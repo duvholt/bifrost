@@ -6,7 +6,6 @@ use std::fmt::Debug;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::hue::api::MirekSchema;
 use crate::z2m::serde_util;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
