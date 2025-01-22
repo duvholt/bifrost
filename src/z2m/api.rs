@@ -305,9 +305,9 @@ pub enum DeviceType {
 pub struct Device {
     pub description: Option<String>,
     pub date_code: Option<String>,
-    pub definition: Option<Definition>,
+    pub definition: Option<DeviceDefinition>,
     pub disabled: bool,
-    pub endpoints: HashMap<String, Endpoint>,
+    pub endpoints: HashMap<String, DeviceEndpoint>,
     pub friendly_name: String,
     pub ieee_address: IeeeAddress,
     pub interview_completed: bool,
@@ -358,7 +358,7 @@ impl Device {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Definition {
+pub struct DeviceDefinition {
     pub description: String,
     pub exposes: Vec<Expose>,
     pub model: String,
@@ -494,15 +494,15 @@ pub struct ExposeSwitch {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Endpoint {
-    pub bindings: Vec<Binding>,
-    pub clusters: Clusters,
-    pub configured_reportings: Vec<ConfiguredReporting>,
-    pub scenes: Vec<Value>,
+pub struct DeviceEndpoint {
+    pub bindings: Vec<DeviceEndpointBinding>,
+    pub configured_reportings: Vec<DeviceEndpointConfiguredReporting>,
+    pub clusters: DeviceEndpointClusters,
+    pub scenes: Vec<Scene>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfiguredReporting {
+pub struct DeviceEndpointConfiguredReporting {
     pub attribute: String,
     pub cluster: String,
     pub maximum_report_interval: i32,
@@ -519,20 +519,21 @@ pub struct Preset {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Binding {
+pub struct DeviceEndpointBinding {
     pub cluster: String,
-    pub target: BindingTarget,
+    pub target: DeviceEndpointBindingTarget,
 }
 
+// NOTE: definition diverges from z2m, but is more strict
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
-pub enum BindingTarget {
+pub enum DeviceEndpointBindingTarget {
     Group(GroupLink),
     Endpoint(EndpointLink),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Clusters {
+pub struct DeviceEndpointClusters {
     pub input: Vec<String>,
     pub output: Vec<String>,
 }
