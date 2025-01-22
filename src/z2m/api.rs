@@ -505,7 +505,7 @@ pub struct DeviceEndpoint {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceEndpointConfiguredReporting {
-    pub attribute: String,
+    pub attribute: Value,
     pub cluster: String,
     pub maximum_report_interval: i32,
     pub minimum_report_interval: i32,
