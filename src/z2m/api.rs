@@ -6,8 +6,6 @@ use std::fmt::Debug;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::z2m::serde_util;
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RawMessage {
@@ -166,7 +164,7 @@ pub struct Config {
     pub external_converters: Vec<Option<Value>>,
     pub frontend: Value,
     pub groups: HashMap<String, GroupValue>,
-    #[serde(with = "serde_util::struct_or_false")]
+    #[serde(with = "crate::z2m::serde_util::struct_or_false")]
     pub homeassistant: Option<ConfigHomeassistant>,
     pub map_options: Value,
     pub mqtt: Value,
