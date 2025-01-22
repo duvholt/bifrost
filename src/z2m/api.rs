@@ -291,6 +291,15 @@ pub enum PowerSource {
 
 pub type BridgeDevices = Vec<Device>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DeviceType {
+    Coordinator,
+    Router,
+    EndDevice,
+    Unknown,
+    GreenPower,
+}
+
 #[allow(clippy::pub_underscore_fields)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
@@ -311,7 +320,7 @@ pub struct Device {
     pub software_build_id: Option<String>,
     pub supported: Option<bool>,
     #[serde(rename = "type")]
-    pub device_type: String,
+    pub device_type: DeviceType,
 
     /* all other fields */
     #[serde(skip_serializing_if = "HashMap::is_empty")]
