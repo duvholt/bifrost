@@ -274,11 +274,16 @@ async fn put_api_user_resource_id(
     }
 }
 
+pub async fn workaround() -> impl IntoResponse {
+    Json(json!([{"error":{"type":1,"address":"/","description":"unauthorized user"}}]))
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(post_api))
         .route("/config", get(get_api_config))
         .route("/:user", get(get_api_user))
+        .route("/newUser", get(workaround))
         .route("/:user/:rtype", get(get_api_user_resource))
         .route("/:user/:rtype", post(post_api_user_resource))
         .route("/:user/:rtype", put(put_api_user_resource))
