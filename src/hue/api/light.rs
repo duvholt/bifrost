@@ -174,6 +174,13 @@ impl AddAssign<LightUpdate> for Light {
                 ct.mirek = None;
             }
         }
+
+        if let Some(grad) = &mut self.gradient {
+            if let Some(grupd) = upd.gradient {
+                grad.mode = grupd.mode.unwrap_or(grad.mode);
+                grad.points = grupd.points;
+            }
+        }
     }
 }
 
@@ -212,6 +219,10 @@ impl Sub<&Light> for &Light {
         }
 
         if self.as_color_opt() != rhs.as_color_opt() {
+            upd = upd.with_color_xy(rhs.as_color_opt());
+        }
+
+        if self.gradient != rhs.gradient {
             upd = upd.with_color_xy(rhs.as_color_opt());
         }
 
