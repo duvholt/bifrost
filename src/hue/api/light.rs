@@ -452,7 +452,7 @@ impl On {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub struct ColorUpdate {
     pub xy: XY,
 }
