@@ -225,11 +225,13 @@ pub struct LightAlert {
     action_values: BTreeSet<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialOrd, Ord, Eq, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialOrd, Ord, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum LightGradientMode {
+    #[default]
     InterpolatedPalette,
     InterpolatedPaletteMirrored,
+    RandomPixelated,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
