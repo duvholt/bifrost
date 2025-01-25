@@ -132,6 +132,13 @@ impl Light {
     pub fn as_color_opt(&self) -> Option<XY> {
         self.color.as_ref().map(|col| col.xy)
     }
+
+    #[must_use]
+    pub fn as_gradient_opt(&self) -> Option<Vec<XY>> {
+        self.gradient
+            .as_ref()
+            .map(|grad| grad.points.iter().map(|p| p.color.xy).collect())
+    }
 }
 
 impl AddAssign<LightUpdate> for Light {
