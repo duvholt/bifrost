@@ -24,9 +24,9 @@ use crate::hue;
 use crate::hue::api::{
     Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature, ColorTemperatureUpdate,
     ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming, DimmingUpdate, GroupedLight,
-    Light, LightColor, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
-    RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement, SceneMetadata,
-    SceneRecall, SceneStatus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    Light, LightColor, LightGradient, LightMetadata, LightUpdate, Metadata, RType, Resource,
+    ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
+    SceneMetadata, SceneRecall, SceneStatus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 
 use crate::error::{ApiError, ApiResult};
@@ -87,6 +87,8 @@ impl Client {
         let product_data = DeviceProductData::guess_from_device(dev);
         let metadata = LightMetadata::new(DeviceArchetype::SpotBulb, name);
 
+        let gradient = dev.expose_gradient();
+
         let dev = hue::api::Device {
             product_data,
             metadata: metadata.clone().into(),
@@ -115,6 +117,9 @@ impl Client {
             .feature("color_xy")
             .and_then(LightColor::extract_from_expose);
         log::trace!("Detected color: {:?}", &light.color);
+
+        light.gradient = gradient.and_then(LightGradient::extract_from_expose);
+        log::trace!("Detected gradient support: {:?}", &light.gradient);
 
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
