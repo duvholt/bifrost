@@ -346,6 +346,26 @@ impl Device {
     }
 
     #[must_use]
+    pub fn expose_gradient(&self) -> Option<&ExposeList> {
+        self.exposes().iter().find_map(|exp| {
+            if let Expose::List(grad) = exp {
+                if grad
+                    .base
+                    .property
+                    .as_ref()
+                    .is_some_and(|prop| prop == "gradient")
+                {
+                    Some(grad)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    #[must_use]
     pub fn expose_action(&self) -> bool {
         self.exposes().iter().any(|exp| {
             if let Expose::Enum(ExposeEnum { base, .. }) = exp {
