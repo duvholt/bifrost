@@ -234,13 +234,35 @@ pub enum LightGradientMode {
     RandomPixelated,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub struct LightGradientPoint {
+    pub color: ColorUpdate,
+}
+
+impl LightGradientPoint {
+    #[must_use]
+    pub const fn xy(xy: XY) -> Self {
+        Self {
+            color: ColorUpdate { xy },
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LightGradient {
-    mode: LightGradientMode,
-    mode_values: BTreeSet<LightGradientMode>,
-    points_capable: u32,
-    points: Vec<Value>,
-    pixel_count: u32,
+    pub mode: LightGradientMode,
+    pub mode_values: BTreeSet<LightGradientMode>,
+    pub points_capable: u32,
+    pub points: Vec<LightGradientPoint>,
+    pub pixel_count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightGradientUpdate {
+    #[serde(default)]
+    pub mode: Option<LightGradientMode>,
+    #[serde(default)]
+    pub points: Vec<LightGradientPoint>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -378,6 +400,8 @@ pub struct LightUpdate {
     pub color: Option<ColorUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<LightGradientUpdate>,
 }
 
 impl LightUpdate {
@@ -414,6 +438,17 @@ impl LightUpdate {
     pub fn with_color_xy(self, xy: impl Into<Option<XY>>) -> Self {
         Self {
             color: xy.into().map(ColorUpdate::new),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_gradient(self, grad: Option<Vec<XY>>) -> Self {
+        Self {
+            gradient: grad.map(|colors| LightGradientUpdate {
+                mode: None,
+                points: colors.into_iter().map(LightGradientPoint::xy).collect(),
+            }),
             ..self
         }
     }
