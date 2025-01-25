@@ -150,10 +150,11 @@ impl Sub<&Device> for &Device {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceArchetype {
     BridgeV2,
+    #[default]
     UnknownArchetype,
     ClassicBulb,
     SultanBulb,
