@@ -31,6 +31,7 @@ use crate::hue::api::{
 
 use crate::error::{ApiError, ApiResult};
 use crate::hue::scene_icons;
+use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
 use crate::z2m::api::{ExposeLight, Message, RawMessage};
@@ -333,12 +334,18 @@ impl Client {
 
     async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
         let mut res = self.state.lock().await;
-        res.update::<Light>(uuid, move |light| {
+        res.update::<Light>(uuid, |light| {
             let upd = LightUpdate::new()
                 .with_on(devupd.state.map(Into::into))
                 .with_brightness(devupd.brightness.map(|b| b / 254.0 * 100.0))
                 .with_color_temperature(devupd.color_temp)
-                .with_color_xy(devupd.color.and_then(|col| col.xy));
+                .with_color_xy(devupd.color.and_then(|col| col.xy))
+                .with_gradient(
+                    devupd
+                        .gradient
+                        .as_ref()
+                        .map(|s| s.iter().map(HexColor::to_xy_color).collect()),
+                );
 
             *light += upd;
         })?;
