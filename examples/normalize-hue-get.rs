@@ -134,6 +134,7 @@ impl<'a> Normalizer<'a> {
     {
         let value = self.parse::<T>(item.clone())?;
         self.items += 1;
+        self.index += 1;
         let after = serde_json::to_value(&value)?;
 
         if !compare(item, &after, self.report)? {
