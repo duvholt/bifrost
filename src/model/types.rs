@@ -1,4 +1,11 @@
+#![allow(dead_code, non_snake_case, clippy::suboptimal_flops)]
+
 use serde::{Deserialize, Serialize};
+
+use crate::model::{
+    clamp::Clamp,
+    colorspace::{self, ColorSpace},
+};
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct XY {
@@ -7,6 +14,8 @@ pub struct XY {
 }
 
 impl XY {
+    const COLOR_SPACE: ColorSpace = colorspace::ADOBE;
+
     pub const D65_WHITE_POINT: Self = Self {
         x: 0.31271,
         y: 0.32902,
@@ -15,6 +24,23 @@ impl XY {
     #[must_use]
     pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    #[must_use]
+    pub fn from_rgb(red: u8, green: u8, blue: u8) -> (Self, f64) {
+        let [r, g, b] = [red, green, blue].map(Clamp::unit_from_u8);
+
+        let [x, y, bright] = Self::COLOR_SPACE.rgb_to_xyy(r, g, b);
+
+        (Self { x, y }, bright)
+    }
+
+    #[must_use]
+    pub fn to_rgb(&self, brightness: f64) -> [u8; 3] {
+        Self::COLOR_SPACE
+            .xy_to_rgb_color(self.x, self.y, brightness)
+            .map(Clamp::unit_to_u8_clamped)
     }
 }
 
