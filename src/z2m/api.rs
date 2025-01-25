@@ -1,12 +1,10 @@
 #![allow(clippy::struct_excessive_bools)]
 
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-
-use crate::hue::api::MirekSchema;
-use crate::z2m::serde_util;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -19,7 +17,7 @@ pub struct RawMessage {
 #[serde(tag = "topic", content = "payload")]
 pub enum Message {
     #[serde(rename = "bridge/info")]
-    BridgeInfo(BridgeInfo),
+    BridgeInfo(Box<BridgeInfo>),
 
     #[serde(rename = "bridge/state")]
     BridgeState(Value),
@@ -166,7 +164,7 @@ pub struct Config {
     pub external_converters: Vec<Option<Value>>,
     pub frontend: Value,
     pub groups: HashMap<String, GroupValue>,
-    #[serde(with = "serde_util::struct_or_false")]
+    #[serde(with = "crate::z2m::serde_util::struct_or_false")]
     pub homeassistant: Option<ConfigHomeassistant>,
     pub map_options: Value,
     pub mqtt: Value,
@@ -471,22 +469,6 @@ pub struct ExposeNumeric {
 
     #[serde(default)]
     pub presets: Vec<Preset>,
-}
-
-impl ExposeNumeric {
-    #[must_use]
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-    pub fn extract_mirek_schema(&self) -> Option<MirekSchema> {
-        if self.unit.as_deref() == Some("mired") {
-            if let (Some(min), Some(max)) = (self.value_min, self.value_max) {
-                return Some(MirekSchema {
-                    mirek_minimum: min as u32,
-                    mirek_maximum: max as u32,
-                });
-            }
-        }
-        None
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

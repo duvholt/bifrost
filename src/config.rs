@@ -54,6 +54,7 @@ pub struct AppConfig {
 }
 
 impl Z2mServer {
+    #[must_use]
     pub fn get_url(&self) -> Url {
         let mut url = self.url.clone();
         // z2m version 1.x allows both / and /api as endpoints for the
@@ -79,6 +80,8 @@ impl Z2mServer {
         url
     }
 
+    #[must_use]
+    #[allow(clippy::option_if_let_else)]
     fn sanitize_url(url: &str) -> String {
         match url.find("token=") {
             Some(offset) => {
@@ -96,6 +99,7 @@ impl Z2mServer {
         }
     }
 
+    #[must_use]
     pub fn get_sanitized_url(&self) -> String {
         Self::sanitize_url(self.get_url().as_str())
     }

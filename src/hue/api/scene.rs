@@ -128,7 +128,6 @@ impl SceneUpdate {
     }
 }
 
-
 impl AddAssign<SceneMetadataUpdate> for SceneMetadata {
     fn add_assign(&mut self, upd: SceneMetadataUpdate) {
         if let Some(appdata) = upd.appdata {

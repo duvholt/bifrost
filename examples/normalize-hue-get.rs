@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use bifrost::error::ApiResult;
 use bifrost::hue::api::ResourceRecord;
-use bifrost::hue::legacy_api::{ApiConfig, ApiGroup, ApiLight, ApiResourceLink, ApiRule, ApiScene, ApiSchedule, ApiSensor};
+use bifrost::hue::legacy_api::{
+    ApiConfig, ApiGroup, ApiLight, ApiResourceLink, ApiRule, ApiScene, ApiSchedule, ApiSensor,
+};
 
 use clap::Parser;
 use clap_stdin::FileOrStdin;
@@ -15,6 +17,7 @@ fn false_positive((a, b): &(&Value, &Value)) -> bool {
     a.is_number() && b.is_number() && a.as_f64() == b.as_f64()
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Input {
@@ -133,7 +136,7 @@ impl<'a> Normalizer<'a> {
         self.items += 1;
         let after = serde_json::to_value(&value)?;
 
-        if !compare(&item, &after, self.report)? {
+        if !compare(item, &after, self.report)? {
             self.errors += 1;
         }
         Ok(())
