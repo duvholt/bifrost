@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    routing::put,
+    routing::get,
     Router,
 };
 use serde_json::Value;
@@ -41,6 +41,10 @@ async fn put_light(
     V2Reply::ok(rlink)
 }
 
+async fn get_light(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
+    V2Reply::ok(state.res.lock().await.get_resource(RType::Light, &id)?)
+}
+
 pub fn router() -> Router<AppState> {
-    Router::new().route("/:id", put(put_light))
+    Router::new().route("/:id", get(get_light).put(put_light))
 }
