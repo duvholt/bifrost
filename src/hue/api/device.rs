@@ -53,7 +53,7 @@ pub struct DeviceProductData {
 }
 
 impl DeviceProductData {
-    const SIGNIFY_MANUFACTURER_NAME: &'static str = "Signify Netherlands B.V.";
+    pub const SIGNIFY_MANUFACTURER_NAME: &'static str = "Signify Netherlands B.V.";
 
     #[must_use]
     pub fn hue_bridge_v2(version: &SwVersion) -> Self {
@@ -150,10 +150,11 @@ impl Sub<&Device> for &Device {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceArchetype {
     BridgeV2,
+    #[default]
     UnknownArchetype,
     ClassicBulb,
     SultanBulb,
