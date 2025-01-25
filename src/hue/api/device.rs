@@ -53,7 +53,7 @@ pub struct DeviceProductData {
 }
 
 impl DeviceProductData {
-    const SIGNIFY_MANUFACTURER_NAME: &'static str = "Signify Netherlands B.V.";
+    pub const SIGNIFY_MANUFACTURER_NAME: &'static str = "Signify Netherlands B.V.";
 
     #[must_use]
     pub fn hue_bridge_v2(version: &SwVersion) -> Self {
