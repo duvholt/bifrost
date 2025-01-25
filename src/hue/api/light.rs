@@ -389,16 +389,108 @@ pub enum LightDynamicsStatus {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightDynamics {
     pub status: LightDynamicsStatus,
-    pub status_values: Vec<String>,
+    pub status_values: Vec<LightDynamicsStatus>,
     pub speed: f64,
     pub speed_valid: bool,
 }
 
+impl Default for LightDynamics {
+    fn default() -> Self {
+        Self {
+            status: LightDynamicsStatus::None,
+            status_values: vec![
+                LightDynamicsStatus::None,
+                LightDynamicsStatus::DynamicPalette,
+            ],
+            speed: 0.0,
+            speed_valid: false,
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum LightEffect {
+    #[default]
+    NoEffect,
+    Prism,
+    Opal,
+    Glisten,
+    Sparkle,
+    Fire,
+    Candle,
+    Underwater,
+    Cosmos,
+    Sunbeam,
+    Enchant,
+}
+
+impl LightEffect {
+    const ALL: [Self; 11] = [
+        Self::Prism,
+        Self::Opal,
+        Self::Glisten,
+        Self::Sparkle,
+        Self::Fire,
+        Self::Candle,
+        Self::Underwater,
+        Self::Cosmos,
+        Self::Sunbeam,
+        Self::Enchant,
+        Self::NoEffect,
+    ];
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightEffects {
-    pub status_values: Vec<String>,
-    pub status: String,
-    pub effect_values: Vec<String>,
+    pub status_values: Vec<LightEffect>,
+    pub status: LightEffect,
+    pub effect_values: Vec<LightEffect>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectsV2 {
+    pub action: LightEffectValues,
+    pub status: LightEffectStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectsV2Update {
+    #[serde(default)]
+    pub action: Option<LightEffectActionUpdate>,
+    #[serde(default)]
+    pub status: Option<LightEffectStatus>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct LightEffectActionUpdate {
+    #[serde(default)]
+    pub effect: Option<LightEffect>,
+    pub parameters: LightEffectParameters,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct LightEffectParameters {
+    #[serde(default)]
+    pub color: Option<ColorUpdate>,
+    #[serde(default)]
+    pub color_temperateure: Option<ColorTemperatureUpdate>,
+    pub speed: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectValues {
+    pub effect_values: Vec<LightEffect>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectStatus {
+    pub effect: LightEffect,
+    pub effect_values: Vec<LightEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
