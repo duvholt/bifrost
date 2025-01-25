@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::model::types::XY;
-use crate::z2m::api::Expose;
+use crate::z2m::api::{Expose, ExposeList};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Light {
@@ -255,6 +255,30 @@ pub struct LightGradient {
     pub points_capable: u32,
     pub points: Vec<LightGradientPoint>,
     pub pixel_count: u32,
+}
+
+impl LightGradient {
+    #[must_use]
+    pub fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
+        match expose {
+            ExposeList {
+                length_max: Some(max),
+                ..
+            } => Some(Self {
+                mode: LightGradientMode::InterpolatedPalette,
+                mode_values: BTreeSet::from([
+                    LightGradientMode::InterpolatedPalette,
+                    LightGradientMode::InterpolatedPaletteMirrored,
+                    LightGradientMode::RandomPixelated,
+                ]),
+                points_capable: *max,
+                points: vec![],
+                // FIXME: we don't have this information, so guestimate it
+                pixel_count: *max * 3,
+            }),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
