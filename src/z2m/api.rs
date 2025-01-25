@@ -379,9 +379,9 @@ pub enum Expose {
     Lock(ExposeLock),
     Numeric(ExposeNumeric),
     Switch(ExposeSwitch),
+    List(ExposeList),
 
     /* FIXME: Not modelled yet */
-    List(ExposeGeneric),
     Text(ExposeGeneric),
     Cover(ExposeGeneric),
     Fan(ExposeGeneric),
@@ -492,6 +492,11 @@ impl ExposeLight {
 pub struct ExposeList {
     #[serde(flatten)]
     pub base: ExposeBase,
+    pub item_type: Box<Expose>,
+    #[serde(default)]
+    pub length_min: Option<u32>,
+    #[serde(default)]
+    pub length_max: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
