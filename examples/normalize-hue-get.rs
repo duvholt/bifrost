@@ -191,6 +191,7 @@ fn process_file(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()> 
                 schedules,
                 sensors,
             } => {
+                /* log::info!("v1 detected"); */
                 nml.test::<ApiConfig>(&config);
 
                 for item in groups.values() {
@@ -222,6 +223,7 @@ fn process_file(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()> 
                 }
             }
             Input::V2Flat(item) => {
+                /* log::info!("v2flat detected"); */
                 nml.test::<ResourceRecord>(&item);
             }
         }
