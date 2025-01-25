@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::ApiError;
+use crate::{error::ApiError, model::types::XY};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(into = "String", try_from = "&str")]
@@ -16,6 +16,17 @@ impl HexColor {
     #[must_use]
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
+    }
+
+    #[must_use]
+    pub fn to_xy_color(&self) -> XY {
+        XY::from_rgb(self.r, self.g, self.b).0
+    }
+}
+
+impl From<[u8; 3]> for HexColor {
+    fn from([r, g, b]: [u8; 3]) -> Self {
+        Self::new(r, g, b)
     }
 }
 
