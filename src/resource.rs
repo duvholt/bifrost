@@ -83,7 +83,8 @@ impl Resources {
                     .with_brightness(light.dimming)
                     .with_on(light.on)
                     .with_color_temperature(light.as_mirek_opt())
-                    .with_color_xy(light.as_color_opt());
+                    .with_color_xy(light.as_color_opt())
+                    .with_gradient(light.as_gradient_opt());
 
                 Ok(Some(Update::Light(upd)))
             }
