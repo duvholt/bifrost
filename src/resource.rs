@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use chrono::Utc;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
@@ -18,56 +17,21 @@ use crate::hue::api::{GroupedLightUpdate, LightUpdate, SceneUpdate, Update};
 use crate::hue::event::EventBlock;
 use crate::hue::version::SwVersion;
 use crate::model::state::{AuxData, State};
+use crate::server::hueevents::HueEventStream;
 use crate::z2m::request::ClientRequest;
-
-use std::collections::VecDeque;
-
-#[derive(Clone, Debug)]
-pub struct LastEvents {
-    inner: VecDeque<(String, EventBlock)>,
-}
-
-impl LastEvents {
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            inner: VecDeque::with_capacity(capacity),
-        }
-    }
-
-    pub fn add(&mut self, id: String, evt: EventBlock) {
-        if self.inner.len() == self.inner.capacity() {
-            self.inner.pop_front();
-            self.inner.push_back((id, evt));
-            debug_assert!(self.inner.len() == self.inner.capacity());
-        } else {
-            self.inner.push_back((id, evt));
-        }
-    }
-
-    pub fn events_after_id(&self, id: &str) -> Vec<(String, EventBlock)> {
-        let mut events = self.inner.iter().skip_while(|(evt_id, _)| evt_id != id);
-        match events.next() {
-            Some(_) => events.cloned().collect(),
-            // return all events if requested event is not in buffer
-            None => self.inner.iter().cloned().collect(),
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct Resources {
     state: State,
     version: SwVersion,
     state_updates: Arc<Notify>,
-    pub hue_updates: Sender<(String, EventBlock)>,
-    pub last_hue_updates: LastEvents,
     pub z2m_updates: Sender<Arc<ClientRequest>>,
-    prev_ts: i64,
-    idx: i32,
+    hue_event_stream: HueEventStream,
 }
 
 impl Resources {
     const MAX_SCENE_ID: u32 = 100;
+    const HUE_EVENTS_BUFFER_SIZE: usize = 128;
 
     #[allow(clippy::new_without_default)]
     #[must_use]
@@ -76,11 +40,8 @@ impl Resources {
             state,
             version,
             state_updates: Arc::new(Notify::new()),
-            hue_updates: Sender::new(32),
-            last_hue_updates: LastEvents::new(32),
             z2m_updates: Sender::new(32),
-            prev_ts: Utc::now().timestamp(),
-            idx: 0,
+            hue_event_stream: HueEventStream::new(Self::HUE_EVENTS_BUFFER_SIZE),
         }
     }
 
@@ -470,30 +431,15 @@ impl Resources {
 
     #[must_use]
     pub fn hue_channel(&self) -> Receiver<(String, EventBlock)> {
-        self.hue_updates.subscribe()
+        self.hue_event_stream.subscribe()
     }
 
-    pub fn hue_events_since(&self, id: &str) -> Vec<(String, EventBlock)> {
-        self.last_hue_updates.events_after_id(id)
-    }
-
-    fn generate_event_id(&mut self) -> String {
-        let ts = Utc::now().timestamp();
-        if ts == self.prev_ts {
-            self.idx += 1;
-        } else {
-            self.idx = 0;
-            self.prev_ts = ts;
-        }
-        format!("{}:{}", ts, self.idx)
+    pub fn hue_events_sent_after_id(&self, id: &str) -> Vec<(String, EventBlock)> {
+        self.hue_event_stream.events_sent_after_id(id)
     }
 
     fn hue_event(&mut self, evt: EventBlock) {
-        let id = self.generate_event_id();
-        self.last_hue_updates.add(id.clone(), evt.clone());
-        if let Err(err) = self.hue_updates.send((id, evt)) {
-            log::trace!("Overflow on hue event pipe: {err}");
-        }
+        self.hue_event_stream.hue_event(evt);
     }
 
     #[must_use]

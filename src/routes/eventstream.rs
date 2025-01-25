@@ -25,7 +25,7 @@ pub async fn get_clip_v2(
                 .res
                 .lock()
                 .await
-                .hue_events_since(id.to_str().unwrap());
+                .hue_events_sent_after_id(id.to_str().unwrap());
             stream::iter(previous_events.into_iter().map(Ok))
                 .chain(stream)
                 .boxed()
