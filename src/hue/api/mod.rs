@@ -18,7 +18,7 @@ pub use light::{
 pub use resource::{RType, ResourceLink, ResourceRecord};
 pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
 pub use scene::{
-    Scene, SceneAction, SceneActionElement, SceneMetadata, SceneRecall, SceneStatus,
+    Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
 };
 pub use stubs::{

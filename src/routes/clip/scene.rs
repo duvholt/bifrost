@@ -7,7 +7,12 @@ use uuid::Uuid;
 
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
+use crate::hue::api::SceneActive;
+use crate::hue::api::{
+    RType, Resource, Scene, SceneStatus, SceneStatusUpdate, SceneUpdate, V2Reply,
+};
 use crate::hue::api::{RType, Resource, Scene, SceneUpdate, V2Reply};
+use crate::model::state::AuxData;
 use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;

@@ -234,7 +234,10 @@ impl Z2mBackend {
                     dimming: None,
                     duration: None,
                 },
-                status: Some(SceneStatus::Inactive),
+                status: Some(SceneStatus {
+                    active: SceneActive::Inactive,
+                    last_recall: None,
+                }),
             };
 
             let link_scene = RType::Scene.deterministic((link_room.rid, scn.id));
@@ -687,11 +690,14 @@ impl Z2mBackend {
                         let scenes = lock.get_scenes_for_room(&scene.group.rid);
                         for rid in scenes {
                             lock.update::<Scene>(&rid, |scn| {
-                                scn.status = if rid == link.rid {
-                                    Some(SceneStatus::Static)
-                                } else {
-                                    Some(SceneStatus::Inactive)
-                                };
+                                scn.status = Some(SceneStatus {
+                                    active: if rid == id {
+                                        SceneActive::Static
+                                    } else {
+                                        SceneActive::Inactive
+                                    },
+                                    last_recall: None,
+                                })
                             })?;
                         }
 
