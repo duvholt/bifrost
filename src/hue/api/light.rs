@@ -485,17 +485,17 @@ pub struct ColorGamut {
 
 impl ColorGamut {
     pub const GAMUT_C: Self = Self {
-        blue: XY {
-            x: 0.1532,
-            y: 0.0475,
+        red: XY {
+            x: 0.6915,
+            y: 0.3083,
         },
         green: XY {
             x: 0.1700,
             y: 0.7000,
         },
-        red: XY {
-            x: 0.6915,
-            y: 0.3083,
+        blue: XY {
+            x: 0.1532,
+            y: 0.0475,
         },
     };
 
