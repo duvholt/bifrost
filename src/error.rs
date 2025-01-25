@@ -126,6 +126,9 @@ pub enum ApiError {
 
     #[error("Cannot parse certificate: {0:?}")]
     CertificateInvalid(Utf8PathBuf),
+
+    #[error("Invalid hex color")]
+    InvalidHexColor,
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;
