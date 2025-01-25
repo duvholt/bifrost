@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::model::types::XY;
@@ -93,27 +93,93 @@ impl From<LightMetadata> for Metadata {
 
 impl Light {
     #[must_use]
-    pub const fn new(owner: ResourceLink, metadata: LightMetadata) -> Self {
+    pub fn new(owner: ResourceLink, metadata: LightMetadata) -> Self {
         Self {
-            alert: None,
+            alert: Some(LightAlert {
+                action_values: BTreeSet::from([String::from("breathe")]),
+            }),
             color: None,
             color_temperature: None,
             color_temperature_delta: Some(Stub {}),
             dimming: None,
             dimming_delta: Some(Stub {}),
-            dynamics: None,
-            effects: None,
-            service_id: None,
+            dynamics: Some(LightDynamics::default()),
+            effects: Some(LightEffects {
+                status_values: LightEffect::ALL.into(),
+                status: LightEffect::NoEffect,
+                effect_values: LightEffect::ALL.into(),
+            }),
+            effects_v2: Some(LightEffectsV2 {
+                action: LightEffectValues {
+                    effect_values: LightEffect::ALL.into(),
+                },
+                status: LightEffectStatus {
+                    effect: LightEffect::NoEffect,
+                    effect_values: LightEffect::ALL.into(),
+                    parameters: None,
+                    /* parameters: Some(json!({ */
+                    /*     "color": { */
+                    /*         "xy": { */
+                    /*             "x": 0.3835, */
+                    /*             "y": 0.3881 */
+                    /*         } */
+                    /*     }, */
+                    /*     "color_temperature": { */
+                    /*         "mirek": 153, */
+                    /*         "mirek_valid": false */
+                    /*     }, */
+                    /*     "speed": 0.4087 */
+                    /* })), */
+                },
+            }),
+            service_id: Some(0),
             gradient: None,
+            /* Some(LightGradient { */
+            /*     mode: LightGradientMode::RandomPixelated, */
+            /*     mode_values: BTreeSet::from([ */
+            /*         LightGradientMode::InterpolatedPalette, */
+            /*         LightGradientMode::InterpolatedPaletteMirrored, */
+            /*         LightGradientMode::RandomPixelated, */
+            /*     ]), */
+            /*     points_capable: 5, */
+            /*     points: vec![], */
+            /*     pixel_count: 7, */
+            /* }) */
             identify: Identify {},
-            timed_effects: None,
+            timed_effects: Some(LightTimedEffects {
+                status_values: json!(["no_effect", "sunrise", "sunset"]),
+                status: json!("no_effect"),
+                effect_values: json!(["no_effect", "sunrise", "sunset"]),
+            }),
             mode: LightMode::Normal,
             on: On { on: true },
-            product_data: None,
+            product_data: Some(LightProductData {
+                function: Some(LightFunction::Decorative),
+            }),
             metadata,
             owner,
-            powerup: None,
-            signaling: None,
+            powerup: Some(LightPowerup {
+                preset: LightPowerupPreset::Safety,
+                configured: true,
+                on: LightPowerupOn::On {
+                    on: On { on: true },
+                },
+                dimming: LightPowerupDimming::Dimming {
+                    dimming: DimmingUpdate { brightness: 100.0 },
+                },
+                color: LightPowerupColor::ColorTemperature {
+                    color_temperature: ColorTemperatureUpdate { mirek: 366 },
+                },
+            }),
+            signaling: Some(LightSignaling {
+                signal_values: vec![
+                    LightSignal::NoSignal,
+                    LightSignal::OnOff,
+                    LightSignal::OnOffColor,
+                    LightSignal::Alternating,
+                ],
+                status: Value::Null,
+            }),
         }
     }
 
