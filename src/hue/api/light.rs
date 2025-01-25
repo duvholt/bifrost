@@ -29,6 +29,8 @@ pub struct Light {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects: Option<LightEffects>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub effects_v2: Option<LightEffectsV2>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub service_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradient>,
@@ -514,6 +516,8 @@ pub struct LightUpdate {
     pub color_temperature: Option<ColorTemperatureUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradientUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effects_v2: Option<LightEffectsV2Update>,
 }
 
 impl LightUpdate {
