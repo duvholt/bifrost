@@ -75,7 +75,7 @@ impl LightMetadata {
         Self {
             archetype,
             name: name.to_string(),
-            function: None,
+            function: Some(LightFunction::Decorative),
             fixed_mired: None,
         }
     }
