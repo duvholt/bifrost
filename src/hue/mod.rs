@@ -2,6 +2,7 @@ use mac_address::MacAddress;
 
 pub mod api;
 pub mod date_format;
+pub mod devicedb;
 pub mod event;
 pub mod legacy_api;
 pub mod scene_icons;
