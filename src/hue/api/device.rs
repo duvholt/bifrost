@@ -3,6 +3,7 @@ use std::ops::{AddAssign, Sub};
 use serde::{Deserialize, Serialize};
 
 use crate::hue::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
+use crate::hue::devicedb::{hardware_platform_type, product_archetype};
 use crate::hue::version::SwVersion;
 use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
 use crate::z2m;
@@ -80,7 +81,8 @@ impl DeviceProductData {
         let certified = manufacturer_name == Self::SIGNIFY_MANUFACTURER_NAME;
         let software_version = str_or_unknown(dev.software_build_id.as_ref());
 
-        let product_archetype = DeviceArchetype::SpotBulb;
+        let product_archetype = product_archetype(&model_id).unwrap_or_default();
+        let hardware_platform_type = hardware_platform_type(&model_id).map(ToString::to_string);
 
         Self {
             model_id,
@@ -89,7 +91,7 @@ impl DeviceProductData {
             product_archetype,
             certified,
             software_version,
-            hardware_platform_type: None,
+            hardware_platform_type,
         }
     }
 }
