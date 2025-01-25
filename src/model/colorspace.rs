@@ -22,13 +22,52 @@ impl ColorSpace {
     }
 
     #[must_use]
-    pub fn to_rgb(&self, x: f64, y: f64, z: f64) -> [f64; 3] {
+    pub fn xyz_to_rgb(&self, x: f64, y: f64, z: f64) -> [f64; 3] {
         Self::mult([x, y, z], &self.rgb).map(|q| self.gamma.transform(q))
     }
 
+    #[allow(non_snake_case)]
     #[must_use]
-    pub fn to_xyz(&self, r: f64, g: f64, b: f64) -> [f64; 3] {
+    pub fn xyy_to_rgb(&self, x: f64, y: f64, Y: f64) -> [f64; 3] {
+        let z = 1.0 - x - y;
+        self.xyz_to_rgb((Y / y) * x, Y, (Y / y) * z)
+    }
+
+    #[must_use]
+    pub fn rgb_to_xyz(&self, r: f64, g: f64, b: f64) -> [f64; 3] {
         Self::mult([r, g, b].map(|q| self.gamma.inverse(q)), &self.xyz)
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    #[must_use]
+    pub fn rgb_to_xyy(&self, r: f64, g: f64, b: f64) -> [f64; 3] {
+        let [cx, cy, cz] = self.rgb_to_xyz(r, g, b);
+
+        let x = cx / (cx + cy + cz);
+        let y = cy / (cx + cy + cz);
+        let brightness = cy;
+
+        [x, y, brightness]
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    #[must_use]
+    pub fn find_maximum_y(&self, x: f64, y: f64) -> f64 {
+        let mut bri = 1.0;
+        for _ in 0..10 {
+            let [r, g, b] = self.xyy_to_rgb(x, y, bri);
+            let max = r.max(g).max(b);
+            bri /= max;
+        }
+
+        bri
+    }
+
+    #[allow(non_snake_case)]
+    #[must_use]
+    pub fn xy_to_rgb_color(&self, x: f64, y: f64, brightness: f64) -> [f64; 3] {
+        let max_Y = self.find_maximum_y(x, y);
+        self.xyy_to_rgb(x, y, max_Y * brightness / 255.0)
     }
 }
 
