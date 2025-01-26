@@ -17,7 +17,7 @@ pub async fn get_clip_v2(
     let hello = tokio_stream::iter([Ok(Event::default().comment("hi"))]);
     let last_event_id = headers.get("last-event-id");
 
-    let channel = state.res.lock().await.hue_channel();
+    let channel = state.res.lock().await.hue_event_stream().subscribe();
     let stream = BroadcastStream::new(channel);
     let events = match last_event_id {
         Some(id) => {
@@ -25,7 +25,8 @@ pub async fn get_clip_v2(
                 .res
                 .lock()
                 .await
-                .hue_events_sent_after_id(id.to_str().unwrap());
+                .hue_event_stream()
+                .events_sent_after_id(id.to_str().unwrap());
             stream::iter(previous_events.into_iter().map(Ok))
                 .chain(stream)
                 .boxed()

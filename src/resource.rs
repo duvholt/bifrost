@@ -128,7 +128,8 @@ impl Resources {
 
         if let Some(delta) = Self::generate_update(obj)? {
             let id_v1 = self.state.id_v1(id);
-            self.hue_event(EventBlock::update(id, id_v1, delta)?);
+            self.hue_event_stream
+                .hue_event(EventBlock::update(id, id_v1, delta)?);
         }
 
         self.state_updates.notify_one();
@@ -187,7 +188,7 @@ impl Resources {
 
         log::trace!("Send event: {evt:?}");
 
-        self.hue_event(evt);
+        self.hue_event_stream.hue_event(evt);
 
         Ok(())
     }
@@ -200,7 +201,7 @@ impl Resources {
 
         let evt = EventBlock::delete(link)?;
 
-        self.hue_event(evt);
+        self.hue_event_stream.hue_event(evt);
 
         Ok(())
     }
@@ -430,16 +431,8 @@ impl Resources {
     }
 
     #[must_use]
-    pub fn hue_channel(&self) -> Receiver<(String, EventBlock)> {
-        self.hue_event_stream.subscribe()
-    }
-
-    pub fn hue_events_sent_after_id(&self, id: &str) -> Vec<(String, EventBlock)> {
-        self.hue_event_stream.events_sent_after_id(id)
-    }
-
-    fn hue_event(&mut self, evt: EventBlock) {
-        self.hue_event_stream.hue_event(evt);
+    pub fn hue_event_stream(&self) -> &HueEventStream {
+        &self.hue_event_stream
     }
 
     #[must_use]
