@@ -1,5 +1,5 @@
 use axum::extract::State;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, HeaderValue};
 use axum::response::sse::{Event, Sse};
 use axum::routing::get;
 use axum::Router;
@@ -15,23 +15,23 @@ pub async fn get_clip_v2(
     State(state): State<AppState>,
 ) -> Sse<impl Stream<Item = ApiResult<Event>>> {
     let hello = tokio_stream::iter([Ok(Event::default().comment("hi"))]);
-    let last_event_id = headers.get("last-event-id");
+    let last_event_id = headers.get("last-event-id").map(HeaderValue::to_str);
 
     let channel = state.res.lock().await.hue_event_stream().subscribe();
     let stream = BroadcastStream::new(channel);
     let events = match last_event_id {
-        Some(id) => {
+        Some(Ok(id)) => {
             let previous_events = state
                 .res
                 .lock()
                 .await
                 .hue_event_stream()
-                .events_sent_after_id(id.to_str().unwrap());
+                .events_sent_after_id(id);
             stream::iter(previous_events.into_iter().map(Ok))
                 .chain(stream)
                 .boxed()
         }
-        None => stream.boxed(),
+        _ => stream.boxed(),
     };
 
     let stream = events.map(move |e| {
