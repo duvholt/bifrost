@@ -375,6 +375,8 @@ pub struct LightPowerup {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupOn {
+    // Not a real powerup.on.mode option, but used to indicate that
+    // powerup.on itself is null
     #[default]
     None,
     Previous,
@@ -393,6 +395,8 @@ impl LightPowerupOn {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupColor {
+    // Not a real powerup.color.mode option, but used to indicate that
+    // powerup.color itself is null
     #[default]
     None,
     Previous,
@@ -414,6 +418,8 @@ impl LightPowerupColor {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupDimming {
+    // Not a real powerup.dimming.mode option, but used to indicate that
+    // powerup.dimming itself is null
     #[default]
     None,
     Previous,
