@@ -1,40 +1,67 @@
 use std::collections::VecDeque;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tokio::sync::broadcast::Sender;
 
 use crate::hue::event::EventBlock;
 
 #[derive(Clone, Debug)]
+pub struct HueEventRecord {
+    timestamp: DateTime<Utc>,
+    index: u32,
+    pub block: EventBlock,
+}
+impl HueEventRecord {
+    pub fn id(&self) -> String {
+        format!("{}:{}", self.timestamp.timestamp(), self.index)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct HueEventStream {
-    prev_ts: i64,
-    idx: i32,
-    hue_updates: Sender<(String, EventBlock)>,
-    buffer: VecDeque<(String, EventBlock)>,
+    prev_ts: DateTime<Utc>,
+    prev_index: u32,
+    hue_updates: Sender<HueEventRecord>,
+    buffer: VecDeque<HueEventRecord>,
 }
 
 impl HueEventStream {
     pub fn new(buffer_capacity: usize) -> Self {
         Self {
-            prev_ts: Utc::now().timestamp(),
-            idx: 0,
+            prev_ts: Utc::now(),
+            prev_index: 0,
             hue_updates: Sender::new(32),
             buffer: VecDeque::with_capacity(buffer_capacity),
         }
     }
 
-    pub fn add_to_buffer(&mut self, id: String, evt: EventBlock) {
+    fn add_to_buffer(&mut self, record: HueEventRecord) {
         if self.buffer.len() == self.buffer.capacity() {
             self.buffer.pop_front();
-            self.buffer.push_back((id, evt));
+            self.buffer.push_back(record);
             debug_assert!(self.buffer.len() == self.buffer.capacity());
         } else {
-            self.buffer.push_back((id, evt));
+            self.buffer.push_back(record);
         }
     }
 
-    pub fn events_sent_after_id(&self, id: &str) -> Vec<(String, EventBlock)> {
-        let mut events = self.buffer.iter().skip_while(|(evt_id, _)| evt_id != id);
+    fn generate_record(&mut self, block: EventBlock) -> HueEventRecord {
+        let ts = Utc::now();
+        if ts.timestamp() == self.prev_ts.timestamp() {
+            self.prev_index += 1;
+        } else {
+            self.prev_index = 0;
+            self.prev_ts = ts;
+        }
+        HueEventRecord {
+            block,
+            timestamp: ts,
+            index: self.prev_index,
+        }
+    }
+
+    pub fn events_sent_after_id(&self, id: &str) -> Vec<HueEventRecord> {
+        let mut events = self.buffer.iter().skip_while(|record| record.id() != id);
         match events.next() {
             Some(_) => events.cloned().collect(),
             // return all events if requested event is not in buffer
@@ -42,26 +69,15 @@ impl HueEventStream {
         }
     }
 
-    pub fn hue_event(&mut self, evt: EventBlock) {
-        let id = self.generate_event_id();
-        self.add_to_buffer(id.clone(), evt.clone());
-        if let Err(err) = self.hue_updates.send((id, evt)) {
+    pub fn hue_event(&mut self, block: EventBlock) {
+        let record = self.generate_record(block);
+        self.add_to_buffer(record.clone());
+        if let Err(err) = self.hue_updates.send(record) {
             log::trace!("Overflow on hue event pipe: {err}");
         }
     }
 
-    fn generate_event_id(&mut self) -> String {
-        let ts = Utc::now().timestamp();
-        if ts == self.prev_ts {
-            self.idx += 1;
-        } else {
-            self.idx = 0;
-            self.prev_ts = ts;
-        }
-        format!("{}:{}", ts, self.idx)
-    }
-
-    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<(String, EventBlock)> {
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<HueEventRecord> {
         self.hue_updates.subscribe()
     }
 }

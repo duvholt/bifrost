@@ -35,8 +35,9 @@ pub async fn get_clip_v2(
     };
 
     let stream = events.map(move |e| {
-        let (evt_id, evt) = e?;
-        let json = [evt];
+        let evt = e?;
+        let evt_id = evt.id();
+        let json = [evt.block];
         log::trace!(
             "## EVENT ##: {}",
             serde_json::to_string(&json).unwrap_or_else(|_| "ERROR".to_string())
