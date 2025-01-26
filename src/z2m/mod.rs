@@ -458,7 +458,8 @@ impl Client {
     }
 
     async fn handle_device_message(&mut self, msg: RawMessage) -> ApiResult<()> {
-        if msg.topic.contains('/') {
+        if msg.topic.ends_with("/availability") {
+            // https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html#zigbee2mqtt-friendly-name-availability
             return Ok(());
         }
 
