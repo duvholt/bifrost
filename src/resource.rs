@@ -431,7 +431,7 @@ impl Resources {
     }
 
     #[must_use]
-    pub fn hue_event_stream(&self) -> &HueEventStream {
+    pub const fn hue_event_stream(&self) -> &HueEventStream {
         &self.hue_event_stream
     }
 

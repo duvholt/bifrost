@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use chrono::{DateTime, Utc};
-use tokio::sync::broadcast::Sender;
+use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::hue::event::EventBlock;
 
@@ -11,7 +11,9 @@ pub struct HueEventRecord {
     index: u32,
     pub block: EventBlock,
 }
+
 impl HueEventRecord {
+    #[must_use]
     pub fn id(&self) -> String {
         format!("{}:{}", self.timestamp.timestamp(), self.index)
     }
@@ -19,17 +21,18 @@ impl HueEventRecord {
 
 #[derive(Clone, Debug)]
 pub struct HueEventStream {
-    prev_ts: DateTime<Utc>,
-    prev_index: u32,
+    timestamp: DateTime<Utc>,
+    index: u32,
     hue_updates: Sender<HueEventRecord>,
     buffer: VecDeque<HueEventRecord>,
 }
 
 impl HueEventStream {
+    #[must_use]
     pub fn new(buffer_capacity: usize) -> Self {
         Self {
-            prev_ts: Utc::now(),
-            prev_index: 0,
+            timestamp: Utc::now(),
+            index: 0,
             hue_updates: Sender::new(32),
             buffer: VecDeque::with_capacity(buffer_capacity),
         }
@@ -46,20 +49,21 @@ impl HueEventStream {
     }
 
     fn generate_record(&mut self, block: EventBlock) -> HueEventRecord {
-        let ts = Utc::now();
-        if ts.timestamp() == self.prev_ts.timestamp() {
-            self.prev_index += 1;
+        let timestamp = Utc::now();
+        if timestamp.timestamp() == self.timestamp.timestamp() {
+            self.index += 1;
         } else {
-            self.prev_index = 0;
-            self.prev_ts = ts;
+            self.index = 0;
+            self.timestamp = timestamp;
         }
         HueEventRecord {
             block,
-            timestamp: ts,
-            index: self.prev_index,
+            timestamp,
+            index: self.index,
         }
     }
 
+    #[must_use]
     pub fn events_sent_after_id(&self, id: &str) -> Vec<HueEventRecord> {
         let mut events = self.buffer.iter().skip_while(|record| record.id() != id);
         match events.next() {
@@ -77,7 +81,8 @@ impl HueEventStream {
         }
     }
 
-    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<HueEventRecord> {
+    #[must_use]
+    pub fn subscribe(&self) -> Receiver<HueEventRecord> {
         self.hue_updates.subscribe()
     }
 }
