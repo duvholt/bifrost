@@ -14,7 +14,7 @@ pub struct ColorSpace {
 
 impl ColorSpace {
     #[must_use]
-    const fn mult(d: [f64; 3], m: &[f64; 9]) -> [f64; 3] {
+    fn mult(d: [f64; 3], m: &[f64; 9]) -> [f64; 3] {
         let cx = d[0] * m[0] + d[1] * m[1] + d[2] * m[2];
         let cy = d[0] * m[3] + d[1] * m[4] + d[2] * m[5];
         let cz = d[0] * m[6] + d[1] * m[7] + d[2] * m[8];
