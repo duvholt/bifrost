@@ -17,6 +17,7 @@ use crate::hue::api::{GroupedLightUpdate, LightUpdate, SceneUpdate, Update};
 use crate::hue::event::EventBlock;
 use crate::hue::version::SwVersion;
 use crate::model::state::{AuxData, State};
+use crate::server::hueevents::HueEventStream;
 use crate::z2m::request::ClientRequest;
 
 #[derive(Clone, Debug)]
@@ -24,12 +25,13 @@ pub struct Resources {
     state: State,
     version: SwVersion,
     state_updates: Arc<Notify>,
-    pub hue_updates: Sender<EventBlock>,
     pub z2m_updates: Sender<Arc<ClientRequest>>,
+    hue_event_stream: HueEventStream,
 }
 
 impl Resources {
     const MAX_SCENE_ID: u32 = 100;
+    const HUE_EVENTS_BUFFER_SIZE: usize = 128;
 
     #[allow(clippy::new_without_default)]
     #[must_use]
@@ -38,8 +40,8 @@ impl Resources {
             state,
             version,
             state_updates: Arc::new(Notify::new()),
-            hue_updates: Sender::new(32),
             z2m_updates: Sender::new(32),
+            hue_event_stream: HueEventStream::new(Self::HUE_EVENTS_BUFFER_SIZE),
         }
     }
 
@@ -126,7 +128,8 @@ impl Resources {
 
         if let Some(delta) = Self::generate_update(obj)? {
             let id_v1 = self.state.id_v1(id);
-            self.hue_event(EventBlock::update(id, id_v1, delta)?);
+            self.hue_event_stream
+                .hue_event(EventBlock::update(id, id_v1, delta)?);
         }
 
         self.state_updates.notify_one();
@@ -185,7 +188,7 @@ impl Resources {
 
         log::trace!("Send event: {evt:?}");
 
-        self.hue_event(evt);
+        self.hue_event_stream.hue_event(evt);
 
         Ok(())
     }
@@ -198,7 +201,7 @@ impl Resources {
 
         let evt = EventBlock::delete(link)?;
 
-        self.hue_event(evt);
+        self.hue_event_stream.hue_event(evt);
 
         Ok(())
     }
@@ -428,14 +431,8 @@ impl Resources {
     }
 
     #[must_use]
-    pub fn hue_channel(&self) -> Receiver<EventBlock> {
-        self.hue_updates.subscribe()
-    }
-
-    fn hue_event(&self, evt: EventBlock) {
-        if let Err(err) = self.hue_updates.send(evt) {
-            log::trace!("Overflow on hue event pipe: {err}");
-        }
+    pub const fn hue_event_stream(&self) -> &HueEventStream {
+        &self.hue_event_stream
     }
 
     #[must_use]
