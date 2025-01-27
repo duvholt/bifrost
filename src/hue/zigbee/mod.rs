@@ -160,3 +160,78 @@ impl HueZigbeeUpdate {
         self
     }
 }
+
+#[allow(clippy::cast_possible_truncation)]
+impl HueZigbeeUpdate {
+    pub fn from_reader(rdr: &mut impl Read) -> ApiResult<Self> {
+        let mut hz = Self::default();
+
+        let mut flags = Flags::from_bits(rdr.read_u16::<LittleEndian>()?).unwrap();
+
+        if flags.take(Flags::ON_OFF) {
+            hz.onoff = Some(rdr.read_u8()?);
+        }
+
+        if flags.take(Flags::BRIGHTNESS) {
+            hz.brightness = Some(rdr.read_u8()?);
+        }
+
+        if flags.take(Flags::COLOR_MIREK) {
+            hz.color_mirek = Some(rdr.read_u16::<LittleEndian>()?);
+        }
+
+        if flags.take(Flags::COLOR_XY) {
+            hz.color_xy = Some(XY::new(
+                f64::from(rdr.read_u16::<LittleEndian>()?) / f64::from(0xFFFF),
+                f64::from(rdr.read_u16::<LittleEndian>()?) / f64::from(0xFFFF),
+            ));
+        }
+
+        if flags.take(Flags::UNKNOWN_0) {
+            hz.unk0 = Some(rdr.read_u16::<LittleEndian>()?);
+        }
+
+        if flags.take(Flags::EFFECT_TYPE) {
+            let data = rdr.read_u8()?;
+            hz.effect_type =
+                Some(EffectType::from_primitive(data).ok_or(ApiError::HueZigbeeDecodeError)?);
+        }
+
+        if flags.take(Flags::GRADIENT_COLORS) {
+            let len = rdr.read_u8()?;
+            let mut data = vec![0; 4];
+            rdr.read_exact(&mut data)?;
+            let header = GradientUpdateHeader::unpack_from_slice(&data)?;
+            debug_assert!(len == header.nlights * 3 + 4);
+
+            let mut points = vec![];
+            for _ in 0..header.nlights {
+                let mut point = vec![0; 3];
+                rdr.read_exact(&mut point)?;
+                let point = PackedXY12::unpack_from_slice(&point)?;
+                points.push(XY {
+                    x: f64::from(point.x) / f64::from(0xFFF),
+                    y: f64::from(point.y) / f64::from(0xFFF),
+                });
+            }
+            hz.gradient_colors = Some(GradientColors { header, points });
+        }
+
+        if flags.take(Flags::EFFECT_SPEED) {
+            hz.effect_speed = Some(rdr.read_u8()?);
+        }
+
+        if flags.take(Flags::GRADIENT_PARAMS) {
+            hz.gradient_params = Some(GradientParams {
+                scale: rdr.read_u8()?,
+                offset: rdr.read_u8()?,
+            });
+        }
+
+        if flags.is_empty() {
+            Ok(hz)
+        } else {
+            Err(ApiError::HueZigbeeUnknownFlags(flags.bits()))
+        }
+    }
+}
