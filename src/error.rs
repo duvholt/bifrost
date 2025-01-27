@@ -136,6 +136,12 @@ pub enum ApiError {
 
     #[error("Invalid hex color")]
     InvalidHexColor,
+
+    #[error("Failed to decode Hue Zigbee Update")]
+    HueZigbeeDecodeError,
+
+    #[error("Failed to decode Hue Zigbee Update: Unknown flags {0:04x}")]
+    HueZigbeeUnknownFlags(u16),
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;
