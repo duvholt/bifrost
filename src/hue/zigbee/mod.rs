@@ -235,3 +235,77 @@ impl HueZigbeeUpdate {
         }
     }
 }
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+impl HueZigbeeUpdate {
+    pub fn serialize(&self, wtr: &mut impl Write) -> ApiResult<()> {
+        #[allow(clippy::ref_option)]
+        fn opt_to_flag<T>(flags: &mut Flags, opt: &Option<T>, flag: Flags) {
+            if opt.is_some() {
+                flags.insert(flag);
+            }
+        }
+
+        let mut flags = Flags::empty();
+        opt_to_flag(&mut flags, &self.onoff, Flags::ON_OFF);
+        opt_to_flag(&mut flags, &self.brightness, Flags::BRIGHTNESS);
+        opt_to_flag(&mut flags, &self.color_mirek, Flags::COLOR_MIREK);
+        opt_to_flag(&mut flags, &self.color_xy, Flags::COLOR_XY);
+        opt_to_flag(&mut flags, &self.unk0, Flags::UNKNOWN_0);
+        opt_to_flag(&mut flags, &self.effect_type, Flags::EFFECT_TYPE);
+        opt_to_flag(&mut flags, &self.effect_speed, Flags::EFFECT_SPEED);
+        opt_to_flag(&mut flags, &self.gradient_colors, Flags::GRADIENT_COLORS);
+        opt_to_flag(&mut flags, &self.gradient_params, Flags::GRADIENT_PARAMS);
+
+        wtr.write_u16::<LittleEndian>(flags.bits())?;
+
+        if let Some(onoff) = self.onoff {
+            wtr.write_u8(onoff)?;
+        }
+
+        if let Some(bright) = self.brightness {
+            wtr.write_u8(bright)?;
+        }
+
+        if let Some(mirek) = self.color_mirek {
+            wtr.write_u16::<LittleEndian>(mirek)?;
+        }
+
+        if let Some(xy) = self.color_xy {
+            wtr.write_u16::<LittleEndian>((xy.x * f64::from(0xFFFF)) as u16)?;
+            wtr.write_u16::<LittleEndian>((xy.y * f64::from(0xFFFF)) as u16)?;
+        }
+
+        if let Some(unk0) = self.unk0 {
+            wtr.write_u16::<LittleEndian>(unk0)?;
+        }
+
+        if let Some(etype) = self.effect_type {
+            wtr.write_u8(etype.to_primitive())?;
+        }
+
+        if let Some(grad_color) = &self.gradient_colors {
+            let len = u8::try_from(4 + 3 * grad_color.points.len())?;
+            wtr.write_u8(len)?;
+            wtr.write_all(&grad_color.header.pack()?)?;
+            for point in &grad_color.points {
+                let packed = PackedXY12 {
+                    x: (point.x * f64::from(0xFFF)) as u16,
+                    y: (point.y * f64::from(0xFFF)) as u16,
+                };
+                wtr.write_all(&packed.pack()?)?;
+            }
+        }
+
+        if let Some(effect_speed) = self.effect_speed {
+            wtr.write_u8(effect_speed)?;
+        }
+
+        if let Some(params) = &self.gradient_params {
+            wtr.write_u8(params.scale)?;
+            wtr.write_u8(params.offset)?;
+        }
+
+        Ok(())
+    }
+}
