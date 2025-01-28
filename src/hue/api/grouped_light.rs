@@ -78,7 +78,7 @@ impl GroupedLightUpdate {
     }
 
     #[must_use]
-    pub const fn with_color_temperature(self, mirek: Option<u32>) -> Self {
+    pub const fn with_color_temperature(self, mirek: Option<u16>) -> Self {
         Self {
             color_temperature: if let Some(ct) = mirek {
                 Some(ColorTemperatureUpdate::new(ct))

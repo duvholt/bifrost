@@ -15,7 +15,7 @@ pub struct DeviceUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brightness: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub color_temp: Option<u32>,
+    pub color_temp: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_mode: Option<DeviceColorMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,7 +81,7 @@ impl DeviceUpdate {
     }
 
     #[must_use]
-    pub fn with_color_temp(self, mirek: Option<u32>) -> Self {
+    pub fn with_color_temp(self, mirek: Option<u16>) -> Self {
         Self {
             color_temp: mirek,
             ..self

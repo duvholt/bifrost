@@ -191,7 +191,7 @@ impl Light {
     }
 
     #[must_use]
-    pub fn as_mirek_opt(&self) -> Option<u32> {
+    pub fn as_mirek_opt(&self) -> Option<u16> {
         self.color_temperature.as_ref().and_then(|ct| ct.mirek)
     }
 
@@ -615,7 +615,7 @@ impl LightUpdate {
     }
 
     #[must_use]
-    pub fn with_color_temperature(self, mirek: impl Into<Option<u32>>) -> Self {
+    pub fn with_color_temperature(self, mirek: impl Into<Option<u16>>) -> Self {
         Self {
             color_temperature: mirek.into().map(ColorTemperatureUpdate::new),
             ..self
@@ -691,12 +691,12 @@ impl ColorUpdate {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct ColorTemperatureUpdate {
-    pub mirek: u32,
+    pub mirek: u16,
 }
 
 impl ColorTemperatureUpdate {
     #[must_use]
-    pub const fn new(mirek: u32) -> Self {
+    pub const fn new(mirek: u16) -> Self {
         Self { mirek }
     }
 }
@@ -783,7 +783,7 @@ impl MirekSchema {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ColorTemperature {
-    pub mirek: Option<u32>,
+    pub mirek: Option<u16>,
     pub mirek_schema: MirekSchema,
     pub mirek_valid: bool,
 }
