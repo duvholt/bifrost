@@ -225,7 +225,108 @@ app are activated.
 
 ### Property: `GRADIENT_COLORS`
 
-For gradient light strips, this property allows setting a number of independent colors
+For gradient light strips, this property allows setting a number of independent
+colors at once.
+
+The gradient colors black is the most complicated of the property data blocks
+used in this format. It has the following layout:
+
+```text
+
+  ┌───────────┬───┬───┬───┬───┬───┬───┬───┬───┐
+  │ Byte  Bit ► 7 │ 6 │ 5 │ 4 │ 3 │ 2 │ 1 │ 0 │
+  ├─▼─────────┼───┴───┴───┴───┴───┴───┴───┴───┤
+  │ 0         │ .size (excluding this field)  │
+  ├───────────┼───────────────┬───────────────┤
+  │ 1         │ .color_count  │ MUST be zero! │
+  ├───────────┼───────────────┴───────────────┤
+  │ 2         │ .gradient_style               │
+  ├───────────┼───────────────────────────────┤
+  │ 3         │ Reserved (seems unused)       │
+  │           │                               │
+  │ 4         │                               │
+  ├───────────┼───────────────────────────────┤
+  │ 5+3*index │ .color_x (low 8 bits)         │\
+  │           ├───────────────┐ - - - - - - - │ \
+  │ 6+3*index │ (low 4 bits)  │ (high 4 bits) │  Repeated {.color_count} times
+  │           │ - - - - - - - └───────────────┤ /
+  │ 7+3*index │ .color_y (high 8 bits)        │/
+  ├───────────┼───────────────────────────────┤
+  :           :                               :
+  :           :                               :
+```
+
+### Property: `GRADIENT_COLORS`: Color encoding
+
+The gradient colors format can speficy up to and including 9 colors, even for
+light strips with fewer than 9 segments. Any attempt to specify 10 or more
+colors will result in the entire message being rejected.
+
+Each color is packed into 3 bytes, representing 12 bits for the `X` and `Y`
+color coordinate, respectively. These bytes are packed in an odd way. The
+following code snippet demonstrates how to unpack them:
+
+```rust
+let x = u16::from(bytes[0]) | u16::from(bytes[1] & 0x0F) << 8;
+let y = u16::from(bytes[2]) << 4 | u16::from(bytes[1] >> 4);
+```
+
+And packing:
+
+```rust
+let bytes: [u8; 3] = [
+    (x & 0xFF) as u8,
+    (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
+    (y >> 4 & 0xFF) as u8,
+];
+```
+
+These 12-bit values are fractional values, but NOT in the unit range 0..1 as
+might be expected.
+
+Instead, the coordinates are scaled so that precision is not wasted on useless
+coordinates outside the visible light spectrum, for example.
+
+Other implementations all seem to make this guess about the scaling:
+
+```rust
+const maxX = 0.7347;
+const maxY = 0.8431;
+```
+
+As far as I can tell, these numbers appeared at one point in someone's
+implementation (probably as a best guess), and have been mercilessly copy-pasted
+since then. If anyone can show a good source for why these numbers would be
+correct, please let me know!
+
+Now, the X coordinate makes a lot of sense, and is right as far as I can tell.
+
+The value 0.7347 is the maximum X value inside the visible light spectrum.
+For a visual illustration of this, see <https://viereck.ch/hue-xy-rgb/>.
+
+The "Wide" color gamut also has this exact number in its specification, as the X
+value of the "Red" coordinate, specifically.
+
+However, the Y value doesn't match any source I can find.
+
+If the scaling matches the Wide Gamut, the Y value (maximum height) should be
+`0.8264`. It it matches the top of the visible light area, it should be around
+`0.836`. I have no idea where `0.8431` comes from!
+
+From experimentation, I have determined that the most likely candidate is the
+outer bounds of the wide gamut, leading to the following values:
+
+```rust
+const MAX_X: f64 = 0.7347;
+const MAX_Y: f64 = 0.8264;
+```
+
+These are then the scaling values used when serializing/deserializing the 24-bit
+(X,Y) values in the gradient colors.
+
+In other words, X values from `0` to `0xFFF` represent the X-coordinates `0.0`
+to `0.7347`, while Y values in the same range represent Y-coordinates from `0.0`
+to `0.8264`.
 
 ### Property: `EFFECT_SPEED`
 
