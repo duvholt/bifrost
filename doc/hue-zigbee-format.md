@@ -112,15 +112,32 @@ Now we can read the properties that have their corresponding flag set.
 
 The fields are always read this this order:
 
-  - `ON_OFF`
-  - `BRIGHTNESS`
-  - `COLOR_MIREK`
-  - `COLOR_XY`
-  - `FADE_SPEED`
-  - `EFFECT_TYPE`
-  - `GRADIENT_COLORS`
-  - `EFFECT_SPEED`
-  - `GRADIENT_PARAMS`
+| Field             | Size     |
+|-------------------|----------|
+| `ON_OFF`          | 1 byte   |
+| `BRIGHTNESS`      | 1 byte   |
+| `COLOR_MIREK`     | 2 bytes  |
+| `COLOR_XY`        | 4 bytes  |
+| `FADE_SPEED`      | 2 bytes  |
+| `EFFECT_TYPE`     | 1 byte   |
+| `GRADIENT_COLORS` | variable |
+| `EFFECT_SPEED`    | 1 byte   |
+| `GRADIENT_PARAMS` | 2 bytes  |
+
+After reading the message in this manner, there shouldn't be any bytes left over.
+
+However, this is seemingly a protocol that has been extended a few times (as can
+be observed from the newest flags occupying the highest bits, for instance).
+
+This would theoretically allow older devices to simply ignore all unknown flags,
+and the corresponding "tail" of the message, while still reacting to the
+properties they understand.
+
+It is unknown if Hue devices actually operate in this way, or if they would
+reject messages they do not fully understand.
+
+Certainly, invalid messages with known flags are readily reject (and thus,
+completely ignored), if they cannot be parsed 100% successfully.
 
 ### Property: `ON_OFF`
 
@@ -153,7 +170,7 @@ The color of the light, in XY format.
 These coordinates are encoded as 16-bit little-endian integers, each
 representing a fixed-point number in the range `0`..`1`.
 
-Here 0 represents `0.0` and `0xFFF` represents `1.0`.
+Here 0 represents `0.0` and `0xFFFF` represents `1.0`.
 
 ### Property: `FADE_SPEED`
 
@@ -172,12 +189,27 @@ be a good way to enable smooth, lightweight light transitions.
 
 Size: 1 byte (specifically, [`EffectType`])
 
+| Name       | Value |
+|------------|-------|
+| NoEffect   | 0x00  |
+| Candle     | 0x01  |
+| Fireplace  | 0x02  |
+| Prism      | 0x03  |
+| Sunrise    | 0x09  |
+| Sparkle    | 0x0a  |
+| Opal       | 0x0b  |
+| Glisten    | 0x0c  |
+| Underwater | 0x0e  |
+| Cosmos     | 0x0f  |
+| Sunbeam    | 0x10  |
+| Enchant    | 0x11  |
+
 This enables one of the specific, known effects in the [`EffectType`] enum. Most
 (all?) effects allow setting other properties (such as color xy or color
 temperature) while the effect is active.
 
-This is how combinations like "Purple Fireplace" or "Blue Candle" are made from
-the Hue app.
+This is how custom effects like "Purple Fireplace" or "Blue Candle" from the Hue
+app are activated.
 
 ### Property: `GRADIENT_COLORS`
 
@@ -199,4 +231,100 @@ A good starting point seems to be 128 (representing 0.5).
 
 ### Property: `GRADIENT_PARAMS`
 
-Size: 2 x 1 byte
+Size: 2 bytes (`scale`, `offset`)
+
+The gradient parameters block contain two bytes, describing the `scale` (first
+byte) and `offset` (second byte).
+
+Both bytes are in fixed-point format, with the upper 5 bits representing the
+integer portion, and the lower 3 bits the fractional part:
+
+```text
+| 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+\                  / \          /
+ \________________/   \________/
+       integer         fraction
+
+```
+
+Here are some examples of translating to/from this fixed-point format:
+
+| Encoded value | Quotient | Numeric value |
+|---------------|----------|---------------|
+| 0x00          | 0/8      | 0.0           |
+| 0x01          | 1/8      | 0.125         |
+| 0x04          | 4/8      | 0.5           |
+| 0x08          | 8/8      | 1.0           |
+| 0x38          | 56/8     | 7.0           |
+| 0x39          | 57/8     | 7,125         |
+| 0x3a          | 58/8     | 7.25          |
+
+#### Property: `GRADIENT_PARAMS`: `scale`
+
+For a gradient light strip, the `scale` value determines how "wide" the gradient
+colors are rendered. Specifically, a gradient light strip will scale the
+gradient colors to fit "scale" colors on the strip.
+
+As an example, the Hue Play gradient lightstrip for PC (model `LCX005`) has 42
+LEDs, but only 7 independent sections. Each group of 6 LEDs can thus be thought
+of as one "pixel".
+
+With such a low pixel count, `scale` greatly affects the resulting colors when
+updating the gradient strip.
+
+For sharp, clear colors, the scale should match the number of segments in the
+light strip. Again using the `LCX005` as an example, a good value for `Linear`
+gradient mode is `0x38` (since this represents `7.0` in the fixed-point
+notation).
+
+This allows each of the colors to fit exactly in a segment on the strip, but
+other values are possible too, of course. For example, `0x08` (= `1.0`) will
+show one color on the entire strip, while `0x10` (= `2.0`) will show a smooth
+transition between the first and second colors.
+
+The above example is for the `Linear` gradient style only. The `Mirrored` mode
+uses the middle segment as the base, and thus has 3 available (mirrored)
+segments on either side, on a 7-segment light strip.
+
+The `Scattered` mode always shows colors aligned with segments. As a result,
+`scale` is ignored in this mode.
+
+| Gradient style:                   | Linear | Mirrored | Scattered |
+|-----------------------------------|--------|----------|-----------|
+| Scale to show single color        | 0x08   | 0x08     | N/A       |
+| Scale to fade between 2 colors    | 0x10   | 0x10     | N/A       |
+| Scale to fit colors to 7 segments | 0x38   | 0x20     | N/A       |
+
+NOTE: The `scale` value MUST BE at least `0x08` (= `1.0`)
+
+NOTE: The `scale` value `0x00` is a special condition. It stretches the gradient
+colors to exactly fit the gradient strip. Kind of a "zoom to fit" option.
+
+#### Property: `GRADIENT_PARAMS`: `offset`
+
+This property is simpler than `scale`. When rendering the gradient colors to the
+light strip, the first `offset` lights are skipped.
+
+For example, assume we have these abstract values for gradient light colors:
+
+```text
+|-------------------|
+| A | B | C | D | E |
+|-------------------|
+```
+
+With `offset` set to `0`, the colors will be rendered starting with `A`, so
+[`A`, `B`, `C`, ...].
+
+With `offset` set to `0x08` (= `1.0` in the fixed-point format), the first color
+shown will be `B`, so [`B`, `C`, `D`, ...], and so forth.
+
+For *fractional* offset values, proportional blending is used to emulate the
+sub-pixel offset. With an offset of `0x04` (= `0.5`), the rendered colors will be:
+
+ - `50% A + 50% B`
+ - `50% B + 50% C`
+ - `50% C + 50% D`
+ - ...
+
+If unsure, a good value for `offset` is `0x00`.
