@@ -458,7 +458,9 @@ impl Client {
     }
 
     async fn handle_device_message(&mut self, msg: RawMessage) -> ApiResult<()> {
-        if msg.topic.contains('/') {
+        if msg.topic.ends_with("/availability") || msg.topic.ends_with("/action") {
+            // availability: https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html#zigbee2mqtt-friendly-name-availability
+            // action: https://www.home-assistant.io/integrations/device_trigger.mqtt/
             return Ok(());
         }
 
