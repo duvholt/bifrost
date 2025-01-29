@@ -18,6 +18,18 @@ been employed. A few examples of the ongoing work:
  - <https://github.com/Koenkk/zigbee-herdsman-converters/pull/5192>
  - <https://github.com/zigpy/zha-device-handlers/issues/2517>
 
+The best (and newest) work so far, is probably Krzysztof Jagiełło's "Hue Gradient Command Wizard":
+
+ - <https://kjagiello.github.io/hue-gradient-command-wizard/>
+
+This one gets much right, but is still missing quite a few details.
+
+Another invaluable resource when researching XY-based lights, is Thomas Lochmatter's RGB/XY converter:
+
+ - <https://viereck.ch/hue-xy-rgb/>
+
+## Examples
+
 Here are some examples of the zigbee messages discussed in this document (hex encoded):
 
  - `50010000135000fffff3620c400f5bf4120d400f5b0cf4f43858`
@@ -32,7 +44,7 @@ At first glance, there's no obvious repeating pattern or fixed header in this
 format, but with a combination of careful analysis and applied elbow grease, we
 have managed to reverse the format in its entirety.
 
-## State of the art (zigbee-herdsman-converters)
+## Current state of the art (in zigbee-herdsman-converters)
 
 The current state of the art in zigbee-herdsman-converters
 (`srd/lib/philips.ts`) has patchy support for a few advanced features, but is
@@ -43,7 +55,7 @@ that happen to work, although they may not be a good fit in the bigger picture.
 There is great potential for improving zigbee-herdsman-converters, using the
 information found in this repository (and in particular, this file).
 
-## Frame format
+# Frame format
 
 Okay, let's start looking at the actual format now.
 
