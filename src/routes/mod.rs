@@ -10,6 +10,7 @@ use crate::server::appstate::AppState;
 pub mod api;
 pub mod clip;
 pub mod eventstream;
+pub mod extractor;
 pub mod licenses;
 
 impl IntoResponse for ApiError {
