@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     routing::{delete, get, post, put},
-    Json, Router,
+    Router,
 };
 use serde_json::Value;
 use uuid::Uuid;
@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::error::ApiError;
 use crate::hue::api::{RType, Resource, ResourceLink, V2Reply};
 use crate::routes::clip::ApiV2Result;
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 async fn get_root(State(state): State<AppState>) -> impl IntoResponse {

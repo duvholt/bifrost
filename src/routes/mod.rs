@@ -1,10 +1,11 @@
 use axum::response::{IntoResponse, Response};
-use axum::{Json, Router};
+use axum::Router;
 use hyper::StatusCode;
 use serde_json::Value;
 
 use crate::error::ApiError;
 use crate::hue::api::V2Reply;
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 pub mod api;
