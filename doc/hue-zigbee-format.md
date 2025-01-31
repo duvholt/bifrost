@@ -277,13 +277,16 @@ color coordinate, respectively. These bytes are packed in an odd way. The
 following code snippet demonstrates how to unpack them:
 
 ```rust
+let bytes: [u8; 3] = [0x11, 0x22, 0x33];
 let x = u16::from(bytes[0]) | u16::from(bytes[1] & 0x0F) << 8;
 let y = u16::from(bytes[2]) << 4 | u16::from(bytes[1] >> 4);
 ```
 
 And packing:
 
-```rust
+```rust,no_run
+let x = 0x123;
+let y = 0x456;
 let bytes: [u8; 3] = [
     (x & 0xFF) as u8,
     (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
@@ -300,8 +303,8 @@ coordinates outside the visible light spectrum, for example.
 Other implementations all seem to make this guess about the scaling:
 
 ```rust
-const maxX = 0.7347;
-const maxY = 0.8431;
+const max_x: f32 = 0.7347;
+const max_y: f32 = 0.8431;
 ```
 
 As far as I can tell, these numbers appeared at one point in someone's
