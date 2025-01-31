@@ -77,15 +77,6 @@ pub struct GradientUpdateHeader {
     pub resv2: u16,
 }
 
-#[derive(Debug, PackedStruct)]
-#[packed_struct(endian = "lsb")]
-struct PackedXY12 {
-    #[packed_field(size_bits = "12")]
-    x: u16,
-    #[packed_field(size_bits = "12")]
-    y: u16,
-}
-
 pub struct GradientColors {
     pub header: GradientUpdateHeader,
     pub points: Vec<XY>,
