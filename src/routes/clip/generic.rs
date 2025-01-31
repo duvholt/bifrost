@@ -72,9 +72,9 @@ async fn delete_resource_id(
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(get_root))
-        .route("/:resource", get(get_resource))
-        .route("/:resource", post(post_resource))
-        .route("/:resource/:id", get(get_resource_id))
-        .route("/:resource/:id", put(put_resource_id))
-        .route("/:resource/:id", delete(delete_resource_id))
+        .route("/{resource}", get(get_resource))
+        .route("/{resource}", post(post_resource))
+        .route("/{resource}/{id}", get(get_resource_id))
+        .route("/{resource}/{id}", put(put_resource_id))
+        .route("/{resource}/{id}", delete(delete_resource_id))
 }

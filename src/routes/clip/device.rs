@@ -33,5 +33,5 @@ async fn put_device(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/:id", put(put_device))
+    Router::new().route("/{id}", put(put_device))
 }
