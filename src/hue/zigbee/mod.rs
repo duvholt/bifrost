@@ -59,21 +59,23 @@ bitflags! {
     }
 }
 
-#[derive(Default, PackedStruct)]
+#[derive(PackedStruct)]
 #[packed_struct(endian = "lsb", bit_numbering = "msb0")]
 pub struct GradientUpdateHeader {
     /// First 4 bits of first byte: number of gradient light points
     #[packed_field(bits = "0..4")]
     pub nlights: u8,
 
-    /// Last 4 bits of first byte: unknown
+    /// Last 4 bits of first byte: MUST BE 0
     #[packed_field(bits = "4..8")]
     pub resv0: u8,
 
-    /// Second byte: unknown
-    pub resv1: u8,
+    /// Second byte: gradient style
+    #[packed_field(bytes = "1", ty = "enum")]
+    pub style: GradientStyle,
 
-    /// Third and fourth byte: unknown
+    /// Third and fourth byte: seems unused
+    #[packed_field(bytes = "2..=3")]
     pub resv2: u16,
 }
 
@@ -154,14 +156,25 @@ impl HueZigbeeUpdate {
         self
     }
 
-    #[must_use]
-    pub fn with_gradient_colors(mut self, colors: GradientColors) -> Self {
-        self.gradient_colors = Some(colors);
-        self
+    pub fn with_gradient_colors(
+        mut self,
+        style: GradientStyle,
+        points: Vec<XY>,
+    ) -> ApiResult<Self> {
+        self.gradient_colors = Some(GradientColors {
+            header: GradientUpdateHeader {
+                nlights: u8::try_from(points.len())?,
+                resv0: 0,
+                style,
+                resv2: 0,
+            },
+            points,
+        });
+        Ok(self)
     }
 
     #[must_use]
-    pub const fn with_gradient_transform(mut self, transform: GradientParams) -> Self {
+    pub const fn with_gradient_params(mut self, transform: GradientParams) -> Self {
         self.gradient_params = Some(transform);
         self
     }
