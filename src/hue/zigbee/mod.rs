@@ -1,6 +1,6 @@
 #![doc = include_str!("../../../doc/hue-zigbee-format.md")]
 
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 
 use bitflags::bitflags;
 use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
@@ -246,6 +246,12 @@ impl HueZigbeeUpdate {
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 impl HueZigbeeUpdate {
+    pub fn to_vec(&self) -> ApiResult<Vec<u8>> {
+        let mut cur = Cursor::new(vec![]);
+        self.serialize(&mut cur)?;
+        Ok(cur.into_inner())
+    }
+
     pub fn serialize(&self, wtr: &mut impl Write) -> ApiResult<()> {
         #[allow(clippy::ref_option)]
         fn opt_to_flag<T>(flags: &mut Flags, opt: &Option<T>, flag: Flags) {
