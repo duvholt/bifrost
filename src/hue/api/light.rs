@@ -549,7 +549,7 @@ pub struct LightEffectParameters {
     pub color: Option<ColorUpdate>,
     #[serde(default)]
     pub color_temperature: Option<ColorTemperatureUpdate>,
-    pub speed: f32,
+    pub speed: Option<f32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
