@@ -11,6 +11,9 @@ use crate::error::{ApiError, ApiResult};
 use crate::model::flags::TakeFlag;
 use crate::model::types::XY;
 
+pub const WIDE_GAMUT_MAX_X: f64 = 0.7347;
+pub const WIDE_GAMUT_MAX_Y: f64 = 0.8264;
+
 #[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
 pub enum EffectType {
     NoEffect = 0x00,
@@ -230,12 +233,15 @@ impl HueZigbeeUpdate {
 
             let mut points = vec![];
             for _ in 0..header.nlights {
-                let mut point = vec![0; 3];
-                rdr.read_exact(&mut point)?;
-                let point = PackedXY12::unpack_from_slice(&point)?;
+                let mut bytes = vec![0; 3];
+                rdr.read_exact(&mut bytes)?;
+
+                let x = u16::from(bytes[0]) | u16::from(bytes[1] & 0x0F) << 8;
+                let y = u16::from(bytes[2]) << 4 | u16::from(bytes[1] >> 4);
+
                 points.push(XY {
-                    x: f64::from(point.x) / f64::from(0xFFF),
-                    y: f64::from(point.y) / f64::from(0xFFF),
+                    x: f64::from(x) * (WIDE_GAMUT_MAX_X / f64::from(0xFFF)),
+                    y: f64::from(y) * (WIDE_GAMUT_MAX_Y / f64::from(0xFFF)),
                 });
             }
             hz.gradient_colors = Some(GradientColors { header, points });
@@ -319,11 +325,18 @@ impl HueZigbeeUpdate {
             wtr.write_u8(len)?;
             wtr.write_all(&grad_color.header.pack()?)?;
             for point in &grad_color.points {
-                let packed = PackedXY12 {
-                    x: (point.x * f64::from(0xFFF)) as u16,
-                    y: (point.y * f64::from(0xFFF)) as u16,
-                };
-                wtr.write_all(&packed.pack()?)?;
+                let x = (point.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
+                let y = (point.y * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_Y) + (0.5 / 4095.))) as u16;
+                debug_assert!(x < 0x1000);
+                debug_assert!(y < 0x1000);
+
+                let bytes: [u8; 3] = [
+                    (x & 0xFF) as u8,
+                    (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
+                    (y >> 4 & 0xFF) as u8,
+                ];
+
+                wtr.write_all(&bytes)?;
             }
         }
 
