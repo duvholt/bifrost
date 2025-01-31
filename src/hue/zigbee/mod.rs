@@ -95,6 +95,22 @@ pub struct GradientParams {
     pub offset: u8,
 }
 
+impl Default for GradientParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GradientParams {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            scale: 0x08,
+            offset: 0x00,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct HueZigbeeUpdate {
     pub onoff: Option<u8>,
