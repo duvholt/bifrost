@@ -41,7 +41,7 @@ bitflags! {
         const BRIGHTNESS      = 1 <<  1;
         const COLOR_MIREK     = 1 <<  2;
         const COLOR_XY        = 1 <<  3;
-        const UNKNOWN_0       = 1 <<  4;
+        const FADE_SPEED      = 1 <<  4;
         const EFFECT_TYPE     = 1 <<  5;
         const GRADIENT_PARAMS = 1 <<  6;
         const EFFECT_SPEED    = 1 <<  7;
@@ -101,7 +101,7 @@ pub struct HueZigbeeUpdate {
     pub brightness: Option<u8>,
     pub color_mirek: Option<u16>,
     pub color_xy: Option<XY>,
-    pub unk0: Option<u16>,
+    pub fade_speed: Option<u16>,
     pub gradient_colors: Option<GradientColors>,
     pub gradient_params: Option<GradientParams>,
     pub effect_type: Option<EffectType>,
@@ -139,8 +139,8 @@ impl HueZigbeeUpdate {
     }
 
     #[must_use]
-    pub const fn with_unknown0(mut self, unk0: u16) -> Self {
-        self.unk0 = Some(unk0);
+    pub const fn with_fade_speed(mut self, speed: u16) -> Self {
+        self.fade_speed = Some(speed);
         self
     }
 
@@ -195,8 +195,8 @@ impl HueZigbeeUpdate {
             ));
         }
 
-        if flags.take(Flags::UNKNOWN_0) {
-            hz.unk0 = Some(rdr.read_u16::<LE>()?);
+        if flags.take(Flags::FADE_SPEED) {
+            hz.fade_speed = Some(rdr.read_u16::<LE>()?);
         }
 
         if flags.take(Flags::EFFECT_TYPE) {
@@ -265,7 +265,7 @@ impl HueZigbeeUpdate {
         opt_to_flag(&mut flags, &self.brightness, Flags::BRIGHTNESS);
         opt_to_flag(&mut flags, &self.color_mirek, Flags::COLOR_MIREK);
         opt_to_flag(&mut flags, &self.color_xy, Flags::COLOR_XY);
-        opt_to_flag(&mut flags, &self.unk0, Flags::UNKNOWN_0);
+        opt_to_flag(&mut flags, &self.fade_speed, Flags::FADE_SPEED);
         opt_to_flag(&mut flags, &self.effect_type, Flags::EFFECT_TYPE);
         opt_to_flag(&mut flags, &self.effect_speed, Flags::EFFECT_SPEED);
         opt_to_flag(&mut flags, &self.gradient_colors, Flags::GRADIENT_COLORS);
@@ -290,8 +290,8 @@ impl HueZigbeeUpdate {
             wtr.write_u16::<LE>((xy.y * f64::from(0xFFFF)) as u16)?;
         }
 
-        if let Some(unk0) = self.unk0 {
-            wtr.write_u16::<LE>(unk0)?;
+        if let Some(fade_speed) = self.fade_speed {
+            wtr.write_u16::<LE>(fade_speed)?;
         }
 
         if let Some(etype) = self.effect_type {
