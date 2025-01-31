@@ -29,12 +29,12 @@ server-banner = ["server", "dep:termcolor", "dep:itertools"]
 
 [dependencies]
 async-stream = "0.3.6"
-axum = { version = "0.8.1", features = ["macros", "multipart"] }
+axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart"], default-features = false }
 axum-core = "0.5.0"
-axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"] }
+axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"], default-features = false }
 bytes = "1.9.0"
-chrono = { version = "0.4.39", features = ["serde"] }
-clap = { version = "4.5.27", features = ["color", "derive"] }
+chrono = { version = "0.4.39", features = ["clock", "serde"], default-features = false }
+clap = { version = "4.5.27", features = ["std", "color", "derive"], default-features = false }
 config = { version = "0.15.7", default-features = false, features = ["yaml"] }
 futures = "0.3.31"
 hyper = "1.6.0"
@@ -44,31 +44,30 @@ mac_address = { version = "1.1.7", features = ["serde"] }
 mdns-sd = "0.13.1"
 mime = "0.3.17"
 rand = "0.9.0"
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"], default-features = false }
 serde_json = "1.0.138"
 serde_yml = "0"
 thiserror = "2.0.11"
-tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
-tokio-stream = { version = "0.1.17", features = ["sync"] }
+tokio = { version = "1.43.0", features = ["rt-multi-thread"], default-features = false }
+tokio-stream = { version = "0.1.17", features = ["sync"], default-features = false }
 tokio-tungstenite = "0.26.1"
 tower = "0.5.2"
-tower-http = { version = "0.6.2", features = ["normalize-path", "trace"] }
+tower-http = { version = "0.6.2", features = ["normalize-path", "trace"], default-features = false }
 tracing = "0.1.41"
 uuid = { version = "1.12.1", features = ["serde", "v4", "v5"] }
 pretty_env_logger = "0.5.0"
 camino = { version = "1.1.9", features = ["serde1"] }
-x509-cert = { version = "0.2.5", features = ["builder", "hazmat"] }
+x509-cert = { version = "0.2.5", features = ["builder", "hazmat", "pem"], default-features = false }
 rsa = "0.9.7"
 sha2 = { version = "0.10.8", features = ["oid"] }
 p256 = "0.13.2"
-#rand_core = { version = "0.9.0", features = ["os_rng"] }
 ecdsa = { version = "0.16.9", features = ["der"] }
 der = { version = "0.7.9", features = ["oid"] }
 sha1 = "0.10.6"
 rustls-pemfile = "2.2.0"
 termcolor = { version = "1.4.1", optional = true }
 itertools = { version = "0.14.0", optional = true }
-reqwest = { version = "0.12.12", default-features = false, features = ["__tls", "json", "rustls-tls"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls-no-provider"] }
 url = { version = "2.5.4", features = ["serde"] }
 clap-stdin = "0.6.0"
 packed_struct = "0.10.1"
