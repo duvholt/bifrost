@@ -612,9 +612,17 @@ impl Z2mBackend {
             "[{}] Topic [{topic}] known as {uuid} on this z2m connection, sending event..",
             self.name
         );
-        let api_req = RawMessage {
-            payload: serde_json::to_value(payload)?,
-            topic: format!("{topic}/set"),
+
+        let api_req = if let Z2mRequest::Untyped { endpoint, value } = &payload {
+            RawMessage {
+                topic: format!("{topic}/{endpoint}/set"),
+                payload: serde_json::to_value(value)?,
+            }
+        } else {
+            RawMessage {
+                topic: format!("{topic}/set"),
+                payload: serde_json::to_value(payload)?,
+            }
         };
         let json = serde_json::to_string(&api_req)?;
         log::debug!("[{}] Sending {json}", self.name);

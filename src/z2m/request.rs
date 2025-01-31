@@ -17,4 +17,10 @@ pub enum Z2mRequest<'a> {
 
     #[serde(untagged)]
     Update(&'a DeviceUpdate),
+
+    #[serde(untagged)]
+    Untyped {
+        endpoint: u32,
+        value: &'a Value,
+    },
 }
