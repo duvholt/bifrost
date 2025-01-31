@@ -127,6 +127,8 @@ pub struct EntertainmentConfiguration {
     pub locations: EntertainmentConfigurationLocations,
     pub light_services: Vec<ResourceLink>,
     pub channels: Vec<EntertainmentConfigurationChannels>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_streamer: Option<ResourceLink>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
