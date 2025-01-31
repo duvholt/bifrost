@@ -25,6 +25,13 @@ pub enum EffectType {
     Enchant = 0x11,
 }
 
+#[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
+pub enum GradientStyle {
+    Linear = 0x00,
+    Scattered = 0x02,
+    Mirrored = 0x04,
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Flags: u16 {
