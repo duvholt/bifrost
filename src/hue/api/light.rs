@@ -341,6 +341,7 @@ pub enum LightPowerupOn {
 }
 
 impl LightPowerupOn {
+    #[must_use]
     pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -361,6 +362,7 @@ pub enum LightPowerupColor {
 }
 
 impl LightPowerupColor {
+    #[must_use]
     pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -378,6 +380,7 @@ pub enum LightPowerupDimming {
 }
 
 impl LightPowerupDimming {
+    #[must_use]
     pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
