@@ -532,8 +532,6 @@ pub struct LightEffectsV2 {
 pub struct LightEffectsV2Update {
     #[serde(default)]
     pub action: Option<LightEffectActionUpdate>,
-    #[serde(default)]
-    pub status: Option<LightEffectStatus>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
