@@ -52,6 +52,7 @@ pub struct Stub {}
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Resource {
+    AuthV1(ResourceLink),
     BehaviorInstance(BehaviorInstance),
     BehaviorScript(BehaviorScript),
     Bridge(Bridge),
@@ -90,6 +91,7 @@ impl Resource {
     #[must_use]
     pub const fn rtype(&self) -> RType {
         match self {
+            Self::AuthV1(_) => RType::AuthV1,
             Self::BehaviorInstance(_) => RType::BehaviorInstance,
             Self::BehaviorScript(_) => RType::BehaviorScript,
             Self::Bridge(_) => RType::Bridge,
@@ -126,6 +128,7 @@ impl Resource {
 
     pub fn from_value(rtype: RType, obj: Value) -> ApiResult<Self> {
         let res = match rtype {
+            RType::AuthV1 => Self::AuthV1(from_value(obj)?),
             RType::BehaviorInstance => Self::BehaviorInstance(from_value(obj)?),
             RType::BehaviorScript => Self::BehaviorScript(from_value(obj)?),
             RType::Bridge => Self::Bridge(from_value(obj)?),
