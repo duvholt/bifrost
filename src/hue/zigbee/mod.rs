@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
 use bitflags::bitflags;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
@@ -172,7 +172,7 @@ impl HueZigbeeUpdate {
     pub fn from_reader(rdr: &mut impl Read) -> ApiResult<Self> {
         let mut hz = Self::default();
 
-        let mut flags = Flags::from_bits(rdr.read_u16::<LittleEndian>()?).unwrap();
+        let mut flags = Flags::from_bits(rdr.read_u16::<LE>()?).unwrap();
 
         if flags.take(Flags::ON_OFF) {
             hz.onoff = Some(rdr.read_u8()?);
@@ -183,18 +183,18 @@ impl HueZigbeeUpdate {
         }
 
         if flags.take(Flags::COLOR_MIREK) {
-            hz.color_mirek = Some(rdr.read_u16::<LittleEndian>()?);
+            hz.color_mirek = Some(rdr.read_u16::<LE>()?);
         }
 
         if flags.take(Flags::COLOR_XY) {
             hz.color_xy = Some(XY::new(
-                f64::from(rdr.read_u16::<LittleEndian>()?) / f64::from(0xFFFF),
-                f64::from(rdr.read_u16::<LittleEndian>()?) / f64::from(0xFFFF),
+                f64::from(rdr.read_u16::<LE>()?) / f64::from(0xFFFF),
+                f64::from(rdr.read_u16::<LE>()?) / f64::from(0xFFFF),
             ));
         }
 
         if flags.take(Flags::UNKNOWN_0) {
-            hz.unk0 = Some(rdr.read_u16::<LittleEndian>()?);
+            hz.unk0 = Some(rdr.read_u16::<LE>()?);
         }
 
         if flags.take(Flags::EFFECT_TYPE) {
@@ -263,7 +263,7 @@ impl HueZigbeeUpdate {
         opt_to_flag(&mut flags, &self.gradient_colors, Flags::GRADIENT_COLORS);
         opt_to_flag(&mut flags, &self.gradient_params, Flags::GRADIENT_PARAMS);
 
-        wtr.write_u16::<LittleEndian>(flags.bits())?;
+        wtr.write_u16::<LE>(flags.bits())?;
 
         if let Some(onoff) = self.onoff {
             wtr.write_u8(onoff)?;
@@ -274,16 +274,16 @@ impl HueZigbeeUpdate {
         }
 
         if let Some(mirek) = self.color_mirek {
-            wtr.write_u16::<LittleEndian>(mirek)?;
+            wtr.write_u16::<LE>(mirek)?;
         }
 
         if let Some(xy) = self.color_xy {
-            wtr.write_u16::<LittleEndian>((xy.x * f64::from(0xFFFF)) as u16)?;
-            wtr.write_u16::<LittleEndian>((xy.y * f64::from(0xFFFF)) as u16)?;
+            wtr.write_u16::<LE>((xy.x * f64::from(0xFFFF)) as u16)?;
+            wtr.write_u16::<LE>((xy.y * f64::from(0xFFFF)) as u16)?;
         }
 
         if let Some(unk0) = self.unk0 {
-            wtr.write_u16::<LittleEndian>(unk0)?;
+            wtr.write_u16::<LE>(unk0)?;
         }
 
         if let Some(etype) = self.effect_type {
