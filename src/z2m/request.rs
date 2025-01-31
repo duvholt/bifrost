@@ -1,4 +1,5 @@
 use serde::Serialize;
+use serde_json::Value;
 
 use crate::z2m::update::DeviceUpdate;
 

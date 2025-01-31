@@ -18,7 +18,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::backend::BackendRequest;
 use crate::hue::api::{
     Device, GroupedLight, GroupedLightUpdate, Light, LightUpdate, On, RType, ResourceLink, Room,
-    Scene, SceneStatus, SceneUpdate, V1Reply,
+    Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use crate::hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
@@ -256,7 +256,10 @@ async fn put_api_user_resource_id(
                     let scene_id = upd.scene.parse()?;
                     let scene_uuid = lock.from_id_v1(scene_id)?;
                     let rlink = RType::Scene.link_to(scene_uuid);
-                    let updv2 = SceneUpdate::new().with_recall_action(Some(SceneStatus::Static));
+                    let updv2 = SceneUpdate::new().with_recall_action(Some(SceneStatus {
+                        active: SceneActive::Static,
+                        last_recall: None,
+                    }));
                     lock.backend_request(BackendRequest::SceneUpdate(rlink, updv2))?;
                     drop(lock);
 
