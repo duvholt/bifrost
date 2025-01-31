@@ -1,3 +1,5 @@
+#![doc = include_str!("../../../doc/hue-zigbee-format.md")]
+
 use std::io::{Read, Write};
 
 use bitflags::bitflags;
