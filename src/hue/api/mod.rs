@@ -12,8 +12,13 @@ pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Ident
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
-    DimmingUpdate, GamutType, Light, LightColor, LightGradient, LightGradientMode,
-    LightGradientUpdate, LightMetadata, LightUpdate, MirekSchema, On,
+    DimmingUpdate, GamutType, Light, LightAlert, LightColor, LightDynamics, LightDynamicsStatus,
+    LightEffect, LightEffectActionUpdate, LightEffectParameters, LightEffectStatus,
+    LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightFunction,
+    LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate, LightMetadata,
+    LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
+    LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffects,
+    LightUpdate, MirekSchema, On,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
 pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
