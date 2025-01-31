@@ -58,5 +58,5 @@ async fn get_light(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/:id", get(get_light).put(put_light))
+    Router::new().route("/{id}", get(get_light).put(put_light))
 }

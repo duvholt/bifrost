@@ -118,6 +118,6 @@ async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> Ap
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(post_scene))
-        .route("/:id", put(put_scene))
-        .route("/:id", delete(delete_scene))
+        .route("/{id}", put(put_scene))
+        .route("/{id}", delete(delete_scene))
 }

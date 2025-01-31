@@ -43,5 +43,5 @@ async fn put_grouped_light(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/:id", put(put_grouped_light))
+    Router::new().route("/{id}", put(put_grouped_light))
 }
