@@ -320,10 +320,10 @@ value of the "Red" coordinate, specifically.
 However, the Y value doesn't match any source I can find.
 
 If the scaling matches the Wide Gamut, the Y value (maximum height) should be
-`0.8264`. It it matches the top of the visible light area, it should be around
+`0.8264`. If it matched the top of the visible light area, it should be around
 `0.836`. I have no idea where `0.8431` comes from!
 
-From experimentation, I have determined that the most likely candidate is the
+From experimentation, I have determined that the most likely candidates are the
 outer bounds of the wide gamut, leading to the following values:
 
 ```rust
