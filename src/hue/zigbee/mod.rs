@@ -43,15 +43,14 @@ bitflags! {
         const EFFECT_TYPE     = 1 <<  5;
         const GRADIENT_PARAMS = 1 <<  6;
         const EFFECT_SPEED    = 1 <<  7;
-
         const GRADIENT_COLORS = 1 <<  8;
-        const UNUSED1         = 1 <<  9;
-        const UNUSED2         = 1 << 10;
-        const UNUSED3         = 1 << 11;
-        const UNUSED4         = 1 << 12;
-        const UNUSED5         = 1 << 13;
-        const UNUSED6         = 1 << 14;
-        const UNUSED7         = 1 << 15;
+        const UNUSED_9        = 1 <<  9;
+        const UNUSED_A        = 1 << 10;
+        const UNUSED_B        = 1 << 11;
+        const UNUSED_C        = 1 << 12;
+        const UNUSED_D        = 1 << 13;
+        const UNUSED_E        = 1 << 14;
+        const UNUSED_F        = 1 << 15;
     }
 }
 
