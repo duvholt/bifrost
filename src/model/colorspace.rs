@@ -13,6 +13,7 @@ pub struct ColorSpace {
 }
 
 impl ColorSpace {
+    #[allow(clippy::suboptimal_flops)]
     #[must_use]
     fn mult(d: [f64; 3], m: &[f64; 9]) -> [f64; 3] {
         let cx = d[0] * m[0] + d[1] * m[1] + d[2] * m[2];
