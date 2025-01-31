@@ -256,6 +256,16 @@ used in this format. It has the following layout:
   :           :                               :
 ```
 
+The gradient style *must* be one of these values:
+
+```rust
+pub enum GradientStyle {
+    Linear = 0x00,
+    Scattered = 0x02,
+    Mirrored = 0x04,
+}
+```
+
 ### Property: `GRADIENT_COLORS`: Color encoding
 
 The gradient colors format can speficy up to and including 9 colors, even for
