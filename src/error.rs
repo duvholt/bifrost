@@ -1,4 +1,4 @@
-use std::num::ParseIntError;
+use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
@@ -35,6 +35,15 @@ pub enum ApiError {
 
     #[error(transparent)]
     ParseIntError(#[from] ParseIntError),
+
+    #[error(transparent)]
+    TryFromIntError(#[from] TryFromIntError),
+
+    #[error(transparent)]
+    FromHexError(#[from] hex::FromHexError),
+
+    #[error(transparent)]
+    PackedStructError(#[from] packed_struct::PackingError),
 
     #[error(transparent)]
     MdnsSdError(#[from] mdns_sd::Error),

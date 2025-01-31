@@ -619,7 +619,7 @@ impl Client {
         };
         let json = serde_json::to_string(&api_req)?;
         log::debug!("[{}] Sending {json}", self.name);
-        let msg = tungstenite::Message::Text(json);
+        let msg = tungstenite::Message::text(json);
         Ok(socket.send(msg).await?)
     }
 
