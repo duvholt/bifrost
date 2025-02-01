@@ -13,7 +13,7 @@ mod update;
 mod zigbee_device_discovery;
 
 pub use behavior::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata, BehaviorInstanceNew,
     BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, WakeupConfiguration,
     WakeupStyle,
 };

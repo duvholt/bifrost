@@ -176,6 +176,14 @@ pub struct BehaviorInstanceMetadata {
     pub name: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BehaviorInstanceNew {
+    pub configuration: Value,
+    pub enabled: bool,
+    pub metadata: BehaviorInstanceMetadata,
+    pub script_id: Uuid,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct BehaviorInstanceUpdate {
     pub configuration: Option<Value>,

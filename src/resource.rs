@@ -12,10 +12,11 @@ use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
-    EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink,
-    ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
-    ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus, Zone,
+    BehaviorScript, Bridge, BridgeHome, Device, DeviceArchetype,
+    DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
+    GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink, ResourceRecord, Room, Stub,
+    TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
+    ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus, Zone,
 };
 use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
@@ -90,7 +91,9 @@ impl Resources {
     }
 
     pub fn init(&mut self, bridge_id: &str) -> ApiResult<()> {
-        self.add_bridge(bridge_id.to_owned())
+        self.add_bridge(bridge_id.to_owned())?;
+        self.add_behavior_scripts()?;
+        Ok(())
     }
 
     pub fn aux_get(&self, link: &ResourceLink) -> ApiResult<&AuxData> {
@@ -370,6 +373,17 @@ impl Resources {
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
         self.add(&link_bridge_ent, Resource::Entertainment(brent))?;
         self.add(&link_bhome_glight, Resource::GroupedLight(bhome_glight))?;
+
+        Ok(())
+    }
+
+    pub fn add_behavior_scripts(&mut self) -> ApiResult<()> {
+        let wake_up_link = ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript);
+
+        self.add(
+            &wake_up_link,
+            Resource::BehaviorScript(BehaviorScript::wake_up()),
+        )?;
 
         Ok(())
     }

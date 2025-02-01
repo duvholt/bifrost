@@ -1,3 +1,4 @@
+pub mod behavior_instance;
 pub mod device;
 pub mod entertainment_configuration;
 pub mod grouped_light;
@@ -77,10 +78,10 @@ async fn post_resource(
     match rtype {
         RType::EntertainmentConfiguration => ent_conf::post_resource(&state, req).await,
         RType::Scene => scene::post_scene(&state, req).await,
+        RType::BehaviorInstance => behavior_instance::post_behavior_instance(&state, req).await,
 
         /* Not supported yet by Bifrost */
-        RType::BehaviorInstance
-        | RType::GeofenceClient
+        RType::GeofenceClient
         | RType::Room
         | RType::ServiceGroup
         | RType::SmartScene
@@ -154,10 +155,12 @@ async fn put_resource_id(
         RType::ZigbeeDeviceDiscovery => {
             zigbee_device_discovery::put_zigbee_device_discovery(&state, rlink, put).await
         }
+        RType::BehaviorInstance => {
+            behavior_instance::put_behavior_instance(&state, rlink, put).await
+        }
 
         /* Allowed, but support is missing in Bifrost */
-        RType::BehaviorInstance
-        | RType::Bridge
+        RType::Bridge
         | RType::Button
         | RType::CameraMotion
         | RType::Contact
