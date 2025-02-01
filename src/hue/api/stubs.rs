@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use uuid::Uuid;
 
 use crate::hue::api::{DeviceArchetype, ResourceLink, SceneMetadata};
 use crate::hue::{best_guess_timezone, date_format};
@@ -67,40 +66,6 @@ pub struct DeviceSoftwareUpdate {
     pub owner: ResourceLink,
     pub state: Value,
     pub problems: Vec<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BehaviorScript {
-    pub configuration_schema: DollarRef,
-    pub description: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_number_instances: Option<u32>,
-    pub metadata: Value,
-    pub state_schema: DollarRef,
-    pub supported_features: Vec<String>,
-    pub trigger_schema: DollarRef,
-    pub version: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BehaviorInstance {
-    pub configuration: Value,
-    #[serde(default)]
-    pub dependees: Vec<Value>,
-    pub enabled: bool,
-    pub last_error: String,
-    pub metadata: BehaviorInstanceMetadata,
-    pub script_id: Uuid,
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub migrated_from: Option<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BehaviorInstanceMetadata {
-    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

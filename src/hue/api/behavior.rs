@@ -2,7 +2,7 @@ use std::ops::AddAssign;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use uuid::Uuid;
+use uuid::{uuid, Uuid};
 
 use super::DollarRef;
 
@@ -25,9 +25,8 @@ pub struct BehaviorScriptMetadata {
     pub category: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct BehaviorInstance {
-    pub configuration: Value,
     #[serde(default)]
     pub dependees: Vec<Value>,
     pub enabled: bool,
@@ -39,9 +38,68 @@ pub struct BehaviorInstance {
     pub state: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub migrated_from: Option<Value>,
+    pub configuration: BehaviorInstanceConfiguration,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+// TODO: refer to const in one place
+const WAKEUP: Uuid = uuid!("ff8957e3-2eb9-4699-a0c8-ad2cb3ede704");
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum BehaviorInstanceConfiguration {
+    #[serde(rename = "ff8957e3-2eb9-4699-a0c8-ad2cb3ede704")]
+    Wakeup(WakeupConfiguration),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WakeupConfiguration {
+    pub end_brightness: f64,
+    pub fade_in_duration: configuration::FadeInDuration,
+    pub style: String,
+    pub when: configuration::When,
+    #[serde(rename = "where")]
+    pub where_field: Vec<configuration::Where>,
+}
+
+pub mod configuration {
+    use serde::{Deserialize, Serialize};
+
+    use crate::hue::api::ResourceLink;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct FadeInDuration {
+        pub seconds: i64,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct When {
+        #[serde(rename = "recurrence_days")]
+        pub recurrence_days: Vec<String>,
+        #[serde(rename = "time_point")]
+        pub time_point: TimePoint,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct TimePoint {
+        pub time: Time,
+        #[serde(rename = "type")]
+        // time
+        pub type_field: String,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Time {
+        pub hour: u32,
+        pub minute: u32,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Where {
+        pub group: ResourceLink,
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct BehaviorInstanceMetadata {
     pub name: String,
 }
@@ -63,9 +121,7 @@ impl BehaviorInstanceUpdate {
     #[must_use]
     pub fn with_metadata(self, metadata: BehaviorInstanceMetadata) -> Self {
         Self {
-            metadata: Some(BehaviorInstanceMetadata {
-                name: metadata.name,
-            }),
+            metadata: Some(metadata),
             ..self
         }
     }
@@ -98,7 +154,13 @@ impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
         }
 
         if let Some(configuration) = upd.configuration {
-            self.configuration = configuration;
+            if self.script_id == WAKEUP {
+                if let Ok(parsed) = serde_json::from_value(configuration) {
+                    self.configuration = parsed;
+                } else {
+                    // todo: log
+                }
+            }
         }
     }
 }

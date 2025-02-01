@@ -49,7 +49,7 @@ impl Resources {
     pub fn update_bridge_version(&mut self, version: SwVersion) {
         self.version = version;
         self.state.patch_bridge_version(&self.version);
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
     }
 
     pub fn read(&mut self, rdr: impl Read) -> ApiResult<()> {
@@ -118,8 +118,9 @@ impl Resources {
             Resource::BehaviorInstance(behavior_instance) => {
                 let upd = BehaviorInstanceUpdate::new()
                     .with_metadata(behavior_instance.metadata.clone())
-                    .with_enabled(behavior_instance.enabled)
-                    .with_configuration(behavior_instance.configuration.clone());
+                    .with_enabled(behavior_instance.enabled);
+                // todo: fix
+                // .with_configuration(behavior_instance.configuration.clone());
 
                 Ok(Some(Update::BehaviorInstance(upd)))
             }
@@ -144,7 +145,7 @@ impl Resources {
                 .hue_event(EventBlock::update(id, id_v1, delta)?);
         }
 
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
 
         Ok(())
     }
@@ -194,7 +195,7 @@ impl Resources {
 
         self.state.insert(link.rid, obj);
 
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
 
         let evt = EventBlock::add(serde_json::to_value(self.get_resource_by_id(&link.rid)?)?);
 
@@ -209,7 +210,7 @@ impl Resources {
         log::info!("Deleting {link:?}..");
         self.state.remove(&link.rid)?;
 
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
 
         let evt = EventBlock::delete(link)?;
 

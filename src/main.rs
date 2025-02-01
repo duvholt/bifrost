@@ -87,6 +87,7 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
         appstate.res.clone(),
         appstate.updater(),
     ));
+    tasks.spawn(server::scheduler(appstate.res.clone()));
 
     for (name, server) in &appstate.config().z2m.servers {
         let client = Z2mBackend::new(
