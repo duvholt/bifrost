@@ -39,7 +39,7 @@ async fn post_scene(
             .with_index(sid),
     );
 
-    lock.z2m_request(ClientRequest::scene_store(
+    lock.backend_request(ClientRequest::scene_store(
         scene.group,
         sid,
         scene.metadata.name.clone(),
@@ -85,7 +85,7 @@ async fn put_scene(
                 })?;
             }
 
-            lock.z2m_request(ClientRequest::scene_recall(rlink))?;
+            lock.backend_request(ClientRequest::scene_recall(rlink))?;
             drop(lock);
         } else {
             log::error!("Scene recall type not supported: {recall:?}");
@@ -104,7 +104,7 @@ async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> Ap
 
     match res.obj {
         Resource::Scene(_) => {
-            lock.z2m_request(ClientRequest::scene_remove(link))?;
+            lock.backend_request(ClientRequest::scene_remove(link))?;
 
             drop(lock);
 

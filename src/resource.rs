@@ -25,7 +25,7 @@ pub struct Resources {
     state: State,
     version: SwVersion,
     state_updates: Arc<Notify>,
-    z2m_updates: Sender<Arc<BackendRequest>>,
+    backend_updates: Sender<Arc<BackendRequest>>,
     hue_event_stream: HueEventStream,
 }
 
@@ -40,7 +40,7 @@ impl Resources {
             state,
             version,
             state_updates: Arc::new(Notify::new()),
-            z2m_updates: Sender::new(32),
+            backend_updates: Sender::new(32),
             hue_event_stream: HueEventStream::new(Self::HUE_EVENTS_BUFFER_SIZE),
         }
     }
@@ -438,13 +438,13 @@ impl Resources {
 
     #[must_use]
     pub fn backend_event_stream(&self) -> Receiver<Arc<BackendRequest>> {
-        self.z2m_updates.subscribe()
+        self.backend_updates.subscribe()
     }
 
-    pub fn z2m_request(&self, req: BackendRequest) -> ApiResult<()> {
+    pub fn backend_request(&self, req: BackendRequest) -> ApiResult<()> {
         log::debug!("z2m request: {req:#?}");
 
-        self.z2m_updates.send(Arc::new(req))?;
+        self.backend_updates.send(Arc::new(req))?;
 
         Ok(())
     }

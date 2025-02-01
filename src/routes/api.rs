@@ -215,7 +215,7 @@ async fn put_api_user_resource_id(
                 .with_color_xy(upd.xy.map(Into::into))
                 .with_color_temp(upd.ct);
 
-            lock.z2m_request(ClientRequest::light_update(link, payload))?;
+            lock.backend_request(ClientRequest::light_update(link, payload))?;
             drop(lock);
 
             let reply = V1Reply::for_light(id, &path).with_light_state_update(&upd)?;
@@ -244,7 +244,7 @@ async fn put_api_user_resource_id(
                         .with_color_xy(upd.xy.map(Into::into))
                         .with_color_temp(upd.ct);
 
-                    lock.z2m_request(ClientRequest::group_update(*glight, payload))?;
+                    lock.backend_request(ClientRequest::group_update(*glight, payload))?;
                     drop(lock);
 
                     V1Reply::for_group(id, &path).with_light_state_update(&upd)?
@@ -253,7 +253,7 @@ async fn put_api_user_resource_id(
                     let scene_id = upd.scene.parse()?;
                     let scene_uuid = lock.from_id_v1(scene_id)?;
                     let rlink = RType::Scene.link_to(scene_uuid);
-                    lock.z2m_request(ClientRequest::scene_recall(rlink))?;
+                    lock.backend_request(ClientRequest::scene_recall(rlink))?;
                     drop(lock);
 
                     V1Reply::for_group(id, &path).add("scene", upd.scene)?
