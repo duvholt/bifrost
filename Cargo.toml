@@ -73,6 +73,7 @@ packed_struct = "0.10.1"
 bitflags = "2.8.0"
 byteorder = "1.5.0"
 hex = "0.4.3"
+async-trait = "0.1.86"
 
 [dev-dependencies]
 json_diff_ng = { version = "0.6.0", default-features = false }
