@@ -11,14 +11,14 @@ license = "GPL-3.0-only"
 categories = ["api-bindings", "simulation", "network-programming"]
 keywords = [
     "home-automation",
-     "hue-lights",
-     "hue-bridge",
-     "home-assistant",
-     "hue",
-     "zigbee",
-     "hue-api",
-     "zigbee2mqtt",
-     "phillips-hue",
+    "hue-lights",
+    "hue-bridge",
+    "home-assistant",
+    "hue",
+    "zigbee",
+    "hue-api",
+    "zigbee2mqtt",
+    "phillips-hue",
 ]
 
 [features]
