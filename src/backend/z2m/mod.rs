@@ -701,6 +701,10 @@ impl Z2mBackend {
                         hz = hz.with_color_mirek(temp.mirek);
                     }
 
+                    if let Some(xy) = &upd.color {
+                        hz = hz.with_color_xy(xy.xy);
+                    }
+
                     if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
                         if let Some(fx) = &act.effect {
                             let et = match fx {
