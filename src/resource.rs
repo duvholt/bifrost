@@ -7,11 +7,12 @@ use maplit::btreeset;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
-use uuid::Uuid;
+use uuid::{uuid, Uuid};
 
 use hue::api::{
-    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
-    Entertainment, EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
+    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, Bridge, BridgeHome, Device,
+    DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate, DollarRef, Entertainment,
+    EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
     EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
     EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, GroupedLight,
     GroupedLightUpdate, Light, LightMode, LightUpdate, Metadata, On, RType, Resource, ResourceLink,
@@ -98,7 +99,9 @@ impl Resources {
     }
 
     pub fn init(&mut self, bridge_id: &str) -> ApiResult<()> {
-        self.add_bridge(bridge_id.to_owned())
+        self.add_bridge(bridge_id.to_owned())?;
+        self.add_behavior_scripts()?;
+        Ok(())
     }
 
     pub fn aux_get(&self, link: &ResourceLink) -> HueResult<&AuxData> {
@@ -174,6 +177,14 @@ impl Resources {
                 };
 
                 Ok(Some(Update::EntertainmentConfiguration(upd)))
+            }
+            Resource::BehaviorInstance(behavior_instance) => {
+                let upd = BehaviorInstanceUpdate::new()
+                    .with_metadata(behavior_instance.metadata.clone())
+                    .with_enabled(behavior_instance.enabled)
+                    .with_configuration(behavior_instance.configuration.clone());
+
+                Ok(Some(Update::BehaviorInstance(upd)))
             }
             obj => Err(HueError::UpdateUnsupported(obj.rtype())),
         }
@@ -367,6 +378,35 @@ impl Resources {
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
         self.add(&link_bridge_ent, Resource::Entertainment(brent))?;
         self.add(&link_bhome_glight, Resource::GroupedLight(bhome_glight))?;
+
+        Ok(())
+    }
+
+    pub fn add_behavior_scripts(&mut self) -> ApiResult<()> {
+        let wake_up_link = ResourceLink::new(
+            uuid!("ff8957e3-2eb9-4699-a0c8-ad2cb3ede704"),
+            RType::BehaviorScript,
+        );
+        let wake_up = BehaviorScript {
+            configuration_schema: DollarRef {
+                dref: Some("basic_wake_up_config.json#".to_string()),
+            },
+            description:
+                "Get your body in the mood to wake up by fading on the lights in the morning."
+                    .to_string(),
+            max_number_instances: None,
+            metadata: BehaviorScriptMetadata {
+                name: "Basic wake up routine".to_string(),
+                category: "automation".to_string(),
+            },
+            state_schema: DollarRef { dref: None },
+            supported_features: vec!["style_sunrise".to_string(), "intensity".to_string()],
+            trigger_schema: DollarRef {
+                dref: Some("trigger.json#".to_string()),
+            },
+            version: "0.0.1".to_string(),
+        };
+        self.add(&wake_up_link, Resource::BehaviorScript(wake_up))?;
 
         Ok(())
     }
