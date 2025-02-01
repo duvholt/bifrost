@@ -65,7 +65,7 @@ fn get_groups(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiGroup
             .find(|rl| rl.rtype == RType::GroupedLight)
             .ok_or(ApiError::NotFound(rr.id))?;
 
-        let glight = res.get::<GroupedLight>(uuid)?.clone();
+        let glight = res.get::<GroupedLight>(uuid)?;
         let lights: Vec<String> = room
             .children
             .iter()
