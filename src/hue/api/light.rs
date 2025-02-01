@@ -499,7 +499,7 @@ impl LightUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct DimmingUpdate {
     pub brightness: f64,
 }
@@ -546,7 +546,7 @@ impl ColorUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct ColorTemperatureUpdate {
     pub mirek: u32,
 }
