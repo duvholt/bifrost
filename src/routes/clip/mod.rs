@@ -1,3 +1,4 @@
+pub mod behavior_instance;
 pub mod device;
 pub mod generic;
 pub mod grouped_light;
@@ -42,5 +43,6 @@ pub fn router() -> Router<AppState> {
         .nest("/light", light::router())
         .nest("/device", device::router())
         .nest("/grouped_light", grouped_light::router())
+        .nest("/behavior_instance", behavior_instance::router())
         .merge(generic::router())
 }

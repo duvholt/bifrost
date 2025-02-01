@@ -5,13 +5,14 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
-use uuid::Uuid;
+use uuid::{uuid, Uuid};
 
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
-    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Metadata, RType,
-    Resource, ResourceLink, ResourceRecord, RoomUpdate, TimeZone, ZigbeeConnectivity,
+    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, Bridge, BridgeHome, Device,
+    DeviceArchetype, DeviceProductData, DeviceUpdate, DollarRef, Metadata, RType, Resource,
+    ResourceLink, ResourceRecord, RoomUpdate, TimeZone, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
 use crate::hue::api::{GroupedLightUpdate, LightUpdate, SceneUpdate, Update};
@@ -65,7 +66,9 @@ impl Resources {
     }
 
     pub fn init(&mut self, bridge_id: &str) -> ApiResult<()> {
-        self.add_bridge(bridge_id.to_owned())
+        self.add_bridge(bridge_id.to_owned())?;
+        self.add_behavior_scripts()?;
+        Ok(())
     }
 
     pub fn aux_get(&self, link: &ResourceLink) -> ApiResult<&AuxData> {
@@ -111,6 +114,14 @@ impl Resources {
                 let upd = RoomUpdate::new().with_metadata(room.metadata.clone());
 
                 Ok(Some(Update::Room(upd)))
+            }
+            Resource::BehaviorInstance(behavior_instance) => {
+                let upd = BehaviorInstanceUpdate::new()
+                    .with_metadata(behavior_instance.metadata.clone())
+                    .with_enabled(behavior_instance.enabled)
+                    .with_configuration(behavior_instance.configuration.clone());
+
+                Ok(Some(Update::BehaviorInstance(upd)))
             }
             obj => Err(ApiError::UpdateUnsupported(obj.rtype())),
         }
@@ -265,6 +276,35 @@ impl Resources {
         self.add(&link_bridge_home, Resource::BridgeHome(bridge_home))?;
         self.add(&link_zbdd, Resource::ZigbeeDeviceDiscovery(zbdd))?;
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
+
+        Ok(())
+    }
+
+    pub fn add_behavior_scripts(&mut self) -> ApiResult<()> {
+        let wake_up_link = ResourceLink::new(
+            uuid!("ff8957e3-2eb9-4699-a0c8-ad2cb3ede704"),
+            RType::BehaviorScript,
+        );
+        let wake_up = BehaviorScript {
+            configuration_schema: DollarRef {
+                dref: Some("basic_wake_up_config.json#".to_string()),
+            },
+            description:
+                "Get your body in the mood to wake up by fading on the lights in the morning."
+                    .to_string(),
+            max_number_instances: None,
+            metadata: BehaviorScriptMetadata {
+                name: "Basic wake up routine".to_string(),
+                category: "automation".to_string(),
+            },
+            state_schema: DollarRef { dref: None },
+            supported_features: vec!["style_sunrise".to_string(), "intensity".to_string()],
+            trigger_schema: DollarRef {
+                dref: Some("trigger.json#".to_string()),
+            },
+            version: "0.0.1".to_string(),
+        };
+        self.add(&wake_up_link, Resource::BehaviorScript(wake_up))?;
 
         Ok(())
     }

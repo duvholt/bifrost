@@ -1,3 +1,4 @@
+mod behavior;
 mod device;
 mod grouped_light;
 mod light;
@@ -7,6 +8,10 @@ mod scene;
 mod stubs;
 mod update;
 
+pub use behavior::{
+    BehaviorInstance, BehaviorInstanceMetadata, BehaviorInstanceUpdate, BehaviorScript,
+    BehaviorScriptMetadata,
+};
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
@@ -22,13 +27,12 @@ pub use scene::{
     SceneStatusUpdate, SceneUpdate,
 };
 pub use stubs::{
-    BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
-    ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
-    Entertainment, EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments,
-    GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
-    Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
-    Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
-    ZigbeeDeviceDiscovery, Zone,
+    Bridge, BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DevicePower,
+    DeviceSoftwareUpdate, DollarRef, Entertainment, EntertainmentConfiguration,
+    EntertainmentSegment, EntertainmentSegments, GeofenceClient, Geolocation, GroupedLightLevel,
+    GroupedMotion, Homekit, LightLevel, Matter, Metadata, MetadataUpdate, Motion, PrivateGroup,
+    PublicImage, RelativeRotary, SmartScene, Taurus, Temperature, TimeZone, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, Zone,
 };
 pub use update::{Update, UpdateRecord};
 
