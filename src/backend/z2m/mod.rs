@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -13,7 +14,7 @@ use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
-use crate::backend::BackendRequest;
+use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::hue;
@@ -703,8 +704,11 @@ impl Z2mBackend {
             };
         }
     }
+}
 
-    pub async fn run_forever(mut self, mut chan: Receiver<Arc<BackendRequest>>) -> ApiResult<()> {
+#[async_trait]
+impl Backend for Z2mBackend {
+    async fn run_forever(mut self, mut chan: Receiver<Arc<BackendRequest>>) -> ApiResult<()> {
         // let's not include auth tokens in log output
         let sanitized_url = self.server.get_sanitized_url();
         let url = self.server.get_url();

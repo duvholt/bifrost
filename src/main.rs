@@ -3,6 +3,7 @@ use std::io::Write;
 use tokio::task::JoinSet;
 
 use bifrost::backend::z2m::Z2mBackend;
+use bifrost::backend::Backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
 use bifrost::mdns;
