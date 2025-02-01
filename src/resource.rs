@@ -12,11 +12,11 @@ use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    BehaviorScript, Bridge, BridgeHome, Device, DeviceArchetype,
-    DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
-    GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink, ResourceRecord, Room, Stub,
-    TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
-    ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus, Zone,
+    BehaviorScript, Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate,
+    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource,
+    ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction,
+    ZigbeeDeviceDiscoveryStatus, Zone,
 };
 use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
@@ -54,7 +54,7 @@ impl Resources {
     pub fn update_bridge_version(&mut self, version: SwVersion) {
         self.version = version;
         self.state.patch_bridge_version(&self.version);
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
     }
 
     pub fn reset_all_streaming(&mut self) -> ApiResult<()> {
@@ -132,7 +132,7 @@ impl Resources {
                 delta,
             )?);
 
-            self.state_updates.notify_one();
+            self.state_updates.notify_waiters();
         }
 
         Ok(())
@@ -197,7 +197,7 @@ impl Resources {
 
         self.state.insert(link.rid, obj);
 
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
 
         let evt = EventBlock::add(vec![self.get_resource_by_id(&link.rid)?]);
 
@@ -265,7 +265,7 @@ impl Resources {
             self.delete(&owned)?;
         }
 
-        self.state_updates.notify_one();
+        self.state_updates.notify_waiters();
 
         let evt = EventBlock::delete(*link, id_v1)?;
 
