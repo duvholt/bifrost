@@ -33,13 +33,13 @@ To install Bifrost from source, you will need the following:
 
 First, install `build-essential` :
 
-```bash
+```sh
 sudo apt install build-essential
 ```
 
 When you have these things available, install bifrost:
 
-```bash
+```sh
 cargo install --git https://github.com/chrivers/bifrost.git
 ```
 
@@ -77,7 +77,7 @@ this will not work. [How to find your mac address](doc/how-to-find-mac-linux.md)
 Now you can start Bifrost. Simple start the "bifrost" command from the same
 directory where you put the `config.yaml`:
 
-```bash
+```sh
 bifrost
 ```
 
@@ -136,14 +136,14 @@ To install Bifrost with Docker, you will need the following:
 
 When you have these things available, you can install Bifrost by running these commands:
 
-```bash
+```sh
 git clone https://github.com/chrivers/bifrost
 cd bifrost
 ```
 
 Then rename or copy our `config.example.yaml`:
 
-```bash
+```sh
 cp config.example.yaml config.yaml
 ```
 
@@ -156,7 +156,7 @@ just leave the default values.
 
 Now you are ready to run the app with:
 
-```bash
+```sh
 docker compose up -d
 ```
 
@@ -165,7 +165,7 @@ This will build and then start the app on your Docker instance.
 To view the logs, use a tool like [Portainer](https://www.portainer.io/) or
 run the following command:
 
-```bash
+```sh
 docker logs bifrost
 ```
 
