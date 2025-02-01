@@ -6,13 +6,11 @@ use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
 
-use crate::{
-    hue::{
-        api::{RType, ResourceLink},
-        event::EventBlock,
-        legacy_api::ApiResourceType,
-    },
-    z2m::request::ClientRequest,
+use crate::backend::BackendRequest;
+use crate::hue::{
+    api::{RType, ResourceLink},
+    event::EventBlock,
+    legacy_api::ApiResourceType,
 };
 
 #[derive(Error, Debug)]
@@ -55,7 +53,7 @@ pub enum ApiError {
     SendErrorHue(#[from] tokio::sync::broadcast::error::SendError<EventBlock>),
 
     #[error(transparent)]
-    SendErrorZ2m(#[from] tokio::sync::broadcast::error::SendError<Arc<ClientRequest>>),
+    SendErrorZ2m(#[from] tokio::sync::broadcast::error::SendError<Arc<BackendRequest>>),
 
     #[error(transparent)]
     SetLoggerError(#[from] log::SetLoggerError),

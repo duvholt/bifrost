@@ -94,7 +94,8 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
             appstate.config(),
             appstate.res.clone(),
         )?;
-        tasks.spawn(client.run_forever());
+        let stream = appstate.res.lock().await.backend_event_stream();
+        tasks.spawn(client.run_forever(stream));
     }
 
     Ok(tasks)

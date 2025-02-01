@@ -13,7 +13,9 @@ use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
+use crate::backend::BackendRequest;
 use crate::config::{AppConfig, Z2mServer};
+use crate::error::{ApiError, ApiResult};
 use crate::hue;
 use crate::hue::api::{
     Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature, ColorTemperatureUpdate,
@@ -22,14 +24,12 @@ use crate::hue::api::{
     ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
     SceneMetadata, SceneRecall, SceneStatus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
-
-use crate::error::{ApiError, ApiResult};
 use crate::hue::scene_icons;
 use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
 use crate::z2m::api::{self, ExposeLight, Message, RawMessage};
-use crate::z2m::request::{ClientRequest, Z2mRequest};
+use crate::z2m::request::Z2mRequest;
 use crate::z2m::update::{DeviceColor, DeviceUpdate};
 
 #[derive(Debug)]
@@ -620,14 +620,14 @@ impl Z2mBackend {
     async fn websocket_write(
         &mut self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-        req: Arc<ClientRequest>,
+        req: Arc<BackendRequest>,
     ) -> ApiResult<()> {
         self.learn_cleanup();
 
         let lock = self.state.lock().await;
 
         match &*req {
-            ClientRequest::LightUpdate { device, upd } => {
+            BackendRequest::LightUpdate { device, upd } => {
                 drop(lock);
                 if let Some(topic) = self.rmap.get(&device.rid) {
                     let z2mreq = Z2mRequest::Update(upd);
@@ -635,7 +635,7 @@ impl Z2mBackend {
                 };
             }
 
-            ClientRequest::GroupUpdate { device, upd } => {
+            BackendRequest::GroupUpdate { device, upd } => {
                 let room = lock.get::<GroupedLight>(device)?.owner.rid;
                 drop(lock);
 
@@ -645,7 +645,7 @@ impl Z2mBackend {
                 }
             }
 
-            ClientRequest::SceneStore { room, id, name } => {
+            BackendRequest::SceneStore { room, id, name } => {
                 drop(lock);
                 if let Some(topic) = self.rmap.get(&room.rid) {
                     let z2mreq = Z2mRequest::SceneStore { name, id: *id };
@@ -653,7 +653,7 @@ impl Z2mBackend {
                 }
             }
 
-            ClientRequest::SceneRecall { scene } => {
+            BackendRequest::SceneRecall { scene } => {
                 let room = lock.get::<Scene>(scene)?.group.rid;
                 let index = lock
                     .aux_get(scene)?
@@ -667,7 +667,7 @@ impl Z2mBackend {
                 }
             }
 
-            ClientRequest::SceneRemove { scene } => {
+            BackendRequest::SceneRemove { scene } => {
                 let room = lock.get::<Scene>(scene)?.group.rid;
                 let index = lock
                     .aux_get(scene)?
@@ -687,7 +687,7 @@ impl Z2mBackend {
 
     pub async fn event_loop(
         &mut self,
-        chan: &mut Receiver<Arc<ClientRequest>>,
+        chan: &mut Receiver<Arc<BackendRequest>>,
         mut socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
     ) -> ApiResult<()> {
         loop {
@@ -704,9 +704,7 @@ impl Z2mBackend {
         }
     }
 
-    pub async fn run_forever(mut self) -> ApiResult<()> {
-        let mut chan = self.state.lock().await.z2m_channel();
-
+    pub async fn run_forever(mut self, mut chan: Receiver<Arc<BackendRequest>>) -> ApiResult<()> {
         // let's not include auth tokens in log output
         let sanitized_url = self.server.get_sanitized_url();
         let url = self.server.get_url();
