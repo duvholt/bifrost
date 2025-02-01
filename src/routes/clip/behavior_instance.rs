@@ -36,5 +36,5 @@ async fn put_behavior_instance(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/:id", put(put_behavior_instance))
+    Router::new().route("/{id}", put(put_behavior_instance))
 }

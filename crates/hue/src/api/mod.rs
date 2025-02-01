@@ -12,8 +12,8 @@ mod stubs;
 mod update;
 
 pub use behavior::{
-    BehaviorInstance, BehaviorInstanceMetadata, BehaviorInstanceUpdate, BehaviorScript,
-    BehaviorScriptMetadata,
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
+    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, WakeupConfiguration,
 };
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
