@@ -14,6 +14,7 @@
     clippy::module_name_repetitions
 )]
 
+pub mod backend;
 pub mod config;
 pub mod error;
 pub mod hue;

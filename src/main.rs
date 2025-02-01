@@ -2,11 +2,12 @@ use std::io::Write;
 
 use tokio::task::JoinSet;
 
+use bifrost::backend::z2m::Z2mBackend;
 use bifrost::config;
 use bifrost::error::ApiResult;
 use bifrost::mdns;
-use bifrost::server::{self, appstate::AppState, banner};
-use bifrost::z2m;
+use bifrost::server;
+use bifrost::server::appstate::AppState;
 
 /*
  * Formatter function to output in syslog format. This makes sense when running
@@ -87,7 +88,7 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
     ));
 
     for (name, server) in &appstate.config().z2m.servers {
-        let client = z2m::Client::new(
+        let client = Z2mBackend::new(
             name.clone(),
             server.clone(),
             appstate.config(),
@@ -103,7 +104,7 @@ async fn run() -> ApiResult<()> {
     init_logging()?;
 
     #[cfg(feature = "server-banner")]
-    banner::print()?;
+    server::banner::print()?;
 
     let config = config::parse("config.yaml".into())?;
     log::debug!("Configuration loaded successfully");
