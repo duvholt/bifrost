@@ -45,7 +45,7 @@ async fn put_light(
         .with_color_xy(upd.color.map(|col| col.xy))
         .with_gradient(upd.gradient);
 
-    lock.z2m_request(ClientRequest::light_update(rlink, payload))?;
+    lock.backend_request(ClientRequest::light_update(rlink, payload))?;
 
     drop(lock);
 

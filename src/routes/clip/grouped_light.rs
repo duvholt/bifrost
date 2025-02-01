@@ -34,7 +34,7 @@ async fn put_grouped_light(
         .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
         .with_color_xy(upd.color.map(|col| col.xy));
 
-    lock.z2m_request(ClientRequest::group_update(rlink, payload))?;
+    lock.backend_request(ClientRequest::group_update(rlink, payload))?;
 
     drop(lock);
 
