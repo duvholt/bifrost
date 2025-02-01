@@ -29,10 +29,17 @@ To install Bifrost from source, you will need the following:
 1.  The rust language toolchain (https://rustup.rs/)
 2.  At least one zigbee2mqtt server to connect to
 3.  The MAC address of the network interface you want to run the server on
+4.  `build-essential` package for compiling the source code (on Debian/Ubuntu systems)
+
+First, install `build-essential` :
+
+```bash
+sudo apt install build-essential
+```
 
 When you have these things available, install bifrost:
 
-```
+```bash
 cargo install --git https://github.com/chrivers/bifrost.git
 ```
 
@@ -70,7 +77,7 @@ this will not work. [How to find your mac address](doc/how-to-find-mac-linux.md)
 Now you can start Bifrost. Simple start the "bifrost" command from the same
 directory where you put the `config.yaml`:
 
-```
+```bash
 bifrost
 ```
 
@@ -129,14 +136,14 @@ To install Bifrost with Docker, you will need the following:
 
 When you have these things available, you can install Bifrost by running these commands:
 
-```
+```bash
 git clone https://github.com/chrivers/bifrost
 cd bifrost
 ```
 
 Then rename or copy our `config.example.yaml`:
 
-```
+```bash
 cp config.example.yaml config.yaml
 ```
 
@@ -149,7 +156,7 @@ just leave the default values.
 
 Now you are ready to run the app with:
 
-```
+```bash
 docker compose up -d
 ```
 
@@ -158,7 +165,7 @@ This will build and then start the app on your Docker instance.
 To view the logs, use a tool like [Portainer](https://www.portainer.io/) or
 run the following command:
 
-```
+```bash
 docker logs bifrost
 ```
 
