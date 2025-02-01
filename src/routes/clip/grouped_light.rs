@@ -1,12 +1,11 @@
-use axum::{
-    extract::{Path, State},
-    routing::put,
-    Router,
-};
+use axum::extract::{Path, State};
+use axum::routing::{get, put};
+use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::hue::api::{GroupedLight, GroupedLightUpdate, RType, V2Reply};
+use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
@@ -43,5 +42,7 @@ async fn put_grouped_light(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/{id}", put(put_grouped_light))
+    Router::new()
+        .route("/", get(|st| get_resource(st, Path(RType::GroupedLight))))
+        .route("/{id}", put(put_grouped_light))
 }
