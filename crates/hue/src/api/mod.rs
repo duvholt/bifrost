@@ -1,3 +1,4 @@
+mod behavior;
 mod device;
 mod entertainment;
 mod entertainment_config;
@@ -11,6 +12,10 @@ mod stubs;
 mod update;
 mod zigbee_device_discovery;
 
+pub use behavior::{
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
+    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, WakeupConfiguration,
+};
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
 pub use entertainment_config::{
@@ -44,11 +49,11 @@ pub use scene::{
 use serde::ser::SerializeMap;
 pub use stream::HueStreamKey;
 pub use stubs::{
-    BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
-    ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
-    GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
-    Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
-    Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
+    Bridge, BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DevicePower,
+    DeviceSoftwareUpdate, DollarRef, GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion,
+    Homekit, LightLevel, Matter, Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage,
+    RelativeRotary, SmartScene, Taurus, Temperature, TimeZone, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus, Zone,
 };
 pub use update::Update;
 pub use zigbee_device_discovery::{
