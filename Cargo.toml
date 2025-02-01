@@ -31,7 +31,7 @@ server-banner = ["server", "dep:termcolor", "dep:itertools"]
 async-stream = "0.3.6"
 axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart"], default-features = false }
 axum-core = "0.5.0"
-axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"], default-features = false }
+axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls-no-provider"], default-features = false }
 bytes = "1.9.0"
 chrono = { version = "0.4.39", features = ["clock", "serde"], default-features = false }
 clap = { version = "4.5.27", features = ["std", "color", "derive"], default-features = false }
@@ -67,7 +67,7 @@ sha1 = "0.10.6"
 rustls-pemfile = "2.2.0"
 termcolor = { version = "1.4.1", optional = true }
 itertools = { version = "0.14.0", optional = true }
-reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls-no-provider"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
 url = { version = "2.5.4", features = ["serde"] }
 clap-stdin = "0.6.0"
 packed_struct = "0.10.1"
