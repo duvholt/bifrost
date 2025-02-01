@@ -17,7 +17,7 @@ async fn get_root(State(state): State<AppState>) -> impl IntoResponse {
     V2Reply::list(state.res.lock().await.get_resources())
 }
 
-async fn get_resource(State(state): State<AppState>, Path(rtype): Path<RType>) -> ApiV2Result {
+pub async fn get_resource(State(state): State<AppState>, Path(rtype): Path<RType>) -> ApiV2Result {
     V2Reply::list(state.res.lock().await.get_resources_by_type(rtype))
 }
 

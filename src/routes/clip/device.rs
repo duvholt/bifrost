@@ -1,12 +1,12 @@
-use axum::{
-    extract::{Path, State},
-    routing::put,
-    Router,
-};
+use axum::extract::{Path, State};
+use axum::routing::{get, put};
+use axum::Router;
+
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::hue::api::{Device, DeviceUpdate, RType, V2Reply};
+use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
@@ -33,5 +33,7 @@ async fn put_device(
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/{id}", put(put_device))
+    Router::new()
+        .route("/", get(|state| get_resource(state, Path(RType::Device))))
+        .route("/{id}", put(put_device))
 }
