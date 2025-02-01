@@ -23,7 +23,8 @@ use crate::hue::api::{
     ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming, DimmingUpdate, GroupedLight,
     Light, LightColor, LightGradient, LightMetadata, LightUpdate, Metadata, RType, Resource,
     ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
-    SceneMetadata, SceneRecall, SceneStatus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
 use crate::model::hexcolor::HexColor;
@@ -618,6 +619,7 @@ impl Z2mBackend {
         Ok(socket.send(msg).await?)
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn websocket_write(
         &mut self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -625,55 +627,112 @@ impl Z2mBackend {
     ) -> ApiResult<()> {
         self.learn_cleanup();
 
-        let lock = self.state.lock().await;
+        let mut lock = self.state.lock().await;
 
-        match &*req {
-            BackendRequest::LightUpdate { device, upd } => {
+        match (*req).clone() {
+            BackendRequest::LightUpdate(link, upd) => {
+                // We cannot recover .mode from backend updates, since these only contain
+                // the gradient colors. So we have no choice, but to update the mode
+                // here. Otherwise, the information would be lost.
+                if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
+                    lock.update::<Light>(&link.rid, |light| {
+                        if let Some(gr) = &mut light.gradient {
+                            gr.mode = mode;
+                        }
+                    })?;
+                }
                 drop(lock);
-                if let Some(topic) = self.rmap.get(&device.rid) {
-                    let z2mreq = Z2mRequest::Update(upd);
+
+                if let Some(topic) = self.rmap.get(&link.rid) {
+                    let payload = DeviceUpdate::default()
+                        .with_state(upd.on.map(|on| on.on))
+                        .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+                        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                        .with_color_xy(upd.color.map(|col| col.xy))
+                        .with_gradient(upd.gradient);
+                    let z2mreq = Z2mRequest::Update(&payload);
                     self.websocket_send(socket, topic, z2mreq).await?;
                 };
             }
+            BackendRequest::SceneCreate(link_scene, sid, scene) => {
+                if let Some(topic) = self.rmap.get(&scene.group.rid) {
+                    log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
 
-            BackendRequest::GroupUpdate { device, upd } => {
-                let room = lock.get::<GroupedLight>(device)?.owner.rid;
+                    lock.aux_set(
+                        &link_scene,
+                        AuxData::new()
+                            .with_topic(&scene.metadata.name)
+                            .with_index(sid),
+                    );
+                    let z2mreq = Z2mRequest::SceneStore {
+                        name: &scene.metadata.name.clone(),
+                        id: sid,
+                    };
+
+                    lock.add(&link_scene, Resource::Scene(scene))?;
+                    drop(lock);
+
+                    self.websocket_send(socket, topic, z2mreq).await?;
+                }
+            }
+            BackendRequest::SceneUpdate(link, upd) => {
+                if let Some(recall) = upd.recall {
+                    let scene = lock.get::<Scene>(&link)?;
+                    if recall.action == Some(SceneStatusUpdate::Active) {
+                        let index = lock
+                            .aux_get(&link)?
+                            .index
+                            .ok_or(ApiError::NotFound(link.rid))?;
+
+                        let scenes = lock.get_scenes_for_room(&scene.group.rid);
+                        for rid in scenes {
+                            lock.update::<Scene>(&rid, |scn| {
+                                scn.status = if rid == link.rid {
+                                    Some(SceneStatus::Static)
+                                } else {
+                                    Some(SceneStatus::Inactive)
+                                };
+                            })?;
+                        }
+
+                        let room = lock.get::<Scene>(&link)?.group.rid;
+                        drop(lock);
+
+                        if let Some(topic) = self.rmap.get(&room).cloned() {
+                            self.learn_scene_recall(&link).await?;
+                            let z2mreq = Z2mRequest::SceneRecall(index);
+                            self.websocket_send(socket, &topic, z2mreq).await?;
+                        }
+                    } else {
+                        log::error!("Scene recall type not supported: {recall:?}");
+                    }
+                }
+            }
+            BackendRequest::GroupedLightUpdate(link, upd) => {
+                let room = lock.get::<GroupedLight>(&link)?.owner.rid;
                 drop(lock);
+
+                let payload = DeviceUpdate::default()
+                    .with_state(upd.on.map(|on| on.on))
+                    .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+                    .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                    .with_color_xy(upd.color.map(|col| col.xy));
 
                 if let Some(topic) = self.rmap.get(&room) {
-                    let z2mreq = Z2mRequest::Update(upd);
+                    let z2mreq = Z2mRequest::Update(&payload);
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
-
-            BackendRequest::SceneStore { room, id, name } => {
-                drop(lock);
-                if let Some(topic) = self.rmap.get(&room.rid) {
-                    let z2mreq = Z2mRequest::SceneStore { name, id: *id };
-                    self.websocket_send(socket, topic, z2mreq).await?;
+            BackendRequest::Delete(link) => {
+                if link.rtype != RType::Scene {
+                    return Ok(());
                 }
-            }
 
-            BackendRequest::SceneRecall { scene } => {
-                let room = lock.get::<Scene>(scene)?.group.rid;
+                let room = lock.get::<Scene>(&link)?.group.rid;
                 let index = lock
-                    .aux_get(scene)?
+                    .aux_get(&link)?
                     .index
-                    .ok_or(ApiError::NotFound(scene.rid))?;
-                drop(lock);
-                if let Some(topic) = self.rmap.get(&room).cloned() {
-                    self.learn_scene_recall(scene).await?;
-                    let z2mreq = Z2mRequest::SceneRecall(index);
-                    self.websocket_send(socket, &topic, z2mreq).await?;
-                }
-            }
-
-            BackendRequest::SceneRemove { scene } => {
-                let room = lock.get::<Scene>(scene)?.group.rid;
-                let index = lock
-                    .aux_get(scene)?
-                    .index
-                    .ok_or(ApiError::NotFound(scene.rid))?;
+                    .ok_or(ApiError::NotFound(link.rid))?;
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&room) {

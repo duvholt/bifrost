@@ -4,13 +4,12 @@ use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::backend::BackendRequest;
 use crate::hue::api::{GroupedLight, GroupedLightUpdate, RType, V2Reply};
 use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
-use crate::z2m::request::ClientRequest;
-use crate::z2m::update::DeviceUpdate;
 
 async fn put_grouped_light(
     State(state): State<AppState>,
@@ -28,13 +27,7 @@ async fn put_grouped_light(
 
     let upd: GroupedLightUpdate = serde_json::from_value(put)?;
 
-    let payload = DeviceUpdate::default()
-        .with_state(upd.on.map(|on| on.on))
-        .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
-        .with_color_xy(upd.color.map(|col| col.xy));
-
-    lock.backend_request(ClientRequest::group_update(rlink, payload))?;
+    lock.backend_request(BackendRequest::GroupedLightUpdate(rlink, upd))?;
 
     drop(lock);
 
