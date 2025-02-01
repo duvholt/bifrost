@@ -1,0 +1,92 @@
+{
+    "type": "behavior_instance",
+    "metadata": {
+        "type": "instance_metadata",
+        "name": "Go to sleep"
+    },
+    "script_id": "7e571ac6-f363-42e1-809a-4cbf6523ed72",
+    "enabled": true,
+    "configuration": {
+        "where": [
+            {
+                "group": {
+                    "rtype": "room",
+                    "rid": "8620e042-21a7-4deb-8d15-ff2a680b9aae"
+                }
+            }
+        ],
+        "when": {
+            "time_point": {
+                "type": "time",
+                "time": {
+                    "hour": 21,
+                    "minute": 0
+                }
+            },
+            "recurrence_days": [
+                "sunday",
+                "monday",
+                "wednesday",
+                "friday"
+            ]
+        },
+        "style": "sunset",
+        "fade_out_duration": {
+            "seconds": 900
+        },
+        "end_state": "turn_off"
+    }
+}
+// resp
+{
+    "data": [
+        {
+            "rid": "1dc77418-1d49-4ba1-89c3-f2b392df759e",
+            "rtype": "behavior_instance"
+        }
+    ],
+    "errors": []
+}
+//
+{
+    "type": "behavior_instance",
+    "metadata": {
+        "type": "instance_metadata",
+        "name": "Wake up Yo"
+    },
+    "script_id": "ff8957e3-2eb9-4699-a0c8-ad2cb3ede704",
+    "enabled": true,
+    "configuration": {
+        "where": [
+            {
+                "group": {
+                    "rtype": "room",
+                    "rid": "7bf4ec3b-b6e7-4d6c-8281-97bb3eddeba2"
+                },
+                "items": [
+                    {
+                        "rtype": "light",
+                        "rid": "4e67e691-8e3f-496f-b21b-875b43eeecad"
+                    }
+                ]
+            }
+        ],
+        "when": {
+            "time_point": {
+                "type": "time",
+                "time": {
+                    "hour": 13,
+                    "minute": 0
+                }
+            },
+            "recurrence_days": [
+                "friday"
+            ]
+        },
+        "style": "sunrise",
+        "end_brightness": 58.02847055288461,
+        "fade_in_duration": {
+            "seconds": 900
+        }
+    }
+}

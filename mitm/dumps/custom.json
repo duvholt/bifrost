@@ -1,0 +1,59 @@
+{
+    "type": "behavior_instance",
+    "metadata": {
+        "type": "instance_metadata",
+        "name": "Testing Custom"
+    },
+    "script_id": "7238c707-8693-4f19-9095-ccdc1444d228",
+    "enabled": true,
+    "configuration": {
+        "when_extended": {
+            "start_at": {
+                "time_point": {
+                    "type": "sunrise",
+                    "offset": {
+                        "minutes": 30
+                    }
+                }
+            },
+            "end_at": {
+                "time_point": {
+                    "type": "sunset",
+                    "offset": {
+                        "minutes": -90
+                    }
+                }
+            },
+            "recurrence_days": [
+                "sunday",
+                "tuesday",
+                "wednesday",
+                "friday",
+                "saturday"
+            ],
+            "randomization": {
+                "minutes": 15
+            }
+        },
+        "where": [
+            {
+                "group": {
+                    "rtype": "room",
+                    "rid": "993d5592-7cd2-4276-b05f-261de765f59a"
+                }
+            }
+        ],
+        "what": [
+            {
+                "group": {
+                    "rtype": "room",
+                    "rid": "993d5592-7cd2-4276-b05f-261de765f59a"
+                },
+                "recall": {
+                    "rtype": "recipe",
+                    "rid": "732ff1d9-76a7-4630-aad0-c8acc499bb0b"
+                }
+            }
+        ]
+    }
+}

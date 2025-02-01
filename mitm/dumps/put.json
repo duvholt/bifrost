@@ -1,0 +1,51 @@
+// /clip/v2/resource/behavior_instance/6383cbfa-3815-416d-a8b1-c389f89a44b6
+{
+    "metadata": {
+        "name": "Kontor"
+    },
+    "enabled": true,
+    "configuration": {
+        "where": [
+            {
+                "group": {
+                    "rtype": "room",
+                    "rid": "7bf4ec3b-b6e7-4d6c-8281-97bb3eddeba2"
+                }
+            }
+        ],
+        "when": {
+            "time_point": {
+                "type": "time",
+                "time": {
+                    "hour": 7,
+                    "minute": 18
+                }
+            },
+            "recurrence_days": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+            ]
+        },
+        "style": "basic",
+        "end_brightness": 100.0,
+        "turn_lights_off_after": {
+            "seconds": 3600
+        },
+        "fade_in_duration": {
+            "seconds": 1200
+        }
+    }
+}
+// resp
+{
+    "data": [
+        {
+            "rid": "6383cbfa-3815-416d-a8b1-c389f89a44b6",
+            "rtype": "behavior_instance"
+        }
+    ],
+    "errors": []
+}
