@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use bifrost_api::backend::BackendRequest;
-use chrono::Utc;
+use chrono::Local;
 use tokio::{spawn, sync::Mutex, task::JoinHandle};
-use tokio_schedule::{Job, every};
+use tokio_schedule::{EveryWeekDay, Job, every};
 
 use hue::api::{
     BehaviorInstance, BehaviorInstanceConfiguration, GroupedLightUpdate, On, RType, Resource,
@@ -44,26 +44,17 @@ impl Scheduler {
             .behavior_instances
             .iter()
             .filter(|bi| bi.enabled)
-            .filter_map(|bi| {
-                let configuration: BehaviorInstanceConfiguration =
-                    serde_json::from_value(bi.configuration.clone()).ok()?;
-                match &configuration {
-                    BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                        // todo: weekday
-                        // todo: timezone
-                        // todo: everything
-                        let time = wakeup_configuration.when.time_point.time();
+            .filter_map(|bi| serde_json::from_value(bi.configuration.clone()).ok())
+            .flat_map(|configuration| match configuration {
+                BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
+                    let jobs = create_wake_up_jobs(&wakeup_configuration);
+                    let res = self.res.clone();
+                    jobs.into_iter().map(move |job| {
+                        log::debug!("Created new behavior instance job: {:#?}", job);
+                        let res = res.clone();
                         let config = wakeup_configuration.clone();
-                        let res = self.res.clone();
-                        let schedule = every(1)
-                            .day()
-                            .at(time.hour, time.minute, 00)
-                            .in_timezone(&Utc);
-                        log::debug!("Created new behavior instance schedule: {:#?}", schedule);
-                        Some(spawn(
-                            schedule.perform(move || run_wake_up(config.clone(), res.clone())),
-                        ))
-                    }
+                        spawn(job.perform(move || run_wake_up(config.clone(), res.clone())))
+                    })
                 }
             })
             .collect();
@@ -81,6 +72,32 @@ impl Scheduler {
             })
             .collect()
     }
+}
+
+fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<EveryWeekDay<Local, Local>> {
+    // todo:
+    // timezone
+    // non repeating
+    // specific lights
+    // style
+    // brightness
+    // turn lights off
+    // fade duration
+
+    let time = &configuration.when.time_point.time();
+    configuration
+        .when
+        .recurrence_days
+        .as_ref()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|weekday| {
+            every(1)
+                .week()
+                .on(weekday.clone())
+                .at(time.hour, time.minute, 0)
+        })
+        .collect()
 }
 
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
