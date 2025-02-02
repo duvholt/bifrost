@@ -7,8 +7,8 @@ use tokio_schedule::{every, EveryWeekDay, Job};
 use crate::{
     backend::BackendRequest,
     hue::api::{
-        BehaviorInstance, BehaviorInstanceConfiguration, GroupedLightUpdate, On, Resource,
-        WakeupConfiguration,
+        BehaviorInstance, BehaviorInstanceConfiguration, GroupedLightUpdate, LightUpdate, On,
+        Resource, Room, WakeupConfiguration,
     },
     resource::Resources,
 };
@@ -77,7 +77,6 @@ fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<EveryWeekDay<
     // todo:
     // timezone
     // non repeating
-    // specific lights
     // style
     // turn lights off
 
@@ -92,23 +91,74 @@ fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<EveryWeekDay<
 
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
     log::debug!("Running scheduled behavior instance:, {:#?}", config);
-    let lock = res.lock().await;
-    let group = &config.where_field[0].group;
-    if let Ok(resource) = lock.get_resource_by_id(&group.rid) {
+    #[allow(clippy::option_if_let_else)]
+    let resource_links = config.where_field.iter().flat_map(|room| {
+        if let Some(items) = &room.items {
+            items.clone()
+        } else {
+            vec![room.group]
+        }
+    });
+
+    for resource_link in resource_links {
+        let resource = res.lock().await.get_resource_by_id(&resource_link.rid);
+        let resource = match resource {
+            Ok(resource) => resource,
+            Err(err) => {
+                log::warn!("Failed to get resource: {}", err);
+                continue;
+            }
+        };
         log::debug!("Turning on {:#?}", resource.obj);
-        if let Resource::Room(room) = resource.obj {
-            if let Some(grouped_light) = room.grouped_light_service() {
-                let payload = GroupedLightUpdate::default()
+        match resource.obj {
+            Resource::Room(room) => {
+                wakeup_room(room, res.clone(), config.clone()).await;
+            }
+            Resource::Light(_light) => {
+                let payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
                     .with_brightness(Some(config.end_brightness))
-                    .with_transition(Some(f64::from(config.fade_in_duration.seconds)));
+                    .with_transition(Some(config.fade_in_duration.seconds));
 
-                if let Err(err) = lock
-                    .backend_request(BackendRequest::GroupedLightUpdate(*grouped_light, payload))
-                {
+                let upd = res
+                    .lock()
+                    .await
+                    .backend_request(BackendRequest::LightUpdate(resource_link, payload));
+                if let Err(err) = upd {
                     log::error!("Failed to execute group update: {:#?}", err);
                 }
             }
+            Resource::BridgeHome(_bridge_home) => {
+                let rooms = res
+                    .lock()
+                    .await
+                    .get_resources_by_type(crate::hue::api::RType::Room);
+                for room_resource in rooms {
+                    if let Resource::Room(room) = room_resource.obj {
+                        wakeup_room(room, res.clone(), config.clone()).await;
+                    }
+                }
+            }
+            _ => (),
         }
+    }
+}
+
+async fn wakeup_room(room: Room, res: Arc<Mutex<Resources>>, config: WakeupConfiguration) {
+    let Some(grouped_light) = room.grouped_light_service() else {
+        log::error!("Failed to get grouped light service for room");
+        return;
+    };
+    let payload = GroupedLightUpdate::default()
+        .with_on(Some(On::new(true)))
+        .with_brightness(Some(config.end_brightness))
+        .with_transition(Some(config.fade_in_duration.seconds));
+
+    let upd = res
+        .lock()
+        .await
+        .backend_request(BackendRequest::GroupedLightUpdate(*grouped_light, payload));
+    if let Err(err) = upd {
+        log::error!("Failed to execute group update: {:#?}", err);
     }
 }

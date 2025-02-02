@@ -106,6 +106,7 @@ pub mod configuration {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub struct Where {
         pub group: ResourceLink,
+        pub items: Option<Vec<ResourceLink>>,
     }
 }
 

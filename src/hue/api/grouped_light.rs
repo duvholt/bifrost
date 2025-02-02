@@ -105,7 +105,10 @@ impl GroupedLightUpdate {
     }
 
     #[must_use]
-    pub const fn with_transition(self, transition: Option<f64>) -> Self {
-        Self { transition, ..self }
+    pub fn with_transition(self, transition: Option<impl Into<f64>>) -> Self {
+        Self {
+            transition: transition.map(Into::into),
+            ..self
+        }
     }
 }
