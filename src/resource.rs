@@ -261,7 +261,8 @@ impl Resources {
 
         self.state_updates.notify_one();
 
-        let evt = EventBlock::delete(link)?;
+        let id_v1 = self.state.id_v1(&link.rid);
+        let evt = EventBlock::delete(*link, id_v1)?;
 
         self.hue_event_stream.hue_event(evt);
 
