@@ -30,7 +30,7 @@ pub use entertainment_config::{
     EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
     EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Position,
 };
-pub use grouped_light::{GroupedLight, GroupedLightUpdate};
+pub use grouped_light::{GroupedLight, GroupedLightDynamicsUpdate, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
     DimmingUpdate, GamutType, Light, LightAlert, LightColor, LightDynamics, LightDynamicsStatus,

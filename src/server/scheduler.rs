@@ -6,8 +6,8 @@ use tokio::{spawn, sync::Mutex, task::JoinHandle};
 use tokio_schedule::{EveryWeekDay, Job, every};
 
 use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, GroupedLightUpdate, On, RType, Resource,
-    WakeupConfiguration,
+    BehaviorInstance, BehaviorInstanceConfiguration, GroupedLightDynamicsUpdate,
+    GroupedLightUpdate, On, RType, Resource, WakeupConfiguration,
 };
 
 use crate::resource::Resources;
@@ -80,9 +80,7 @@ fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<EveryWeekDay<
     // non repeating
     // specific lights
     // style
-    // brightness
     // turn lights off
-    // fade duration
 
     let time = &configuration.when.time_point.time();
     configuration
@@ -108,7 +106,13 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
         log::debug!("Turning on {:#?}", resource.obj);
         if let Resource::Room(room) = resource.obj {
             if let Some(grouped_light) = room.grouped_light_service() {
-                let payload = GroupedLightUpdate::default().with_on(Some(On::new(true)));
+                let payload = GroupedLightUpdate::default()
+                    .with_on(Some(On::new(true)))
+                    .with_brightness(Some(config.end_brightness))
+                    .with_dynamics(Some(
+                        GroupedLightDynamicsUpdate::new()
+                            .with_duration(Some(config.fade_in_duration.seconds * 1000)),
+                    ));
 
                 if let Err(err) = lock
                     .backend_request(BackendRequest::GroupedLightUpdate(*grouped_light, payload))
