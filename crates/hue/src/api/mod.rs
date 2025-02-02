@@ -34,10 +34,10 @@ pub use grouped_light::{GroupedLight, GroupedLightDynamicsUpdate, GroupedLightUp
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
     DimmingUpdate, GamutType, Light, LightAlert, LightColor, LightDynamics, LightDynamicsStatus,
-    LightEffect, LightEffectActionUpdate, LightEffectParameters, LightEffectStatus,
-    LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightFunction,
-    LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate, LightMetadata,
-    LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
+    LightDynamicsUpdate, LightEffect, LightEffectActionUpdate, LightEffectParameters,
+    LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update,
+    LightFunction, LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate,
+    LightMetadata, LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
     LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffect,
     LightTimedEffects, LightTimedEffectsUpdate, LightUpdate, MirekSchema, On,
 };
