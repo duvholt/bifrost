@@ -124,6 +124,61 @@ pub struct DeviceRemoveResponse {
     pub force: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum Response<T> {
+    Ok {
+        data: T,
+        #[serde(default)]
+        transaction: Option<Value>,
+    },
+    Error {
+        error: Value,
+        #[serde(default)]
+        transaction: Option<Value>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupAdd {
+    pub id: Option<u32>,
+    pub friendly_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupRemove {
+    pub id: String,
+    #[serde(default)]
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupMemberAddRemove {
+    pub device: String,
+    pub endpoint: u8,
+    pub group: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupRename {
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupOptions {
+    pub from: Value,
+    pub to: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceRename {
+    pub from: String,
+    pub to: String,
+    #[serde(default)]
+    pub homeassistant_rename: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Availability {
