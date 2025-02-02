@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::Local;
 use tokio::{spawn, sync::Mutex, task::JoinHandle};
-use tokio_schedule::{every, Job};
+use tokio_schedule::{every, EveryWeekDay, Job};
 
 use crate::{
     backend::BackendRequest,
@@ -45,20 +45,15 @@ impl Scheduler {
             .behavior_instances
             .iter()
             .filter(|bi| bi.enabled)
-            .map(|bi| match &bi.configuration {
+            .flat_map(|bi| match &bi.configuration {
                 BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                    // todo: weekday
-                    // todo: timezone
-                    // todo: everything
-                    let time = &wakeup_configuration.when.time_point.time;
-                    let config = wakeup_configuration.clone();
-                    let res = self.res.clone();
-                    let schedule = every(1)
-                        .day()
-                        .at(time.hour, time.minute, 00)
-                        .in_timezone(&Utc);
-                    log::debug!("Created new behavior instance schedule: {:#?}", schedule);
-                    spawn(schedule.perform(move || run_wake_up(config.clone(), res.clone())))
+                    let jobs = create_wake_up_jobs(wakeup_configuration);
+                    jobs.into_iter().map(|job| {
+                        log::debug!("Created new behavior instance job: {:#?}", job);
+                        let res = self.res.clone();
+                        let config = wakeup_configuration.clone();
+                        spawn(job.perform(move || run_wake_up(config.clone(), res.clone())))
+                    })
                 }
             })
             .collect();
@@ -76,6 +71,25 @@ impl Scheduler {
             })
             .collect()
     }
+}
+
+fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<EveryWeekDay<Local, Local>> {
+    // todo:
+    // timezone
+    // non repeating
+    // specific lights
+    // style
+    // brightness
+    // turn lights off
+    // fade duration
+
+    let time = &configuration.when.time_point.time;
+    configuration
+        .when
+        .weekdays()
+        .into_iter()
+        .map(|weekday| every(1).week().on(weekday).at(time.hour, time.minute, 0))
+        .collect()
 }
 
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
