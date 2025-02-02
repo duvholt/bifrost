@@ -56,6 +56,9 @@ pub struct GroupedLightUpdate {
     pub color: Option<ColorUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
+
+    #[serde(skip)]
+    pub transition: Option<f64>,
 }
 
 impl GroupedLightUpdate {
@@ -99,5 +102,10 @@ impl GroupedLightUpdate {
             },
             ..self
         }
+    }
+
+    #[must_use]
+    pub const fn with_transition(self, transition: Option<f64>) -> Self {
+        Self { transition, ..self }
     }
 }
