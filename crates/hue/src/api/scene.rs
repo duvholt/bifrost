@@ -151,16 +151,16 @@ impl SceneUpdate {
     }
 }
 
-impl AddAssign<SceneUpdate> for Scene {
-    fn add_assign(&mut self, upd: SceneUpdate) {
-        if let Some(actions) = upd.actions {
-            self.actions = actions;
+impl AddAssign<&SceneUpdate> for Scene {
+    fn add_assign(&mut self, upd: &SceneUpdate) {
+        if let Some(actions) = &upd.actions {
+            self.actions.clone_from(actions);
         }
-        if let Some(md) = upd.metadata {
+        if let Some(md) = &upd.metadata {
             self.metadata += md;
         }
-        if let Some(palette) = upd.palette {
-            self.palette = palette;
+        if let Some(palette) = &upd.palette {
+            self.palette.clone_from(palette);
         }
         if let Some(speed) = upd.speed {
             self.speed = speed;
@@ -171,16 +171,16 @@ impl AddAssign<SceneUpdate> for Scene {
     }
 }
 
-impl AddAssign<SceneMetadataUpdate> for SceneMetadata {
-    fn add_assign(&mut self, upd: SceneMetadataUpdate) {
-        if let Some(appdata) = upd.appdata {
-            self.appdata = Some(appdata);
+impl AddAssign<&SceneMetadataUpdate> for SceneMetadata {
+    fn add_assign(&mut self, upd: &SceneMetadataUpdate) {
+        if let Some(appdata) = &upd.appdata {
+            self.appdata = Some(appdata.to_string());
         }
-        if let Some(image) = upd.image {
-            self.image = Some(image);
+        if let Some(image) = &upd.image {
+            self.image = Some(*image);
         }
-        if let Some(name) = upd.name {
-            self.name = name;
+        if let Some(name) = &upd.name {
+            self.name.clone_from(name);
         }
     }
 }

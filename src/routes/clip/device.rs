@@ -20,7 +20,7 @@ pub async fn put_device(state: &AppState, rlink: ResourceLink, put: Value) -> Ap
         }
     }
 
-    lock.update::<Device>(&rlink.rid, |obj| *obj += upd)?;
+    lock.update::<Device>(&rlink.rid, |obj| *obj += &upd)?;
     drop(lock);
 
     V2Reply::ok(rlink)

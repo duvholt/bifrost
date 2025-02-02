@@ -28,7 +28,7 @@ pub async fn put_scene(state: &AppState, rlink: ResourceLink, put: Value) -> Api
     let upd: SceneUpdate = serde_json::from_value(put)?;
 
     if let Some(md) = &upd.metadata {
-        lock.update::<Scene>(&rlink.rid, |scn| scn.metadata += md.clone())?;
+        lock.update::<Scene>(&rlink.rid, |scn| scn.metadata += md)?;
     }
 
     let _scene = lock.get::<Scene>(&rlink)?;

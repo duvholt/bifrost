@@ -457,7 +457,7 @@ impl Z2mBackend {
         let upd: LightUpdate = devupd.into();
 
         let mut lock = self.state.lock().await;
-        lock.update::<Light>(uuid, |light| *light += upd)?;
+        lock.update::<Light>(uuid, |light| *light += &upd)?;
 
         self.learner.learn(uuid, &lock, devupd)?;
         self.learner.collect(&mut lock)?;
@@ -906,7 +906,7 @@ impl Z2mBackend {
                 // We have requested z2m to update the scene, so update
                 // the state database accordingly
                 lock.update::<Scene>(&link.rid, |scene| {
-                    *scene += upd.clone();
+                    *scene += upd;
                 })?;
 
                 drop(lock);

@@ -14,7 +14,7 @@ pub async fn put_room(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
 
     if let Some(metadata) = upd.metadata.take() {
         lock.update(&rlink.rid, |room: &mut Room| {
-            room.metadata += metadata;
+            room.metadata += &metadata;
         })?;
     }
 

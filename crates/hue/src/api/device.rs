@@ -116,14 +116,14 @@ impl DeviceUpdate {
     }
 }
 
-impl AddAssign<DeviceUpdate> for Device {
-    fn add_assign(&mut self, upd: DeviceUpdate) {
-        if let Some(md) = upd.metadata {
-            if let Some(name) = md.name {
-                self.metadata.name = name;
+impl AddAssign<&DeviceUpdate> for Device {
+    fn add_assign(&mut self, upd: &DeviceUpdate) {
+        if let Some(md) = &upd.metadata {
+            if let Some(name) = &md.name {
+                self.metadata.name.clone_from(name);
             }
-            if let Some(archetype) = md.archetype {
-                self.metadata.archetype = archetype;
+            if let Some(archetype) = &md.archetype {
+                self.metadata.archetype.clone_from(archetype);
             }
         }
     }

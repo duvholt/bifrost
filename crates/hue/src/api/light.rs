@@ -184,14 +184,14 @@ impl Light {
     }
 }
 
-impl AddAssign<LightUpdate> for Light {
-    fn add_assign(&mut self, upd: LightUpdate) {
-        if let Some(md) = upd.metadata {
-            if let Some(name) = md.name {
-                self.metadata.name = name;
+impl AddAssign<&LightUpdate> for Light {
+    fn add_assign(&mut self, upd: &LightUpdate) {
+        if let Some(md) = &upd.metadata {
+            if let Some(name) = &md.name {
+                self.metadata.name.clone_from(name);
             }
-            if let Some(archetype) = md.archetype {
-                self.metadata.archetype = archetype;
+            if let Some(archetype) = &md.archetype {
+                self.metadata.archetype = archetype.clone();
             }
         }
 
@@ -219,9 +219,9 @@ impl AddAssign<LightUpdate> for Light {
         }
 
         if let Some(grad) = &mut self.gradient {
-            if let Some(grupd) = upd.gradient {
+            if let Some(grupd) = &upd.gradient {
                 grad.mode = grupd.mode.unwrap_or(grad.mode);
-                grad.points = grupd.points;
+                grad.points.clone_from(&grupd.points);
             }
         }
     }
