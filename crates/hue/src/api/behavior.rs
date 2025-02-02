@@ -73,6 +73,7 @@ pub struct WakeupConfiguration {
 }
 
 pub mod configuration {
+    use chrono::Weekday;
     use serde::{Deserialize, Serialize};
 
     use crate::api::ResourceLink;
@@ -88,6 +89,15 @@ pub mod configuration {
         pub recurrence_days: Vec<String>,
         #[serde(rename = "time_point")]
         pub time_point: TimePoint,
+    }
+
+    impl When {
+        pub fn weekdays(&self) -> Vec<Weekday> {
+            self.recurrence_days
+                .iter()
+                .filter_map(|w| w.parse().ok())
+                .collect()
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
