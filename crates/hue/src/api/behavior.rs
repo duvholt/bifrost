@@ -80,7 +80,7 @@ pub mod configuration {
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub struct FadeInDuration {
-        pub seconds: i64,
+        pub seconds: u32,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
