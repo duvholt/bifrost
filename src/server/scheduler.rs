@@ -1,15 +1,16 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use bifrost_api::backend::BackendRequest;
-use chrono::Local;
-use tokio::{spawn, sync::Mutex, task::JoinHandle};
-use tokio_schedule::{EveryWeekDay, Job, every};
+use chrono::{Days, Local, NaiveTime, Weekday};
+use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
+use tokio_schedule::{Job, every};
 
 use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, GroupedLightDynamicsUpdate,
-    GroupedLightUpdate, LightDynamicsUpdate, LightUpdate, On, RType, Resource, Room,
-    WakeupConfiguration,
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
+    GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightUpdate, On, RType,
+    Resource, Room, WakeupConfiguration,
 };
+use uuid::Uuid;
 
 use crate::resource::Resources;
 
@@ -17,7 +18,7 @@ use crate::resource::Resources;
 pub struct Scheduler {
     jobs: Vec<JoinHandle<()>>,
     res: Arc<Mutex<Resources>>,
-    behavior_instances: Vec<BehaviorInstance>,
+    behavior_instances: Vec<ScheduleBehaviorInstance>,
 }
 
 impl Scheduler {
@@ -44,58 +45,153 @@ impl Scheduler {
         self.jobs = self
             .behavior_instances
             .iter()
-            .filter(|bi| bi.enabled)
-            .filter_map(|bi| serde_json::from_value(bi.configuration.clone()).ok())
-            .flat_map(|configuration| match configuration {
+            .filter(|ScheduleBehaviorInstance(_, bi)| bi.enabled)
+            .filter_map(|ScheduleBehaviorInstance(id, bi)| match bi.script_id {
+                BehaviorScript::WAKE_UP_ID => {
+                    match serde_json::from_value::<WakeupConfiguration>(bi.configuration.clone()) {
+                        Ok(config) => Some((id, BehaviorInstanceConfiguration::Wakeup(config))),
+                        Err(err) => {
+                            log::error!(
+                                "Failed to parse behavior instance {}: {}",
+                                bi.configuration,
+                                err
+                            );
+                            None
+                        }
+                    }
+                }
+                _ => None,
+            })
+            .flat_map(|(id, configuration)| match &configuration {
                 BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                    let jobs = create_wake_up_jobs(&wakeup_configuration);
-                    let res = self.res.clone();
-                    jobs.into_iter().map(move |job| {
-                        log::debug!("Created new behavior instance job: {:#?}", job);
-                        let res = res.clone();
-                        let config = wakeup_configuration.clone();
-                        spawn(job.perform(move || run_wake_up(config.clone(), res.clone())))
-                    })
+                    wakeup(self.res.clone(), *id, wakeup_configuration.clone())
                 }
             })
             .collect();
     }
 
-    async fn get_behavior_instances(&self) -> Vec<BehaviorInstance> {
+    async fn get_behavior_instances(&self) -> Vec<ScheduleBehaviorInstance> {
         self.res
             .lock()
             .await
             .get_resources_by_type(RType::BehaviorInstance)
             .into_iter()
             .filter_map(|r| match r.obj {
-                Resource::BehaviorInstance(behavior_instance) => Some(behavior_instance),
+                Resource::BehaviorInstance(behavior_instance) => {
+                    Some(ScheduleBehaviorInstance(r.id, behavior_instance))
+                }
                 _ => None,
             })
             .collect()
     }
 }
 
-fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<EveryWeekDay<Local, Local>> {
-    // todo:
-    // timezone
-    // non repeating
-    // style
-    // turn lights off
-
-    let time = &configuration.when.time_point.time();
-    configuration
-        .when
-        .recurrence_days
-        .as_ref()
-        .unwrap_or(&Vec::new())
-        .iter()
-        .map(|weekday| {
-            every(1)
-                .week()
-                .on(weekday.clone())
-                .at(time.hour, time.minute, 0)
+fn wakeup(
+    res: Arc<Mutex<Resources>>,
+    id: Uuid,
+    wakeup_configuration: WakeupConfiguration,
+) -> Vec<JoinHandle<()>> {
+    let jobs = create_wake_up_jobs(&wakeup_configuration);
+    jobs.into_iter()
+        .map(move |job| {
+            log::debug!("Created new behavior instance job: {:?}", job);
+            let res = res.clone();
+            let config = wakeup_configuration.clone();
+            let fut = match job {
+                ScheduleJob::Recurring(weekday, time) => every(1)
+                    .week()
+                    .on(weekday)
+                    .at(time.hour, time.minute, 0)
+                    .perform(move || run_wake_up(config.clone(), res.clone())),
+                ScheduleJob::Once(time) => Box::pin(async move {
+                    match time.get_sleep_duration() {
+                        Ok(sleep_duration) => {
+                            sleep(sleep_duration).await;
+                            run_wake_up(config.clone(), res.clone()).await;
+                            disable_behavior_instance(id, res).await;
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Failed to get sleep duration for time {:?}: {}",
+                                time,
+                                err
+                            );
+                        }
+                    }
+                }),
+            };
+            spawn(fut)
         })
         .collect()
+}
+
+async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
+    let upd = BehaviorInstanceUpdate::default().with_enabled(false);
+    let upd_result = res
+        .lock()
+        .await
+        .update::<BehaviorInstance>(&id, |bi| *bi += upd);
+    if let Err(err) = upd_result {
+        log::error!("Failed to disable behavior instance {:?}", err);
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct ScheduleBehaviorInstance(Uuid, BehaviorInstance);
+
+#[derive(Clone, Debug)]
+struct Time {
+    pub hour: u32,
+    pub minute: u32,
+}
+
+impl Time {
+    fn get_sleep_duration(&self) -> Result<Duration, &'static str> {
+        let now = Local::now();
+        let naive_time = NaiveTime::from_hms_opt(self.hour, self.minute, 0).ok_or("naive time")?;
+        let next = match now.with_time(naive_time) {
+            chrono::offset::LocalResult::Single(time) => time,
+            chrono::offset::LocalResult::Ambiguous(_, latest) => latest,
+            chrono::offset::LocalResult::None => {
+                return Err("with time");
+            }
+        };
+        let wakeup_datetime = if next < now {
+            next.checked_add_days(Days::new(1)).ok_or("add day")?
+        } else {
+            next
+        };
+        let sleep_duration = (wakeup_datetime - now).to_std().ok().ok_or("duration")?;
+        Ok(sleep_duration)
+    }
+}
+
+#[derive(Debug)]
+enum ScheduleJob {
+    Recurring(Weekday, Time),
+    Once(Time),
+}
+
+fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<ScheduleJob> {
+    // todo:
+    // timezone
+    // turn lights off
+
+    let chrono_time = configuration.when.time_point.time();
+    let time = Time {
+        hour: chrono_time.hour,
+        minute: chrono_time.minute,
+    };
+    let weekdays = configuration.when.recurrence_days.as_ref();
+
+    if let Some(weekdays) = weekdays {
+        weekdays
+            .into_iter()
+            .map(|weekday| ScheduleJob::Recurring(weekday.clone(), time.clone()))
+            .collect()
+    } else {
+        vec![ScheduleJob::Once(time)]
+    }
 }
 
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
