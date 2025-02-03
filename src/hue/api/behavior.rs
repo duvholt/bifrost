@@ -55,7 +55,7 @@ pub enum BehaviorInstanceConfiguration {
 pub struct WakeupConfiguration {
     pub end_brightness: f64,
     pub fade_in_duration: configuration::FadeInDuration,
-    pub style: String,
+    pub style: Option<String>,
     pub when: configuration::When,
     #[serde(rename = "where")]
     pub where_field: Vec<configuration::Where>,
@@ -75,17 +75,16 @@ pub mod configuration {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub struct When {
         #[serde(rename = "recurrence_days")]
-        pub recurrence_days: Vec<String>,
+        pub recurrence_days: Option<Vec<String>>,
         #[serde(rename = "time_point")]
         pub time_point: TimePoint,
     }
 
     impl When {
-        pub fn weekdays(&self) -> Vec<Weekday> {
+        pub fn weekdays(&self) -> Option<Vec<Weekday>> {
             self.recurrence_days
-                .iter()
-                .filter_map(|w| w.parse().ok())
-                .collect()
+                .as_ref()
+                .map(|days| days.iter().filter_map(|w| w.parse().ok()).collect())
         }
     }
 
