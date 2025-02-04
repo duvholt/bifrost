@@ -1,9 +1,10 @@
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::{Json, Router};
+use axum::Router;
 use itertools::Itertools;
 use serde_json::{json, Value};
 
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 async fn packages() -> Json<Value> {

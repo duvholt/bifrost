@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     routing::{get, post, put},
-    Json, Router,
+    Router,
 };
 
 use bytes::Bytes;
@@ -13,19 +13,17 @@ use serde_json::{json, Value};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
+use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{Device, GroupedLight, Light, RType, ResourceLink, Room, Scene, V1Reply};
 use crate::hue::legacy_api::{
-    ApiGroup, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene, ApiUserConfig,
-    Capabilities, HueResult, NewUser, NewUserReply,
+    ApiGroup, ApiGroupActionUpdate, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
+    ApiUserConfig, Capabilities, HueResult, NewUser, NewUserReply,
 };
 use crate::resource::Resources;
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 use crate::z2m::request::ClientRequest;
 use crate::z2m::update::DeviceUpdate;
-use crate::{
-    error::{ApiError, ApiResult},
-    hue::legacy_api::ApiGroupActionUpdate,
-};
 
 async fn get_api_config(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.api_short_config().await)

@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
     routing::{delete, post, put},
-    Json, Router,
+    Router,
 };
 use serde_json::Value;
 use uuid::Uuid;
@@ -13,6 +13,7 @@ use crate::hue::api::{
 };
 use crate::model::state::AuxData;
 use crate::routes::clip::ApiV2Result;
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 use crate::z2m::request::ClientRequest;
 

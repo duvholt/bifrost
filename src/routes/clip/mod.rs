@@ -4,12 +4,13 @@ pub mod grouped_light;
 pub mod light;
 pub mod scene;
 
-use axum::{Json, Router};
+use axum::Router;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::error::ApiResult;
 use crate::hue::api::V2Reply;
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 type ApiV2Result = ApiResult<Json<V2Reply<Value>>>;

@@ -1,13 +1,14 @@
 use axum::{
     extract::{Path, State},
     routing::put,
-    Json, Router,
+    Router,
 };
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::hue::api::{GroupedLight, GroupedLightUpdate, RType, V2Reply};
 use crate::routes::clip::ApiV2Result;
+use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 use crate::z2m::request::ClientRequest;
 use crate::z2m::update::DeviceUpdate;
