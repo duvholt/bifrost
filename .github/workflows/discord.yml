@@ -1,0 +1,21 @@
+name: discord notification
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  message:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@master
+
+    - uses: appleboy/discord-action@master
+      name: Message
+      with:
+        webhook_id: ${{ secrets.WEBHOOK_ID }}
+        webhook_token: ${{ secrets.WEBHOOK_TOKEN }}
+        username: "Hermod"
+        args: Branch ${{ github.ref_name }} was merged.
