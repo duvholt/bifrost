@@ -134,6 +134,7 @@ impl<'a> Normalizer<'a> {
     {
         let value = self.parse::<T>(item.clone())?;
         self.items += 1;
+        self.index += 1;
         let after = serde_json::to_value(&value)?;
 
         if !compare(item, &after, self.report)? {
@@ -190,6 +191,7 @@ fn process_file(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()> 
                 schedules,
                 sensors,
             } => {
+                /* log::info!("v1 detected"); */
                 nml.test::<ApiConfig>(&config);
 
                 for item in groups.values() {
@@ -221,6 +223,7 @@ fn process_file(file: FileOrStdin, width: usize, report: bool) -> ApiResult<()> 
                 }
             }
             Input::V2Flat(item) => {
+                /* log::info!("v2flat detected"); */
                 nml.test::<ResourceRecord>(&item);
             }
         }

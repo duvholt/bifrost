@@ -201,20 +201,20 @@ be a good way to enable smooth, lightweight light transitions.
 
 Size: 1 byte (specifically, [`EffectType`])
 
-| Name       | Value |
-|------------|-------|
-| NoEffect   | 0x00  |
-| Candle     | 0x01  |
-| Fireplace  | 0x02  |
-| Prism      | 0x03  |
-| Sunrise    | 0x09  |
-| Sparkle    | 0x0a  |
-| Opal       | 0x0b  |
-| Glisten    | 0x0c  |
-| Underwater | 0x0e  |
-| Cosmos     | 0x0f  |
-| Sunbeam    | 0x10  |
-| Enchant    | 0x11  |
+| Name         | Value |
+|--------------|-------|
+| `NoEffect`   | 0x00  |
+| `Candle`     | 0x01  |
+| `Fireplace`  | 0x02  |
+| `Prism`      | 0x03  |
+| `Sunrise`    | 0x09  |
+| `Sparkle`    | 0x0a  |
+| `Opal`       | 0x0b  |
+| `Glisten`    | 0x0c  |
+| `Underwater` | 0x0e  |
+| `Cosmos`     | 0x0f  |
+| `Sunbeam`    | 0x10  |
+| `Enchant`    | 0x11  |
 
 This enables one of the specific, known effects in the [`EffectType`] enum. Most
 (all?) effects allow setting other properties (such as color xy or color
@@ -254,6 +254,16 @@ used in this format. It has the following layout:
   ├───────────┼───────────────────────────────┤
   :           :                               :
   :           :                               :
+```
+
+The gradient style *must* be one of these values:
+
+```rust
+pub enum GradientStyle {
+    Linear = 0x00,
+    Scattered = 0x02,
+    Mirrored = 0x04,
+}
 ```
 
 ### Property: `GRADIENT_COLORS`: Color encoding

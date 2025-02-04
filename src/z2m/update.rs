@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::hue::api::On;
+use crate::hue::api::{LightGradientUpdate, On};
+use crate::model::hexcolor::HexColor;
 use crate::model::types::XY;
 
 #[allow(clippy::pub_underscore_fields)]
@@ -19,6 +20,8 @@ pub struct DeviceUpdate {
     pub color_mode: Option<DeviceColorMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<DeviceColor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<Vec<HexColor>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub linkquality: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -89,6 +92,22 @@ impl DeviceUpdate {
     pub fn with_color_xy(self, xy: Option<XY>) -> Self {
         Self {
             color: xy.map(DeviceColor::xy),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_gradient(self, grad: Option<LightGradientUpdate>) -> Self {
+        Self {
+            gradient: grad.map(|g| {
+                g.points
+                    .iter()
+                    .map(|p| {
+                        let [r, g, b] = p.color.xy.to_rgb(255.0);
+                        HexColor::new(r, g, b)
+                    })
+                    .collect()
+            }),
             ..self
         }
     }

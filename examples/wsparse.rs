@@ -86,6 +86,13 @@ async fn main() -> ApiResult<()> {
             continue;
         }
 
+        /* everything that ends in /action are action events */
+
+        if raw_msg.topic.ends_with("/action") {
+            // FIXME: parse action events
+            continue;
+        }
+
         /* everything else: device updates */
 
         let data = serde_json::from_value::<DeviceUpdate>(raw_msg.payload);

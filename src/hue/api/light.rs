@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::model::types::XY;
-use crate::z2m::api::Expose;
+use crate::z2m::api::{Expose, ExposeList};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Light {
@@ -75,7 +75,7 @@ impl LightMetadata {
         Self {
             archetype,
             name: name.to_string(),
-            function: None,
+            function: Some(LightFunction::Decorative),
             fixed_mired: None,
         }
     }
@@ -132,6 +132,13 @@ impl Light {
     pub fn as_color_opt(&self) -> Option<XY> {
         self.color.as_ref().map(|col| col.xy)
     }
+
+    #[must_use]
+    pub fn as_gradient_opt(&self) -> Option<Vec<XY>> {
+        self.gradient
+            .as_ref()
+            .map(|grad| grad.points.iter().map(|p| p.color.xy).collect())
+    }
 }
 
 impl AddAssign<LightUpdate> for Light {
@@ -165,6 +172,13 @@ impl AddAssign<LightUpdate> for Light {
             }
             if let Some(ct) = &mut self.color_temperature {
                 ct.mirek = None;
+            }
+        }
+
+        if let Some(grad) = &mut self.gradient {
+            if let Some(grupd) = upd.gradient {
+                grad.mode = grupd.mode.unwrap_or(grad.mode);
+                grad.points = grupd.points;
             }
         }
     }
@@ -208,6 +222,10 @@ impl Sub<&Light> for &Light {
             upd = upd.with_color_xy(rhs.as_color_opt());
         }
 
+        if self.gradient != rhs.gradient {
+            upd = upd.with_color_xy(rhs.as_color_opt());
+        }
+
         upd
     }
 }
@@ -225,20 +243,68 @@ pub struct LightAlert {
     action_values: BTreeSet<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialOrd, Ord, Eq, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialOrd, Ord, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum LightGradientMode {
+    #[default]
     InterpolatedPalette,
     InterpolatedPaletteMirrored,
+    RandomPixelated,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub struct LightGradientPoint {
+    pub color: ColorUpdate,
+}
+
+impl LightGradientPoint {
+    #[must_use]
+    pub const fn xy(xy: XY) -> Self {
+        Self {
+            color: ColorUpdate { xy },
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct LightGradient {
+    pub mode: LightGradientMode,
+    pub mode_values: BTreeSet<LightGradientMode>,
+    pub points_capable: u32,
+    pub points: Vec<LightGradientPoint>,
+    pub pixel_count: u32,
+}
+
+impl LightGradient {
+    #[must_use]
+    pub fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
+        match expose {
+            ExposeList {
+                length_max: Some(max),
+                ..
+            } => Some(Self {
+                mode: LightGradientMode::InterpolatedPalette,
+                mode_values: BTreeSet::from([
+                    LightGradientMode::InterpolatedPalette,
+                    LightGradientMode::InterpolatedPaletteMirrored,
+                    LightGradientMode::RandomPixelated,
+                ]),
+                points_capable: *max,
+                points: vec![],
+                // FIXME: we don't have this information, so guestimate it
+                pixel_count: *max * 3,
+            }),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LightGradient {
-    mode: LightGradientMode,
-    mode_values: BTreeSet<LightGradientMode>,
-    points_capable: u32,
-    points: Vec<Value>,
-    pixel_count: u32,
+pub struct LightGradientUpdate {
+    #[serde(default)]
+    pub mode: Option<LightGradientMode>,
+    #[serde(default)]
+    pub points: Vec<LightGradientPoint>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -275,6 +341,7 @@ pub enum LightPowerupOn {
 }
 
 impl LightPowerupOn {
+    #[must_use]
     pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -295,6 +362,7 @@ pub enum LightPowerupColor {
 }
 
 impl LightPowerupColor {
+    #[must_use]
     pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -312,6 +380,7 @@ pub enum LightPowerupDimming {
 }
 
 impl LightPowerupDimming {
+    #[must_use]
     pub const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -376,6 +445,8 @@ pub struct LightUpdate {
     pub color: Option<ColorUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<LightGradientUpdate>,
 }
 
 impl LightUpdate {
@@ -412,6 +483,17 @@ impl LightUpdate {
     pub fn with_color_xy(self, xy: impl Into<Option<XY>>) -> Self {
         Self {
             color: xy.into().map(ColorUpdate::new),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_gradient(self, grad: Option<Vec<XY>>) -> Self {
+        Self {
+            gradient: grad.map(|colors| LightGradientUpdate {
+                mode: None,
+                points: colors.into_iter().map(LightGradientPoint::xy).collect(),
+            }),
             ..self
         }
     }
@@ -452,7 +534,7 @@ impl On {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub struct ColorUpdate {
     pub xy: XY,
 }
@@ -485,17 +567,17 @@ pub struct ColorGamut {
 
 impl ColorGamut {
     pub const GAMUT_C: Self = Self {
-        blue: XY {
-            x: 0.1532,
-            y: 0.0475,
+        red: XY {
+            x: 0.6915,
+            y: 0.3083,
         },
         green: XY {
             x: 0.1700,
             y: 0.7000,
         },
-        red: XY {
-            x: 0.6915,
-            y: 0.3083,
+        blue: XY {
+            x: 0.1532,
+            y: 0.0475,
         },
     };
 
