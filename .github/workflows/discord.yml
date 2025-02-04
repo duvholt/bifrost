@@ -15,7 +15,7 @@ jobs:
     - uses: appleboy/discord-action@master
       name: Message
       with:
-        webhook_id: ${{ secrets.WEBHOOK_ID }}
-        webhook_token: ${{ secrets.WEBHOOK_TOKEN }}
+        webhook_id: ${{ secrets.DISCORD_WEBHOOK_ID }}
+        webhook_token: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
         username: "Hermod"
-        args: Branch ${{ github.ref_name }} was merged.
+        args: Branch ${{ github.ref }} was merged into ${{ github.base_ref }}
