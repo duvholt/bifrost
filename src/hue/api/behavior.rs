@@ -54,7 +54,10 @@ pub enum BehaviorInstanceConfiguration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WakeupConfiguration {
     pub end_brightness: f64,
-    pub fade_in_duration: configuration::FadeInDuration,
+    pub fade_in_duration: configuration::Duration,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_lights_off_after: Option<configuration::Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub style: Option<String>,
     pub when: configuration::When,
     #[serde(rename = "where")]
@@ -62,14 +65,22 @@ pub struct WakeupConfiguration {
 }
 
 pub mod configuration {
+    use std::time::Duration as StdDuration;
+
     use chrono::Weekday;
     use serde::{Deserialize, Serialize};
 
     use crate::hue::api::ResourceLink;
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    pub struct FadeInDuration {
+    pub struct Duration {
         pub seconds: u32,
+    }
+
+    impl Duration {
+        pub fn to_std(&self) -> StdDuration {
+            StdDuration::from_secs(self.seconds.into())
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
