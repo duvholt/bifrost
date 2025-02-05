@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use chrono::{Days, Local, NaiveTime, Weekday};
+use chrono::{Days, Local, NaiveTime, Timelike, Weekday};
 use futures::{stream, StreamExt};
 use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
 use tokio_schedule::{every, Job};
@@ -76,35 +76,7 @@ fn wakeup(
 ) -> Vec<JoinHandle<()>> {
     let jobs = create_wake_up_jobs(&wakeup_configuration);
     jobs.into_iter()
-        .map(move |job| {
-            log::debug!("Created new behavior instance job: {:?}", job);
-            let res = res.clone();
-            let config = wakeup_configuration.clone();
-            let fut = match job {
-                ScheduleJob::Recurring(weekday, time) => every(1)
-                    .week()
-                    .on(weekday)
-                    .at(time.hour, time.minute, 0)
-                    .perform(move || run_wake_up(config.clone(), res.clone())),
-                ScheduleJob::Once(time) => Box::pin(async move {
-                    match time.get_sleep_duration() {
-                        Ok(sleep_duration) => {
-                            sleep(sleep_duration).await;
-                            run_wake_up(config.clone(), res.clone()).await;
-                            disable_behavior_instance(id, res).await;
-                        }
-                        Err(err) => {
-                            log::error!(
-                                "Failed to get sleep duration for time {:?}: {}",
-                                time,
-                                err
-                            );
-                        }
-                    }
-                }),
-            };
-            spawn(fut)
-        })
+        .map(move |job| spawn(job.run(id, wakeup_configuration.clone(), res.clone())))
         .collect()
 }
 
@@ -129,8 +101,16 @@ struct Time {
 }
 
 impl Time {
-    fn get_sleep_duration(&self) -> Result<Duration, &'static str> {
-        let now = Local::now();
+    fn get_sleep_duration(&self, now: chrono::DateTime<Local>) -> Result<Duration, &'static str> {
+        let wakeup_datetime = self.next_datetime(now)?;
+        let sleep_duration = (wakeup_datetime - now).to_std().ok().ok_or("duration")?;
+        Ok(sleep_duration)
+    }
+
+    fn next_datetime(
+        &self,
+        now: chrono::DateTime<Local>,
+    ) -> Result<chrono::DateTime<Local>, &'static str> {
         let naive_time = NaiveTime::from_hms_opt(self.hour, self.minute, 0).ok_or("naive time")?;
         let next = match now.with_time(naive_time) {
             chrono::offset::LocalResult::Single(time) => time,
@@ -144,8 +124,7 @@ impl Time {
         } else {
             next
         };
-        let sleep_duration = (wakeup_datetime - now).to_std().ok().ok_or("duration")?;
-        Ok(sleep_duration)
+        Ok(wakeup_datetime)
     }
 }
 
@@ -153,6 +132,50 @@ impl Time {
 enum ScheduleJob {
     Recurring(Weekday, Time),
     Once(Time),
+}
+
+impl ScheduleJob {
+    async fn run(
+        self,
+        id: Uuid,
+        wakeup_configuration: WakeupConfiguration,
+        res: Arc<Mutex<Resources>>,
+    ) {
+        log::debug!("Created new behavior instance job: {:?}", self);
+        let now = Local::now();
+        match self {
+            Self::Recurring(weekday, time) => match time.next_datetime(now) {
+                Ok(datetime) => {
+                    let fade_in_start = datetime - wakeup_configuration.fade_in_duration.to_std();
+                    every(1)
+                        .week()
+                        .on(weekday)
+                        .at(
+                            fade_in_start.hour(),
+                            fade_in_start.minute(),
+                            fade_in_start.second(),
+                        )
+                        .perform(move || run_wake_up(wakeup_configuration.clone(), res.clone()))
+                        .await;
+                }
+                Err(err) => {
+                    log::error!("Failed to get next datetime {:?}: {}", time, err);
+                }
+            },
+            Self::Once(time) => match time.get_sleep_duration(now) {
+                Ok(time_until_wakeup) => {
+                    let fade_in_start =
+                        time_until_wakeup - wakeup_configuration.fade_in_duration.to_std();
+                    sleep(fade_in_start).await;
+                    run_wake_up(wakeup_configuration.clone(), res.clone()).await;
+                    disable_behavior_instance(id, res).await;
+                }
+                Err(err) => {
+                    log::error!("Failed to get sleep duration for time {:?}: {}", time, err);
+                }
+            },
+        }
+    }
 }
 
 fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<ScheduleJob> {
@@ -236,7 +259,7 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
     }
 
     if let Some(duration) = config.turn_lights_off_after {
-        sleep(duration.to_std()).await;
+        sleep(config.fade_in_duration.to_std() + duration.to_std()).await;
         for (resource_link, resource) in resources {
             match resource.obj {
                 Resource::Room(room) => {
