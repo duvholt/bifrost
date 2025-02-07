@@ -78,7 +78,7 @@ fn wakeup(
 ) -> Vec<JoinHandle<()>> {
     let jobs = create_wake_up_jobs(id, wakeup_configuration);
     jobs.into_iter()
-        .map(move |job| spawn(job.run(res.clone())))
+        .map(move |job| spawn(job.create(res.clone())))
         .collect()
 }
 
@@ -145,59 +145,60 @@ impl WakeupJob {
         Ok(scheduled_wakeup_time - fade_in_duration)
     }
 
-    async fn run(self, res: Arc<Mutex<Resources>>) {
+    async fn create(self, res: Arc<Mutex<Resources>>) {
         log::debug!(
             "Created new behavior instance job: {:?}",
             self.configuration
         );
         let now = Local::now();
-        match &self.schedule_type {
-            ScheduleType::Recurring(weekday, time) => match self.start_time() {
-                Ok(fade_in_start) => {
-                    every(1)
-                        .week()
-                        .on(*weekday)
-                        .at(
-                            fade_in_start.hour(),
-                            fade_in_start.minute(),
-                            fade_in_start.second(),
-                        )
-                        .perform(move || {
-                            let wakeup_configuration = self.configuration.clone();
-                            let res = res.clone();
-                            async move {
-                                spawn(run_wake_up(wakeup_configuration.clone(), res.clone()));
-                            }
-                        })
-                        .await;
-                }
-                Err(err) => {
-                    log::error!("Failed to get next datetime {:?}: {}", time, err);
-                }
-            },
-            ScheduleType::Once(time) => match self.start_datetime(now) {
-                Ok(fade_in_datetime) => {
-                    spawn(async move {
-                        let Ok(time_until_fade_in) =
-                            (fade_in_datetime - now).to_std().ok().ok_or("duration")
-                        else {
-                            log::error!(
-                                "Failed to get sleep duration: datetime {}, now {}",
-                                fade_in_datetime,
-                                now
-                            );
-                            return;
-                        };
-                        sleep(time_until_fade_in).await;
-                        run_wake_up(self.configuration.clone(), res.clone()).await;
-                        disable_behavior_instance(self.resource_id, res).await;
-                    });
-                }
-                Err(err) => {
-                    log::error!("Failed to get sleep duration for time {:?}: {}", time, err);
-                }
-            },
+        let result = match &self.schedule_type {
+            ScheduleType::Recurring(weekday, time) => self.create_recurring(*weekday, res).await,
+            ScheduleType::Once(time) => self.run_once(now, res),
+        };
+        if let Err(err) = result {
+            log::error!("Failed to create wake up job: {}", err);
         }
+    }
+
+    async fn create_recurring(
+        &self,
+        weekday: Weekday,
+        res: Arc<Mutex<Resources>>,
+    ) -> Result<(), &'static str> {
+        let fade_in_start = self.start_time()?;
+        every(1)
+            .week()
+            .on(weekday)
+            .at(
+                fade_in_start.hour(),
+                fade_in_start.minute(),
+                fade_in_start.second(),
+            )
+            .perform(move || {
+                let wakeup_configuration = self.configuration.clone();
+                let res = res.clone();
+                async move {
+                    spawn(run_wake_up(wakeup_configuration.clone(), res.clone()));
+                }
+            })
+            .await;
+        Ok(())
+    }
+
+    fn run_once(
+        self,
+        now: DateTime<Local>,
+        res: Arc<Mutex<Resources>>,
+    ) -> Result<(), &'static str> {
+        let fade_in_datetime = self.start_datetime(now)?;
+        let time_until_fade_in = (fade_in_datetime - now).to_std().ok().ok_or("duration")?;
+        spawn(async move {
+            sleep(time_until_fade_in).await;
+            run_wake_up(self.configuration.clone(), res.clone()).await;
+            disable_behavior_instance(self.resource_id, res).await;
+        });
+
+        Ok(())
     }
 }
 
