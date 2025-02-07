@@ -173,7 +173,13 @@ impl ScheduleJob {
                             fade_in_start.minute(),
                             fade_in_start.second(),
                         )
-                        .perform(move || run_wake_up(wakeup_configuration.clone(), res.clone()))
+                        .perform(move || {
+                            let wakeup_configuration = wakeup_configuration.clone();
+                            let res = res.clone();
+                            async move {
+                                spawn(run_wake_up(wakeup_configuration.clone(), res.clone()));
+                            }
+                        })
                         .await;
                 }
                 Err(err) => {
@@ -182,11 +188,13 @@ impl ScheduleJob {
             },
             Self::Once(time) => match time.get_sleep_duration(now) {
                 Ok(time_until_wakeup) => {
-                    let fade_in_start =
-                        time_until_wakeup - wakeup_configuration.fade_in_duration.to_std();
-                    sleep(fade_in_start).await;
-                    run_wake_up(wakeup_configuration.clone(), res.clone()).await;
-                    disable_behavior_instance(id, res).await;
+                    spawn(async move {
+                        let fade_in_duration = wakeup_configuration.fade_in_duration.to_std();
+                        let fade_in_start = time_until_wakeup - fade_in_duration;
+                        sleep(fade_in_start).await;
+                        run_wake_up(wakeup_configuration.clone(), res.clone()).await;
+                        disable_behavior_instance(id, res).await;
+                    });
                 }
                 Err(err) => {
                     log::error!("Failed to get sleep duration for time {:?}: {}", time, err);
