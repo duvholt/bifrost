@@ -1,6 +1,6 @@
-use std::{iter, sync::Arc, time::Duration};
+use std::{iter, sync::Arc};
 
-use chrono::{Days, Local, NaiveTime, Timelike, Weekday};
+use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
 use futures::{stream, StreamExt};
 use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
 use tokio_schedule::{every, Job};
@@ -102,34 +102,6 @@ struct Time {
     pub minute: u32,
 }
 
-impl Time {
-    fn get_sleep_duration(&self, now: chrono::DateTime<Local>) -> Result<Duration, &'static str> {
-        let wakeup_datetime = self.next_datetime(now)?;
-        let sleep_duration = (wakeup_datetime - now).to_std().ok().ok_or("duration")?;
-        Ok(sleep_duration)
-    }
-
-    fn next_datetime(
-        &self,
-        now: chrono::DateTime<Local>,
-    ) -> Result<chrono::DateTime<Local>, &'static str> {
-        let naive_time = NaiveTime::from_hms_opt(self.hour, self.minute, 0).ok_or("naive time")?;
-        let next = match now.with_time(naive_time) {
-            chrono::offset::LocalResult::Single(time) => time,
-            chrono::offset::LocalResult::Ambiguous(_, latest) => latest,
-            chrono::offset::LocalResult::None => {
-                return Err("with time");
-            }
-        };
-        let wakeup_datetime = if next < now {
-            next.checked_add_days(Days::new(1)).ok_or("add day")?
-        } else {
-            next
-        };
-        Ok(wakeup_datetime)
-    }
-}
-
 #[derive(Debug)]
 enum ScheduleType {
     Recurring(Weekday, Time),
@@ -143,19 +115,48 @@ pub struct WakeupJob {
 }
 
 impl WakeupJob {
+    fn start_datetime(&self, now: DateTime<Local>) -> Result<DateTime<Local>, &'static str> {
+        let start_time = self.start_time()?;
+        let next = match now.with_time(start_time) {
+            chrono::offset::LocalResult::Single(time) => time,
+            chrono::offset::LocalResult::Ambiguous(_, latest) => latest,
+            chrono::offset::LocalResult::None => {
+                return Err("with time");
+            }
+        };
+        let wakeup_datetime = if next < now {
+            next.checked_add_days(Days::new(1)).ok_or("add day")?
+        } else {
+            next
+        };
+        Ok(wakeup_datetime)
+    }
+
+    fn start_time(&self) -> Result<NaiveTime, &'static str> {
+        let job_time: &Time = match &self.schedule_type {
+            ScheduleType::Recurring(_weekday, time) => time,
+            ScheduleType::Once(time) => time,
+        };
+        let scheduled_wakeup_time =
+            NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0).ok_or("naive time")?;
+        // although the scheduled time in the Hue app is the time when lights are at full brightness
+        // the job start time is considered to be when the fade in effects starts
+        let fade_in_duration = self.configuration.fade_in_duration.to_std();
+        Ok(scheduled_wakeup_time - fade_in_duration)
+    }
+
     async fn run(self, res: Arc<Mutex<Resources>>) {
         log::debug!(
             "Created new behavior instance job: {:?}",
             self.configuration
         );
         let now = Local::now();
-        match self.schedule_type {
-            ScheduleType::Recurring(weekday, time) => match time.next_datetime(now) {
-                Ok(datetime) => {
-                    let fade_in_start = datetime - self.configuration.fade_in_duration.to_std();
+        match &self.schedule_type {
+            ScheduleType::Recurring(weekday, time) => match self.start_time() {
+                Ok(fade_in_start) => {
                     every(1)
                         .week()
-                        .on(weekday)
+                        .on(*weekday)
                         .at(
                             fade_in_start.hour(),
                             fade_in_start.minute(),
@@ -174,12 +175,20 @@ impl WakeupJob {
                     log::error!("Failed to get next datetime {:?}: {}", time, err);
                 }
             },
-            ScheduleType::Once(time) => match time.get_sleep_duration(now) {
-                Ok(time_until_wakeup) => {
+            ScheduleType::Once(time) => match self.start_datetime(now) {
+                Ok(fade_in_datetime) => {
                     spawn(async move {
-                        let fade_in_duration = self.configuration.fade_in_duration.to_std();
-                        let fade_in_start = time_until_wakeup - fade_in_duration;
-                        sleep(fade_in_start).await;
+                        let Ok(time_until_fade_in) =
+                            (fade_in_datetime - now).to_std().ok().ok_or("duration")
+                        else {
+                            log::error!(
+                                "Failed to get sleep duration: datetime {}, now {}",
+                                fade_in_datetime,
+                                now
+                            );
+                            return;
+                        };
+                        sleep(time_until_fade_in).await;
                         run_wake_up(self.configuration.clone(), res.clone()).await;
                         disable_behavior_instance(self.resource_id, res).await;
                     });
