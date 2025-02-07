@@ -112,16 +112,10 @@ async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
 #[derive(Debug, PartialEq)]
 struct ScheduleBehaviorInstance(Uuid, BehaviorInstance);
 
-#[derive(Clone, Debug)]
-struct Time {
-    pub hour: u32,
-    pub minute: u32,
-}
-
 #[derive(Debug)]
 enum ScheduleType {
-    Recurring(Weekday, Time),
-    Once(Time),
+    Recurring(Weekday),
+    Once(),
 }
 
 pub struct WakeupJob {
@@ -149,10 +143,7 @@ impl WakeupJob {
     }
 
     fn start_time(&self) -> Result<NaiveTime, &'static str> {
-        let job_time: &Time = match &self.schedule_type {
-            ScheduleType::Recurring(_weekday, time) => time,
-            ScheduleType::Once(time) => time,
-        };
+        let job_time = self.configuration.when.time_point.time();
         let scheduled_wakeup_time =
             NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0).ok_or("naive time")?;
         // although the scheduled time in the Hue app is the time when lights are at full brightness
@@ -168,8 +159,8 @@ impl WakeupJob {
         );
         let now = Local::now();
         let result = match &self.schedule_type {
-            ScheduleType::Recurring(weekday, _time) => self.create_recurring(*weekday, res).await,
-            ScheduleType::Once(_time) => self.run_once(now, res),
+            ScheduleType::Recurring(weekday) => self.create_recurring(*weekday, res).await,
+            ScheduleType::Once() => self.run_once(now, res),
         };
         if let Err(err) = result {
             log::error!("Failed to create wake up job: {}", err);
@@ -219,22 +210,12 @@ impl WakeupJob {
 }
 
 fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
-    let chrono_time = configuration.when.time_point.time();
-    let time = Time {
-        hour: chrono_time.hour,
-        minute: chrono_time.minute,
-    };
     let weekdays = configuration.when.recurrence_days.as_ref();
 
-    let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = if let Some(weekdays) = weekdays {
-        Box::new(
-            weekdays
-                .into_iter()
-                .map(|weekday| ScheduleType::Recurring(weekday.clone(), time.clone())),
-        )
-    } else {
-        Box::new(iter::once(ScheduleType::Once(time)))
-    };
+    let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
+        || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
+        |weekdays| Box::new(weekdays.clone().into_iter().map(ScheduleType::Recurring)),
+    );
     schedule_types
         .map(|schedule_type| WakeupJob {
             resource_id: *resource_id,
