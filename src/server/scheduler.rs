@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{iter, sync::Arc, time::Duration};
 
 use bifrost_api::backend::BackendRequest;
 use chrono::{Days, Local, NaiveTime, Timelike, Weekday};
@@ -65,7 +65,7 @@ impl Scheduler {
             })
             .flat_map(|(id, configuration)| match &configuration {
                 BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                    wakeup(self.res.clone(), *id, wakeup_configuration.clone())
+                    wakeup(self.res.clone(), id, wakeup_configuration)
                 }
             })
             .collect();
@@ -89,12 +89,12 @@ impl Scheduler {
 
 fn wakeup(
     res: Arc<Mutex<Resources>>,
-    id: Uuid,
-    wakeup_configuration: WakeupConfiguration,
+    id: &Uuid,
+    wakeup_configuration: &WakeupConfiguration,
 ) -> Vec<JoinHandle<()>> {
-    let jobs = create_wake_up_jobs(&wakeup_configuration);
+    let jobs = create_wake_up_jobs(id, wakeup_configuration);
     jobs.into_iter()
-        .map(move |job| spawn(job.run(id, wakeup_configuration.clone(), res.clone())))
+        .map(move |job| spawn(job.run(res.clone())))
         .collect()
 }
 
@@ -147,24 +147,28 @@ impl Time {
 }
 
 #[derive(Debug)]
-enum ScheduleJob {
+enum ScheduleType {
     Recurring(Weekday, Time),
     Once(Time),
 }
 
-impl ScheduleJob {
-    async fn run(
-        self,
-        id: Uuid,
-        wakeup_configuration: WakeupConfiguration,
-        res: Arc<Mutex<Resources>>,
-    ) {
-        log::debug!("Created new behavior instance job: {:?}", self);
+pub struct WakeupJob {
+    resource_id: Uuid,
+    schedule_type: ScheduleType,
+    configuration: WakeupConfiguration,
+}
+
+impl WakeupJob {
+    async fn run(self, res: Arc<Mutex<Resources>>) {
+        log::debug!(
+            "Created new behavior instance job: {:?}",
+            self.configuration
+        );
         let now = Local::now();
-        match self {
-            Self::Recurring(weekday, time) => match time.next_datetime(now) {
+        match self.schedule_type {
+            ScheduleType::Recurring(weekday, time) => match time.next_datetime(now) {
                 Ok(datetime) => {
-                    let fade_in_start = datetime - wakeup_configuration.fade_in_duration.to_std();
+                    let fade_in_start = datetime - self.configuration.fade_in_duration.to_std();
                     every(1)
                         .week()
                         .on(weekday)
@@ -174,7 +178,7 @@ impl ScheduleJob {
                             fade_in_start.second(),
                         )
                         .perform(move || {
-                            let wakeup_configuration = wakeup_configuration.clone();
+                            let wakeup_configuration = self.configuration.clone();
                             let res = res.clone();
                             async move {
                                 spawn(run_wake_up(wakeup_configuration.clone(), res.clone()));
@@ -186,14 +190,14 @@ impl ScheduleJob {
                     log::error!("Failed to get next datetime {:?}: {}", time, err);
                 }
             },
-            Self::Once(time) => match time.get_sleep_duration(now) {
+            ScheduleType::Once(time) => match time.get_sleep_duration(now) {
                 Ok(time_until_wakeup) => {
                     spawn(async move {
-                        let fade_in_duration = wakeup_configuration.fade_in_duration.to_std();
+                        let fade_in_duration = self.configuration.fade_in_duration.to_std();
                         let fade_in_start = time_until_wakeup - fade_in_duration;
                         sleep(fade_in_start).await;
-                        run_wake_up(wakeup_configuration.clone(), res.clone()).await;
-                        disable_behavior_instance(id, res).await;
+                        run_wake_up(self.configuration.clone(), res.clone()).await;
+                        disable_behavior_instance(self.resource_id, res).await;
                     });
                 }
                 Err(err) => {
@@ -204,10 +208,7 @@ impl ScheduleJob {
     }
 }
 
-fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<ScheduleJob> {
-    // todo:
-    // timezone
-
+fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
     let chrono_time = configuration.when.time_point.time();
     let time = Time {
         hour: chrono_time.hour,
@@ -215,14 +216,22 @@ fn create_wake_up_jobs(configuration: &WakeupConfiguration) -> Vec<ScheduleJob> 
     };
     let weekdays = configuration.when.recurrence_days.as_ref();
 
-    if let Some(weekdays) = weekdays {
-        weekdays
-            .into_iter()
-            .map(|weekday| ScheduleJob::Recurring(weekday.clone(), time.clone()))
-            .collect()
+    let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = if let Some(weekdays) = weekdays {
+        Box::new(
+            weekdays
+                .into_iter()
+                .map(|weekday| ScheduleType::Recurring(weekday.clone(), time.clone())),
+        )
     } else {
-        vec![ScheduleJob::Once(time)]
-    }
+        Box::new(iter::once(ScheduleType::Once(time)))
+    };
+    schedule_types
+        .map(|schedule_type| WakeupJob {
+            resource_id: *resource_id,
+            schedule_type,
+            configuration: configuration.clone(),
+        })
+        .collect()
 }
 
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
