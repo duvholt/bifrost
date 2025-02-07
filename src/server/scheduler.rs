@@ -196,11 +196,10 @@ impl WakeupJob {
 fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
     let weekdays = configuration.when.weekdays();
 
-    let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = if let Some(weekdays) = weekdays {
-        Box::new(weekdays.into_iter().map(ScheduleType::Recurring))
-    } else {
-        Box::new(iter::once(ScheduleType::Once()))
-    };
+    let schedule_types = weekdays.map_or_else(
+        || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
+        |weekdays| Box::new(weekdays.into_iter().map(ScheduleType::Recurring)),
+    );
     schedule_types
         .map(|schedule_type| WakeupJob {
             resource_id: *resource_id,
