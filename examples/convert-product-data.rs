@@ -8,7 +8,6 @@ use std::io::stdin;
 
 use serde_json::Deserializer;
 
-use bifrost::error::ApiResult;
 use bifrost::hue::api::DeviceProductData;
 use bifrost::hue::devicedb::{product_data, SimpleProductData};
 
@@ -26,7 +25,7 @@ fn print_std(obj: DeviceProductData) {
     );
 }
 
-fn main() -> ApiResult<()> {
+fn main() {
     pretty_env_logger::formatted_builder()
         .filter_level(log::LevelFilter::Debug)
         .parse_default_env()
@@ -54,6 +53,4 @@ fn main() -> ApiResult<()> {
             print_std(obj);
         }
     }
-
-    Ok(())
 }

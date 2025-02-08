@@ -152,7 +152,11 @@ impl HueZigbeeUpdate {
         self
     }
 
-    pub fn with_gradient_colors(mut self, style: GradientStyle, points: Vec<XY>) -> HueResult<Self> {
+    pub fn with_gradient_colors(
+        mut self,
+        style: GradientStyle,
+        points: Vec<XY>,
+    ) -> HueResult<Self> {
         self.gradient_colors = Some(GradientColors {
             header: GradientUpdateHeader {
                 nlights: u8::try_from(points.len())?,

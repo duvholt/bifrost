@@ -6,7 +6,7 @@ use bifrost::error::ApiResult;
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Url to websocket (ws://example.org:1234/)
+    /// Url to websocket (<ws://example.org:1234/>)
     url: String,
 }
 
@@ -23,7 +23,7 @@ async fn main() -> ApiResult<()> {
 
         let Message::Text(txt) = pkt? else { break };
 
-        println!("{}", txt);
+        println!("{txt}");
     }
 
     Ok(())
