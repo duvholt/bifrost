@@ -2,7 +2,7 @@ use std::ops::AddAssign;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use uuid::{uuid, Uuid};
+use uuid::Uuid;
 
 use super::DollarRef;
 
@@ -39,6 +39,7 @@ pub struct BehaviorInstance {
     pub enabled: bool,
     pub last_error: Option<String>,
     pub metadata: BehaviorInstanceMetadata,
+    // Wake up: ff8957e3-2eb9-4699-a0c8-ad2cb3ede704
     pub script_id: Uuid,
     pub status: Option<String>,
     #[serde(
@@ -52,13 +53,9 @@ pub struct BehaviorInstance {
     pub configuration: BehaviorInstanceConfiguration,
 }
 
-// TODO: refer to const in one place
-const WAKEUP: Uuid = uuid!("ff8957e3-2eb9-4699-a0c8-ad2cb3ede704");
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum BehaviorInstanceConfiguration {
-    #[serde(rename = "ff8957e3-2eb9-4699-a0c8-ad2cb3ede704")]
     Wakeup(WakeupConfiguration),
 }
 
@@ -138,7 +135,7 @@ pub struct BehaviorInstanceMetadata {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct BehaviorInstanceUpdate {
-    pub configuration: Option<Value>,
+    pub configuration: Option<BehaviorInstanceConfiguration>,
     pub enabled: Option<bool>,
     pub metadata: Option<BehaviorInstanceMetadata>,
     // trigger
@@ -167,7 +164,7 @@ impl BehaviorInstanceUpdate {
     }
 
     #[must_use]
-    pub fn with_configuration(self, configuration: Value) -> Self {
+    pub fn with_configuration(self, configuration: BehaviorInstanceConfiguration) -> Self {
         Self {
             configuration: Some(configuration),
             ..self
@@ -186,13 +183,7 @@ impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
         }
 
         if let Some(configuration) = upd.configuration {
-            if self.script_id == WAKEUP {
-                if let Ok(parsed) = serde_json::from_value(configuration) {
-                    self.configuration = parsed;
-                } else {
-                    // todo: log
-                }
-            }
+            self.configuration = configuration;
         }
     }
 }

@@ -181,9 +181,8 @@ impl Resources {
             Resource::BehaviorInstance(behavior_instance) => {
                 let upd = BehaviorInstanceUpdate::new()
                     .with_metadata(behavior_instance.metadata.clone())
-                    .with_enabled(behavior_instance.enabled);
-                // todo: fix
-                // .with_configuration(behavior_instance.configuration.clone());
+                    .with_enabled(behavior_instance.enabled)
+                    .with_configuration(behavior_instance.configuration.clone());
 
                 Ok(Some(Update::BehaviorInstance(upd)))
             }
