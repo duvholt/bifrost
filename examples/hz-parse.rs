@@ -1,11 +1,14 @@
 use std::io::{stdin, BufRead, Cursor};
 
-use bifrost::error::ApiResult;
-use bifrost::hue::zigbee::{Flags, GradientColors, HueZigbeeUpdate};
 use itertools::Itertools;
 use log::warn;
 use packed_struct::PrimitiveEnumDynamicStr;
 
+use hue::zigbee::{Flags, GradientColors, HueZigbeeUpdate};
+
+use bifrost::error::ApiResult;
+
+#[must_use]
 pub fn present_gradcolors(grad: &GradientColors) -> String {
     let mut res = format!(
         "{}-{}-{}-{:<9}",

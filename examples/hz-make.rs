@@ -1,6 +1,7 @@
+use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate};
+
 use bifrost::error::ApiResult;
 use bifrost::hue::api::ColorGamut;
-use bifrost::hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate};
 
 fn main() -> ApiResult<()> {
     pretty_env_logger::formatted_builder()

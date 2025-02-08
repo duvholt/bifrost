@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
 
+use hue::xy::XY;
+
 use crate::hue::api::{
     ColorGamut, ColorTemperature, DeviceProductData, Dimming, GamutType, LightColor, LightGradient,
     LightGradientMode, MirekSchema,
 };
 use crate::hue::devicedb::{hardware_platform_type, product_archetype};
-use crate::model::types::XY;
 use crate::z2m::api::{Device, Expose, ExposeList, ExposeNumeric};
 
 impl ExposeNumeric {

@@ -1,5 +1,3 @@
-#![doc = include_str!("../../../doc/hue-zigbee-format.md")]
-
 use std::io::{Cursor, Read, Write};
 
 use bitflags::bitflags;
@@ -7,12 +5,10 @@ use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
-use crate::error::{ApiError, ApiResult};
-use crate::model::flags::TakeFlag;
-use crate::model::types::XY;
-
-pub const WIDE_GAMUT_MAX_X: f64 = 0.7347;
-pub const WIDE_GAMUT_MAX_Y: f64 = 0.8264;
+use crate::error::{HueError, HueResult};
+use crate::flags::TakeFlag;
+use crate::xy::XY;
+use crate::{WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y};
 
 #[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
 pub enum EffectType {
@@ -156,11 +152,7 @@ impl HueZigbeeUpdate {
         self
     }
 
-    pub fn with_gradient_colors(
-        mut self,
-        style: GradientStyle,
-        points: Vec<XY>,
-    ) -> ApiResult<Self> {
+    pub fn with_gradient_colors(mut self, style: GradientStyle, points: Vec<XY>) -> HueResult<Self> {
         self.gradient_colors = Some(GradientColors {
             header: GradientUpdateHeader {
                 nlights: u8::try_from(points.len())?,
@@ -194,7 +186,7 @@ impl HueZigbeeUpdate {
 
 #[allow(clippy::cast_possible_truncation)]
 impl HueZigbeeUpdate {
-    pub fn from_reader(rdr: &mut impl Read) -> ApiResult<Self> {
+    pub fn from_reader(rdr: &mut impl Read) -> HueResult<Self> {
         let mut hz = Self::default();
 
         let mut flags = Flags::from_bits(rdr.read_u16::<LE>()?).unwrap();
@@ -225,7 +217,7 @@ impl HueZigbeeUpdate {
         if flags.take(Flags::EFFECT_TYPE) {
             let data = rdr.read_u8()?;
             hz.effect_type =
-                Some(EffectType::from_primitive(data).ok_or(ApiError::HueZigbeeDecodeError)?);
+                Some(EffectType::from_primitive(data).ok_or(HueError::HueZigbeeDecodeError)?);
         }
 
         if flags.take(Flags::GRADIENT_COLORS) {
@@ -265,20 +257,20 @@ impl HueZigbeeUpdate {
         if flags.is_empty() {
             Ok(hz)
         } else {
-            Err(ApiError::HueZigbeeUnknownFlags(flags.bits()))
+            Err(HueError::HueZigbeeUnknownFlags(flags.bits()))
         }
     }
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 impl HueZigbeeUpdate {
-    pub fn to_vec(&self) -> ApiResult<Vec<u8>> {
+    pub fn to_vec(&self) -> HueResult<Vec<u8>> {
         let mut cur = Cursor::new(vec![]);
         self.serialize(&mut cur)?;
         Ok(cur.into_inner())
     }
 
-    pub fn serialize(&self, wtr: &mut impl Write) -> ApiResult<()> {
+    pub fn serialize(&self, wtr: &mut impl Write) -> HueResult<()> {
         #[allow(clippy::ref_option)]
         fn opt_to_flag<T>(flags: &mut Flags, opt: &Option<T>, flag: Flags) {
             if opt.is_some() {

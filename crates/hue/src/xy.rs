@@ -1,11 +1,7 @@
-#![allow(dead_code, non_snake_case, clippy::suboptimal_flops)]
-
 use serde::{Deserialize, Serialize};
 
-use crate::model::{
-    clamp::Clamp,
-    colorspace::{self, ColorSpace},
-};
+use crate::clamp::Clamp;
+use crate::colorspace::{self, ColorSpace};
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct XY {
@@ -14,17 +10,17 @@ pub struct XY {
 }
 
 impl XY {
-    const COLOR_SPACE: ColorSpace = colorspace::ADOBE;
-
-    pub const D65_WHITE_POINT: Self = Self {
-        x: 0.31271,
-        y: 0.32902,
-    };
+    const COLOR_SPACE: ColorSpace = colorspace::WIDE;
 
     #[must_use]
     pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
+
+    pub const D65_WHITE_POINT: Self = Self {
+        x: 0.31271,
+        y: 0.32902,
+    };
 
     #[allow(clippy::many_single_char_names)]
     #[must_use]

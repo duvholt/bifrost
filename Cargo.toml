@@ -1,6 +1,18 @@
 [package]
 name = "bifrost"
 version = "0.1.0"
+
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[workspace.package]
 edition = "2021"
 authors = ["Christian Iversen <ci@iversenit.dk>"]
 rust-version = "1.76"
@@ -19,6 +31,11 @@ keywords = [
     "hue-api",
     "zigbee2mqtt",
     "phillips-hue",
+]
+
+[workspace]
+members = [
+    "crates/hue",
 ]
 
 [features]
@@ -74,6 +91,7 @@ bitflags = "2.8.0"
 byteorder = "1.5.0"
 hex = "0.4.3"
 async-trait = "0.1.86"
+hue = { version = "0.1.0", path = "crates/hue" }
 
 [dev-dependencies]
 json_diff_ng = { version = "0.6.0", default-features = false }

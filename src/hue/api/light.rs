@@ -4,8 +4,9 @@ use std::ops::{AddAssign, Sub};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use hue::xy::XY;
+
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
-use crate::model::types::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Light {
