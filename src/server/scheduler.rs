@@ -264,8 +264,12 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
         }
     }
 
+    // wait until fade in has completed
+    // otherwise the behavior instance can be disabled before it has actually finished
+    sleep(config.fade_in_duration.to_std()).await;
+
     if let Some(duration) = config.turn_lights_off_after {
-        sleep(config.fade_in_duration.to_std() + duration.to_std()).await;
+        sleep(duration.to_std()).await;
 
         for request in &requests {
             if let Err(err) = request.off(res.clone()).await {
