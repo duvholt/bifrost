@@ -41,9 +41,6 @@ pub enum ApiError {
     FromHexError(#[from] hex::FromHexError),
 
     #[error(transparent)]
-    PackedStructError(#[from] packed_struct::PackingError),
-
-    #[error(transparent)]
     MdnsSdError(#[from] mdns_sd::Error),
 
     #[error(transparent)]

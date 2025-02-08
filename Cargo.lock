@@ -271,8 +271,6 @@ dependencies = [
  "axum",
  "axum-core",
  "axum-server",
- "bitflags",
- "byteorder",
  "bytes",
  "camino",
  "chrono",
