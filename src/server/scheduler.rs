@@ -225,6 +225,9 @@ fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) 
         .collect()
 }
 
+// As reported by the Hue bridge
+const WAKEUP_FADE_MIREK: u16 = 447;
+
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
     log::debug!("Running scheduled behavior instance:, {:#?}", config);
     #[allow(clippy::option_if_let_else)]
@@ -266,7 +269,8 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                     .with_dynamics(Some(
                         LightDynamicsUpdate::new()
                             .with_duration(Some(config.fade_in_duration.seconds * 1000)),
-                    ));
+                    ))
+                    .with_color_temperature(Some(WAKEUP_FADE_MIREK));
 
                 let upd = res
                     .lock()
@@ -331,7 +335,8 @@ async fn wakeup_room(room: &Room, res: Arc<Mutex<Resources>>, config: WakeupConf
         .with_dynamics(Some(
             GroupedLightDynamicsUpdate::new()
                 .with_duration(Some(config.fade_in_duration.seconds * 1000)),
-        ));
+        ))
+        .with_color_temperature(Some(WAKEUP_FADE_MIREK));
 
     let upd = res
         .lock()
