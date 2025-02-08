@@ -1,4 +1,4 @@
-use std::{iter, sync::Arc};
+use std::{iter, sync::Arc, time::Duration};
 
 use bifrost_api::backend::BackendRequest;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
@@ -303,33 +303,49 @@ impl WakeupRequest {
         // As reported by the Hue bridge
         const WAKEUP_FADE_MIREK: u16 = 447;
 
-        let backend_request = match self {
+        // Reset brightness and set color temperature
+        let reset_backend_request = match self {
             Self::Light(resource_link) => {
                 let payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
-                    .with_brightness(Some(config.end_brightness))
-                    .with_dynamics(Some(
-                        LightDynamicsUpdate::new()
-                            .with_duration(Some(config.fade_in_duration.seconds * 1000)),
-                    ))
+                    .with_brightness(Some(0.0))
                     .with_color_temperature(Some(WAKEUP_FADE_MIREK));
                 BackendRequest::LightUpdate(*resource_link, payload)
             }
             Self::Group(resource_link) => {
                 let payload = GroupedLightUpdate::default()
                     .with_on(Some(On::new(true)))
+                    .with_brightness(Some(0.0))
+                    .with_color_temperature(Some(WAKEUP_FADE_MIREK));
+                BackendRequest::GroupedLightUpdate(*resource_link, payload)
+            }
+        };
+        res.lock().await.backend_request(reset_backend_request)?;
+
+        sleep(Duration::from_secs(1)).await;
+
+        // Start fade in to set brightness
+        let on_backend_request = match self {
+            Self::Light(resource_link) => {
+                let payload = LightUpdate::default()
+                    .with_brightness(Some(config.end_brightness))
+                    .with_dynamics(Some(
+                        LightDynamicsUpdate::new()
+                            .with_duration(Some(config.fade_in_duration.seconds * 1000)),
+                    ));
+                BackendRequest::LightUpdate(*resource_link, payload)
+            }
+            Self::Group(resource_link) => {
+                let payload = GroupedLightUpdate::default()
                     .with_brightness(Some(config.end_brightness))
                     .with_dynamics(Some(
                         GroupedLightDynamicsUpdate::new()
                             .with_duration(Some(config.fade_in_duration.seconds * 1000)),
-                    ))
-                    .with_color_temperature(Some(WAKEUP_FADE_MIREK));
-
+                    ));
                 BackendRequest::GroupedLightUpdate(*resource_link, payload)
             }
         };
-
-        res.lock().await.backend_request(backend_request)
+        res.lock().await.backend_request(on_backend_request)
     }
 
     async fn off(&self, res: Arc<Mutex<Resources>>) -> ApiResult<()> {
