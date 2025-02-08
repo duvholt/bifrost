@@ -2,18 +2,17 @@ use std::{iter, sync::Arc};
 
 use bifrost_api::backend::BackendRequest;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
-use futures::{StreamExt, stream};
 use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
 use tokio_schedule::{Job, every};
 
 use hue::api::{
     BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
     GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightUpdate, On, RType,
-    Resource, Room, WakeupConfiguration,
+    Resource, ResourceLink, WakeupConfiguration,
 };
 use uuid::Uuid;
 
-use crate::resource::Resources;
+use crate::{error::ApiResult, resource::Resources};
 
 #[derive(Debug)]
 pub struct Scheduler {
@@ -225,9 +224,6 @@ fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) 
         .collect()
 }
 
-// As reported by the Hue bridge
-const WAKEUP_FADE_MIREK: u16 = 447;
-
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
     log::debug!("Running scheduled behavior instance:, {:#?}", config);
     #[allow(clippy::option_if_let_else)]
@@ -239,11 +235,12 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
         }
     });
 
-    let resources = stream::iter(resource_links.into_iter())
-        .filter_map(|resource_link| {
-            let res = res.clone();
-            async move {
-                let resource = res.lock().await.get_resource_by_id(&resource_link.rid);
+    let requests = {
+        let lock = res.lock().await;
+        resource_links
+            .into_iter()
+            .filter_map(|resource_link| {
+                let resource = lock.get_resource_by_id(&resource_link.rid);
                 match resource {
                     Ok(resource) => Some((resource_link, resource)),
                     Err(err) => {
@@ -251,18 +248,63 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                         None
                     }
                 }
-            }
-        })
-        .collect::<Vec<_>>()
-        .await;
+            })
+            .flat_map(|(resource_link, resource)| match resource.obj {
+                Resource::Room(room) => room
+                    .grouped_light_service()
+                    .map_or_else(Vec::new, |grouped_light| {
+                        vec![WakeupRequest::Group(*grouped_light)]
+                    }),
+                Resource::Light(_light) => {
+                    vec![WakeupRequest::Light(resource_link)]
+                }
+                Resource::BridgeHome(_bridge_home) => {
+                    let all_rooms = lock.get_resources_by_type(RType::Room);
+                    all_rooms
+                        .into_iter()
+                        .filter_map(|room_resource| match room_resource.obj {
+                            Resource::Room(room) => {
+                                let grouped_light = room.grouped_light_service()?;
+                                Some(WakeupRequest::Group(*grouped_light))
+                            }
+                            _ => None,
+                        })
+                        .collect()
+                }
+                _ => Vec::new(),
+            })
+            .collect::<Vec<_>>()
+    };
 
-    for (resource_link, resource) in &resources {
-        log::debug!("Turning on {:#?}", resource.obj);
-        match &resource.obj {
-            Resource::Room(room) => {
-                wakeup_room(room, res.clone(), config.clone()).await;
+    for request in &requests {
+        if let Err(err) = request.on(res.clone(), config.clone()).await {
+            log::warn!("Failed to turn on wake up light: {}", err);
+        }
+    }
+
+    if let Some(duration) = config.turn_lights_off_after {
+        sleep(config.fade_in_duration.to_std() + duration.to_std()).await;
+
+        for request in &requests {
+            if let Err(err) = request.off(res.clone()).await {
+                log::warn!("Failed to turn off wake up light: {}", err);
             }
-            Resource::Light(_light) => {
+        }
+    }
+}
+
+enum WakeupRequest {
+    Light(ResourceLink),
+    Group(ResourceLink),
+}
+
+impl WakeupRequest {
+    async fn on(&self, res: Arc<Mutex<Resources>>, config: WakeupConfiguration) -> ApiResult<()> {
+        // As reported by the Hue bridge
+        const WAKEUP_FADE_MIREK: u16 = 447;
+
+        let backend_request = match self {
+            Self::Light(resource_link) => {
                 let payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
                     .with_brightness(Some(config.end_brightness))
@@ -271,94 +313,37 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                             .with_duration(Some(config.fade_in_duration.seconds * 1000)),
                     ))
                     .with_color_temperature(Some(WAKEUP_FADE_MIREK));
+                BackendRequest::LightUpdate(*resource_link, payload)
+            }
+            Self::Group(resource_link) => {
+                let payload = GroupedLightUpdate::default()
+                    .with_on(Some(On::new(true)))
+                    .with_brightness(Some(config.end_brightness))
+                    .with_dynamics(Some(
+                        GroupedLightDynamicsUpdate::new()
+                            .with_duration(Some(config.fade_in_duration.seconds * 1000)),
+                    ))
+                    .with_color_temperature(Some(WAKEUP_FADE_MIREK));
 
-                let upd = res
-                    .lock()
-                    .await
-                    .backend_request(BackendRequest::LightUpdate(*resource_link, payload));
-                if let Err(err) = upd {
-                    log::error!("Failed to execute group update: {:#?}", err);
-                }
+                BackendRequest::GroupedLightUpdate(*resource_link, payload)
             }
-            Resource::BridgeHome(_bridge_home) => {
-                let rooms = res.lock().await.get_resources_by_type(RType::Room);
-                for room_resource in rooms {
-                    if let Resource::Room(room) = room_resource.obj {
-                        wakeup_room(&room, res.clone(), config.clone()).await;
-                    }
-                }
-            }
-            _ => (),
-        }
+        };
+
+        res.lock().await.backend_request(backend_request)
     }
 
-    if let Some(duration) = config.turn_lights_off_after {
-        sleep(config.fade_in_duration.to_std() + duration.to_std()).await;
-        for (resource_link, resource) in resources {
-            match resource.obj {
-                Resource::Room(room) => {
-                    turn_off_room(&room, res.clone()).await;
-                }
-                Resource::Light(_light) => {
-                    let payload = LightUpdate::default().with_on(Some(On::new(false)));
-
-                    let upd = res
-                        .lock()
-                        .await
-                        .backend_request(BackendRequest::LightUpdate(resource_link, payload));
-                    if let Err(err) = upd {
-                        log::error!("Failed to execute group update: {:#?}", err);
-                    }
-                }
-                Resource::BridgeHome(_bridge_home) => {
-                    let rooms = res.lock().await.get_resources_by_type(RType::Room);
-                    for room_resource in rooms {
-                        if let Resource::Room(room) = room_resource.obj {
-                            turn_off_room(&room, res.clone()).await;
-                        }
-                    }
-                }
-                _ => (),
+    async fn off(&self, res: Arc<Mutex<Resources>>) -> ApiResult<()> {
+        let backend_request = match self {
+            Self::Light(resource_link) => {
+                let payload = LightUpdate::default().with_on(Some(On::new(false)));
+                BackendRequest::LightUpdate(*resource_link, payload)
             }
-        }
-    }
-}
+            Self::Group(resource_link) => {
+                let payload = GroupedLightUpdate::default().with_on(Some(On::new(false)));
+                BackendRequest::GroupedLightUpdate(*resource_link, payload)
+            }
+        };
 
-async fn wakeup_room(room: &Room, res: Arc<Mutex<Resources>>, config: WakeupConfiguration) {
-    let Some(grouped_light) = room.grouped_light_service() else {
-        log::error!("Failed to get grouped light service for room");
-        return;
-    };
-    let payload = GroupedLightUpdate::default()
-        .with_on(Some(On::new(true)))
-        .with_brightness(Some(config.end_brightness))
-        .with_dynamics(Some(
-            GroupedLightDynamicsUpdate::new()
-                .with_duration(Some(config.fade_in_duration.seconds * 1000)),
-        ))
-        .with_color_temperature(Some(WAKEUP_FADE_MIREK));
-
-    let upd = res
-        .lock()
-        .await
-        .backend_request(BackendRequest::GroupedLightUpdate(*grouped_light, payload));
-    if let Err(err) = upd {
-        log::error!("Failed to execute group update: {:#?}", err);
-    }
-}
-
-async fn turn_off_room(room: &Room, res: Arc<Mutex<Resources>>) {
-    let Some(grouped_light) = room.grouped_light_service() else {
-        log::error!("Failed to get grouped light service for room");
-        return;
-    };
-    let payload = GroupedLightUpdate::default().with_on(Some(On::new(false)));
-
-    let upd = res
-        .lock()
-        .await
-        .backend_request(BackendRequest::GroupedLightUpdate(*grouped_light, payload));
-    if let Err(err) = upd {
-        log::error!("Failed to execute group update: {:#?}", err);
+        res.lock().await.backend_request(backend_request)
     }
 }
