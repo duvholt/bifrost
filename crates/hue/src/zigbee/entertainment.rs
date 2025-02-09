@@ -2,9 +2,9 @@ use std::fmt::Debug;
 
 use packed_struct::prelude::*;
 
-use hue::{WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y};
+use crate::{WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y};
 
-use crate::error::{ZclError, ZclResult};
+use crate::error::{HueError, HueResult};
 
 #[derive(PackedStruct, Debug, Clone, Copy)]
 #[packed_struct(size = "6", endian = "lsb")]
@@ -60,14 +60,14 @@ impl Debug for HueEntFrameLight {
 }
 
 impl HueEntStart {
-    pub fn parse(data: &[u8]) -> ZclResult<Self> {
+    pub fn parse(data: &[u8]) -> HueResult<Self> {
         if data.len() < 2 {
-            return Err(ZclError::PackedStructError(PackingError::InvalidValue));
+            return Err(HueError::PackedStructError(PackingError::InvalidValue));
         }
         let (hdr, mut data) = data.split_at(2);
         let count = u16::from_be_bytes([hdr[0], hdr[1]]);
         if (count as usize * 2) != data.len() {
-            return Err(ZclError::PackedStructError(PackingError::InvalidValue));
+            return Err(HueError::PackedStructError(PackingError::InvalidValue));
         }
 
         let mut members = vec![];
@@ -83,9 +83,9 @@ impl HueEntStart {
 }
 
 impl HueEntFrame {
-    pub fn parse(data: &[u8]) -> ZclResult<Self> {
+    pub fn parse(data: &[u8]) -> HueResult<Self> {
         if data.len() < (8 + 5) {
-            return Err(ZclError::PackedStructError(PackingError::InvalidValue));
+            return Err(HueError::PackedStructError(PackingError::InvalidValue));
         }
         let (hdr, mut data) = data.split_at(6);
         let hdr = HueEntFrameHeader::unpack_from_slice(hdr)?;

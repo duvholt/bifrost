@@ -2,7 +2,7 @@ use packed_struct::PackedStructSlice;
 
 use crate::error::ZclResult;
 use crate::frame::ZclFrame;
-use crate::hue::{HueEntFrame, HueEntStart, HueEntStop};
+use hue::zigbee::{HueEntFrame, HueEntStart, HueEntStop};
 
 pub fn describe(frame: &ZclFrame, data: &[u8]) -> ZclResult<Option<String>> {
     if !frame.cluster_specific() {

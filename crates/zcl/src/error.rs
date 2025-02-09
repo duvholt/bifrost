@@ -10,6 +10,9 @@ pub enum ZclError {
     IOError(#[from] std::io::Error),
 
     #[error(transparent)]
+    HueError(#[from] hue::error::HueError),
+
+    #[error(transparent)]
     PackedStructError(#[from] packed_struct::PackingError),
 }
 

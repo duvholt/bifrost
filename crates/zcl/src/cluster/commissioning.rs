@@ -1,6 +1,6 @@
 use crate::error::ZclResult;
 use crate::frame::ZclFrame;
-use crate::hue::HueEntFrame;
+use hue::zigbee::HueEntFrame;
 
 pub fn describe(frame: &ZclFrame, data: &[u8]) -> ZclResult<Option<String>> {
     if frame.cluster_specific() && frame.cmd == 0x02 {
