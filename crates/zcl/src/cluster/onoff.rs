@@ -1,7 +1,7 @@
 use crate::frame::{ZclFrame, ZclFrameDirection};
 
 pub fn describe(frame: &ZclFrame, _data: &[u8]) -> Option<String> {
-    if !frame.manufacturer_specific() {
+    if frame.manufacturer_specific() {
         return None;
     }
 
