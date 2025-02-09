@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use packed_struct::prelude::*;
 
-use crate::{WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y};
+use crate::xy::XY;
 
 use crate::error::{HueError, HueResult};
 
@@ -44,17 +44,12 @@ pub struct HueEntFrameLight {
 
 impl Debug for HueEntFrameLight {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let b = self.raw;
-        let x0 = u16::from(b[0]) | u16::from(b[1] & 0x0F) << 8;
-        let y0 = u16::from(b[2]) << 4 | u16::from(b[1] >> 4);
-
-        let x = f64::from(x0) * WIDE_GAMUT_MAX_X / f64::from(0xFFF);
-        let y = f64::from(y0) * WIDE_GAMUT_MAX_Y / f64::from(0xFFF);
+        let xy = XY::from_quant(self.raw);
 
         write!(
             f,
             "<{:04x}> ({:.3?},{:.3?})@{:04x?}",
-            self.addr, x, y, self.b
+            self.addr, xy.x, xy.y, self.b
         )
     }
 }
