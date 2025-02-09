@@ -1,3 +1,4 @@
+pub mod colorctrl;
 pub mod commissioning;
 pub mod effects;
 pub mod groups;
