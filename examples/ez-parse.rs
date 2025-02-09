@@ -162,11 +162,19 @@ fn main() -> ApiResult<()> {
     for line in stdin().lines() {
         let line = line?;
 
-        let data: Record = serde_json::from_str(line.trim())?;
-        if let Err(e) = parse(&data) {
-            error!("Failed parse: {e}");
-            eprintln!("    {line:<40}");
-            eprintln!("    {data:?}");
+        match serde_json::from_str::<Record>(line.trim()) {
+            Ok(data) => {
+                if let Err(err) = parse(&data) {
+                    error!("Failed parse: {err}");
+                    eprintln!("    {line:<40}");
+                    eprintln!("    {data:?}");
+                }
+            }
+
+            Err(err) => {
+                error!("Failed to parse json: {err}");
+                eprintln!("    {line:<40}");
+            }
         }
     }
 
