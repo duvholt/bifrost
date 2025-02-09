@@ -32,8 +32,7 @@ pub fn describe(frame: &ZclFrame, data: &[u8]) -> ZclResult<Option<String>> {
         Some(ZclCommand::DefaultResp) => {
             /* let req = ZclDefaultResp::parse(data)?; */
             /* format!("Attr dr <-  {:02x} {:02x}", req.cmd, req.stat) */
-            /* return Ok(()); */
-            None
+            return Ok(Some(String::new()));
         }
         _ => None,
     };
