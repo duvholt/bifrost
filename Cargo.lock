@@ -314,6 +314,7 @@ dependencies = [
  "url",
  "uuid",
  "x509-cert",
+ "zcl",
 ]
 
 [[package]]
@@ -2930,6 +2931,17 @@ dependencies = [
  "quote",
  "syn 2.0.96",
  "synstructure",
+]
+
+[[package]]
+name = "zcl"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "hex 0.4.3",
+ "hue",
+ "packed_struct",
+ "thiserror 2.0.11",
 ]
 
 [[package]]

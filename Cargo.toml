@@ -36,6 +36,7 @@ keywords = [
 [workspace]
 members = [
     "crates/hue",
+    "crates/zcl",
 ]
 
 [workspace.lints.rust]
@@ -106,6 +107,7 @@ url = { version = "2.5.4", features = ["serde"] }
 hex = "0.4.3"
 async-trait = "0.1.86"
 hue = { version = "0.1.0", path = "crates/hue" }
+zcl = { path = "crates/zcl" }
 
 [dev-dependencies]
 hex-serde = "0.1.0"
