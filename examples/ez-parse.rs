@@ -46,6 +46,18 @@ where
     }
 }
 
+pub fn vec_hex_opt<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    if let Some(s) = opt {
+        Ok(hex::decode(s).map_err(serde::de::Error::custom)?)
+    } else {
+        Ok(vec![])
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Record {
     /* pub src_mac: String, */
@@ -64,7 +76,7 @@ pub struct Record {
     #[serde(deserialize_with = "u16_hex")]
     pub cluster: u16,
 
-    #[serde(with = "hex_serde")]
+    #[serde(deserialize_with = "vec_hex_opt")]
     pub data: Vec<u8>,
 }
 
