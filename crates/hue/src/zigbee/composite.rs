@@ -8,7 +8,6 @@ use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 use crate::error::{HueError, HueResult};
 use crate::flags::TakeFlag;
 use crate::xy::XY;
-use crate::{WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y};
 
 #[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
 pub enum EffectType {
@@ -233,16 +232,9 @@ impl HueZigbeeUpdate {
 
             let mut points = vec![];
             for _ in 0..header.nlights {
-                let mut bytes = vec![0; 3];
+                let mut bytes = [0u8; 3];
                 rdr.read_exact(&mut bytes)?;
-
-                let x = u16::from(bytes[0]) | u16::from(bytes[1] & 0x0F) << 8;
-                let y = u16::from(bytes[2]) << 4 | u16::from(bytes[1] >> 4);
-
-                points.push(XY {
-                    x: f64::from(x) * (WIDE_GAMUT_MAX_X / f64::from(0xFFF)),
-                    y: f64::from(y) * (WIDE_GAMUT_MAX_Y / f64::from(0xFFF)),
-                });
+                points.push(XY::from_quant(bytes));
             }
             hz.gradient_colors = Some(GradientColors { header, points });
         }
@@ -325,18 +317,7 @@ impl HueZigbeeUpdate {
             wtr.write_u8(len)?;
             wtr.write_all(&grad_color.header.pack()?)?;
             for point in &grad_color.points {
-                let x = (point.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
-                let y = (point.y * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_Y) + (0.5 / 4095.))) as u16;
-                debug_assert!(x < 0x1000);
-                debug_assert!(y < 0x1000);
-
-                let bytes: [u8; 3] = [
-                    (x & 0xFF) as u8,
-                    (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
-                    (y >> 4 & 0xFF) as u8,
-                ];
-
-                wtr.write_all(&bytes)?;
+                wtr.write_all(&point.to_quant())?;
             }
         }
 
