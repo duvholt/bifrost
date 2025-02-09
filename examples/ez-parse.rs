@@ -140,6 +140,12 @@ fn parse(rec: &Record) -> ZclResult<()> {
             // suppress OTA messages
         }
 
+        0x0021 => {
+            // suppress ZGP (Zigbee Green Power) messages
+        }
+
+        0x0300 => describe("ColorCtrl:", Ok(cluster::colorctrl::describe(&frame, data))),
+
         0x0406 => {
             // suppress occypancy sensing
         }
