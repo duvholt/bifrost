@@ -125,11 +125,11 @@ fn parse(rec: &Record) -> ZclResult<()> {
     }
 
     match rec.cluster {
-        0x0003 => describe("Effect", Ok(cluster::effects::describe(&frame, data))),
-        0x0004 => describe("Group", Ok(cluster::groups::describe(&frame, data))),
-        0x0005 => describe("Scene", Ok(cluster::scenes::describe(&frame, data))),
-        0x0006 => describe("OnOff", Ok(cluster::onoff::describe(&frame, data))),
-        0x0008 => describe("LevelCtrl", Ok(cluster::levelctrl::describe(&frame, data))),
+        0x0003 => describe("Effect:", Ok(cluster::effects::describe(&frame, data))),
+        0x0004 => describe("Group:", Ok(cluster::groups::describe(&frame, data))),
+        0x0005 => describe("Scene:", Ok(cluster::scenes::describe(&frame, data))),
+        0x0006 => describe("OnOff:", Ok(cluster::onoff::describe(&frame, data))),
+        0x0008 => describe("LevelCtrl:", Ok(cluster::levelctrl::describe(&frame, data))),
 
         0x0019 => {
             // suppress OTA messages
@@ -140,14 +140,14 @@ fn parse(rec: &Record) -> ZclResult<()> {
         }
 
         0x1000 => describe(
-            "Commissioning",
+            "Commissioning:",
             cluster::commissioning::describe(&frame, data),
         ),
 
-        0xFC01 => describe("HueEnt", cluster::hue_fc01::describe(&frame, data)),
-        0xFC03 => describe("HueCmp", cluster::hue_fc03::describe(&frame, data)),
+        0xFC01 => describe("HueEnt:", cluster::hue_fc01::describe(&frame, data)),
+        0xFC03 => describe("HueCmp:", cluster::hue_fc03::describe(&frame, data)),
 
-        _ => describe("UNKNOWN", Ok(None)),
+        _ => describe("UNKNOWN:", Ok(None)),
     }
 
     Ok(())
