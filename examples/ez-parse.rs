@@ -95,24 +95,29 @@ fn parse(rec: &Record) -> ZclResult<()> {
     let flags = frame.flags;
     let cmd = frame.cmd;
     let cls = rec.cluster;
+    let index = rec.index;
 
     let describe = |cat: &str, desc: ZclResult<Option<String>>| {
         match desc {
             Ok(Some(desc)) => {
+                if desc.is_empty() {
+                    return;
+                }
+
                 info!(
-                    "[{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}{desc} {}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}{desc} {}",
                     hex::encode(data)
                 );
             }
             Ok(None) => {
                 warn!(
-                    "[{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}Unknown {}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}Unknown {}",
                     hex::encode(data)
                 );
             }
             Err(err) => {
                 error!(
-                    "[{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: FAILED {}: {err}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: FAILED {}: {err}",
                     hex::encode(data)
                 );
             }
