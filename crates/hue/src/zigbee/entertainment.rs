@@ -31,18 +31,18 @@ pub struct HueEntFrameHeader {
 pub struct HueEntFrame {
     pub counter: u32,
     pub x0: u16,
-    pub blks: Vec<HueEntFrameLight>,
+    pub blks: Vec<HueEntFrameLightRecord>,
 }
 
 #[derive(PackedStruct, Clone)]
 #[packed_struct(size = "5", endian = "lsb")]
-pub struct HueEntFrameLight {
+pub struct HueEntFrameLightRecord {
     pub addr: u16,
     pub b: u16,
     pub raw: [u8; 3],
 }
 
-impl Debug for HueEntFrameLight {
+impl Debug for HueEntFrameLightRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let xy = XY::from_quant(self.raw);
 
@@ -54,24 +54,31 @@ impl Debug for HueEntFrameLight {
     }
 }
 
+fn check_size_valid(len: usize, header_size: usize, element_size: usize) -> HueResult<()> {
+    // Must have bytes enough for the header
+    if len < header_size {
+        return Err(HueError::HueZigbeeDecodeError);
+    }
+
+    // Must have a whole number of elements
+    if (len - header_size) % element_size != 0 {
+        return Err(HueError::HueZigbeeDecodeError);
+    }
+
+    Ok(())
+}
+
 impl HueEntStart {
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        if data.len() < 2 {
-            return Err(HueError::PackedStructError(PackingError::InvalidValue));
-        }
-        let (hdr, mut data) = data.split_at(2);
+        check_size_valid(data.len(), 2, 2)?;
+
+        let (hdr, data) = data.split_at(2);
         let count = u16::from_be_bytes([hdr[0], hdr[1]]);
-        if (count as usize * 2) != data.len() {
-            return Err(HueError::PackedStructError(PackingError::InvalidValue));
-        }
 
-        let mut members = vec![];
-        while !data.is_empty() {
-            members.push(u16::from_le_bytes([data[0], data[1]]));
-            data = &data[2..];
-        }
-
-        debug_assert!(data.is_empty());
+        let members = data
+            .chunks_exact(2)
+            .map(|d| u16::from_le_bytes([d[0], d[1]]))
+            .collect();
 
         Ok(Self { count, members })
     }
@@ -79,18 +86,17 @@ impl HueEntStart {
 
 impl HueEntFrame {
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        if data.len() < (8 + 5) {
-            return Err(HueError::PackedStructError(PackingError::InvalidValue));
+        if data.len() < 6 {
+            return Err(HueError::HueZigbeeDecodeError);
         }
-        let (hdr, mut data) = data.split_at(6);
+
+        let (hdr, data) = data.split_at(6);
         let hdr = HueEntFrameHeader::unpack_from_slice(hdr)?;
 
-        let mut blks: Vec<HueEntFrameLight> = vec![];
-
-        while !data.is_empty() {
-            blks.push(HueEntFrameLight::unpack_from_slice(&data[..7])?);
-            data = &data[7..];
-        }
+        let blks = data
+            .chunks_exact(7)
+            .map(HueEntFrameLightRecord::unpack_from_slice)
+            .collect::<Result<_, _>>()?;
 
         Ok(Self {
             counter: hdr.counter,
