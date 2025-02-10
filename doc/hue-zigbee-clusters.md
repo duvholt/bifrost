@@ -95,6 +95,53 @@ struct {
 }
 ```
 
+### Command 4: Retrieve segment mapping
+
+This command is used to retrieve the segment mapping for a hue lamp.
+
+#### Request
+
+A single byte is sent. Only observed as `00` (might be an index for highly
+addressable devices?).
+
+#### Response
+
+```c
+struct Response {
+  x0: u8, // unknown
+  x1: u8, // unknown
+  count: u8, // number of segments
+  segments: [Segment], // segment descriptors
+}
+
+struct Segment {
+  start: u8, // start index for segment
+  length: u8, // segment length
+}
+```
+
+As an example, the following is a real response from a Hue Gradient light strip:
+
+```
+00 00 07 0001 0101 0201 0301 0401 0501 0601
+|      | |                                |
+\      / \                               /
+ header   \                             /
+           \                           /
+             seven segment descriptors
+```
+
+This tells us the segments are arranged thus:
+
+ - Start at `00`, length `01`
+ - Start at `01`, length `01`
+ - Start at `02`, length `01`
+ - ...
+
+These are all length 1. In other words, the layout is:
+
+ `0, 1, 2, 3, 4, 5, 6`
+
 ### Command 7: Configure segments for entertainment mode (req/rsp)
 
 Hue Entertainment frames consists of brightness and color data for up to 10
