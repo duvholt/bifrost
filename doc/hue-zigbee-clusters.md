@@ -1,23 +1,34 @@
-# Cluster 0xFC00: ?
+# The Color of Magic: Reversing the Hue Zigbee Clusters
 
-Observed in several samples. Could be related to entertainment mode.
+This document, which builds on the [initial work](hue-zigbee-format.md), aims to
+compile all available information about the custom Zigbee messages used by
+Philips Hue devices, and in particular, lights.
+
+The following text refers to commands and attributes on Hue devices. This has
+been researched using the following units:
+
+## "Hue Bulb"
+
+ - "Hue white and color ambiance E27 1100lm"
+ - Model `LCA006`
+ - Firmware 1.122.2 (20240902)
+
+## "Hue Gradient strip"
+
+ - "Hue Play gradient lightstrip for PC"
+ - Model `LCX005`
+ - Firmware 1.122.2 (20240902)
+
+# Cluster 0xFC00: Hue Button events
+
+Used by hue buttons to report button events and other state changes.
 
 ## Cluster-specific commands
 
-### Command 0: Maybe reporting for light status?
+### Command 0: Button Event
 
-Unknown purpose. Examples of real answers from a gradient strip:
-
-```
-0100003000210000
-0100003002210100
-0200003000210000
-0200003002210100
-0300003000210000
-0300003002210100
-0400003000210000
-0400003002210100
-```
+These are mostly documented elsewhere, and because they are button events, they
+are not the main focus of this document.
 
 # Cluster 0xFC01: Entertainment
 
