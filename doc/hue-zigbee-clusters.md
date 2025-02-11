@@ -32,13 +32,16 @@ are not the main focus of this document.
 
 # Cluster 0xFC01: Entertainment
 
+This cluster is used to control "Entertainment Zones", a defining feature of the
+Hue ecosystem.
+
 ## Cluster-specific commands
 
 ### Command 1: Update entertainment zone
 
 This is the major command used to send a "frame" of Hue Entertainment data.
 
-Sending it to a Hue lamp will cause that lamp to repeat it in broadcast mode,
+Sending it to a Hue bulb will cause that bulb to repeat it in broadcast mode,
 for other devices to pick up.
 
 ```text
@@ -68,7 +71,7 @@ for other devices to pick up.
 ```
 
 Each "light data block" is a 7-byte packed structure describing the desired
-state for a light (a lamp, or single segment of a multi-segment light source).
+state for a light (a bulb, or single segment of a multi-segment light source).
 
 
 
@@ -93,22 +96,23 @@ state for a light (a lamp, or single segment of a multi-segment light source).
 ```
 
 
-### Command 3: Synchronize entertainment mode
+### Command 3: Synchronize entertainment zone
 
 This command is used to synchronize the sequence number in an entertainment
 group. The first two bytes are unknown.
 
 ```c
 struct {
-    x0: u8, // always 0
-    x1: u8, // seen as 0 or 1. unknown
+    x0: u8, // only seen as 0
+    x1: u8, // seen as 0 or 1. unknown function
     counter: u32, // frame counter for entertainment group
 }
 ```
 
 ### Command 4: Retrieve segment mapping
 
-This command is used to retrieve the segment mapping for a hue lamp.
+This command is used to retrieve the segment mapping for a hue multi-segment
+light.
 
 #### Request
 
@@ -134,12 +138,11 @@ struct Segment {
 As an example, the following is a real response from a Hue Gradient light strip:
 
 ```
-00 00 07 0001 0101 0201 0301 0401 0501 0601
-|      | |                                |
-\      / \                               /
- header   \                             /
-           \                           /
-             seven segment descriptors
+           ┌───┬───First segment descriptor
+           │   │
+  00 00 07 00 01 01 01 02 01 03 01 04 01 05 01 06 01
+  │      │ │                                       │
+  └header┘ └───────Seven segment descriptors───────┘
 ```
 
 This tells us the segments are arranged thus:
@@ -174,9 +177,29 @@ struct {
   count: u16,
   addresses: [count x u16],
 }
-
-// example: 0007 98d2 99d2 9ad2 9bd2 9cd2 9dd2 9ed2
 ```
+
+Here is an example of a command that sets seven virtual addresses for a gradient
+light strip with 7 segments:
+
+```
+        ┌───┬───Segment index 0
+        │   │
+  00 07 97 d2 98 d2 99 d2 9a d2 9b d2 9c d2 9d d2
+  │   │ │                                       │
+  └cnt┘ └───────Seven segment indices───────────┘
+
+```
+
+After this, the segments will respond the these addresses:
+
+ - `0xD297`
+ - `0xD298`
+ - `0xD299`
+ - `0xD29A`
+ - `0xD29B`
+ - `0xD29C`
+ - `0xD29D`
 
 #### Response
 
@@ -184,31 +207,46 @@ struct {
 struct {
   x0: u16,
 }
-
-// example: 0000
 ```
 
 The only observed response is `0000`, which indicates success.
 
 Running this command on a Hue device that does not have multiple segments (i.e,
-a regular Hue lamp) gets a "Command Not Supported" standard Zigbee response, so
+a regular Hue bulb) gets a "Command Not Supported" standard Zigbee response, so
 returning `0000` seems to be a safe way to detect success.
 
 ## Attributes
 
-| Attr   | Type | Desc                 | Sample value |
-|--------|------|----------------------|--------------|
-| 0x0005 | u8   | Light balance factor | `0xFE`       |
+Gradient strip:
+
+| Attr   | Type | Value | Desc                       |
+|--------|------|-------|----------------------------|
+| `0000` | `b8` | `0F`  | ?                          |
+| `0001` | `e8` | `00`  | ?                          |
+| `0002` | `u8` | `0A`  | Probably max segment count |
+| `0003` | `u8` | `04`  | Probably gradient-related  |
+| `0004` | `u8` | `07`  | Probably segment count     |
+| `0005` | `u8` | `FE`  | Light balance factor       |
+
+
+Hue bulb:
+
+| Attr   | Type | Value | Desc |
+|--------|------|-------|------|
+| `0000` | `b8` | `0B`  | ?    |
+| `0001` | `e8` | `00`  | ?    |
+| `0005` | `u8` | `FE`  | ?    |
+
+Notice that attributes `0002`, `0003` and `0004` are not present on the hue
+bulb. This supports the idea that these attributes are gradient-related.
 
 So far the only attribute known on this cluster is `0x005`, which sets the light
 level balancing for entertainment mode.
 
 This is a feature where lights can be dimmed relatively, so certain lights
 aren't blindingly bright. Just like regular brightness updates, the valid range
-is `0x01` to `0xFE`.
-
-This should always be set to `0xFE`, unless you want to dim the light in
-entertainment mode.
+is `0x01` to `0xFE`. This should always be set to `0xFE`, unless you want to dim
+the light in entertainment mode.
 
 # Cluster 0xFC02
 
@@ -216,36 +254,50 @@ Never seen. Maybe they skipped a number?
 
 # Cluster 0xFC03: Gradients, Effects, Animations
 
-
-
 ## Cluster-specific commands
 
 ### Command 0: Write combined state
 
 This is perhaps the single most complicated Hue command. It is used to
-simultaneously set all supported properties of a Hue lamp.
+simultaneously set all supported properties of a Hue bulb.
 
 It has been extensively [documented in a separate document](hue-zigbee-format.md).
 
+After setting the state with this command, it can be read back as property
+`0x0002` (see below).
+
 ## Attributes
 
-| Attr   | Type        | Desc                    | Sample value from Hue device |
-|--------|-------------|-------------------------|------------------------------|
-| 0x0001 | u32 bitmap  | ?                       | `00 00 00 0F`                |
-| 0x0002 | octets      | u8: len, combined state | `08 0B 00 01 1F 67 98 26 4F` |
-| 0x0010 | u16         | ?                       | `00 01`                      |
-| 0x0011 | u64         | ?                       | `00 00 00 00 00 03 FE 0E`    |
-| 0x0012 | u32         | ?                       | `00 00 00 03`                |
-| 0x0013 | u16         | maybe `segment_count`   | `00 07`                      |
-| 0x0030 | unsupported | ?                       | -                            |
-| 0x0032 | u8          | ?                       | `00`                         |
-| 0x0033 | u8          | ?                       | `00`                         |
-| 0x0034 | u8          | ?                       | `03`                         |
-| 0x0034 | u8          | ?                       | `03`                         |
-| 0x0035 | u8          | ?                       | `FE`                         |
-| 0x0036 | u8          | ?                       | `4F`                         |
-| 0x0037 | unsupported | ?                       | -                            |
-| 0x0038 | u16         | maybe `segment_count`   | `00 07`                      |
+Sample data from gradient strip:
+
+| Attr   | Type  | Value              | Desc            |
+|--------|-------|--------------------|-----------------|
+| `0001` | `b32` | `0000000F`         | ?               |
+| `0002` | `hex` | `0700010a6e01`     | Composite state |
+| `0010` | `b16` | `0001`             | ?               |
+| `0011` | `b64` | `000000000003FE0E` | ?               |
+| `0012` | `b32` | `00000003`         | ?               |
+| `0013` | `b16` | `0007`             | ?               |
+| `0031` | `u16` | `04E2`             | ?               |
+| `0032` | `u8`  | `00`               | ?               |
+| `0033` | `u8`  | `00`               | ?               |
+| `0034` | `u8`  | `03`               | ?               |
+| `0035` | `u8`  | `FE`               | ?               |
+| `0036` | `u8`  | `4F`               | ?               |
+| `0038` | `u16` | `0007`             | ?               |
+
+From hue bulb:
+
+| Attr   | Type  | Value              | Desc            |
+|--------|-------|--------------------|-----------------|
+| `0001` | `b32` | `00000007`         | ?               |
+| `0002` | `hex` | `070001176f01`     | Composite state |
+| `0010` | `b16` | `0001`             | ?               |
+| `0011` | `b64` | `000000000003FE0E` | ?               |
+| `0012` | `b32` | `00000000`         | ?               |
+
+The bulb supports noticably fewer properties, which makes it likely that the
+missing ones are related to gradient handling.
 
 # Cluster 0xFC04
 
@@ -253,7 +305,26 @@ Very rarely observed. Only seen with ZCL: Read Attributes.
 
 ## Attributes
 
-| Attr   | Type       | Desc | Sample |
-|--------|------------|------|--------|
-| 0x0000 | u16 bitmap | ?    | 0x1007 |
-|        |            |      | 0x0007 |
+Gradient strip:
+
+| Attr   | Type  | Value      | Desc |
+|--------|-------|------------|------|
+| `0000` | `b16` | `1007`     | ?    |
+| `0001` | `b16` | `0000`     | ?    |
+| `0002` | `b16` | `0000`     | ?    |
+| `0010` | `u32` | `00000000` | ?    |
+| `0011` | `u32` | `00000000` | ?    |
+| `0012` | `u32` | `00000000` | ?    |
+| `0013` | `u32` | `00000000` | ?    |
+
+Hue Bulb:
+
+| Attr   | Type  | Value      | Desc |
+|--------|-------|------------|------|
+| `0000` | `b16` | `1007`     |      |
+| `0001` | `b16` | `0000`     |      |
+| `0002` | `b16` | `0000`     |      |
+| `0010` | `u32` | `00000000` |      |
+| `0011` | `u32` | `00000000` |      |
+| `0012` | `u32` | `00000000` |      |
+| `0013` | `u32` | `00000000` |      |
