@@ -22,7 +22,7 @@ DiyHue bridge, you will notice that it does not react to any changes from other
 phones, home automation, etc. Also, the reported light states (on/off, color,
 temperature, etc) are sometimes just wrong.
 
-Overall, DieHue can do an impressive number of things, but it seems to have some
+Overall, DiyHue can do an impressive number of things, but it seems to have some
 pretty rough edges.
 
 Just to clarify, I've enjoyed using DiyHue, and I wish them all the best. It's

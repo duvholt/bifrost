@@ -41,6 +41,6 @@
 
 | Feature | GET | POST | PUT          | DELETE |
 |---------|-----|------|--------------|--------|
-| Lights  | ✅  | -    | ✅ (patial)  | -      |
-| Groups  | ✅  | ❌   | ✅ (patial)  | ❌     |
+| Lights  | ✅  | -    | ✅ (partial) | -      |
+| Groups  | ✅  | ❌   | ✅ (partial) | ❌     |
 | Scenes  | ✅  | ✅   | ✅ (partial) | ✅     |

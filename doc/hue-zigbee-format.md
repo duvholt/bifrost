@@ -48,8 +48,8 @@ have managed to reverse the format in its entirety.
 
 The current state of the art in zigbee-herdsman-converters
 (`srd/lib/philips.ts`) has patchy support for a few advanced features, but is
-riddled with errors and inacuracies. It also suffers from being written before a
-complete understanding of the format was availeble, widely using "magic" numbers
+riddled with errors and inaccuracies. It also suffers from being written before a
+complete understanding of the format was available, widely using "magic" numbers
 that happen to work, although they may not be a good fit in the bigger picture.
 
 There is great potential for improving zigbee-herdsman-converters, using the
@@ -268,7 +268,7 @@ pub enum GradientStyle {
 
 ### Property: `GRADIENT_COLORS`: Color encoding
 
-The gradient colors format can speficy up to and including 9 colors, even for
+The gradient colors format can specify up to and including 9 colors, even for
 light strips with fewer than 9 segments. Any attempt to specify 10 or more
 colors will result in the entire message being rejected.
 
@@ -347,7 +347,7 @@ This property controls the animation speed for effects (see `EFFECT_TYPE`).
 All values in the range `0`..`255` seem to be allowed, with `0` being the
 slowest and `255` the fastest.
 
-Curiously, the Hue app does not use the full rnage for all effects, and at high
+Curiously, the Hue app does not use the full range for all effects, and at high
 values, some animations are rendered so quickly that they start to break down.
 
 A good starting point seems to be 128 (representing 0.5).

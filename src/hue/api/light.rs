@@ -291,7 +291,7 @@ impl LightGradient {
                 ]),
                 points_capable: *max,
                 points: vec![],
-                // FIXME: we don't have this information, so guestimate it
+                // FIXME: we don't have this information, so guesstimate it
                 pixel_count: *max * 3,
             }),
             _ => None,
