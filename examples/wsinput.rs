@@ -2,6 +2,8 @@ use std::io::Write;
 
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
+use serde::Deserialize;
+use serde_json::Value;
 use tokio::io::{stdin, AsyncBufReadExt, BufReader};
 use tokio::select;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -20,10 +22,17 @@ struct Args {
     topic: String,
 }
 
+#[derive(Deserialize)]
+pub struct Log {
+    pub level: String,
+    message: String,
+}
+
 #[allow(clippy::redundant_pub_crate)]
 #[tokio::main]
 async fn main() -> ApiResult<()> {
     pretty_env_logger::formatted_builder()
+        .write_style(pretty_env_logger::env_logger::fmt::WriteStyle::Always)
         .filter_level(log::LevelFilter::Debug)
         .parse_default_env()
         .init();
@@ -44,7 +53,7 @@ async fn main() -> ApiResult<()> {
                     continue;
                 }
 
-                println!("{line}");
+                /* println!("{line}"); */
 
                 let req: RawMessage = match serde_json::from_str(&line) {
                     Ok(res) => res,
@@ -54,10 +63,10 @@ async fn main() -> ApiResult<()> {
                     },
                 };
 
-                info!("req: {req:?}");
+                /* info!("req: {req:?}"); */
                 match serde_json::to_string(&req) {
                     Ok(pkt) => {
-                        println!("Parsed: {}", &pkt);
+                        /* println!("Parsed: {}", &pkt); */
                         socket.send(Message::text(pkt)).await?;
                     }
                     Err(err) => {
@@ -69,7 +78,21 @@ async fn main() -> ApiResult<()> {
                 if let Message::Text(txt) = pkt {
                     let msg: RawMessage = serde_json::from_str(&txt)?;
                     if msg.topic != "bridge/info" && msg.topic != "bridge/definitions" && msg.topic != "bridge/devices" {
-                        println!("{msg:?}");
+                        if msg.topic == "bridge/logging" {
+                            let log: Log = serde_json::from_value(msg.payload)?;
+                            if log.message.starts_with("zhc:tz: Read result") {
+                                let body = &log.message.split('\'').nth(2).unwrap()[2..];
+                                info!("{body}");
+                                let rsp: Value = serde_json::from_str(body)?;
+                                info!("{rsp:?}");
+                            } else if log.message.contains("UNSUPPORTED_ATTRIBUTE") {
+                                error!("Unsupported attribute");
+                            } else {
+                                info!("{:?}", log.message);
+                            }
+                        } else {
+                            println!("{msg:?}");
+                        }
                     }
                 } else {
                     println!("{pkt:?}");
