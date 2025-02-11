@@ -35,10 +35,13 @@ pub struct HueEntFrame {
 }
 
 #[derive(PackedStruct, Clone)]
-#[packed_struct(size = "5", endian = "lsb")]
+#[packed_struct(size_bytes = "7", endian = "lsb", bit_numbering = "msb0")]
 pub struct HueEntFrameLightRecord {
+    #[packed_field(bits = "0..=15")]
     pub addr: u16,
-    pub b: u16,
+    #[packed_field(bits = "16..=27")]
+    pub brightness: u16,
+    #[packed_field(bits = "32..=55")]
     pub raw: [u8; 3],
 }
 
@@ -49,7 +52,7 @@ impl Debug for HueEntFrameLightRecord {
         write!(
             f,
             "<{:04x}> ({:.3?},{:.3?})@{:04x?}",
-            self.addr, xy.x, xy.y, self.b
+            self.addr, xy.x, xy.y, self.brightness
         )
     }
 }
