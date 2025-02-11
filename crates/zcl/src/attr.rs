@@ -192,16 +192,16 @@ impl ZclAttr {
         let value = match dtype {
             ZclDataType::Null => ZclAttrValue::Null,
             ZclDataType::Zcl8bit => ZclAttrValue::X8(rdr.read_i8()?),
-            ZclDataType::Zcl16bit => ZclAttrValue::X16(rdr.read_i16::<BE>()?),
-            ZclDataType::Zcl32bit => ZclAttrValue::X32(rdr.read_i32::<BE>()?),
+            ZclDataType::Zcl16bit => ZclAttrValue::X16(rdr.read_i16::<LE>()?),
+            ZclDataType::Zcl32bit => ZclAttrValue::X32(rdr.read_i32::<LE>()?),
             ZclDataType::ZclBool => ZclAttrValue::Bool(rdr.read_u8()? != 0),
             ZclDataType::Zcl8bitmap => ZclAttrValue::B8(rdr.read_u8()?),
-            ZclDataType::Zcl16bitmap => ZclAttrValue::B16(rdr.read_u16::<BE>()?),
-            ZclDataType::Zcl32bitmap => ZclAttrValue::B32(rdr.read_u32::<BE>()?),
+            ZclDataType::Zcl16bitmap => ZclAttrValue::B16(rdr.read_u16::<LE>()?),
+            ZclDataType::Zcl32bitmap => ZclAttrValue::B32(rdr.read_u32::<LE>()?),
             ZclDataType::ZclU8 => ZclAttrValue::U8(rdr.read_u8()?),
-            ZclDataType::ZclU16 => ZclAttrValue::U16(rdr.read_u16::<BE>()?),
-            ZclDataType::ZclU32 => ZclAttrValue::U32(rdr.read_u32::<BE>()?),
-            ZclDataType::ZclI16 => ZclAttrValue::I16(rdr.read_i16::<BE>()?),
+            ZclDataType::ZclU16 => ZclAttrValue::U16(rdr.read_u16::<LE>()?),
+            ZclDataType::ZclU32 => ZclAttrValue::U32(rdr.read_u32::<LE>()?),
+            ZclDataType::ZclI16 => ZclAttrValue::I16(rdr.read_i16::<LE>()?),
             ZclDataType::ZclE8 => ZclAttrValue::E8(rdr.read_u8()?),
             ZclDataType::ZclBytearray => {
                 let len = rdr.read_u8()?;
