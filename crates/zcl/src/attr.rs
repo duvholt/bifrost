@@ -67,6 +67,18 @@ pub enum ZclDataType {
     /** 32-bit bitmap data type */
     Zcl32bitmap = 0x1b,
 
+    /** 40-bit bitmap data type */
+    Zcl40bitmap = 0x1c,
+
+    /** 48-bit bitmap data type */
+    Zcl48bitmap = 0x1d,
+
+    /** 56-bit bitmap data type */
+    Zcl56bitmap = 0x1e,
+
+    /** 64-bit bitmap data type */
+    Zcl64bitmap = 0x1f,
+
     /** Unsigned 8-bit value data type */
     ZclU8 = 0x20,
 
@@ -125,6 +137,10 @@ pub enum ZclAttrValue {
     B8(u8),
     B16(u16),
     B32(u32),
+    B40(u64),
+    B48(u64),
+    B56(u64),
+    B64(u64),
     U8(u8),
     U16(u16),
     U32(u32),
@@ -147,6 +163,10 @@ impl Debug for ZclAttrValue {
             Self::B8(val)  => write!(f, "b8:{:02X}", val),
             Self::B16(val) => write!(f, "b16:{:04X}", val),
             Self::B32(val) => write!(f, "b32:{:08X}", val),
+            Self::B40(val) => write!(f, "b40:{:010X}", val),
+            Self::B48(val) => write!(f, "b48:{:012X}", val),
+            Self::B56(val) => write!(f, "b56:{:014X}", val),
+            Self::B64(val) => write!(f, "b64:{:016X}", val),
             Self::U8(val) => write!(f, "u8:{:02X}", val),
             Self::U16(val) => write!(f, "u16:{:04X}", val),
             Self::U32(val) => write!(f, "u32:{:08X}", val),
@@ -198,6 +218,10 @@ impl ZclAttr {
             ZclDataType::Zcl8bitmap => ZclAttrValue::B8(rdr.read_u8()?),
             ZclDataType::Zcl16bitmap => ZclAttrValue::B16(rdr.read_u16::<LE>()?),
             ZclDataType::Zcl32bitmap => ZclAttrValue::B32(rdr.read_u32::<LE>()?),
+            ZclDataType::Zcl40bitmap => todo!(),
+            ZclDataType::Zcl48bitmap => todo!(),
+            ZclDataType::Zcl56bitmap => todo!(),
+            ZclDataType::Zcl64bitmap => ZclAttrValue::B64(rdr.read_u64::<LE>()?),
             ZclDataType::ZclU8 => ZclAttrValue::U8(rdr.read_u8()?),
             ZclDataType::ZclU16 => ZclAttrValue::U16(rdr.read_u16::<LE>()?),
             ZclDataType::ZclU32 => ZclAttrValue::U32(rdr.read_u32::<LE>()?),
