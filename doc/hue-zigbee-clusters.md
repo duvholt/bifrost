@@ -19,6 +19,21 @@ been researched using the following units:
  - Model `LCX005`
  - Firmware 1.122.2 (20240902)
 
+## Nomenclature
+
+The following short names are used to refer to zigbee data types and concepts:
+
+| Name used here | Zigbee meaning                              |
+|----------------|---------------------------------------------|
+| N/S            | Attribute not supported                     |
+| u8             | Unsigned, 8-bit integer                     |
+| u16            | Unsigned, 16-bit integer                    |
+| i16            | Signed, 16-bit integer                      |
+| b8             | 8-bit bitmap value                          |
+| b32            | 32-bit bitmap value                         |
+| e8             | 8-bit enum value                            |
+| hex            | "Octet string" (byte array) in hex notation |
+
 # Cluster 0xFC00: Hue Button events
 
 Used by hue buttons to report button events and other state changes.
@@ -209,7 +224,7 @@ struct {
 }
 ```
 
-The only observed response is `0000`, which indicates success.
+The only observed response is `0000`, which probably indicates success.
 
 Running this command on a Hue device that does not have multiple segments (i.e,
 a regular Hue bulb) gets a "Command Not Supported" standard Zigbee response, so
@@ -217,25 +232,14 @@ returning `0000` seems to be a safe way to detect success.
 
 ## Attributes
 
-Gradient strip:
-
-| Attr   | Type | Value | Desc                       |
-|--------|------|-------|----------------------------|
-| `0000` | `b8` | `0F`  | ?                          |
-| `0001` | `e8` | `00`  | ?                          |
-| `0002` | `u8` | `0A`  | Probably max segment count |
-| `0003` | `u8` | `04`  | Probably gradient-related  |
-| `0004` | `u8` | `07`  | Probably segment count     |
-| `0005` | `u8` | `FE`  | Light balance factor       |
-
-
-Hue bulb:
-
-| Attr   | Type | Value | Desc |
-|--------|------|-------|------|
-| `0000` | `b8` | `0B`  | ?    |
-| `0001` | `e8` | `00`  | ?    |
-| `0005` | `u8` | `FE`  | ?    |
+| Attr   | Type | Desc                       | Strip | Bulb |
+|--------|------|----------------------------|-------|------|
+| `0000` | `b8` | ?                          | `0F`  | `0B` |
+| `0001` | `e8` | ?                          | `00`  | `00` |
+| `0002` | `u8` | Probably max segment count | `0A`  | N/S  |
+| `0003` | `u8` | Probably gradient-related  | `04`  | N/S  |
+| `0004` | `u8` | Probably segment count     | `07`  | N/S  |
+| `0005` | `u8` | Light balance factor       | `FE`  | `FE` |
 
 Notice that attributes `0002`, `0003` and `0004` are not present on the hue
 bulb. This supports the idea that these attributes are gradient-related.
@@ -270,31 +274,21 @@ After setting the state with this command, it can be read back as property
 
 Sample data from gradient strip:
 
-| Attr   | Type  | Value              | Desc            |
-|--------|-------|--------------------|-----------------|
-| `0001` | `b32` | `0000000F`         | ?               |
-| `0002` | `hex` | `0700010a6e01`     | Composite state |
-| `0010` | `b16` | `0001`             | ?               |
-| `0011` | `b64` | `000000000003FE0E` | ?               |
-| `0012` | `b32` | `00000003`         | ?               |
-| `0013` | `b16` | `0007`             | ?               |
-| `0031` | `u16` | `04E2`             | ?               |
-| `0032` | `u8`  | `00`               | ?               |
-| `0033` | `u8`  | `00`               | ?               |
-| `0034` | `u8`  | `03`               | ?               |
-| `0035` | `u8`  | `FE`               | ?               |
-| `0036` | `u8`  | `4F`               | ?               |
-| `0038` | `u16` | `0007`             | ?               |
-
-From hue bulb:
-
-| Attr   | Type  | Value              | Desc            |
-|--------|-------|--------------------|-----------------|
-| `0001` | `b32` | `00000007`         | ?               |
-| `0002` | `hex` | `070001176f01`     | Composite state |
-| `0010` | `b16` | `0001`             | ?               |
-| `0011` | `b64` | `000000000003FE0E` | ?               |
-| `0012` | `b32` | `00000000`         | ?               |
+| Attr   | Type  | Desc            | Strip              | Value              |
+|--------|-------|-----------------|--------------------|--------------------|
+| `0001` | `b32` | ?               | `0000000F`         | `00000007`         |
+| `0002` | `hex` | Composite state | `0700010a6e01`     | `070001176f01`     |
+| `0010` | `b16` | ?               | `0001`             | `0001`             |
+| `0011` | `b64` | ?               | `000000000003FE0E` | `000000000003FE0E` |
+| `0012` | `b32` | ?               | `00000003`         | `00000000`         |
+| `0013` | `b16` | ?               | `0007`             | N/S                |
+| `0031` | `u16` | ?               | `04E2`             | N/S                |
+| `0032` | `u8`  | ?               | `00`               | N/S                |
+| `0033` | `u8`  | ?               | `00`               | N/S                |
+| `0034` | `u8`  | ?               | `03`               | N/S                |
+| `0035` | `u8`  | ?               | `FE`               | N/S                |
+| `0036` | `u8`  | ?               | `4F`               | N/S                |
+| `0038` | `u16` | ?               | `0007`             | N/S                |
 
 The bulb supports noticably fewer properties, which makes it likely that the
 missing ones are related to gradient handling.
@@ -305,26 +299,12 @@ Very rarely observed. Only seen with ZCL: Read Attributes.
 
 ## Attributes
 
-Gradient strip:
-
-| Attr   | Type  | Value      | Desc |
-|--------|-------|------------|------|
-| `0000` | `b16` | `1007`     | ?    |
-| `0001` | `b16` | `0000`     | ?    |
-| `0002` | `b16` | `0000`     | ?    |
-| `0010` | `u32` | `00000000` | ?    |
-| `0011` | `u32` | `00000000` | ?    |
-| `0012` | `u32` | `00000000` | ?    |
-| `0013` | `u32` | `00000000` | ?    |
-
-Hue Bulb:
-
-| Attr   | Type  | Value      | Desc |
-|--------|-------|------------|------|
-| `0000` | `b16` | `1007`     |      |
-| `0001` | `b16` | `0000`     |      |
-| `0002` | `b16` | `0000`     |      |
-| `0010` | `u32` | `00000000` |      |
-| `0011` | `u32` | `00000000` |      |
-| `0012` | `u32` | `00000000` |      |
-| `0013` | `u32` | `00000000` |      |
+| Attr   | Type  | Desc | Strip      | Bulb       |
+|--------|-------|------|------------|------------|
+| `0000` | `b16` | ?    | `1007`     | `1007`     |
+| `0001` | `b16` | ?    | `0000`     | `0000`     |
+| `0002` | `b16` | ?    | `0000`     | `0000`     |
+| `0010` | `u32` | ?    | `00000000` | `00000000` |
+| `0011` | `u32` | ?    | `00000000` | `00000000` |
+| `0012` | `u32` | ?    | `00000000` | `00000000` |
+| `0013` | `u32` | ?    | `00000000` | `00000000` |
