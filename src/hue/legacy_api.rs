@@ -60,7 +60,7 @@ impl Default for ApiShortConfig {
         Self {
             apiversion: hue::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
             bridgeid: "0000000000000000".to_string(),
-            datastoreversion: "163".to_string(),
+            datastoreversion: "172".to_string(),
             factorynew: false,
             mac: MacAddress::default(),
             modelid: hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
