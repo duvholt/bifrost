@@ -18,8 +18,6 @@ extern crate log;
 struct Args {
     /// Url to websocket (<ws://example.org:1234/>)
     url: String,
-
-    topic: String,
 }
 
 #[derive(Deserialize)]
