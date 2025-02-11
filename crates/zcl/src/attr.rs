@@ -186,8 +186,8 @@ impl ZclAttr {
             }
         }
 
-        let dtype = ZclDataType::from_primitive(rdr.read_u8()?)
-            .ok_or(ZclError::PackedStructError(PackingError::InvalidValue))?;
+        let zdt = rdr.read_u8()?;
+        let dtype = ZclDataType::from_primitive(zdt).ok_or(ZclError::UnsupportedAttrType(zdt))?;
 
         let value = match dtype {
             ZclDataType::Null => ZclAttrValue::Null,

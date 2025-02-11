@@ -12,6 +12,9 @@ pub enum ZclError {
     #[error(transparent)]
     HueError(#[from] hue::error::HueError),
 
+    #[error("Attribute type 0x{0:02x} not supported")]
+    UnsupportedAttrType(u8),
+
     #[error(transparent)]
     PackedStructError(#[from] packed_struct::PackingError),
 }
