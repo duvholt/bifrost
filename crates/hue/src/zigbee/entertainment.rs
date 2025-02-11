@@ -107,4 +107,19 @@ impl HueEntFrame {
             blks,
         })
     }
+
+    pub fn pack(&self) -> HueResult<Vec<u8>> {
+        let hdr = HueEntFrameHeader {
+            counter: self.counter,
+            x0: self.x0,
+        };
+
+        let mut res = hdr.pack_to_vec()?;
+
+        for blk in &self.blks {
+            res.extend(&blk.pack()?);
+        }
+
+        Ok(res)
+    }
 }
