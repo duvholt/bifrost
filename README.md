@@ -126,7 +126,6 @@ The Philips Hue app should be able to find it on your network!
 > If you encounter any bugs, or have suggestions, feel free to leave your feedback
 > [here](#problems-questions-feedback).
 
-
 #### Docker Installation
 
 To install Bifrost with Docker, you will need the following:
@@ -137,87 +136,12 @@ To install Bifrost with Docker, you will need the following:
     with [Docker-Compose](https://docs.docker.com/compose/install/) installed
 4.  Have `git` installed to clone this repository
 
-There are two ways to run Bifrost with Docker:
+There are currently two installation methods:
 
-##### Using Docker Pull
+- [Install using Docker Compose](doc/docker-.md) (recommended for most users)
+- [Install using Docker Image](doc/docker-image-install.md) (for direct image pulls)
 
-Pull the latest image from Github Container Registry:
-
-```sh
-docker pull ghcr.io/chrivers/bifrost:master-2025-02-04
-```
-
-Or specify architecture:
-
-```sh
-#Linux AMD64
-docker pull ghcr.io/chrivers/bifrost:master-2025-02-04@sha256:76868ec0e46cc68c234bc6f7b15afd9a3147cfc96357d4dd42e85dce6cd7d774
-```
-
-```sh
-#Linux ARM64
-docker pull ghcr.io/chrivers/bifrost:master-2025-02-04@sha256:f615e2522e4e08f34f81e641571cd078029c0dfdc0cc8b337d26e02adcb2562d
-```
-
-Curl and rename the example configuration file:
-
-```sh
-curl -O https://raw.githubusercontent.com/chrivers/bifrost/master/config.example.yaml
-cp config.example.yaml config.yaml
-```
-
-And edit it with your favorite editor to your liking (see
-[configuration reference](doc/config-reference.md)).
-
-Now run the Docker Container:
-
-```sh
-docker run -v $(pwd)/config.yaml:/app/config.yaml ghcr.io/chrivers/bifrost:master-2025-02-04
-```
-
-To view the logs, use a tool like [Portainer](https://www.portainer.io/) or
-run the following command:
-
-```
-docker logs bifrost
-```
-
-##### Building From Source
-
-When you have these things available, you can install Bifrost by running these commands:
-
-```sh
-git clone https://github.com/chrivers/bifrost
-cd bifrost
-```
-
-Then rename or copy our `config.example.yaml`:
-
-```sh
-cp config.example.yaml config.yaml
-```
-
-And edit it with your favorite editor to your liking (see
-[configuration reference](doc/config-reference.md)).
-
-If you want to put your configuration file or the certificates Bifrost creates somewhere
-else, you also need to adjust the mount paths in the `docker-compose.yaml`. Otherwise,
-just leave the default values.
-
-Now you are ready to run the app with:
-
-```sh
-docker compose up -d
-```
-
-This will build and then start the app on your Docker instance.
-
-To view the logs, use a tool like [Portainer](https://www.portainer.io/) or
-run the following command:
-
-```sh
-docker logs bifrost
-```
+Choose the method that best fits your needs.
 
 # Configuration
 
