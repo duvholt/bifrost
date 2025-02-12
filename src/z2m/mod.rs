@@ -289,7 +289,7 @@ impl Client {
             if let Some(icon) = &room_conf.icon {
                 metadata.archetype = *icon;
             }
-        };
+        }
 
         let room = Room {
             children,
@@ -638,7 +638,7 @@ impl Client {
                 if let Some(topic) = self.rmap.get(&device.rid) {
                     let z2mreq = Z2mRequest::Update(upd);
                     self.websocket_send(socket, topic, z2mreq).await?;
-                };
+                }
             }
 
             ClientRequest::GroupUpdate { device, upd } => {
