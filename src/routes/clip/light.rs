@@ -29,7 +29,7 @@ async fn put_light(
     let upd: LightUpdate = serde_json::from_value(put)?;
 
     // We cannot recover .mode from backend updates, since these only contain
-    // the gradiant colors. So we have no choice, but to update the mode
+    // the gradient colors. So we have no choice, but to update the mode
     // here. Otherwise, the information would be lost.
     if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
         lock.update::<Light>(&rlink.rid, |light| {
