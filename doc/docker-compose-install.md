@@ -14,7 +14,7 @@ cp config.example.yaml config.yaml
 ```
 
 And edit it with your favorite editor to your liking (see
-[configuration reference](doc/config-reference.md)).
+[configuration reference](config-reference.md)).
 
 If you want to put your configuration file or the certificates Bifrost creates somewhere
 else, you also need to adjust the mount paths in the `docker-compose.yaml`. Otherwise,

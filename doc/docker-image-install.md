@@ -14,7 +14,7 @@ cp config.example.yaml config.yaml
 ```
 
 And edit it with your favorite editor to your liking (see
-[configuration reference](doc/config-reference.md)).
+[configuration reference](config-reference.md)).
 
 Now run the Docker Container:
 
