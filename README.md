@@ -126,6 +126,8 @@ The Philips Hue app should be able to find it on your network!
 > If you encounter any bugs, or have suggestions, feel free to leave your feedback
 > [here](#problems-questions-feedback).
 
+#### Docker Installation
+
 To install Bifrost with Docker, you will need the following:
 
 1.  At least one zigbee2mqtt server to connect to
@@ -134,40 +136,10 @@ To install Bifrost with Docker, you will need the following:
     with [Docker-Compose](https://docs.docker.com/compose/install/) installed
 4.  Have `git` installed to clone this repository
 
-When you have these things available, you can install Bifrost by running these commands:
+Please choose one of the following installation methods:
 
-```sh
-git clone https://github.com/chrivers/bifrost
-cd bifrost
-```
-
-Then rename or copy our `config.example.yaml`:
-
-```sh
-cp config.example.yaml config.yaml
-```
-
-And edit it with your favorite editor to your liking (see
-[configuration reference](doc/config-reference.md)).
-
-If you want to put your configuration file or the certificates Bifrost creates somewhere
-else, you also need to adjust the mount paths in the `docker-compose.yaml`. Otherwise,
-just leave the default values.
-
-Now you are ready to run the app with:
-
-```sh
-docker compose up -d
-```
-
-This will build and then start the app on your Docker instance.
-
-To view the logs, use a tool like [Portainer](https://www.portainer.io/) or
-run the following command:
-
-```sh
-docker logs bifrost
-```
+- [Install using Docker Compose](doc/docker-compose-install.md) (recommended for most users)
+- [Install using Docker Image](doc/docker-image-install.md) (for direct image pulls)
 
 # Configuration
 
