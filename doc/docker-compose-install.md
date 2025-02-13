@@ -28,8 +28,7 @@ docker compose up -d
 
 This will build and then start the app on your Docker instance.
 
-To view the logs, use a tool like [Portainer](https://www.portainer.io/) or
-run the following command:
+To view the logs, run the following command:
 
 ```sh
 docker logs bifrost

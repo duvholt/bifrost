@@ -136,12 +136,10 @@ To install Bifrost with Docker, you will need the following:
     with [Docker-Compose](https://docs.docker.com/compose/install/) installed
 4.  Have `git` installed to clone this repository
 
-There are currently two installation methods:
+Please choose one of the following installation methods:
 
-- [Install using Docker Compose](doc/docker-.md) (recommended for most users)
+- [Install using Docker Compose](doc/docker-compose-install.md) (recommended for most users)
 - [Install using Docker Image](doc/docker-image-install.md) (for direct image pulls)
-
-Choose the method that best fits your needs.
 
 # Configuration
 
