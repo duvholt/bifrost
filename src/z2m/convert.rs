@@ -54,10 +54,9 @@ impl LightGradient {
                     LightGradientMode::InterpolatedPaletteMirrored,
                     LightGradientMode::RandomPixelated,
                 ]),
-                points_capable: *max,
+                points_capable: *max.min(&5),
                 points: vec![],
-                // FIXME: we don't have this information, so guesstimate it
-                pixel_count: *max * 3,
+                pixel_count: *max.min(&7),
             }),
             _ => None,
         }
