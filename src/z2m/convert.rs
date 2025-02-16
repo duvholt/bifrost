@@ -92,8 +92,8 @@ impl Dimming {
         };
 
         Some(Self {
-            brightness: 0.0,
-            min_dim_level: None,
+            brightness: 0.01,
+            min_dim_level: Some(0.01),
         })
     }
 }
