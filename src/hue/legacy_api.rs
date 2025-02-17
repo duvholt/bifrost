@@ -101,8 +101,8 @@ pub enum ApiResourceType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
-    devicetype: String,
-    generateclientkey: Option<bool>,
+    pub devicetype: String,
+    pub generateclientkey: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -269,22 +269,22 @@ pub enum ApiAlert {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupAction {
-    on: bool,
+    pub on: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    bri: Option<u32>,
+    pub bri: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    hue: Option<u32>,
+    pub hue: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sat: Option<u32>,
+    pub sat: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    effect: Option<ApiEffect>,
+    pub effect: Option<ApiEffect>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    xy: Option<[f64; 2]>,
+    pub xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ct: Option<u16>,
-    alert: ApiAlert,
+    pub ct: Option<u16>,
+    pub alert: ApiAlert,
     #[serde(skip_serializing_if = "Option::is_none")]
-    colormode: Option<LightColorMode>,
+    pub colormode: Option<LightColorMode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -297,20 +297,20 @@ pub enum ApiGroupType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroup {
-    name: String,
-    lights: Vec<String>,
-    action: ApiGroupAction,
+    pub name: String,
+    pub lights: Vec<String>,
+    pub action: ApiGroupAction,
 
     #[serde(rename = "type")]
-    group_type: ApiGroupType,
-    class: String,
-    recycle: bool,
-    sensors: Vec<Value>,
-    state: Value,
+    pub group_type: ApiGroupType,
+    pub class: String,
+    pub recycle: bool,
+    pub sensors: Vec<Value>,
+    pub state: Value,
     #[serde(skip_serializing_if = "Value::is_null", default)]
-    stream: Value,
+    pub stream: Value,
     #[serde(skip_serializing_if = "Value::is_null", default)]
-    locations: Value,
+    pub locations: Value,
 }
 
 impl ApiGroup {
