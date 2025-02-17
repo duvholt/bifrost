@@ -791,9 +791,9 @@ impl Capabilities {
                 available: 233,
                 total: 255,
                 conditions: Capacity::new(1500, 1451),
-                actions: Capacity::new(1000, 954),
+                actions: Capacity::new(1000, 1000),
             },
-            resourcelinks: Capacity::new(64, 59),
+            resourcelinks: Capacity::new(64, 64),
             streaming: StreamingCapacity {
                 available: 1,
                 total: 1,
