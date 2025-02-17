@@ -76,7 +76,7 @@ impl ApiShortConfig {
     #[must_use]
     pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
         Self {
-            bridgeid: hue::bridge_id(mac),
+            bridgeid: hue::bridge_id(mac).to_uppercase(),
             apiversion: version.get_legacy_apiversion(),
             swversion: version.get_legacy_swversion(),
             mac,
