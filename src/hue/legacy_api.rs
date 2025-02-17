@@ -188,6 +188,8 @@ impl Default for SwUpdate {
 pub enum SwUpdateState {
     NoUpdates,
     Transferring,
+    ReadyToInstall,
+    AnyReadyToInstall,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
