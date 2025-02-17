@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
+use crate::hue::api::ColorGamut;
 use crate::hue::version::SwVersion;
 use crate::hue::{self, api, best_guess_timezone};
 use crate::resource::Resources;
@@ -476,9 +477,9 @@ impl ApiLight {
                 "certified": true,
                 "control": {
                     "colorgamut": [
-                        [0.6915, 0.3083 ],
-                        [0.17,   0.7    ],
-                        [0.1532, 0.0475 ],
+                        [ColorGamut::GAMUT_C.red.x,   ColorGamut::GAMUT_C.red.y  ],
+                        [ColorGamut::GAMUT_C.green.x, ColorGamut::GAMUT_C.green.y],
+                        [ColorGamut::GAMUT_C.blue.x,  ColorGamut::GAMUT_C.blue.y ],
                     ],
                     "colorgamuttype": "C",
                     "ct": {
