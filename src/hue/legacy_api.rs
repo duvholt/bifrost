@@ -825,24 +825,24 @@ impl Capabilities {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            lights: Capacity::new(63, 60),
+            lights: Capacity::new(63, 62),
             sensors: SensorsCapacity {
-                available: 240,
+                available: 249,
                 total: 250,
-                clip: Capacity::new(250, 240),
-                zll: Capacity::new(64, 63),
-                zgp: Capacity::new(64, 63),
+                clip: Capacity::new(250, 249),
+                zll: Capacity::new(64, 64),
+                zgp: Capacity::new(64, 64),
             },
             groups: Capacity::new(64, 60),
             scenes: SceneCapacity {
                 scenes: Capacity::new(200, 175),
                 lightstates: Capacity::new(12600, 11025),
             },
-            schedules: Capacity::new(100, 95),
+            schedules: Capacity::new(100, 100),
             rules: RulesCapacity {
-                available: 233,
-                total: 255,
-                conditions: Capacity::new(1500, 1451),
+                available: 250,
+                total: 250,
+                conditions: Capacity::new(1500, 1500),
                 actions: Capacity::new(1000, 1000),
             },
             resourcelinks: Capacity::new(64, 64),
