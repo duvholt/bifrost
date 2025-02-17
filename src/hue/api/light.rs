@@ -465,17 +465,17 @@ pub enum LightEffect {
 
 impl LightEffect {
     pub const ALL: [Self; 11] = [
+        Self::NoEffect,
+        Self::Candle,
+        Self::Fire,
         Self::Prism,
+        Self::Sparkle,
         Self::Opal,
         Self::Glisten,
-        Self::Sparkle,
-        Self::Fire,
-        Self::Candle,
         Self::Underwater,
         Self::Cosmos,
         Self::Sunbeam,
         Self::Enchant,
-        Self::NoEffect,
     ];
 }
 
