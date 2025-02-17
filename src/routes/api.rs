@@ -250,7 +250,7 @@ async fn put_api_user_resource_id(
                     lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
                     drop(lock);
 
-                    V1Reply::for_group(id, &path).with_light_state_update(&upd)?
+                    V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?
                 }
                 ApiGroupActionUpdate::GroupUpdate(upd) => {
                     let scene_id = upd.scene.parse()?;
@@ -263,7 +263,7 @@ async fn put_api_user_resource_id(
                     lock.backend_request(BackendRequest::SceneUpdate(rlink, updv2))?;
                     drop(lock);
 
-                    V1Reply::for_group(id, &path).add("scene", upd.scene)?
+                    V1Reply::for_group_path(id, &path).add("scene", upd.scene)?
                 }
             };
 

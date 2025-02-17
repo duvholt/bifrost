@@ -267,8 +267,13 @@ impl<'a> V1Reply<'a> {
     }
 
     #[must_use]
-    pub fn for_group(id: u32, path: &str) -> Self {
+    pub fn for_group_path(id: u32, path: &str) -> Self {
         Self::new(format!("/groups/{id}/{path}"))
+    }
+
+    #[must_use]
+    pub fn for_group(id: u32) -> Self {
+        Self::new(format!("/groups/{id}"))
     }
 
     pub fn with_light_state_update(self, upd: &ApiLightStateUpdate) -> ApiResult<Self> {
