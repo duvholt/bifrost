@@ -95,7 +95,7 @@ pub struct BehaviorInstance {
     #[serde(default)]
     pub dependees: Vec<Value>,
     pub enabled: bool,
-    pub last_error: String,
+    pub last_error: Option<String>,
     pub metadata: BehaviorInstanceMetadata,
     pub script_id: Uuid,
     pub status: Option<String>,
