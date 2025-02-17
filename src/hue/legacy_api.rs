@@ -688,7 +688,7 @@ impl Default for ApiConfig {
             internetservices: ApiInternetServices::default(),
             linkbutton: Default::default(),
             portalconnection: ConnectionState::Disconnected,
-            portalservices: Default::default(),
+            portalservices: true,
             portalstate: PortalState::default(),
             proxyaddress: "none".to_string(),
             proxyport: Default::default(),
