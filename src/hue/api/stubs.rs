@@ -173,7 +173,7 @@ pub struct EntertainmentConfigurationChannels {
     pub members: Vec<EntertainmentConfigurationStreamMembers>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct EntertainmentConfigurationPosition {
     pub x: f64,
     pub y: f64,
