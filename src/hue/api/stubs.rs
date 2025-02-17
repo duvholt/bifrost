@@ -297,7 +297,10 @@ pub struct SmartScene {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Taurus {}
+pub struct Taurus {
+    pub capabilities: Vec<String>,
+    pub owner: ResourceLink,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
