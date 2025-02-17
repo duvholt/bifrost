@@ -86,6 +86,9 @@ pub enum ApiError {
     ReqwestError(#[from] reqwest::Error),
 
     #[error(transparent)]
+    UuidError(#[from] uuid::Error),
+
+    #[error(transparent)]
     HueError(#[from] hue::error::HueError),
 
     /* zigbee2mqtt errors */
