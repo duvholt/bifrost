@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -82,6 +82,13 @@ pub struct BehaviorScript {
     pub version: String,
 }
 
+fn deserialize_optional_field<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Value::deserialize(deserializer)?))
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BehaviorInstance {
     pub configuration: Value,
@@ -91,8 +98,12 @@ pub struct BehaviorInstance {
     pub last_error: String,
     pub metadata: BehaviorInstanceMetadata,
     pub script_id: Uuid,
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_field",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub state: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub migrated_from: Option<Value>,
