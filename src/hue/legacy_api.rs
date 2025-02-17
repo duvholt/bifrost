@@ -743,6 +743,13 @@ pub struct RulesCapacity {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
+pub struct SceneCapacity {
+    #[serde(flatten)]
+    pub scenes: Capacity,
+    pub lightstates: Capacity,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct StreamingCapacity {
     pub available: u32,
     pub total: u32,
@@ -754,6 +761,7 @@ pub struct Capabilities {
     pub lights: Capacity,
     pub sensors: SensorsCapacity,
     pub groups: Capacity,
+    pub scenes: SceneCapacity,
     pub schedules: Capacity,
     pub rules: RulesCapacity,
     pub resourcelinks: Capacity,
@@ -774,6 +782,10 @@ impl Capabilities {
                 zgp: Capacity::new(64, 63),
             },
             groups: Capacity::new(64, 60),
+            scenes: SceneCapacity {
+                scenes: Capacity::new(200, 175),
+                lightstates: Capacity::new(12600, 11025),
+            },
             schedules: Capacity::new(100, 95),
             rules: RulesCapacity {
                 available: 233,
