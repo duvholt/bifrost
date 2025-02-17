@@ -160,7 +160,7 @@ impl Debug for ZclAttrValue {
             Self::X16(val) => write!(f, "x16:{}", val),
             Self::X32(val) => write!(f, "x32:{}", val),
             Self::Bool(val) => write!(f, "bool:{}", val),
-            Self::B8(val)  => write!(f, "b8:{:02X}", val),
+            Self::B8(val) => write!(f, "b8:{:02X}", val),
             Self::B16(val) => write!(f, "b16:{:04X}", val),
             Self::B32(val) => write!(f, "b32:{:08X}", val),
             Self::B40(val) => write!(f, "b40:{:010X}", val),
