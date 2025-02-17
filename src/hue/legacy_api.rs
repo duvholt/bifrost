@@ -167,13 +167,6 @@ impl Default for ApiBackup {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct DeviceTypes {
-    bridge: bool,
-    lights: Vec<Value>,
-    sensors: Vec<Value>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SwUpdate {
     #[serde(with = "date_format::legacy_utc")]
