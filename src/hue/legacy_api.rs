@@ -299,6 +299,58 @@ pub enum ApiGroupType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum ApiGroupClass {
+    #[serde(rename = "Living room")]
+    LivingRoom,
+    Kitchen,
+    Dining,
+    Bedroom,
+    #[serde(rename = "Kids bedroom")]
+    KidsBedroom,
+    Bathroom,
+    Nursery,
+    Recreation,
+    Office,
+    Gym,
+    Hallway,
+    Toilet,
+    #[serde(rename = "Front door")]
+    FrontDoor,
+    Garage,
+    Terrace,
+    Garden,
+    Driveway,
+    Carport,
+    Other,
+
+    Home,
+    Downstairs,
+    Upstairs,
+    #[serde(rename = "Top floor")]
+    TopFloor,
+    Attic,
+    #[serde(rename = "Guest room")]
+    GuestRoom,
+    Staircase,
+    Lounge,
+    #[serde(rename = "Man cave")]
+    ManCave,
+    Computer,
+    Studio,
+    Music,
+    TV,
+    Reading,
+    Closet,
+    Storage,
+    #[serde(rename = "Laundry room")]
+    LaundryRoom,
+    Balcony,
+    Porch,
+    Barbecue,
+    Pool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroup {
     pub name: String,
     pub lights: Vec<String>,
@@ -306,7 +358,7 @@ pub struct ApiGroup {
 
     #[serde(rename = "type")]
     pub group_type: ApiGroupType,
-    pub class: String,
+    pub class: ApiGroupClass,
     pub recycle: bool,
     pub sensors: Vec<Value>,
     pub state: Value,
@@ -338,7 +390,7 @@ impl ApiGroup {
                 alert: ApiAlert::None,
                 colormode: None,
             },
-            class: "Bedroom".to_string(),
+            class: ApiGroupClass::Other,
             group_type: ApiGroupType::Room,
             recycle: false,
             sensors: vec![],
