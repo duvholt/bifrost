@@ -126,6 +126,8 @@ async-trait = "0.1.86"
 hue = { version = "0.1.0", path = "crates/hue" }
 zcl = { path = "crates/zcl" }
 openssl = { version = "0.10", optional = true }
+tokio-util = { version = "0.7.13", features = ["net"] }
+tokio-openssl = "0.6.5"
 
 [dev-dependencies]
 clap-stdin = "0.6.0"
