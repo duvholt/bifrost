@@ -315,6 +315,7 @@ dependencies = [
  "tower 0.5.2",
  "tower-http",
  "tracing",
+ "udp-stream",
  "url",
  "uuid",
  "x509-cert",
@@ -2695,6 +2696,17 @@ name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+
+[[package]]
+name = "udp-stream"
+version = "0.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf021324a3dc10f5b46ab1c1cf5635e6a81b5559971967b806674673a5f2a18e"
+dependencies = [
+ "bytes",
+ "log",
+ "tokio",
+]
 
 [[package]]
 name = "unicode-ident"
