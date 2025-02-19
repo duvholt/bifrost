@@ -91,6 +91,15 @@ pub enum ApiError {
     #[error(transparent)]
     HueError(#[from] hue::error::HueError),
 
+    #[error(transparent)]
+    OpenSslError(#[from] openssl::error::Error),
+
+    #[error(transparent)]
+    OpenSslErrors(#[from] openssl::error::ErrorStack),
+
+    #[error(transparent)]
+    SslError(#[from] openssl::ssl::Error),
+
     /* zigbee2mqtt errors */
     #[error("Unexpected eof on z2m socket")]
     UnexpectedZ2mEof,
@@ -133,6 +142,9 @@ pub enum ApiError {
 
     #[error("Cannot load certificate: {0:?}")]
     Certificate(Utf8PathBuf, std::io::Error),
+
+    #[error("Cannot load certificate: {0:?}")]
+    CertificateOpenSSL(Utf8PathBuf, openssl::ssl::Error),
 
     #[error("Cannot parse certificate: {0:?}")]
     CertificateInvalid(Utf8PathBuf),

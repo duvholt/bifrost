@@ -69,7 +69,7 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
 
     log::info!("Serving mac [{}]", bconf.mac);
 
-    let tls_config = appstate.tls_config().await?;
+    let certfile = &appstate.config().bifrost.cert_file;
     let state_file = appstate.config().bifrost.state_file.clone();
 
     tasks.spawn(server::http_server(
@@ -77,11 +77,19 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
         bconf.http_port,
         svc.clone(),
     ));
-    tasks.spawn(server::https_server(
+    #[cfg(feature = "tls-rustls")]
+    tasks.spawn(server::https_server_rustls(
         bconf.ipaddress,
         bconf.https_port,
-        svc,
-        tls_config,
+        svc.clone(),
+        certfile.clone(),
+    ));
+    #[cfg(feature = "tls-openssl")]
+    tasks.spawn(server::https_server_openssl(
+        bconf.ipaddress,
+        bconf.https_port,
+        svc.clone(),
+        certfile.clone(),
     ));
     tasks.spawn(server::config_writer(appstate.res.clone(), state_file));
     tasks.spawn(server::version_updater(

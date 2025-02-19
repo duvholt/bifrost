@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::sync::Arc;
 
-use axum_server::tls_rustls::RustlsConfig;
 use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
 use crate::config::AppConfig;
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 use crate::hue;
 use crate::hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use crate::model::state::{State, StateVersion};
@@ -66,15 +65,6 @@ impl AppState {
         let res = Arc::new(Mutex::new(res));
 
         Ok(Self { conf, upd, res })
-    }
-
-    pub async fn tls_config(&self) -> ApiResult<RustlsConfig> {
-        let certfile = &self.conf.bifrost.cert_file;
-
-        log::debug!("Loading certificate from [{certfile}]");
-        RustlsConfig::from_pem_file(&certfile, &certfile)
-            .await
-            .map_err(|e| ApiError::Certificate(certfile.to_owned(), e))
     }
 
     #[must_use]

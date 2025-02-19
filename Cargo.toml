@@ -58,7 +58,24 @@ missing_errors_doc      = "allow"
 missing_panics_doc      = "allow"
 
 [features]
-default = ["server", "server-banner"]
+default = [
+    "server",
+    "server-banner",
+    "tls-openssl",
+    # "tls-rustls",
+]
+
+tls-openssl = [
+    "axum-server/tls-openssl",
+    "reqwest/native-tls",
+    "dep:openssl"
+]
+
+tls-rustls  = [
+    "axum-server/rustls",
+    "axum-server/tls-rustls-no-provider",
+    "reqwest/rustls-tls"
+]
 
 server = []
 server-banner = ["server", "dep:termcolor", "dep:itertools"]
@@ -66,7 +83,7 @@ server-banner = ["server", "dep:termcolor", "dep:itertools"]
 [dependencies]
 axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart"], default-features = false }
 axum-core = "0.5.0"
-axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls-no-provider"], default-features = false }
+axum-server = { version = "0.7.1", features = [], default-features = false }
 bytes = "1.10.0"
 chrono = { version = "0.4.39", features = ["clock", "serde"], default-features = false }
 clap = { version = "4.5.29", features = ["std", "color", "derive"], default-features = false }
@@ -102,12 +119,13 @@ sha1 = "0.10.6"
 rustls-pemfile = "2.2.0"
 termcolor = { version = "1.4.1", optional = true }
 itertools = { version = "0.14.0", optional = true }
-reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["json"] }
 url = { version = "2.5.4", features = ["serde"] }
 hex = "0.4.3"
 async-trait = "0.1.86"
 hue = { version = "0.1.0", path = "crates/hue" }
 zcl = { path = "crates/zcl" }
+openssl = { version = "0.10", optional = true }
 
 [dev-dependencies]
 clap-stdin = "0.6.0"
