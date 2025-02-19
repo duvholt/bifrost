@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
-use crate::hue::api::ColorGamut;
+use crate::hue::api::{ColorGamut, DeviceProductData};
 use crate::hue::version::SwVersion;
 use crate::hue::{self, api, best_guess_timezone};
 use crate::resource::Resources;
@@ -716,6 +716,35 @@ pub struct ApiSensor {
     pub recycle: Option<bool>,
     #[serde(skip_serializing_if = "Value::is_null", default)]
     pub capabilities: Value,
+}
+
+impl ApiSensor {
+    #[must_use]
+    pub fn builtin_daylight_sensor() -> Self {
+        Self {
+            config: json!({
+                "configured": false,
+                "on": true,
+                "sunriseoffset": 30,
+                "sunsetoffset": -30
+            }),
+            manufacturername: DeviceProductData::SIGNIFY_MANUFACTURER_NAME.to_string(),
+            modelid: "PHDL00".to_string(),
+            name: "Daylight".to_string(),
+            state: json!({
+                "daylight": Value::Null,
+                "lastupdated": "none",
+            }),
+            swversion: "1.0".to_string(),
+            sensor_type: "Daylight".to_string(),
+            swupdate: None,
+            uniqueid: None,
+            diversityid: None,
+            productname: None,
+            recycle: None,
+            capabilities: Value::Null,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
