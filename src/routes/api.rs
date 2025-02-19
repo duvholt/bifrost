@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 
-use axum::{
-    extract::{Path, State},
-    response::IntoResponse,
-    routing::{get, post, put},
-    Router,
-};
-
+use axum::extract::{Path, State};
+use axum::response::IntoResponse;
+use axum::routing::{get, post, put};
+use axum::Router;
 use bytes::Bytes;
 use log::{info, warn};
 use serde_json::{json, Value};
