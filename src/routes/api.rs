@@ -305,7 +305,3 @@ pub fn router() -> Router<AppState> {
         .route("/{user}/{rtype}/{id}", get(get_api_user_resource_id))
         .route("/{user}/{rtype}/{id}/{key}", put(put_api_user_resource_id))
 }
-
-pub fn auth_router() -> Router<AppState> {
-    Router::new().route("/v1", get(get_api_config))
-}
