@@ -1,5 +1,6 @@
 mod device;
 mod entertainment;
+mod entertainment_config;
 mod grouped_light;
 mod light;
 mod resource;
@@ -10,12 +11,12 @@ mod stubs;
 mod update;
 
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
-pub use entertainment::{
-    Entertainment, EntertainmentConfiguration, EntertainmentConfigurationChannels,
+pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
+pub use entertainment_config::{
+    EntertainmentConfiguration, EntertainmentConfigurationChannels,
     EntertainmentConfigurationLocations, EntertainmentConfigurationMetadata,
     EntertainmentConfigurationPosition, EntertainmentConfigurationServiceLocations,
     EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
-    EntertainmentSegment, EntertainmentSegments,
 };
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
