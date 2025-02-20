@@ -552,10 +552,11 @@ impl ApiLight {
             },
             swupdate: SwUpdate::default(),
             name: light.metadata.name.clone(),
-            modelid: product_data.product_name,
+            modelid: product_data.model_id,
             manufacturername: product_data.manufacturer_name,
-            productname: "Hue color spot".to_string(),
-            productid: Some(product_data.model_id),
+            productname: product_data.product_name,
+            productid: product_data.hardware_platform_type,
+
             capabilities: json!({
                 "certified": true,
                 "control": {
