@@ -251,7 +251,7 @@ impl Resources {
         let zbc = ZigbeeConnectivity {
             owner: link_bridge_dev,
             mac_address: String::from("11:22:33:44:55:66:77:88"),
-            status: ZigbeeConnectivityStatus::ConnectivityIssue,
+            status: ZigbeeConnectivityStatus::Connected,
             channel: Some(json!({
                 "status": "set",
                 "value": "channel_25",
