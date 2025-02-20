@@ -272,9 +272,9 @@ After setting the state with this command, it can be read back as property
 
 ## Attributes
 
-Sample data from gradient strip:
+Sample values:
 
-| Attr   | Type  | Desc            | Strip              | Value              |
+| Attr   | Type  | Desc            | Strip              | Bulb               |
 |--------|-------|-----------------|--------------------|--------------------|
 | `0001` | `b32` | ?               | `0000000F`         | `00000007`         |
 | `0002` | `hex` | Composite state | `0700010a6e01`     | `070001176f01`     |
