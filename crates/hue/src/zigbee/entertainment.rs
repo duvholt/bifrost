@@ -24,7 +24,7 @@ pub struct HueEntStart {
 #[packed_struct(size = "6", endian = "lsb")]
 pub struct HueEntFrameHeader {
     pub counter: u32,
-    pub x0: u16,
+    pub smoothing: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -103,7 +103,7 @@ impl HueEntFrame {
 
         Ok(Self {
             counter: hdr.counter,
-            smoothing: hdr.x0,
+            smoothing: hdr.smoothing,
             blks,
         })
     }
@@ -111,7 +111,7 @@ impl HueEntFrame {
     pub fn pack(&self) -> HueResult<Vec<u8>> {
         let hdr = HueEntFrameHeader {
             counter: self.counter,
-            x0: self.smoothing,
+            smoothing: self.smoothing,
         };
 
         let mut res = hdr.pack_to_vec()?;
