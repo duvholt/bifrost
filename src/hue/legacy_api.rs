@@ -257,20 +257,22 @@ pub struct ApiConfig {
     pub whitelist: HashMap<String, Whitelist>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiEffect {
+    #[default]
     None,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiAlert {
+    #[default]
     None,
     Select,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ApiGroupAction {
     pub on: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
