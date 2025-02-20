@@ -419,6 +419,31 @@ impl ApiGroup {
             locations: Value::Null,
         }
     }
+
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[must_use]
+    pub fn from_entertainment_configuration(ent: &api::EntertainmentConfiguration) -> Self {
+        Self {
+            name: ent.metadata.name.clone(),
+            // FIXME: obviously don't hard-code light numbers here
+            lights: vec!["9".into()],
+            locations: json!({
+                "9": [0, 0.8, 0],
+            }),
+            action: ApiGroupAction::default(),
+            class: ApiGroupClass::Other,
+            group_type: ApiGroupType::Entertainment,
+            recycle: false,
+            sensors: vec![],
+            state: ApiGroupState::default(),
+            stream: json!({
+                "active": false,
+                "owner": Value::Null,
+                "proxymode": "auto",
+                "proxynode": "/bridge"
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
