@@ -6,6 +6,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use futures::{SinkExt, StreamExt};
+use maplit::btreeset;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::net::TcpStream;
@@ -97,7 +98,7 @@ impl Z2mBackend {
         let dev = hue::api::Device {
             product_data,
             metadata: metadata.clone().into(),
-            services: vec![link_light],
+            services: btreeset![link_zigcon, link_light, link_enttm, link_taurus],
             identify: None,
             usertest: None,
         };
@@ -163,7 +164,7 @@ impl Z2mBackend {
         let dev = hue::api::Device {
             product_data: DeviceProductData::guess_from_device(dev),
             metadata: Metadata::new(DeviceArchetype::UnknownArchetype, "foo"),
-            services: vec![link_button, link_zbc],
+            services: btreeset![link_button, link_zbc],
             identify: None,
             usertest: None,
         };
@@ -320,7 +321,7 @@ impl Z2mBackend {
         let room = Room {
             children,
             metadata,
-            services: vec![link_glight],
+            services: btreeset![link_glight],
         };
 
         self.map.insert(topic.clone(), link_glight.rid);

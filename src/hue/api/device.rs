@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,7 @@ use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
 pub struct Device {
     pub product_data: DeviceProductData,
     pub metadata: Metadata,
-    pub services: Vec<ResourceLink>,
+    pub services: BTreeSet<ResourceLink>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usertest: Option<UserTest>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use maplit::btreeset;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
@@ -253,7 +254,7 @@ impl Resources {
         let bridge_dev = Device {
             product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost"),
-            services: vec![link_bridge, link_zbc, link_bridge_ent, link_zbdd],
+            services: btreeset![link_bridge, link_zbc, link_bridge_ent, link_zbdd],
             identify: Some(Stub),
             usertest: None,
         };
@@ -267,14 +268,14 @@ impl Resources {
         let bridge_home_dev = Device {
             product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost Bridge Home"),
-            services: vec![link_bridge],
+            services: btreeset![link_bridge],
             identify: None,
             usertest: None,
         };
 
         let bridge_home = BridgeHome {
-            children: vec![link_bridge_dev],
-            services: vec![link_bhome_glight],
+            children: btreeset![link_bridge_dev],
+            services: btreeset![link_bhome_glight],
         };
 
         let bhome_glight = GroupedLight {

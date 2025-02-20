@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -15,8 +17,8 @@ pub struct Bridge {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BridgeHome {
-    pub children: Vec<ResourceLink>,
-    pub services: Vec<ResourceLink>,
+    pub children: BTreeSet<ResourceLink>,
+    pub services: BTreeSet<ResourceLink>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -247,9 +249,9 @@ pub struct ZigbeeDeviceDiscovery {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Zone {
     pub metadata: Metadata,
-    pub children: Vec<ResourceLink>,
+    pub children: BTreeSet<ResourceLink>,
     #[serde(default)]
-    pub services: Vec<ResourceLink>,
+    pub services: BTreeSet<ResourceLink>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
