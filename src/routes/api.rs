@@ -297,6 +297,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(post_api))
         .route("/config", get(get_api_config))
+        .route("/nouser/config", get(get_api_config))
         .route("/newUser", get(workaround_iconnect_hue))
         .route("/{user}", get(get_api_user))
         .route("/{user}/{rtype}", get(get_api_user_resource))
