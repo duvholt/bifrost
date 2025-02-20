@@ -139,6 +139,18 @@ impl From<EntertainmentConfigurationServiceLocationsNew>
     }
 }
 
+impl From<EntertainmentConfigurationServiceLocations>
+    for EntertainmentConfigurationServiceLocationsUpdate
+{
+    fn from(value: EntertainmentConfigurationServiceLocations) -> Self {
+        Self {
+            equalization_factor: Some(value.equalization_factor),
+            service: value.service,
+            positions: value.positions,
+        }
+    }
+}
+
 impl From<EntertainmentConfigurationServiceLocationsUpdate>
     for EntertainmentConfigurationServiceLocations
 {
