@@ -537,7 +537,9 @@ impl ApiLight {
         Self {
             state: ApiLightState {
                 on: light.on.on,
-                bri: light.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                bri: light
+                    .dimming
+                    .map(|dim| ((dim.brightness * 2.54) as u32).max(1)),
                 hue: None,
                 sat: None,
                 effect: None,
