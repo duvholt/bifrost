@@ -4,6 +4,7 @@ mod light;
 mod resource;
 mod room;
 mod scene;
+mod stream;
 mod stubs;
 mod update;
 
@@ -26,6 +27,7 @@ pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
 };
+pub use stream::HueStreamKey;
 pub use stubs::{
     BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
