@@ -344,6 +344,15 @@ impl Resources {
                 .and_then(|light| self.state.id_v1(&light.rid))
                 .map(|id| format!("/lights/{id}")),
 
+            Resource::EntertainmentConfiguration(_dev) => Some(format!("/groups/{id}")),
+
+            Resource::Entertainment(ent) => {
+                let dev: &Device = self.get(&ent.owner).ok()?;
+                dev.light_service()
+                    .and_then(|light| self.state.id_v1(&light.rid))
+                    .map(|id| format!("/lights/{id}"))
+            }
+
             /* BridgeHome maps to "group 0" that seems to be present in the v1 api */
             Resource::BridgeHome(_) => Some(String::from("/groups/0")),
 
@@ -355,8 +364,6 @@ impl Resources {
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
             | Resource::Button(_)
-            | Resource::Entertainment(_)
-            | Resource::EntertainmentConfiguration(_)
             | Resource::GeofenceClient(_)
             | Resource::Geolocation(_)
             | Resource::GroupedMotion(_)
