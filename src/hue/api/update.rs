@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::hue::api::{
-    DeviceUpdate, GroupedLightUpdate, LightUpdate, RType, RoomUpdate, SceneUpdate,
+    DeviceUpdate, EntertainmentConfigurationUpdate, GroupedLightUpdate, LightUpdate, RType,
+    RoomUpdate, SceneUpdate,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -14,6 +15,7 @@ pub enum Update {
     /* BridgeHome(BridgeHomeUpdate), */
     Device(DeviceUpdate),
     /* Entertainment(EntertainmentUpdate), */
+    EntertainmentConfiguration(EntertainmentConfigurationUpdate),
     /* GeofenceClient(GeofenceClientUpdate), */
     /* Geolocation(GeolocationUpdate), */
     GroupedLight(GroupedLightUpdate),
@@ -35,6 +37,7 @@ impl Update {
         match self {
             Self::GroupedLight(_) => RType::GroupedLight,
             Self::Device(_) => RType::Device,
+            Self::EntertainmentConfiguration(_) => RType::EntertainmentConfiguration,
             Self::Light(_) => RType::Light,
             Self::Room(_) => RType::Room,
             Self::Scene(_) => RType::Scene,
@@ -44,7 +47,9 @@ impl Update {
     #[must_use]
     pub fn id_v1_scope(&self, id: u32, uuid: &Uuid) -> Option<String> {
         match self {
-            Self::Room(_) | Self::GroupedLight(_) => Some(format!("/groups/{id}")),
+            Self::Room(_) | Self::GroupedLight(_) | Self::EntertainmentConfiguration(_) => {
+                Some(format!("/groups/{id}"))
+            }
             Self::Device(_) => Some(format!("/device/{id}")),
             Self::Light(_) => Some(format!("/lights/{id}")),
             Self::Scene(_) => Some(format!("/scenes/{uuid}")),
