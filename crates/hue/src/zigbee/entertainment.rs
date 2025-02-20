@@ -15,7 +15,7 @@ pub struct HueEntStop {
 }
 
 #[derive(Debug, Clone)]
-pub struct HueEntStart {
+pub struct HueEntSegmentConfig {
     pub count: u16,
     pub members: Vec<u16>,
 }
@@ -71,7 +71,7 @@ fn check_size_valid(len: usize, header_size: usize, element_size: usize) -> HueR
     Ok(())
 }
 
-impl HueEntStart {
+impl HueEntSegmentConfig {
     pub fn parse(data: &[u8]) -> HueResult<Self> {
         check_size_valid(data.len(), 2, 2)?;
 
