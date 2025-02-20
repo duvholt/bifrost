@@ -7,13 +7,20 @@ pub struct EntertainmentConfiguration {
     pub name: String,
     pub configuration_type: EntertainmentConfigurationType,
     pub metadata: EntertainmentConfigurationMetadata,
-    pub status: String,
+    pub status: EntertainmentConfigurationStatus,
     pub stream_proxy: EntertainmentConfigurationStreamProxy,
     pub locations: EntertainmentConfigurationLocations,
     pub light_services: Vec<ResourceLink>,
     pub channels: Vec<EntertainmentConfigurationChannels>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_streamer: Option<ResourceLink>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum EntertainmentConfigurationStatus {
+    Active,
+    Inactive,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

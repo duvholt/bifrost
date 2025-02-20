@@ -19,10 +19,10 @@ pub use entertainment_config::{
     EntertainmentConfigurationMetadata, EntertainmentConfigurationNew,
     EntertainmentConfigurationPosition, EntertainmentConfigurationServiceLocations,
     EntertainmentConfigurationServiceLocationsNew,
-    EntertainmentConfigurationServiceLocationsUpdate, EntertainmentConfigurationStreamMembers,
-    EntertainmentConfigurationStreamProxy, EntertainmentConfigurationStreamProxyMode,
-    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationType,
-    EntertainmentConfigurationUpdate,
+    EntertainmentConfigurationServiceLocationsUpdate, EntertainmentConfigurationStatus,
+    EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
+    EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate,
 };
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
