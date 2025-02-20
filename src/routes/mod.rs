@@ -9,6 +9,7 @@ use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 pub mod api;
+pub mod auth;
 pub mod clip;
 pub mod eventstream;
 pub mod extractor;
@@ -39,7 +40,7 @@ impl IntoResponse for ApiError {
 pub fn router(appstate: AppState) -> Router<()> {
     Router::new()
         .nest("/api", api::router())
-        .nest("/auth", api::auth_router())
+        .nest("/auth", auth::router())
         .nest("/licenses", licenses::router())
         .nest("/clip/v2/resource", clip::router())
         .nest("/eventstream", eventstream::router())
