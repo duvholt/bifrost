@@ -245,14 +245,16 @@ impl Resources {
         let link_bridge_home = RType::BridgeHome.deterministic(format!("{bridge_id}HOME"));
         let link_bridge_dev = RType::Device.deterministic(link_bridge.rid);
         let link_bridge_home_dev = RType::Device.deterministic(link_bridge_home.rid);
+        let link_bridge_ent = RType::Entertainment.deterministic(link_bridge.rid);
         let link_zbdd = RType::ZigbeeDeviceDiscovery.deterministic(link_bridge.rid);
         let link_zbc = RType::ZigbeeConnectivity.deterministic(link_bridge.rid);
+        let link_bhome_glight = RType::GroupedLight.deterministic(link_bridge_home.rid);
 
         let bridge_dev = Device {
             product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost"),
-            services: vec![link_bridge, link_zbdd, link_zbc],
-            identify: None,
+            services: vec![link_bridge, link_zbc, link_bridge_ent, link_zbdd],
+            identify: Some(Stub),
             usertest: None,
         };
 
@@ -272,7 +274,31 @@ impl Resources {
 
         let bridge_home = BridgeHome {
             children: vec![link_bridge_dev],
-            services: vec![RType::GroupedLight.deterministic(link_bridge_home.rid)],
+            services: vec![link_bhome_glight],
+        };
+
+        let bhome_glight = GroupedLight {
+            alert: json!({
+                "action_values": [
+                    "breathe",
+                ]
+            }),
+            dimming: Some(DimmingUpdate { brightness: 8.7 }),
+            color: Some(Stub),
+            color_temperature: Some(Stub),
+            color_temperature_delta: Some(Stub),
+            dimming_delta: Stub,
+            dynamics: Stub,
+            on: Some(On { on: true }),
+            owner: link_bridge_home,
+            signaling: json!({
+                "signal_values": [
+                    "alternating",
+                    "no_signal",
+                    "on_off",
+                    "on_off_color",
+                ]
+            }),
         };
 
         let zbdd = ZigbeeDeviceDiscovery {
@@ -292,12 +318,24 @@ impl Resources {
             extended_pan_id: None,
         };
 
+        let brent = Entertainment {
+            equalizer: false,
+            owner: link_bridge_dev,
+            proxy: true,
+            renderer: false,
+            max_streams: Some(1),
+            renderer_reference: None,
+            segments: None,
+        };
+
         self.add(&link_bridge_dev, Resource::Device(bridge_dev))?;
         self.add(&link_bridge, Resource::Bridge(bridge))?;
         self.add(&link_bridge_home_dev, Resource::Device(bridge_home_dev))?;
         self.add(&link_bridge_home, Resource::BridgeHome(bridge_home))?;
         self.add(&link_zbdd, Resource::ZigbeeDeviceDiscovery(zbdd))?;
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
+        self.add(&link_bridge_ent, Resource::Entertainment(brent))?;
+        self.add(&link_bhome_glight, Resource::GroupedLight(bhome_glight))?;
 
         Ok(())
     }
