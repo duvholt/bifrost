@@ -129,6 +129,7 @@ impl Resources {
 
         if let Some(delta) = Self::generate_update(obj)? {
             let id_v1 = self.state.id_v1(id);
+            log::trace!("Hue event: {id_v1:?} {delta:#?}");
             self.hue_event_stream
                 .hue_event(EventBlock::update(id, id_v1, delta)?);
         }
