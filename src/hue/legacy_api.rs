@@ -474,6 +474,16 @@ pub struct ApiGroupUpdate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Active {
+    pub active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiGroupUpdate2 {
+    pub stream: Active,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ApiGroupActionUpdate {
     GroupUpdate(ApiGroupUpdate),
