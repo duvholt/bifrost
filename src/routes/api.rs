@@ -17,8 +17,9 @@ use crate::hue::api::{
     Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use crate::hue::legacy_api::{
-    ApiGroup, ApiGroupActionUpdate, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
-    ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
+    ApiGroup, ApiGroupAction, ApiGroupActionUpdate, ApiGroupClass, ApiGroupType, ApiGroupUpdate2,
+    ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene, ApiSensor, ApiUserConfig,
+    Capabilities, HueApiResult, NewUser, NewUserReply,
 };
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
@@ -59,8 +60,29 @@ fn get_lights(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiLight
     Ok(lights)
 }
 
-fn get_groups(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiGroup>> {
+fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<String, ApiGroup>> {
     let mut rooms = HashMap::new();
+
+    if group_0 {
+        rooms.insert(
+            "0".into(),
+            ApiGroup {
+                name: "Group 0".into(),
+                lights: vec![],
+                action: ApiGroupAction::default(),
+                group_type: ApiGroupType::LightGroup,
+                class: ApiGroupClass::Other,
+                recycle: false,
+                sensors: vec![],
+                state: json!({
+                    "all_on": false,
+                    "any_on": false,
+                }),
+                stream: Value::Null,
+                locations: Value::Null,
+            },
+        );
+    }
 
     for rr in res.get_resources_by_type(RType::Room) {
         let room: Room = rr.obj.try_into()?;
@@ -112,7 +134,7 @@ async fn get_api_user(
 
     Ok(Json(ApiUserConfig {
         config: state.api_config(username.clone()).await,
-        groups: get_groups(&lock)?,
+        groups: get_groups(&lock, false)?,
         lights: get_lights(&lock)?,
         resourcelinks: HashMap::new(),
         rules: HashMap::new(),
@@ -130,7 +152,7 @@ async fn get_api_user_resource(
     match artype {
         ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await))),
         ApiResourceType::Lights => Ok(Json(json!(get_lights(lock)?))),
-        ApiResourceType::Groups => Ok(Json(json!(get_groups(lock)?))),
+        ApiResourceType::Groups => Ok(Json(json!(get_groups(lock, false)?))),
         ApiResourceType::Scenes => Ok(Json(json!(get_scenes(&username, lock)?))),
         ApiResourceType::Resourcelinks
         | ApiResourceType::Rules
@@ -184,7 +206,7 @@ async fn get_api_user_resource_id(
         }
         ApiResourceType::Groups => {
             let lock = state.res.lock().await;
-            let groups = get_groups(&lock)?;
+            let groups = get_groups(&lock, true)?;
             let group = groups
                 .get(&id.to_string())
                 .ok_or(ApiError::V1NotFound(id))?;
