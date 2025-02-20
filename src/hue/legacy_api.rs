@@ -372,6 +372,22 @@ pub struct ApiGroup {
 }
 
 impl ApiGroup {
+    #[must_use]
+    pub fn make_group_0() -> Self {
+        Self {
+            name: "Group 0".into(),
+            lights: vec![],
+            action: ApiGroupAction::default(),
+            group_type: ApiGroupType::LightGroup,
+            class: ApiGroupClass::Other,
+            recycle: false,
+            sensors: vec![],
+            state: ApiGroupState::default(),
+            stream: Value::Null,
+            locations: Value::Null,
+        }
+    }
+
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
     pub fn from_lights_and_room(
