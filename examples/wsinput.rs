@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
@@ -39,11 +39,15 @@ async fn main() -> ApiResult<()> {
 
     let (mut socket, _) = connect_async(args.url).await?;
 
+    let tty = std::io::stdout().is_terminal();
+
     let mut lines = BufReader::new(stdin()).lines();
 
     loop {
-        print!("> ");
-        std::io::stdout().flush()?;
+        if !tty {
+            print!("> ");
+            std::io::stdout().flush()?;
+        }
 
         select! {
             Ok(Some(line)) = lines.next_line() => {
