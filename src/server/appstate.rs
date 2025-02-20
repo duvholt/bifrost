@@ -6,7 +6,6 @@ use axum_server::tls_rustls::RustlsConfig;
 use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::error::{ApiError, ApiResult};
@@ -95,7 +94,7 @@ impl AppState {
     }
 
     #[must_use]
-    pub async fn api_config(&self, username: Uuid) -> ApiConfig {
+    pub async fn api_config(&self, username: String) -> ApiConfig {
         ApiConfig {
             short_config: self.api_short_config().await,
             ipaddress: self.conf.bridge.ipaddress,
@@ -103,7 +102,7 @@ impl AppState {
             gateway: self.conf.bridge.gateway,
             timezone: self.conf.bridge.timezone.clone(),
             whitelist: HashMap::from([(
-                username.to_string(),
+                username,
                 Whitelist {
                     create_date: Utc::now(),
                     last_use_date: Utc::now(),

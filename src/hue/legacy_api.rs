@@ -103,13 +103,14 @@ pub enum ApiResourceType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
     pub devicetype: String,
-    pub generateclientkey: Option<bool>,
+    #[serde(default)]
+    pub generateclientkey: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUserReply {
-    pub username: Uuid,
-    pub clientkey: Uuid,
+    pub username: String,
+    pub clientkey: Option<String>,
 }
 
 #[allow(non_camel_case_types)]
@@ -633,7 +634,7 @@ pub struct ApiScene {
 }
 
 impl ApiScene {
-    pub fn from_scene(res: &Resources, owner: Uuid, scene: &api::Scene) -> ApiResult<Self> {
+    pub fn from_scene(res: &Resources, owner: String, scene: &api::Scene) -> ApiResult<Self> {
         let lights = scene
             .actions
             .iter()
@@ -658,7 +659,7 @@ impl ApiScene {
             scene_type: ApiSceneType::GroupScene,
             lights,
             lightstates,
-            owner: owner.to_string(),
+            owner,
             recycle: false,
             locked: false,
             /* Some clients (e.g. Hue Essentials) require .appdata */

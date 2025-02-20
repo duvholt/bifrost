@@ -10,9 +10,8 @@ use serde_json::{json, Value};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
-use crate::error::{ApiError, ApiResult};
-
 use crate::backend::BackendRequest;
+use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
     Device, GroupedLight, GroupedLightUpdate, Light, LightUpdate, On, RType, ResourceLink, Room,
     Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
@@ -22,6 +21,7 @@ use crate::hue::legacy_api::{
     ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
 };
 use crate::resource::Resources;
+use crate::routes::auth::STANDARD_CLIENT_KEY;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
@@ -30,11 +30,16 @@ async fn get_api_config(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn post_api(bytes: Bytes) -> ApiResult<impl IntoResponse> {
+    info!("post: {bytes:?}");
     let json: NewUser = serde_json::from_slice(&bytes)?;
-    info!("post: {json:?}");
+
     let res = NewUserReply {
-        clientkey: Uuid::new_v4(),
-        username: Uuid::new_v4(),
+        clientkey: if json.generateclientkey {
+            Some(STANDARD_CLIENT_KEY.to_hex())
+        } else {
+            None
+        },
+        username: Uuid::new_v4().as_simple().to_string(),
     };
     Ok(Json(vec![HueApiResult::Success(res)]))
 }
@@ -83,7 +88,7 @@ fn get_groups(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiGroup
     Ok(rooms)
 }
 
-fn get_scenes(owner: &Uuid, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
+fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
     let mut scenes = HashMap::new();
 
     for rr in res.get_resources_by_type(RType::Scene) {
@@ -91,7 +96,7 @@ fn get_scenes(owner: &Uuid, res: &MutexGuard<Resources>) -> ApiResult<HashMap<St
 
         scenes.insert(
             res.get_id_v1(rr.id)?,
-            ApiScene::from_scene(res, *owner, scene)?,
+            ApiScene::from_scene(res, owner.to_string(), scene)?,
         );
     }
 
@@ -101,12 +106,12 @@ fn get_scenes(owner: &Uuid, res: &MutexGuard<Resources>) -> ApiResult<HashMap<St
 #[allow(clippy::zero_sized_map_values)]
 async fn get_api_user(
     state: State<AppState>,
-    Path(username): Path<Uuid>,
+    Path(username): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
     let lock = state.res.lock().await;
 
     Ok(Json(ApiUserConfig {
-        config: state.api_config(username).await,
+        config: state.api_config(username.clone()).await,
         groups: get_groups(&lock)?,
         lights: get_lights(&lock)?,
         resourcelinks: HashMap::new(),
@@ -119,10 +124,10 @@ async fn get_api_user(
 
 async fn get_api_user_resource(
     State(state): State<AppState>,
-    Path((username, resource)): Path<(Uuid, ApiResourceType)>,
+    Path((username, artype)): Path<(String, ApiResourceType)>,
 ) -> ApiResult<Json<Value>> {
     let lock = &state.res.lock().await;
-    match resource {
+    match artype {
         ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await))),
         ApiResourceType::Lights => Ok(Json(json!(get_lights(lock)?))),
         ApiResourceType::Groups => Ok(Json(json!(get_groups(lock)?))),
@@ -136,7 +141,7 @@ async fn get_api_user_resource(
 }
 
 async fn post_api_user_resource(
-    Path((_username, resource)): Path<(Uuid, ApiResourceType)>,
+    Path((_username, resource)): Path<(String, ApiResourceType)>,
     Json(req): Json<Value>,
 ) -> ApiResult<Json<Value>> {
     warn!("POST v1 user resource unsupported");
@@ -156,7 +161,7 @@ async fn put_api_user_resource(
 #[allow(clippy::significant_drop_tightening)]
 async fn get_api_user_resource_id(
     State(state): State<AppState>,
-    Path((username, resource, id)): Path<(Uuid, ApiResourceType, u32)>,
+    Path((username, resource, id)): Path<(String, ApiResourceType, u32)>,
 ) -> ApiResult<impl IntoResponse> {
     log::debug!("GET v1 username={username} resource={resource:?} id={id}");
     let result = match resource {
@@ -194,10 +199,10 @@ async fn get_api_user_resource_id(
 
 async fn put_api_user_resource_id(
     State(state): State<AppState>,
-    Path((_username, resource, id, path)): Path<(String, ApiResourceType, u32, String)>,
+    Path((_username, artype, id, path)): Path<(String, ApiResourceType, u32, String)>,
     Json(req): Json<Value>,
 ) -> ApiResult<Json<Value>> {
-    match resource {
+    match artype {
         ApiResourceType::Lights => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "state" {
@@ -229,8 +234,10 @@ async fn put_api_user_resource_id(
             }
 
             let lock = state.res.lock().await;
+
             let uuid = lock.from_id_v1(id)?;
             let link = ResourceLink::new(uuid, RType::Room);
+
             let room: &Room = lock.get(&link)?;
             let glight = room.grouped_light_service().unwrap();
 
@@ -272,7 +279,7 @@ async fn put_api_user_resource_id(
         | ApiResourceType::Scenes
         | ApiResourceType::Schedules
         | ApiResourceType::Sensors
-        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(resource)),
+        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(artype)),
     }
 }
 
