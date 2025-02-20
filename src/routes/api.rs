@@ -17,9 +17,9 @@ use crate::hue::api::{
     Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use crate::hue::legacy_api::{
-    ApiGroup, ApiGroupAction, ApiGroupActionUpdate, ApiGroupClass, ApiGroupType, ApiGroupUpdate2,
-    ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene, ApiSensor, ApiUserConfig,
-    Capabilities, HueApiResult, NewUser, NewUserReply,
+    ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
+    ApiResourceType, ApiScene, ApiSensor, ApiUserConfig, Capabilities, HueApiResult, NewUser,
+    NewUserReply,
 };
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
@@ -64,24 +64,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
     let mut rooms = HashMap::new();
 
     if group_0 {
-        rooms.insert(
-            "0".into(),
-            ApiGroup {
-                name: "Group 0".into(),
-                lights: vec![],
-                action: ApiGroupAction::default(),
-                group_type: ApiGroupType::LightGroup,
-                class: ApiGroupClass::Other,
-                recycle: false,
-                sensors: vec![],
-                state: json!({
-                    "all_on": false,
-                    "any_on": false,
-                }),
-                stream: Value::Null,
-                locations: Value::Null,
-            },
-        );
+        rooms.insert("0".into(), ApiGroup::make_group_0());
     }
 
     for rr in res.get_resources_by_type(RType::Room) {
