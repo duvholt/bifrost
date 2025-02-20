@@ -10,11 +10,13 @@ use uuid::Uuid;
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
-    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Metadata, RType,
-    Resource, ResourceLink, ResourceRecord, RoomUpdate, TimeZone, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
+    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
+    Entertainment, EntertainmentConfigurationLocationsUpdate,
+    EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
+    EntertainmentConfigurationUpdate, GroupedLight, GroupedLightUpdate, LightUpdate, Metadata, On,
+    RType, Resource, ResourceLink, ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
-use crate::hue::api::{GroupedLightUpdate, LightUpdate, SceneUpdate, Update};
 use crate::hue::event::EventBlock;
 use crate::hue::version::SwVersion;
 use crate::model::state::{AuxData, State};
@@ -111,6 +113,36 @@ impl Resources {
                 let upd = RoomUpdate::new().with_metadata(room.metadata.clone());
 
                 Ok(Some(Update::Room(upd)))
+            }
+            Resource::BridgeHome(_home) => Ok(None),
+            Resource::EntertainmentConfiguration(ent) => {
+                let upd = EntertainmentConfigurationUpdate {
+                    configuration_type: Some(ent.configuration_type.clone()),
+                    metadata: Some(ent.metadata.clone()),
+                    action: None,
+                    stream_proxy: match ent.stream_proxy.mode {
+                        EntertainmentConfigurationStreamProxyMode::Auto => {
+                            Some(EntertainmentConfigurationStreamProxyUpdate::Auto)
+                        }
+                        EntertainmentConfigurationStreamProxyMode::Manual => {
+                            debug_assert!(ent.stream_proxy.node.rtype == RType::Entertainment);
+                            Some(EntertainmentConfigurationStreamProxyUpdate::Manual {
+                                node: ent.stream_proxy.node,
+                            })
+                        }
+                    },
+                    locations: Some(EntertainmentConfigurationLocationsUpdate {
+                        service_locations: ent
+                            .locations
+                            .service_locations
+                            .clone()
+                            .into_iter()
+                            .map(Into::into)
+                            .collect(),
+                    }),
+                };
+
+                Ok(Some(Update::EntertainmentConfiguration(upd)))
             }
             obj => Err(ApiError::UpdateUnsupported(obj.rtype())),
         }
