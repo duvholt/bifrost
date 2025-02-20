@@ -1,4 +1,5 @@
 mod device;
+mod entertainment;
 mod grouped_light;
 mod light;
 mod resource;
@@ -9,7 +10,13 @@ mod stubs;
 mod update;
 
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
-
+pub use entertainment::{
+    Entertainment, EntertainmentConfiguration, EntertainmentConfigurationChannels,
+    EntertainmentConfigurationLocations, EntertainmentConfigurationMetadata,
+    EntertainmentConfigurationPosition, EntertainmentConfigurationServiceLocations,
+    EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
+    EntertainmentSegment, EntertainmentSegments,
+};
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
@@ -31,7 +38,6 @@ pub use stream::HueStreamKey;
 pub use stubs::{
     BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
-    Entertainment, EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments,
     GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
     Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
     Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
