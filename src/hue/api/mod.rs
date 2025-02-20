@@ -13,10 +13,16 @@ mod update;
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
 pub use entertainment_config::{
-    EntertainmentConfiguration, EntertainmentConfigurationChannels,
-    EntertainmentConfigurationLocations, EntertainmentConfigurationMetadata,
+    EntertainmentConfiguration, EntertainmentConfigurationAction,
+    EntertainmentConfigurationChannels, EntertainmentConfigurationLocations,
+    EntertainmentConfigurationLocationsNew, EntertainmentConfigurationLocationsUpdate,
+    EntertainmentConfigurationMetadata, EntertainmentConfigurationNew,
     EntertainmentConfigurationPosition, EntertainmentConfigurationServiceLocations,
-    EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
+    EntertainmentConfigurationServiceLocationsNew,
+    EntertainmentConfigurationServiceLocationsUpdate, EntertainmentConfigurationStreamMembers,
+    EntertainmentConfigurationStreamProxy, EntertainmentConfigurationStreamProxyMode,
+    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationType,
+    EntertainmentConfigurationUpdate,
 };
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
