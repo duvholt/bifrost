@@ -1,3 +1,5 @@
+pub mod zclcommand;
+
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
