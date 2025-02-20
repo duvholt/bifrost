@@ -1,4 +1,5 @@
 use packed_struct::prelude::*;
+use packed_struct::types::bits::ByteArray;
 use uuid::Uuid;
 
 use crate::error::HueResult;
@@ -30,8 +31,8 @@ pub struct HueStreamPacket {
 
 impl HueStreamPacket {
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        let hdr =
-            HueStreamHeader::unpack_from_slice(&data[..HueStreamHeader::packed_bytes_size(None)?])?;
+        let len = <HueStreamHeader as PackedStruct>::ByteArray::len();
+        let hdr = HueStreamHeader::unpack_from_slice(&data[..len])?;
         debug_assert_eq!(&hdr.magic, b"HueStream");
         Ok(Self {
             color_mode: hdr.color_mode,
