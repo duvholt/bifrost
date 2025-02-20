@@ -588,8 +588,13 @@ impl ApiLight {
                 }
             }),
             light_type: "Extended color light".to_string(),
+
+            /* FIXME: Should have form "00:11:22:33:44:55:66:77-0b" */
             uniqueid: uuid.as_simple().to_string(),
+
             swversion: product_data.software_version,
+
+            /* FIXME: Should have form "9012C6FD" */
             swconfigid: None,
         }
     }
