@@ -140,7 +140,7 @@ async fn get_api_user(
         rules: HashMap::new(),
         scenes: get_scenes(&username, &lock)?,
         schedules: HashMap::new(),
-        sensors: HashMap::new(),
+        sensors: HashMap::from([(1, ApiSensor::builtin_daylight_sensor())]),
     }))
 }
 
