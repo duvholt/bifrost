@@ -24,7 +24,7 @@ pub struct HueError {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum HueResult<T> {
+pub enum HueApiResult<T> {
     Success(T),
     Error(HueError),
 }

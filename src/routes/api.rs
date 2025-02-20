@@ -19,7 +19,7 @@ use crate::hue::api::{
 };
 use crate::hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
-    ApiUserConfig, Capabilities, HueResult, NewUser, NewUserReply,
+    ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
 };
 use crate::resource::Resources;
 use crate::routes::extractor::Json;
@@ -36,7 +36,7 @@ async fn post_api(bytes: Bytes) -> ApiResult<impl IntoResponse> {
         clientkey: Uuid::new_v4(),
         username: Uuid::new_v4(),
     };
-    Ok(Json(vec![HueResult::Success(res)]))
+    Ok(Json(vec![HueApiResult::Success(res)]))
 }
 
 fn get_lights(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiLight>> {
@@ -150,7 +150,7 @@ async fn put_api_user_resource(
 ) -> impl IntoResponse {
     warn!("PUT v1 user resource {req:?}");
     //Json(format!("user {username} resource {resource}"))
-    Json(vec![HueResult::Success(req)])
+    Json(vec![HueApiResult::Success(req)])
 }
 
 #[allow(clippy::significant_drop_tightening)]
