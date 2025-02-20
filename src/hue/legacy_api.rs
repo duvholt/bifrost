@@ -364,7 +364,7 @@ pub struct ApiGroup {
     pub class: ApiGroupClass,
     pub recycle: bool,
     pub sensors: Vec<Value>,
-    pub state: Value,
+    pub state: ApiGroupState,
     #[serde(skip_serializing_if = "Value::is_null", default)]
     pub stream: Value,
     #[serde(skip_serializing_if = "Value::is_null", default)]
@@ -397,14 +397,14 @@ impl ApiGroup {
             group_type: ApiGroupType::Room,
             recycle: false,
             sensors: vec![],
-            state: json!({}),
+            state: ApiGroupState::default(),
             stream: Value::Null,
             locations: Value::Null,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ApiGroupState {
     pub all_on: bool,
     pub any_on: bool,
