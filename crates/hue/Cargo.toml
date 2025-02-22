@@ -22,3 +22,6 @@ packed_struct = "0.10.1"
 serde = { version = "1.0.217", features = ["derive"] }
 thiserror = "2.0.11"
 uuid = "1.13.1"
+
+[dev-dependencies]
+hex = "0.4.3"
