@@ -107,15 +107,15 @@ state for a light (a bulb, or single segment of a multi-segment light source).
  │ 0         │ .addr                         │
  │           │ Zigbee address (or alias)     │
  │ 1         │ for the target light          │
+ ├───────────┼───────────┬───────────────────┤
+ │ 2         │(low 3 bit)│ 0   0   0   0   0 │<-- 5 reserved bits MUST be zero
+ │           │─ ─ ─ ─ ─ ─└───────────────────┤
+ │ 3         │ .brightnes (high 8 bits)      │
  ├───────────┼───────────────────────────────┤
- │ 2         │ .brightness (11 bits)         │
- │           │ - - - - - ┌───────────────────┤
- │ 3         │           │ X   X   X   X   X │ <-- 5 reserved bits MUST be zero
- ├───────────┼───────────┴───────────────────┤
  │ 4         │ .color_x (low 8 bits)         │\
- │           ├───────────────┐ - - - - - - - │ \
+ │           ├───────────────┐─ ─ ─ ─ ─ ─ ─ ─│ \
  │ 5         │ (low 4 bits)  │ (high 4 bits) │  same format as for composite updates
- │           │ - - - - - - - └───────────────┤ /
+ │           │─ ─ ─ ─ ─ ─ ─ ─└───────────────┤ /
  │ 6         │ .color_y (high 8 bits)        │/
  └───────────┴───────────────────────────────┘
 ```
