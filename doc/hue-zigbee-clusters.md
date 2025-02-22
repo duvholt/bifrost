@@ -71,13 +71,13 @@ for other devices to pick up.
   │           │                               │
   │ 3         │                               │
   ├───────────┼───────────────────────────────┤
-  │ 4         │ .x0 (unknown)                 │
-  │           │                               │
-  │ 5         │ Always observed as 0x0400     │
+  │ 4         │ .smoothing                    │\
+  │           │ Defaults to 0x0400            │ } Smoothing factor
+  │ 5         │ (encoded as "0004")           │/
   ├───────────┼───────────────────────────────┤
   │ 6         │ Light data block 0            │\
   │           │                               │ \
-  │ ..        │                               │  Repeated for each light
+  │ ..        │                               │  } Repeated for each light
   │           │                               │ /
   │ 12        │                               │/
   ├───────────┼───────────────────────────────┤
@@ -85,10 +85,20 @@ for other devices to pick up.
   :           :                               :
 ```
 
+The "smoothing factor" is a value that controls how agressively the
+color/brightness will change from the previous frame. A value of `0x0000` is the
+fastest possible (and generally not very pleasant to look at), while a value of
+`0x1000` is quite slow, giving very smooth animations, but without any quick changes.
+
+Very high values (e.g. above `0x4000`) are so slow that they are unlikely to be
+useful in most cases.
+
+The existing Hue Entertainment clients all seem to use `0x0400`, which is a
+reasonable starting point. Note that this property does NOT seem to be exposed
+over any known API, but it is available over Bifrost.
+
 Each "light data block" is a 7-byte packed structure describing the desired
 state for a light (a bulb, or single segment of a multi-segment light source).
-
-
 
 ```text
  ┌───────────┬───┬───┬───┬───┬───┬───┬───┬───┐
