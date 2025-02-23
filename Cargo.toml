@@ -80,6 +80,9 @@ tls-rustls  = [
 server = []
 server-banner = ["server", "dep:termcolor", "dep:itertools"]
 
+[profile.dev]
+debug = "limited"
+
 [dependencies]
 axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart"], default-features = false }
 axum-core = "0.5.0"
