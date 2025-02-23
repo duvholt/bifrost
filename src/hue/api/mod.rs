@@ -141,6 +141,44 @@ impl Resource {
         }
     }
 
+    #[must_use]
+    pub const fn owner(&self) -> Option<ResourceLink> {
+        match self {
+            Self::AuthV1(_) => None,
+            Self::BehaviorInstance(_) => None,
+            Self::BehaviorScript(_) => None,
+            Self::Bridge(obj) => Some(obj.owner),
+            Self::BridgeHome(_) => None,
+            Self::Button(obj) => Some(obj.owner),
+            Self::Device(_) => None,
+            Self::DevicePower(obj) => Some(obj.owner),
+            Self::DeviceSoftwareUpdate(obj) => Some(obj.owner),
+            Self::Entertainment(obj) => Some(obj.owner),
+            Self::EntertainmentConfiguration(_) => None,
+            Self::GeofenceClient(_) => None,
+            Self::Geolocation(_) => None,
+            Self::GroupedLight(obj) => Some(obj.owner),
+            Self::GroupedLightLevel(obj) => Some(obj.owner),
+            Self::GroupedMotion(obj) => Some(obj.owner),
+            Self::Homekit(_) => None,
+            Self::Light(obj) => Some(obj.owner),
+            Self::LightLevel(obj) => Some(obj.owner),
+            Self::Matter(_) => None,
+            Self::Motion(obj) => Some(obj.owner),
+            Self::PrivateGroup(_) => None,
+            Self::PublicImage(_) => None,
+            Self::RelativeRotary(obj) => Some(obj.owner),
+            Self::Room(_) => None,
+            Self::Scene(_) => None,
+            Self::SmartScene(_) => None,
+            Self::Taurus(obj) => Some(obj.owner),
+            Self::Temperature(obj) => Some(obj.owner),
+            Self::ZigbeeConnectivity(obj) => Some(obj.owner),
+            Self::ZigbeeDeviceDiscovery(obj) => Some(obj.owner),
+            Self::Zone(_) => None,
+        }
+    }
+
     pub fn from_value(rtype: RType, obj: Value) -> ApiResult<Self> {
         let res = match rtype {
             RType::AuthV1 => Self::AuthV1(from_value(obj)?),
