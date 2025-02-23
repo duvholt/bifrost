@@ -61,6 +61,8 @@ impl AppState {
             res.init(&hue::bridge_id(config.bridge.mac))?;
         }
 
+        res.reset_all_streaming()?;
+
         let conf = Arc::new(config);
         let res = Arc::new(Mutex::new(res));
 
