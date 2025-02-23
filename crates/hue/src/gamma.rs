@@ -59,3 +59,47 @@ impl GammaCorrection {
     /// Standard gamma correction for sRGB color space
     pub const SRGB: Self = Self::new(0.42, 0.003_130_8, 12.92, 0.055);
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::gamma::GammaCorrection;
+
+    macro_rules! compare {
+        ($expr:expr, $value:expr) => {
+            assert!(($expr - $value).abs() < 1e-5);
+        };
+    }
+
+    #[test]
+    fn gamma_none() {
+        let gc = GammaCorrection::NONE;
+
+        compare!(gc.transform(0.0), 0.0);
+        compare!(gc.transform(0.1), 0.1);
+        compare!(gc.transform(0.9), 0.9);
+        compare!(gc.transform(1.0), 1.0);
+        compare!(gc.transform(10.0), 10.0);
+    }
+
+    #[test]
+    fn inv_gamma_none() {
+        let gc = GammaCorrection::NONE;
+
+        compare!(gc.inverse(0.0), 0.0);
+        compare!(gc.inverse(0.1), 0.1);
+        compare!(gc.inverse(0.9), 0.9);
+        compare!(gc.inverse(1.0), 1.0);
+        compare!(gc.inverse(10.0), 10.0);
+    }
+
+    #[test]
+    fn srgb_roundtrip() {
+        let gc = GammaCorrection::SRGB;
+
+        compare!(gc.inverse(gc.transform(0.0)), 0.0);
+        compare!(gc.inverse(gc.transform(0.1)), 0.1);
+        compare!(gc.inverse(gc.transform(0.9)), 0.9);
+        compare!(gc.inverse(gc.transform(1.0)), 1.0);
+        compare!(gc.inverse(gc.transform(10.0)), 10.0);
+    }
+}
