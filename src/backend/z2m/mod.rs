@@ -25,13 +25,14 @@ use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::hue;
 use crate::hue::api::{
-    Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature, ColorTemperatureUpdate,
-    ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming, DimmingUpdate, GroupedLight,
-    Light, LightColor, LightEffect, LightEffectStatus, LightEffectValues, LightEffects,
-    LightEffectsV2, LightEffectsV2Update, LightGradient, LightGradientMode, LightMetadata,
-    LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene,
-    SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
-    SceneStatusUpdate, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature,
+    ColorTemperatureUpdate, ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming,
+    DimmingUpdate, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
+    LightColor, LightEffect, LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2,
+    LightEffectsV2Update, LightGradient, LightGradientMode, LightMetadata, LightUpdate, Metadata,
+    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction,
+    SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate,
+    Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
 use crate::model::hexcolor::HexColor;
@@ -82,18 +83,21 @@ impl Z2mBackend {
         })
     }
 
-    pub async fn add_light(&mut self, dev: &api::Device, expose: &ExposeLight) -> ApiResult<()> {
-        let name = &dev.friendly_name;
+    pub async fn add_light(&mut self, apidev: &api::Device, expose: &ExposeLight) -> ApiResult<()> {
+        let name = &apidev.friendly_name;
 
-        let link_device = RType::Device.deterministic(&dev.ieee_address);
-        let link_light = RType::Light.deterministic(&dev.ieee_address);
+        let link_device = RType::Device.deterministic(&apidev.ieee_address);
+        let link_light = RType::Light.deterministic(&apidev.ieee_address);
+        let link_enttm = RType::Entertainment.deterministic(&apidev.ieee_address);
+        let link_taurus = RType::Taurus.deterministic(&apidev.ieee_address);
+        let link_zigcon = RType::ZigbeeConnectivity.deterministic(&apidev.ieee_address);
 
-        let product_data = DeviceProductData::guess_from_device(dev);
-        let metadata = LightMetadata::new(DeviceArchetype::SpotBulb, name);
+        let product_data = DeviceProductData::guess_from_device(apidev);
+        let metadata = LightMetadata::new(product_data.product_archetype.clone(), name);
 
-        let gradient = dev.expose_gradient();
         let effects =
-            dev.manufacturer.as_deref() == Some(DeviceProductData::SIGNIFY_MANUFACTURER_NAME);
+            apidev.manufacturer.as_deref() == Some(DeviceProductData::SIGNIFY_MANUFACTURER_NAME);
+        let gradient = apidev.expose_gradient();
 
         let dev = hue::api::Device {
             product_data,
@@ -146,9 +150,54 @@ impl Z2mBackend {
             });
         }
 
+        // FIXME: This should be feature-detected, not always enabled
+        let enttm = Entertainment {
+            equalizer: true,
+            owner: link_device,
+            proxy: true,
+            renderer: true,
+            max_streams: None,
+            renderer_reference: Some(link_light),
+
+            // FIXME: hard-coded to values suitable for LCX005 (gradient light strip)
+            segments: Some(EntertainmentSegments {
+                configurable: false,
+                max_segments: 10,
+                segments: (0..7)
+                    .map(|x| EntertainmentSegment {
+                        start: x,
+                        length: 1,
+                    })
+                    .collect(),
+            }),
+        };
+
+        // FIXME: The Taurus objects are seen on Hue Entertainment devices on a
+        // real hue bridge, but nobody knows what it does. Some clients seem to
+        // want them present, though.
+        let taurus = Taurus {
+            capabilities: vec![
+                "sensor".to_string(),
+                "collector".to_string(),
+                "sync".to_string(),
+            ],
+            owner: link_device,
+        };
+
+        let zigcon = ZigbeeConnectivity {
+            channel: None,
+            extended_pan_id: None,
+            mac_address: apidev.ieee_address.to_string(),
+            owner: link_device,
+            status: ZigbeeConnectivityStatus::Connected,
+        };
+
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
         res.add(&link_light, Resource::Light(light))?;
+        res.add(&link_enttm, Resource::Entertainment(enttm))?;
+        res.add(&link_taurus, Resource::Taurus(taurus))?;
+        res.add(&link_zigcon, Resource::ZigbeeConnectivity(zigcon))?;
         drop(res);
 
         Ok(())
