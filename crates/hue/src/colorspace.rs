@@ -192,3 +192,50 @@ pub const ADOBE: ColorSpace = ColorSpace {
     ]),
     gamma: GammaCorrection::NONE,
 };
+
+#[cfg(test)]
+mod tests {
+    use std::iter::zip;
+
+    use crate::colorspace::{ColorSpace, ADOBE, SRGB, WIDE};
+
+    macro_rules! compare {
+        ($expr:expr, $value:expr) => {
+            let a = $expr;
+            let b = $value;
+            eprintln!("{a} vs {b:.4}");
+            assert!((a - b).abs() < 1e-4);
+        };
+    }
+
+    fn verify_matrix(cs: &ColorSpace) {
+        let xyz = &cs.xyz;
+        let rgb = &cs.rgb;
+
+        let xyzi = xyz.inverted().unwrap();
+        let rgbi = rgb.inverted().unwrap();
+
+        zip(xyz.0, rgbi.0).for_each(|(a, b)| {
+            compare!(a, b);
+        });
+
+        zip(rgb.0, xyzi.0).for_each(|(a, b)| {
+            compare!(a, b);
+        });
+    }
+
+    #[test]
+    fn iverse_wide() {
+        verify_matrix(&WIDE);
+    }
+
+    #[test]
+    fn iverse_srgb() {
+        verify_matrix(&SRGB);
+    }
+
+    #[test]
+    fn iverse_adobe() {
+        verify_matrix(&ADOBE);
+    }
+}
