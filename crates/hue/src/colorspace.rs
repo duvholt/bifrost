@@ -4,6 +4,8 @@
 //
 // Original code by Thomas Lochmatter
 
+use std::ops::{Index, IndexMut};
+
 use crate::gamma::GammaCorrection;
 
 #[derive(Clone, Debug)]
@@ -88,6 +90,20 @@ impl Matrix3 {
         let cy = d[0] * m[3] + d[1] * m[4] + d[2] * m[5];
         let cz = d[0] * m[6] + d[1] * m[7] + d[2] * m[8];
         [cx, cy, cz]
+    }
+}
+
+impl Index<[usize; 2]> for Matrix3 {
+    type Output = f64;
+
+    fn index(&self, index: [usize; 2]) -> &Self::Output {
+        &self.0[index[0] * 3 + index[1]]
+    }
+}
+
+impl IndexMut<[usize; 2]> for Matrix3 {
+    fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
+        &mut self.0[index[0] * 3 + index[1]]
     }
 }
 
