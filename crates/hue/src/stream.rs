@@ -3,6 +3,7 @@ use packed_struct::types::bits::ByteArray;
 use uuid::Uuid;
 
 use crate::error::HueResult;
+use crate::xy::XY;
 
 #[derive(PrimitiveEnum_u8, Clone, Debug, Copy)]
 pub enum HueStreamColorMode {
@@ -48,4 +49,14 @@ pub struct HueStreamLight {
     pub r: u16,
     pub g: u16,
     pub b: u16,
+}
+
+impl HueStreamLight {
+    pub fn to_xy(&self) -> (XY, f64) {
+        XY::from_rgb(
+            (self.r / 256) as u8,
+            (self.g / 256) as u8,
+            (self.b / 256) as u8,
+        )
+    }
 }
