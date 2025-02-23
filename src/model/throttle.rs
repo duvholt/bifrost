@@ -6,6 +6,7 @@ pub struct Throttle {
 }
 
 impl Throttle {
+    #[must_use]
     pub fn new(interval: Duration) -> Self {
         Self {
             interval,
@@ -13,15 +14,18 @@ impl Throttle {
         }
     }
 
+    #[must_use]
     pub fn from_fps(fps: u32) -> Self {
         let interval = Duration::microseconds(1_000_000 / i64::from(fps));
         Self::new(interval)
     }
 
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.elapsed_since(Utc::now())
     }
 
+    #[must_use]
     pub fn elapsed_since(&self, now: DateTime<Utc>) -> Duration {
         now - self.last_update
     }
