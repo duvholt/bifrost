@@ -16,7 +16,7 @@ pub struct EntertainmentConfiguration {
     pub active_streamer: Option<ResourceLink>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum EntertainmentConfigurationStatus {
     Active,

@@ -261,7 +261,7 @@ impl Sub<&Light> for &Light {
     }
 }
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LightMode {
     #[default]
