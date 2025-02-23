@@ -141,6 +141,7 @@ impl Resource {
         }
     }
 
+    #[allow(clippy::match_same_arms)]
     #[must_use]
     pub const fn owner(&self) -> Option<ResourceLink> {
         match self {
