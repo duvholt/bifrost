@@ -532,6 +532,26 @@ impl Resources {
             .collect()
     }
 
+    #[must_use]
+    pub fn get_resource_ids_by_type(&self, ty: RType) -> Vec<Uuid> {
+        self.state
+            .res
+            .iter()
+            .filter(|(_, r)| r.rtype() == ty)
+            .map(|(id, _res)| *id)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn get_resources_by_owner(&self, owner: ResourceLink) -> Vec<ResourceRecord> {
+        self.state
+            .res
+            .iter()
+            .filter(|(_, r)| r.owner() == Some(owner))
+            .map(|(id, res)| self.make_resource_record(id, res))
+            .collect()
+    }
+
     pub fn get_id_v1_index(&self, uuid: Uuid) -> ApiResult<u32> {
         self.state.id_v1(&uuid).ok_or(ApiError::NotFound(uuid))
     }
