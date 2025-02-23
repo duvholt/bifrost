@@ -56,26 +56,23 @@ impl Resources {
     }
 
     pub fn reset_all_streaming(&mut self) -> ApiResult<()> {
-        for rr in self.get_resources_by_type(RType::Light) {
-            let light: &Light = self.get_id(rr.id)?;
+        for id in self.get_resource_ids_by_type(RType::Light) {
+            let light: &Light = self.get_id(id)?;
             if light.mode != LightMode::Normal {
-                log::warn!("Clearing streaming state of Light {}", rr.id);
-                self.update::<Light>(&rr.id, |light| {
+                log::warn!("Clearing streaming state of Light {}", id);
+                self.update::<Light>(&id, |light| {
                     light.mode = LightMode::Normal;
                 })?;
             }
         }
 
-        for rr in self.get_resources_by_type(RType::EntertainmentConfiguration) {
-            let ec: &EntertainmentConfiguration = self.get_id(rr.id)?;
+        for id in self.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+            let ec: &EntertainmentConfiguration = self.get_id(id)?;
             if ec.active_streamer.is_some()
                 || ec.status != EntertainmentConfigurationStatus::Inactive
             {
-                log::warn!(
-                    "Clearing streaming state of EntertainmentConfiguration {}",
-                    rr.id,
-                );
-                self.update::<EntertainmentConfiguration>(&rr.id, |ec| {
+                log::warn!("Clearing streaming state of EntertainmentConfiguration {id}");
+                self.update::<EntertainmentConfiguration>(&id, |ec| {
                     ec.active_streamer = None;
                     ec.status = EntertainmentConfigurationStatus::Inactive;
                 })?;
