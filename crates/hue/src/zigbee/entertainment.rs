@@ -39,10 +39,19 @@ pub struct HueEntFrame {
 pub struct HueEntFrameLightRecord {
     #[packed_field(bits = "0..=15")]
     pub addr: u16,
-    #[packed_field(bits = "16..=27")]
     pub brightness: u16,
     #[packed_field(bits = "32..=55")]
     pub raw: [u8; 3],
+}
+
+impl HueEntFrameLightRecord {
+    pub fn new(addr: u16, brightness: u16, color: XY) -> Self {
+        Self {
+            addr,
+            brightness: brightness << 5,
+            raw: color.to_quant(),
+        }
+    }
 }
 
 impl Debug for HueEntFrameLightRecord {
@@ -121,5 +130,34 @@ impl HueEntFrame {
         }
 
         Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use packed_struct::prelude::*;
+
+    use crate::{xy::XY, zigbee::HueEntFrameLightRecord};
+
+    #[test]
+    fn light_record() {
+        let foo = HueEntFrameLightRecord {
+            addr: 0x1122,
+            brightness: 0x7FF << 5,
+            raw: [0xAA, 0xBB, 0xCC],
+        };
+
+        let data = foo.pack().unwrap();
+
+        assert_eq!("2211e0ffaabbcc", hex::encode(data));
+    }
+
+    #[test]
+    fn light_record_raw() {
+        let foo = HueEntFrameLightRecord::new(0x1122, 0x7FF, XY::from_quant([0xAA, 0xBB, 0xCC]));
+
+        let data = foo.pack().unwrap();
+
+        assert_eq!("2211e0ffaabbcc", hex::encode(data));
     }
 }
