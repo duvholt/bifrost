@@ -28,9 +28,11 @@ impl XY {
     pub fn from_rgb(red: u8, green: u8, blue: u8) -> (Self, f64) {
         let [r, g, b] = [red, green, blue].map(Clamp::unit_from_u8);
 
-        let [x, y, bright] = Self::COLOR_SPACE.rgb_to_xyy(r, g, b);
+        let [x, y, b] = Self::COLOR_SPACE.rgb_to_xyy(r, g, b);
 
-        (Self { x, y }, bright)
+        let max_y = Self::COLOR_SPACE.find_maximum_y(x, y);
+
+        (Self { x, y }, b / max_y * 255.0)
     }
 
     #[must_use]
