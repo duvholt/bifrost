@@ -86,7 +86,7 @@ axum-core = "0.5.0"
 axum-server = { version = "0.7.1", features = [], default-features = false }
 bytes = "1.10.0"
 chrono = { version = "0.4.39", features = ["clock", "serde"], default-features = false }
-clap = { version = "4.5.29", features = ["std", "color", "derive"], default-features = false }
+clap = { version = "4.5.29", features = ["std", "color", "derive", "help", "usage"], default-features = false }
 config = { version = "0.15.8", default-features = false, features = ["yaml"] }
 futures = "0.3.31"
 hyper = "1.6.0"
