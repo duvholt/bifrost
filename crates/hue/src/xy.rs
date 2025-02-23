@@ -11,7 +11,7 @@ pub struct XY {
 }
 
 impl XY {
-    const COLOR_SPACE: ColorSpace = colorspace::WIDE;
+    pub const COLOR_SPACE: ColorSpace = colorspace::WIDE;
 
     #[must_use]
     pub const fn new(x: f64, y: f64) -> Self {
