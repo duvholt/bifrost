@@ -43,8 +43,8 @@ impl XY {
 
 impl XY {
     pub fn from_quant(data: [u8; 3]) -> Self {
-        let x0 = u16::from(data[0]) | u16::from(data[1] & 0x0F) << 8;
-        let y0 = u16::from(data[2]) << 4 | u16::from(data[1] >> 4);
+        let x0 = u16::from(data[0]) | (u16::from(data[1] & 0x0F) << 8);
+        let y0 = (u16::from(data[2]) << 4) | (u16::from(data[1] >> 4));
 
         let x = f64::from(x0) * WIDE_GAMUT_MAX_X / f64::from(0xFFF);
         let y = f64::from(y0) * WIDE_GAMUT_MAX_Y / f64::from(0xFFF);
@@ -61,7 +61,7 @@ impl XY {
         [
             (x & 0xFF) as u8,
             (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
-            (y >> 4 & 0xFF) as u8,
+            ((y >> 4) & 0xFF) as u8,
         ]
     }
 }
