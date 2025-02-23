@@ -12,11 +12,12 @@ use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
-    Entertainment, EntertainmentConfigurationLocationsUpdate,
-    EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
-    EntertainmentConfigurationUpdate, GroupedLight, GroupedLightUpdate, LightUpdate, Metadata, On,
-    RType, Resource, ResourceLink, ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
+    Entertainment, EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
+    EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
+    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, GroupedLight,
+    GroupedLightUpdate, Light, LightMode, LightUpdate, Metadata, On, RType, Resource, ResourceLink,
+    ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
 use crate::hue::event::EventBlock;
 use crate::hue::version::SwVersion;
@@ -52,6 +53,36 @@ impl Resources {
         self.version = version;
         self.state.patch_bridge_version(&self.version);
         self.state_updates.notify_one();
+    }
+
+    pub fn reset_all_streaming(&mut self) -> ApiResult<()> {
+        for rr in self.get_resources_by_type(RType::Light) {
+            let light: &Light = self.get_id(rr.id)?;
+            if light.mode != LightMode::Normal {
+                log::warn!("Clearing streaming state of Light {}", rr.id);
+                self.update::<Light>(&rr.id, |light| {
+                    light.mode = LightMode::Normal;
+                })?;
+            }
+        }
+
+        for rr in self.get_resources_by_type(RType::EntertainmentConfiguration) {
+            let ec: &EntertainmentConfiguration = self.get_id(rr.id)?;
+            if ec.active_streamer.is_some()
+                || ec.status != EntertainmentConfigurationStatus::Inactive
+            {
+                log::warn!(
+                    "Clearing streaming state of EntertainmentConfiguration {}",
+                    rr.id,
+                );
+                self.update::<EntertainmentConfiguration>(&rr.id, |ec| {
+                    ec.active_streamer = None;
+                    ec.status = EntertainmentConfigurationStatus::Inactive;
+                })?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn read(&mut self, rdr: impl Read) -> ApiResult<()> {
