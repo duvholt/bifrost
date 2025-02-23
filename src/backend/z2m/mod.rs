@@ -99,7 +99,7 @@ impl Z2mBackend {
             product_data,
             metadata: metadata.clone().into(),
             services: btreeset![link_zigcon, link_light, link_enttm, link_taurus],
-            identify: None,
+            identify: Some(Stub),
             usertest: None,
         };
 
