@@ -152,7 +152,7 @@ impl ColorSpace {
 pub const WIDE: ColorSpace = ColorSpace {
     rgb: Matrix3([
         1.4625, -0.1845, -0.2734, //
-        -0.5228, 1.4479, 0.0681, //
+        -0.5229, 1.4479, 0.0681, //
         0.0346, -0.0958, 1.2875, //
     ]),
     xyz: Matrix3([
@@ -166,9 +166,9 @@ pub const WIDE: ColorSpace = ColorSpace {
 /// sRGB color space
 pub const SRGB: ColorSpace = ColorSpace {
     rgb: Matrix3([
-        3.2405, -1.5371, -0.4985, //
-        -0.9693, 1.8760, 0.0416, //
-        0.0556, -0.2040, 1.0572, //
+        3.2401, -1.5370, -0.4983, //
+        -0.9693, 1.8760, 0.0415, //
+        0.0558, -0.2040, 1.0572, //
     ]),
     xyz: Matrix3([
         0.4125, 0.3576, 0.1804, //
