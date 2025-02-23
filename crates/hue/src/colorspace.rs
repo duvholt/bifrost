@@ -27,13 +27,13 @@ impl Matrix3 {
         // Gaussian elimination (part 1)
         for i in 0..3 {
             // Get the diagonal term
-            let mut d = current.0[i * 3 + i];
+            let mut d = current[[i, i]];
 
             // If it is 0, there must be at least one row with a non-zero element (otherwise, the matrix is not invertible)
             if d == 0.0 {
                 let mut r = i + 1;
 
-                while r < 3 && (current.0[r * 3 + i]).abs() < 1e-10 {
+                while r < 3 && (current[[r, i]]).abs() < 1e-10 {
                     r += 1
                 }
 
@@ -42,18 +42,18 @@ impl Matrix3 {
                 } // i is the rank
 
                 for c in 0..3 {
-                    current.0[i * 3 + c] += current.0[r * 3 + c];
-                    inverse.0[i * 3 + c] += inverse.0[r * 3 + c];
+                    current[[i, c]] += current[[r, c]];
+                    inverse[[i, c]] += inverse[[r, c]];
                 }
 
-                d = current.0[i * 3 + i];
+                d = current[[i, i]];
             }
 
             // Divide the row by the diagonal term
             let inv = 1.0 / d;
             for c in 0..3 {
-                current.0[i * 3 + c] *= inv;
-                inverse.0[i * 3 + c] *= inv;
+                current[[i, c]] *= inv;
+                inverse[[i, c]] *= inv;
             }
 
             // Divide all subsequent rows with a non-zero coefficient, and subtract the row
@@ -61,8 +61,8 @@ impl Matrix3 {
                 let p = current.0[r * 3 + i];
                 if p != 0.0 {
                     for c in 0..3 {
-                        current.0[r * 3 + c] -= current.0[i * 3 + c] * p;
-                        inverse.0[r * 3 + c] -= inverse.0[i * 3 + c] * p;
+                        current[[r, c]] -= current[[i, c]] * p;
+                        inverse[[r, c]] -= inverse[[i, c]] * p;
                     }
                 }
             }
@@ -71,10 +71,10 @@ impl Matrix3 {
         // Gaussian elimination (part 2)
         for i in (0..3).rev() {
             for r in 0..i {
-                let d = current.0[r * 3 + i];
+                let d = current[[r, i]];
                 for c in 0..3 {
-                    current.0[r * 3 + c] -= current.0[i * 3 + c] * d;
-                    inverse.0[r * 3 + c] -= inverse.0[i * 3 + c] * d;
+                    current[[r, c]] -= current[[i, c]] * d;
+                    inverse[[r, c]] -= inverse[[i, c]] * d;
                 }
             }
         }
