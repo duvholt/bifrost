@@ -11,7 +11,7 @@ pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
 ///
 /// A REGULAR INSTALL OF Z2M WILL NOT WORK.
 #[must_use]
-pub fn hue_zclcommand(topic: &str, cluster: u16, command: u8, data: &[u8]) -> RawMessage {
+pub fn hue_zclcommand(topic: &str, cluster: &str, command: u8, data: &[u8]) -> RawMessage {
     RawMessage {
         topic: topic.to_string(),
         payload: json!({
