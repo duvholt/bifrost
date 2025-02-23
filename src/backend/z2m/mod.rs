@@ -328,6 +328,12 @@ impl Z2mBackend {
         self.rmap.insert(link_glight.rid, topic.clone());
         self.rmap.insert(link_room.rid, topic.clone());
 
+        for id in &res.get_resource_ids_by_type(RType::BridgeHome) {
+            res.update(id, |bh: &mut BridgeHome| {
+                bh.children.insert(link_room);
+            })?;
+        }
+
         res.add(&link_room, Resource::Room(room))?;
 
         let glight = GroupedLight::new(link_room);
