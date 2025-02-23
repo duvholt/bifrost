@@ -373,7 +373,14 @@ impl Resources {
     where
         &'a T: TryFrom<&'a Resource, Error = ApiError>,
     {
-        self.state.get(&link.rid)?.try_into()
+        self.get_id(link.rid)
+    }
+
+    pub fn get_id<'a, T>(&'a self, id: Uuid) -> ApiResult<&'a T>
+    where
+        &'a T: TryFrom<&'a Resource, Error = ApiError>,
+    {
+        self.state.get(&id)?.try_into()
     }
 
     /*
