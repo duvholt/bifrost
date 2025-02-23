@@ -10,7 +10,7 @@ pub fn describe(frame: &ZclFrame, data: &[u8]) -> Option<String> {
             match frame.cmd {
                 0x02 => Some(format!(
                     "SetComposite {:?}",
-                    Flags::from_bits((data[3] as u16) | (data[4] as u16) << 8).unwrap()
+                    Flags::from_bits((data[3] as u16) | ((data[4] as u16) << 8)).unwrap()
                 )),
                 _ => None,
             }
