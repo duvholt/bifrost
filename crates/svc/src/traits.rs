@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::future::Future;
 
 use async_trait::async_trait;
 use tokio::sync::{mpsc, watch};
@@ -57,4 +58,26 @@ where
         rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
     ) -> Result<(), RunSvcError<E>>;
+}
+
+#[async_trait]
+impl<E: Error + Send, F> Service<E> for F
+where
+    F: Future<Output = Result<(), E>> + Send + Unpin,
+{
+    async fn configure(&mut self) -> Result<(), E> {
+        Ok(())
+    }
+
+    async fn start(&mut self) -> Result<(), E> {
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), E> {
+        self.await
+    }
+
+    async fn stop(&mut self) -> Result<(), E> {
+        Ok(())
+    }
 }
