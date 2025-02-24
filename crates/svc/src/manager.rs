@@ -65,21 +65,18 @@ impl<E: Error + Send> ServiceManager<E> {
         }
     }
 
-    pub fn register_standard(
-        &mut self,
-        name: impl AsRef<str>,
-        svc: impl Service<E> + 'static,
-    ) -> SvcResult<Uuid>
+    pub fn register_standard<S>(&mut self, name: impl AsRef<str>, svc: S) -> SvcResult<Uuid>
     where
-        RunSvcError<E>: From<E> + 'static,
+        S: Service<Error = E> + 'static,
+        RunSvcError<S::Error>: From<E> + 'static,
     {
         self.register(StandardService::new(name, svc))
     }
 
-    pub fn register<S>(&mut self, svc: impl ServiceRunner<S, E> + 'static) -> SvcResult<Uuid>
+    pub fn register<S>(&mut self, svc: impl ServiceRunner<S> + 'static) -> SvcResult<Uuid>
     where
-        S: Service<E>,
-        RunSvcError<E>: From<E> + 'static,
+        S: Service<Error = E>,
+        RunSvcError<S::Error>: From<E> + 'static,
     {
         let name = svc.name().to_string();
         if self.names.contains_key(&name) {

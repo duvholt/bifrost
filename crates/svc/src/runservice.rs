@@ -1,6 +1,4 @@
 use async_trait::async_trait;
-use std::error::Error;
-use std::marker::PhantomData;
 use std::time::Duration;
 use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
@@ -44,26 +42,16 @@ impl State {
     }
 }
 
-pub struct StandardService<S, E>
-where
-    S: Service<E>,
-    E: Error + Send,
-{
+pub struct StandardService<S: Service> {
     name: String,
     svc: S,
-    p: PhantomData<E>,
     configure_policy: Policy,
     start_policy: Policy,
     run_policy: Policy,
     stop_policy: Policy,
 }
 
-impl<S, E> StandardService<S, E>
-where
-    E: Error + Send,
-    S: Service<E>,
-    RunSvcError<E>: From<E>,
-{
+impl<S: Service> StandardService<S> {
     pub fn with_configure_policy(mut self, policy: Policy) -> Self {
         self.configure_policy = policy;
         self
@@ -86,17 +74,11 @@ where
 }
 
 #[async_trait]
-impl<S, E> ServiceRunner<S, E> for StandardService<S, E>
-where
-    E: Error + Send,
-    S: Service<E>,
-    RunSvcError<E>: From<E>,
-{
+impl<S: Service> ServiceRunner<S> for StandardService<S> {
     fn new(name: impl AsRef<str>, svc: S) -> Self {
         Self {
             name: name.as_ref().to_string(),
             svc,
-            p: PhantomData,
             configure_policy: Policy::new(),
             start_policy: Policy::new()
                 .with_delay(Duration::from_secs(1))
@@ -115,9 +97,9 @@ where
         id: Uuid,
         mut rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
-    ) -> Result<(), RunSvcError<E>>
+    ) -> Result<(), RunSvcError<S::Error>>
     where
-        RunSvcError<E>: From<E>,
+        RunSvcError<S::Error>: From<S::Error>,
     {
         let name = self.name;
         let mut svc = self.svc;

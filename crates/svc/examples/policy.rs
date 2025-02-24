@@ -27,7 +27,9 @@ impl From<Error> for RunSvcError<Error> {
 }
 
 #[async_trait]
-impl Service<Error> for PolicyService {
+impl Service for PolicyService {
+    type Error = Error;
+
     async fn run(&mut self) -> Result<(), Error> {
         println!("Hello {}", self.counter);
         self.counter += 1;

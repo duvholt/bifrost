@@ -26,29 +26,26 @@ pub enum ServiceState {
 }
 
 #[async_trait]
-pub trait Service<E: Error + Send>: Send {
-    async fn configure(&mut self) -> Result<(), E> {
+pub trait Service: Send {
+    type Error: Error + Send;
+
+    async fn configure(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    async fn start(&mut self) -> Result<(), E> {
+    async fn start(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), E>;
+    async fn run(&mut self) -> Result<(), Self::Error>;
 
-    async fn stop(&mut self) -> Result<(), E> {
+    async fn stop(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
 #[async_trait]
-pub trait ServiceRunner<S, E>
-where
-    E: Error + Send,
-    S: Service<E>,
-    RunSvcError<E>: From<E>,
-{
+pub trait ServiceRunner<S: Service> {
     fn new(name: impl AsRef<str>, svc: S) -> Self;
     fn name(&self) -> &str;
 
@@ -57,14 +54,18 @@ where
         id: Uuid,
         rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
-    ) -> Result<(), RunSvcError<E>>;
+    ) -> Result<(), RunSvcError<S::Error>>
+    where
+        RunSvcError<S::Error>: From<S::Error>;
 }
 
 #[async_trait]
-impl<E: Error + Send, F> Service<E> for F
+impl<E: Error + Send, F> Service for F
 where
     F: Future<Output = Result<(), E>> + Send + Unpin,
 {
+    type Error = E;
+
     async fn configure(&mut self) -> Result<(), E> {
         Ok(())
     }

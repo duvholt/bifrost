@@ -27,7 +27,9 @@ impl From<SimpleError> for RunSvcError<SimpleError> {
 }
 
 #[async_trait]
-impl Service<SimpleError> for Simple {
+impl Service for Simple {
+    type Error = SimpleError;
+
     async fn run(&mut self) -> Result<(), SimpleError> {
         let dur = Duration::from_millis(300);
 
