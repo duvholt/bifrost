@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use chrono::{DateTime, Duration, Utc};
 
 pub struct Throttle {
@@ -38,5 +40,40 @@ impl Throttle {
         }
 
         ready
+    }
+}
+
+pub struct ThrottleQueue<T> {
+    throttle: Throttle,
+    queue: VecDeque<T>,
+    capacity: usize,
+}
+
+impl<T> ThrottleQueue<T> {
+    #[must_use]
+    pub const fn new(throttle: Throttle, capacity: usize) -> Self {
+        Self {
+            throttle,
+            queue: VecDeque::new(),
+            capacity,
+        }
+    }
+
+    pub fn push(&mut self, value: T) -> bool {
+        if !self.throttle.tick() {
+            return false;
+        }
+
+        if self.queue.len() >= self.capacity {
+            return false;
+        }
+
+        self.queue.push_front(value);
+
+        true
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        self.queue.pop_back()
     }
 }
