@@ -7,8 +7,8 @@ use tokio::task::{AbortHandle, JoinSet};
 use uuid::Uuid;
 
 use crate::error::{RunSvcError, SvcError, SvcResult};
-use crate::runservice::run_service;
-use crate::traits::{Service, ServiceState};
+use crate::runservice::StandardService;
+use crate::traits::{Service, ServiceRunner, ServiceState};
 
 pub trait IntoServiceId<E: Error + Send>: Display {
     fn service_id(&self, svcm: &ServiceManager<E>) -> Option<Uuid>;
@@ -59,22 +59,35 @@ impl<E: Error + Send> ServiceManager<E> {
         }
     }
 
-    pub fn register<S>(&mut self, name: &str, svc: S) -> SvcResult<Uuid>
+    pub fn register_standard(
+        &mut self,
+        name: impl AsRef<str>,
+        svc: impl Service<E> + 'static,
+    ) -> SvcResult<Uuid>
     where
-        S: Service<E> + Send + 'static,
         RunSvcError<E>: From<E> + 'static,
     {
-        if self.names.contains_key(name) {
-            return Err(SvcError::ServiceAlreadyExists(name.to_string()));
+        self.register(StandardService::new(
+            Uuid::new_v4(),
+            name.as_ref().to_string(),
+            svc,
+        ))
+    }
+
+    pub fn register<S>(&mut self, svc: impl ServiceRunner<S, E> + 'static) -> SvcResult<Uuid>
+    where
+        S: Service<E>,
+        RunSvcError<E>: From<E> + 'static,
+    {
+        let name = svc.name().to_string();
+        if self.names.contains_key(&name) {
+            return Err(SvcError::ServiceAlreadyExists(name));
         }
 
-        let id = Uuid::new_v4();
-
         let (tx, rx) = watch::channel(ServiceState::Registered);
+        let id = svc.uuid();
 
-        let abort_handle =
-            self.tasks
-                .spawn(run_service(id, name.to_string(), rx, self.tx.clone(), svc));
+        let abort_handle = self.tasks.spawn(svc.run(rx, self.tx.clone()));
 
         let rec = ServiceInstance {
             tx,

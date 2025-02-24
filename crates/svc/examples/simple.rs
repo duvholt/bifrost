@@ -69,11 +69,18 @@ async fn main() -> SvcResult<()> {
         counter: 0,
     };
 
-    svm.register("foo", svc)?;
+    svm.register_standard("foo", svc)?;
     svm.start("foo")?;
+
+    println!("main: service configured");
 
     svm.wait_for_start("foo").await?;
 
+    println!("main: service started");
+
     svm.wait_for_stop("foo").await?;
+
+    println!("main: service stopped");
+
     Ok(())
 }
