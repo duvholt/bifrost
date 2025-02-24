@@ -26,6 +26,12 @@ impl<E: Error + Send> IntoServiceId<E> for &str {
     }
 }
 
+impl<E: Error + Send, I: IntoServiceId<E>> IntoServiceId<E> for &I {
+    fn service_id(&self, svcm: &ServiceManager<E>) -> Option<Uuid> {
+        (*self).service_id(svcm)
+    }
+}
+
 pub struct ServiceInstance {
     tx: watch::Sender<ServiceState>,
     name: String,
