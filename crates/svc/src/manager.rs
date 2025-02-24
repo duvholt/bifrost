@@ -121,9 +121,13 @@ impl<E: Error + Send> ServiceManager<E> {
     }
 
     pub fn start(&mut self, id: impl IntoServiceId<E>) -> SvcResult<()> {
-        let svc = self.get(id)?;
-        svc.tx.send(ServiceState::Running)?;
-        Ok(())
+        self.get(id)
+            .and_then(|svc| Ok(svc.tx.send(ServiceState::Running)?))
+    }
+
+    pub fn stop(&mut self, id: impl IntoServiceId<E>) -> SvcResult<()> {
+        self.get(id)
+            .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
 
     async fn next_event(&mut self) -> SvcResult<(Uuid, ServiceState)> {
