@@ -178,8 +178,21 @@ where
                         /* sleep(Duration::from_secs(1)).await; */
                     }
                     Err(err) => {
-                        log::error!("[{name}] Failed to start service: {err}");
-                        sleep(Duration::from_secs(3)).await;
+                        self.run_policy.sleep().await;
+                        if self.run_policy.should_retry(state.retry()) {
+                            log::warn!("[{name}] Service failed to start, retrying..");
+                        } else {
+                            log::error!("[{name}] Failed to run service: {err}");
+                            match svc.stop().await {
+                                Ok(()) => {
+                                    log::debug!("[{name}] Stopped failing service");
+                                }
+                                Err(err) => {
+                                    log::error!("[{name}] Failed to stop failing service: {err}");
+                                }
+                            }
+                            state.set(ServiceState::Failed).await?;
+                        }
                     }
                 },
 
