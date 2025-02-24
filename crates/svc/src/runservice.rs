@@ -195,10 +195,17 @@ where
                 },
 
                 ServiceState::Stopped => {
+                    rx.changed().await?;
                     if rx.has_changed()? {
                         log::debug!("[{name}] Service stopped.");
                     }
+                }
+
+                ServiceState::Failed => {
                     rx.changed().await?;
+                    if rx.has_changed()? {
+                        log::debug!("[{name}] Service failed.");
+                    }
                 }
             }
         }

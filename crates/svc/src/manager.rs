@@ -137,13 +137,23 @@ impl<E: Error + Send> ServiceManager<E> {
     pub async fn wait_for_state(
         &mut self,
         handle: impl IntoServiceId<E>,
-        state: ServiceState,
+        expected: ServiceState,
     ) -> SvcResult<()> {
         let id = handle
             .service_id(self)
             .ok_or(SvcError::ServiceNameNotFound(handle.to_string()))?;
 
-        while self.get(id)?.state != state {
+        loop {
+            let state = self.get(id)?.state;
+
+            if state == expected {
+                break;
+            }
+
+            if state == ServiceState::Failed {
+                return Err(SvcError::ServiceFailed);
+            }
+
             self.next_event().await?;
         }
 

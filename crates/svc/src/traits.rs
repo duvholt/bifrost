@@ -20,6 +20,8 @@ pub enum ServiceState {
     Stopping,
     /// Service is not running, but is ready to start up again
     Stopped,
+    /// Service has failed
+    Failed,
 }
 
 #[async_trait]
