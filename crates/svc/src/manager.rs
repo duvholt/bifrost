@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt::Display;
 
@@ -174,6 +174,54 @@ impl<E: Error + Send> ServiceManager<E> {
 
     pub async fn wait_for_start(&mut self, handle: impl IntoServiceId<E>) -> SvcResult<()> {
         self.wait_for_state(handle, ServiceState::Running).await
+    }
+
+    pub async fn start_multiple(&mut self, _handles: &[impl IntoServiceId<E>]) -> SvcResult<()> {
+        todo!();
+    }
+
+    fn resolve_multiple(&self, handles: &[impl IntoServiceId<E>]) -> SvcResult<BTreeSet<Uuid>> {
+        let res = BTreeSet::from_iter(
+            handles
+                .iter()
+                .map(|id| self.resolve(id))
+                .collect::<Result<Vec<Uuid>, SvcError>>()?,
+        );
+
+        Ok(res)
+    }
+
+    pub async fn wait_for_multiple(
+        &mut self,
+        handles: &[impl IntoServiceId<E>],
+        target: ServiceState,
+    ) -> SvcResult<()> {
+        let mut missing = self.resolve_multiple(handles)?;
+        let mut done = BTreeSet::new();
+
+        while !missing.is_empty() {
+            for m in &missing {
+                let state = self.get(m)?.state;
+
+                if state == ServiceState::Failed {
+                    return Err(SvcError::ServiceFailed);
+                }
+
+                if state == target {
+                    done.insert(*m);
+                }
+            }
+
+            missing.retain(|f| !done.contains(f));
+        }
+        Ok(())
+    }
+
+    pub async fn wait_for_multiple_started(
+        &mut self,
+        handles: &[impl IntoServiceId<E>],
+    ) -> SvcResult<()> {
+        self.wait_for_multiple(handles, ServiceState::Running).await
     }
 
     pub async fn wait_for_stop(&mut self, handle: impl IntoServiceId<E>) -> SvcResult<()> {
