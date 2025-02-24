@@ -36,6 +36,7 @@ keywords = [
 [workspace]
 members = [
     "crates/hue",
+    "crates/svc",
     "crates/zcl",
 ]
 
