@@ -53,6 +53,37 @@ where
     name: String,
     svc: S,
     p: PhantomData<E>,
+    configure_policy: Policy,
+    start_policy: Policy,
+    run_policy: Policy,
+    stop_policy: Policy,
+}
+
+impl<S, E> StandardService<S, E>
+where
+    E: Error + Send,
+    S: Service<E>,
+    RunSvcError<E>: From<E>,
+{
+    pub fn with_configure_policy(mut self, policy: Policy) -> Self {
+        self.configure_policy = policy;
+        self
+    }
+
+    pub fn with_start_policy(mut self, policy: Policy) -> Self {
+        self.start_policy = policy;
+        self
+    }
+
+    pub fn with_run_policy(mut self, policy: Policy) -> Self {
+        self.run_policy = policy;
+        self
+    }
+
+    pub fn with_stop_policy(mut self, policy: Policy) -> Self {
+        self.stop_policy = policy;
+        self
+    }
 }
 
 #[async_trait]
@@ -73,6 +104,12 @@ where
             name: name.as_ref().to_string(),
             svc,
             p: PhantomData,
+            configure_policy: Policy::new(),
+            start_policy: Policy::new()
+                .with_delay(Duration::from_secs(1))
+                .with_retry(Retry::Limit(3)),
+            run_policy: Policy::new().with_delay(Duration::from_secs(1)),
+            stop_policy: Policy::new(),
         }
     }
 
