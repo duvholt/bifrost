@@ -46,7 +46,7 @@ where
     S: Service<E>,
     RunSvcError<E>: From<E>,
 {
-    fn new(id: Uuid, name: String, svc: S) -> Self;
+    fn new(id: Uuid, name: impl AsRef<str>, svc: S) -> Self;
     fn uuid(&self) -> Uuid;
     fn name(&self) -> &str;
 

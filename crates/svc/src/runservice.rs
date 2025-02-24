@@ -62,7 +62,7 @@ where
     S: Service<E>,
     RunSvcError<E>: From<E>,
 {
-    fn new(id: Uuid, name: String, svc: S) -> Self
+    fn new(id: Uuid, name: impl AsRef<str>, svc: S) -> Self
     where
         E: Error + Send,
         S: Service<E>,
@@ -70,7 +70,7 @@ where
     {
         Self {
             id,
-            name,
+            name: name.as_ref().to_string(),
             svc,
             p: PhantomData,
         }

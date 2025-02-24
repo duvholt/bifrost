@@ -67,11 +67,7 @@ impl<E: Error + Send> ServiceManager<E> {
     where
         RunSvcError<E>: From<E> + 'static,
     {
-        self.register(StandardService::new(
-            Uuid::new_v4(),
-            name.as_ref().to_string(),
-            svc,
-        ))
+        self.register(StandardService::new(Uuid::new_v4(), name, svc))
     }
 
     pub fn register<S>(&mut self, svc: impl ServiceRunner<S, E> + 'static) -> SvcResult<Uuid>
