@@ -8,7 +8,6 @@ use thiserror::Error;
 use svc::error::{RunSvcError, SvcResult};
 use svc::manager::ServiceManager;
 use svc::traits::{Service, ServiceRunner, ServiceState};
-use uuid::Uuid;
 
 #[derive(Clone)]
 struct PolicyService {
@@ -53,7 +52,7 @@ async fn main() -> SvcResult<()> {
 
     // Manually construct a ServiceRunner, and set a specific policy for
     // handling errors during .run()
-    let svcr = StandardService::new(Uuid::new_v4(), NAME, svc).with_run_policy(
+    let svcr = StandardService::new(NAME, svc).with_run_policy(
         // Try up to 5 times, waiting 300ms between each attempt
         Policy::new()
             .with_retry(Retry::Limit(5))

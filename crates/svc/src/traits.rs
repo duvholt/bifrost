@@ -48,12 +48,12 @@ where
     S: Service<E>,
     RunSvcError<E>: From<E>,
 {
-    fn new(id: Uuid, name: impl AsRef<str>, svc: S) -> Self;
-    fn uuid(&self) -> Uuid;
+    fn new(name: impl AsRef<str>, svc: S) -> Self;
     fn name(&self) -> &str;
 
     async fn run(
         mut self,
+        id: Uuid,
         rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
     ) -> Result<(), RunSvcError<E>>;

@@ -67,7 +67,7 @@ impl<E: Error + Send> ServiceManager<E> {
     where
         RunSvcError<E>: From<E> + 'static,
     {
-        self.register(StandardService::new(Uuid::new_v4(), name, svc))
+        self.register(StandardService::new(name, svc))
     }
 
     pub fn register<S>(&mut self, svc: impl ServiceRunner<S, E> + 'static) -> SvcResult<Uuid>
@@ -81,9 +81,9 @@ impl<E: Error + Send> ServiceManager<E> {
         }
 
         let (tx, rx) = watch::channel(ServiceState::Registered);
-        let id = svc.uuid();
+        let id = Uuid::new_v4();
 
-        let abort_handle = self.tasks.spawn(svc.run(rx, self.tx.clone()));
+        let abort_handle = self.tasks.spawn(svc.run(id, rx, self.tx.clone()));
 
         let rec = ServiceInstance {
             tx,

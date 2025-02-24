@@ -49,7 +49,6 @@ where
     S: Service<E>,
     E: Error + Send,
 {
-    id: Uuid,
     name: String,
     svc: S,
     p: PhantomData<E>,
@@ -93,14 +92,8 @@ where
     S: Service<E>,
     RunSvcError<E>: From<E>,
 {
-    fn new(id: Uuid, name: impl AsRef<str>, svc: S) -> Self
-    where
-        E: Error + Send,
-        S: Service<E>,
-        RunSvcError<E>: From<E>,
-    {
+    fn new(name: impl AsRef<str>, svc: S) -> Self {
         Self {
-            id,
             name: name.as_ref().to_string(),
             svc,
             p: PhantomData,
@@ -113,23 +106,19 @@ where
         }
     }
 
-    fn uuid(&self) -> Uuid {
-        self.id
-    }
-
     fn name(&self) -> &str {
         &self.name
     }
 
     async fn run(
         mut self,
+        id: Uuid,
         mut rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
     ) -> Result<(), RunSvcError<E>>
     where
         RunSvcError<E>: From<E>,
     {
-        let id = self.id;
         let name = self.name;
         let mut svc = self.svc;
 
