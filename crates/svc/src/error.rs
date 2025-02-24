@@ -35,6 +35,9 @@ pub enum SvcError {
 
     #[error("All services stopped")]
     Shutdown,
+
+    #[error("Service has failed")]
+    ServiceFailed,
 }
 
 #[derive(Error, Debug)]
