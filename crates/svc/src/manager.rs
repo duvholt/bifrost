@@ -108,6 +108,11 @@ impl<E: Error + Send> ServiceManager<E> {
         self.names.get(name).copied()
     }
 
+    pub fn resolve(&self, id: impl IntoServiceId<E>) -> SvcResult<Uuid> {
+        id.service_id(self)
+            .ok_or(SvcError::ServiceNameNotFound(id.to_string()))
+    }
+
     pub fn abort(&self, id: impl IntoServiceId<E>) -> SvcResult<()> {
         let svc = self.get(id)?;
 
@@ -117,9 +122,10 @@ impl<E: Error + Send> ServiceManager<E> {
     }
 
     pub fn get(&self, svc: impl IntoServiceId<E>) -> SvcResult<&ServiceInstance> {
-        svc.service_id(self)
-            .and_then(|id| self.svcs.get(&id))
-            .ok_or_else(|| SvcError::ServiceNameNotFound(svc.to_string()))
+        let id = &self.resolve(svc)?;
+        self.svcs
+            .get(id)
+            .ok_or_else(|| SvcError::ServiceNameNotFound(id.to_string()))
     }
 
     pub fn start(&mut self, id: impl IntoServiceId<E>) -> SvcResult<()> {
