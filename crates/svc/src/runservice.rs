@@ -7,26 +7,40 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::error::RunSvcError;
+use crate::policy::{Policy, Retry};
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
 struct State {
     id: Uuid,
+    retry: u32,
     state: ServiceState,
     tx: mpsc::Sender<(Uuid, ServiceState)>,
 }
 
 impl State {
     pub fn new(id: Uuid, state: ServiceState, tx: mpsc::Sender<(Uuid, ServiceState)>) -> Self {
-        Self { id, state, tx }
+        Self {
+            id,
+            retry: 0,
+            state,
+            tx,
+        }
     }
 
     pub async fn set<E>(&mut self, next: ServiceState) -> Result<(), RunSvcError<E>> {
         self.state = next;
+        self.retry = 0;
         Ok(self.tx.send((self.id, self.state)).await?)
     }
 
     pub fn get(&self) -> ServiceState {
         self.state
+    }
+
+    pub fn retry(&mut self) -> u32 {
+        let res = self.retry;
+        self.retry += 1;
+        res
     }
 }
 
