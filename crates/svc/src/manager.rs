@@ -10,24 +10,24 @@ use crate::error::{RunSvcError, SvcError, SvcResult};
 use crate::runservice::StandardService;
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
-pub trait IntoServiceId<E: Error + Send>: Display {
-    fn service_id(&self, svcm: &ServiceManager<E>) -> Option<Uuid>;
+pub trait IntoServiceId: Display {
+    fn service_id<E>(&self, svcm: &ServiceManager<E>) -> Option<Uuid>;
 }
 
-impl<E: Error + Send> IntoServiceId<E> for Uuid {
-    fn service_id(&self, _svcm: &ServiceManager<E>) -> Option<Uuid> {
+impl IntoServiceId for Uuid {
+    fn service_id<E>(&self, _svcm: &ServiceManager<E>) -> Option<Uuid> {
         Some(*self)
     }
 }
 
-impl<E: Error + Send> IntoServiceId<E> for &str {
-    fn service_id(&self, svcm: &ServiceManager<E>) -> Option<Uuid> {
+impl IntoServiceId for &str {
+    fn service_id<E>(&self, svcm: &ServiceManager<E>) -> Option<Uuid> {
         svcm.lookup(self)
     }
 }
 
-impl<E: Error + Send, I: IntoServiceId<E>> IntoServiceId<E> for &I {
-    fn service_id(&self, svcm: &ServiceManager<E>) -> Option<Uuid> {
+impl<I: IntoServiceId> IntoServiceId for &I {
+    fn service_id<E>(&self, svcm: &ServiceManager<E>) -> Option<Uuid> {
         (*self).service_id(svcm)
     }
 }
@@ -47,13 +47,13 @@ pub struct ServiceManager<E> {
     tasks: JoinSet<Result<(), RunSvcError<E>>>,
 }
 
-impl<E: Error + Send> Default for ServiceManager<E> {
+impl<E> Default for ServiceManager<E> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<E: Error + Send> ServiceManager<E> {
+impl<E> ServiceManager<E> {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(32);
         Self {
@@ -67,6 +67,7 @@ impl<E: Error + Send> ServiceManager<E> {
 
     pub fn register_standard<S>(&mut self, name: impl AsRef<str>, svc: S) -> SvcResult<Uuid>
     where
+        E: Error + Send,
         S: Service<Error = E> + 'static,
         RunSvcError<S::Error>: From<E> + 'static,
     {
@@ -75,6 +76,7 @@ impl<E: Error + Send> ServiceManager<E> {
 
     pub fn register<S>(&mut self, svc: impl ServiceRunner<S> + 'static) -> SvcResult<Uuid>
     where
+        E: Error + Send,
         S: Service<Error = E>,
         RunSvcError<S::Error>: From<E> + 'static,
     {
@@ -105,12 +107,12 @@ impl<E: Error + Send> ServiceManager<E> {
         self.names.get(name).copied()
     }
 
-    pub fn resolve(&self, id: impl IntoServiceId<E>) -> SvcResult<Uuid> {
+    pub fn resolve(&self, id: impl IntoServiceId) -> SvcResult<Uuid> {
         id.service_id(self)
             .ok_or(SvcError::ServiceNameNotFound(id.to_string()))
     }
 
-    pub fn abort(&self, id: impl IntoServiceId<E>) -> SvcResult<()> {
+    pub fn abort(&self, id: impl IntoServiceId) -> SvcResult<()> {
         let svc = self.get(id)?;
 
         svc.abort_handle.abort();
@@ -118,19 +120,19 @@ impl<E: Error + Send> ServiceManager<E> {
         Ok(())
     }
 
-    pub fn get(&self, svc: impl IntoServiceId<E>) -> SvcResult<&ServiceInstance> {
+    pub fn get(&self, svc: impl IntoServiceId) -> SvcResult<&ServiceInstance> {
         let id = &self.resolve(svc)?;
         self.svcs
             .get(id)
             .ok_or_else(|| SvcError::ServiceNameNotFound(id.to_string()))
     }
 
-    pub fn start(&mut self, id: impl IntoServiceId<E>) -> SvcResult<()> {
+    pub fn start(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
         self.get(id)
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Running)?))
     }
 
-    pub fn stop(&mut self, id: impl IntoServiceId<E>) -> SvcResult<()> {
+    pub fn stop(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
         self.get(id)
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
@@ -145,7 +147,7 @@ impl<E: Error + Send> ServiceManager<E> {
 
     pub async fn wait_for_state(
         &mut self,
-        handle: impl IntoServiceId<E>,
+        handle: impl IntoServiceId,
         expected: ServiceState,
     ) -> SvcResult<()> {
         let id = handle
@@ -169,15 +171,15 @@ impl<E: Error + Send> ServiceManager<E> {
         Ok(())
     }
 
-    pub async fn wait_for_start(&mut self, handle: impl IntoServiceId<E>) -> SvcResult<()> {
+    pub async fn wait_for_start(&mut self, handle: impl IntoServiceId) -> SvcResult<()> {
         self.wait_for_state(handle, ServiceState::Running).await
     }
 
-    pub async fn start_multiple(&mut self, _handles: &[impl IntoServiceId<E>]) -> SvcResult<()> {
+    pub async fn start_multiple(&mut self, _handles: &[impl IntoServiceId]) -> SvcResult<()> {
         todo!();
     }
 
-    fn resolve_multiple(&self, handles: &[impl IntoServiceId<E>]) -> SvcResult<BTreeSet<Uuid>> {
+    fn resolve_multiple(&self, handles: &[impl IntoServiceId]) -> SvcResult<BTreeSet<Uuid>> {
         let res = BTreeSet::from_iter(
             handles
                 .iter()
@@ -190,7 +192,7 @@ impl<E: Error + Send> ServiceManager<E> {
 
     pub async fn wait_for_multiple(
         &mut self,
-        handles: &[impl IntoServiceId<E>],
+        handles: &[impl IntoServiceId],
         target: ServiceState,
     ) -> SvcResult<()> {
         let mut missing = self.resolve_multiple(handles)?;
@@ -216,12 +218,12 @@ impl<E: Error + Send> ServiceManager<E> {
 
     pub async fn wait_for_multiple_started(
         &mut self,
-        handles: &[impl IntoServiceId<E>],
+        handles: &[impl IntoServiceId],
     ) -> SvcResult<()> {
         self.wait_for_multiple(handles, ServiceState::Running).await
     }
 
-    pub async fn wait_for_stop(&mut self, handle: impl IntoServiceId<E>) -> SvcResult<()> {
+    pub async fn wait_for_stop(&mut self, handle: impl IntoServiceId) -> SvcResult<()> {
         self.wait_for_state(handle, ServiceState::Stopped).await
     }
 
