@@ -130,7 +130,7 @@ impl<E: Error + Send> ServiceManager<E> {
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
 
-    async fn next_event(&mut self) -> SvcResult<(Uuid, ServiceState)> {
+    pub async fn next_event(&mut self) -> SvcResult<(Uuid, ServiceState)> {
         let (id, state) = self.rx.recv().await.ok_or(SvcError::Shutdown)?;
         let name = &self.svcs[&id].name;
         log::trace!("[{name}] [{id}] Service is now {state:?}");
