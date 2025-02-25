@@ -201,7 +201,7 @@ impl<E> ServiceManager<E> {
         let mut missing = self.resolve_multiple(handles)?;
         let mut done = BTreeSet::new();
 
-        while !missing.is_empty() {
+        loop {
             for m in &missing {
                 let state = self.get(m)?.state;
 
@@ -215,7 +215,14 @@ impl<E> ServiceManager<E> {
             }
 
             missing.retain(|f| !done.contains(f));
+
+            if missing.is_empty() {
+                break;
+            }
+
+            self.next_event().await?;
         }
+
         Ok(())
     }
 
