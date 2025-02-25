@@ -150,9 +150,7 @@ impl<E> ServiceManager<E> {
         handle: impl IntoServiceId,
         expected: ServiceState,
     ) -> SvcResult<()> {
-        let id = handle
-            .service_id(self)
-            .ok_or(SvcError::ServiceNameNotFound(handle.to_string()))?;
+        let id = self.resolve(&handle)?;
 
         loop {
             let state = self.get(id)?.state;
