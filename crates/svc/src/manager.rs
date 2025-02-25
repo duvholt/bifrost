@@ -173,8 +173,13 @@ impl<E> ServiceManager<E> {
         self.wait_for_state(handle, ServiceState::Running).await
     }
 
-    pub async fn start_multiple(&mut self, _handles: &[impl IntoServiceId]) -> SvcResult<()> {
-        todo!();
+    pub async fn start_multiple(&mut self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
+        let ids = self.resolve_multiple(handles)?;
+        for id in ids {
+            self.start(id)?;
+        }
+
+        Ok(())
     }
 
     fn resolve_multiple(&self, handles: &[impl IntoServiceId]) -> SvcResult<BTreeSet<Uuid>> {
