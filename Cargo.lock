@@ -306,6 +306,7 @@ dependencies = [
  "serde_yml",
  "sha1",
  "sha2",
+ "svc",
  "termcolor",
  "thiserror 2.0.11",
  "tokio",
