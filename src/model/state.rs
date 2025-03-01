@@ -126,7 +126,7 @@ impl State {
     }
 
     pub fn patch_bridge_version(&mut self, version: &SwVersion) {
-        let software_version = version.get_legacy_apiversion();
+        let software_version = version.get_software_version();
         for (uuid, value) in &mut self.res {
             let Resource::Device(dev) = value else {
                 continue;
