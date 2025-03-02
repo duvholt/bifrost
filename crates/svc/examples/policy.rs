@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use svc::error::SvcResult;
 use svc::manager::ServiceManager;
-use svc::traits::Service;
+use svc::traits::{Service, ServiceState};
 
 #[derive(Clone)]
 struct PolicyService {
@@ -55,15 +55,15 @@ async fn main() -> SvcResult<()> {
             .with_delay(Duration::from_millis(300)),
     );
 
-    client.register(NAME, svcr).await?;
-    client.start(NAME).await?;
+    let uuid = client.register(NAME, svcr).await?;
+    client.start(uuid).await?;
+    println!("main: service will attempt to run 5 times");
 
-    println!("main: service configured to try starting 5 times");
-
-    client.wait_for_start(NAME).await?;
-
+    client.wait_for_start(uuid).await?;
     println!("main: service started");
 
+    client.wait_for_state(uuid, ServiceState::Failed).await?;
+    client.shutdown().await?;
     future.await??;
 
     Ok(())

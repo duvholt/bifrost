@@ -16,7 +16,7 @@ struct Simple {
 
 #[derive(Error, Debug)]
 pub enum SimpleError {
-    #[error("That didn't work")]
+    #[error("That didn't work..")]
     Nope,
 }
 

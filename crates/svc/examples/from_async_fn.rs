@@ -35,24 +35,15 @@ async fn main() -> SvcResult<()> {
 
     let (mut client, future) = ServiceManager::spawn();
 
-    client.register_function("foo", Box::pin(run())).await?;
-
+    client.register_function("foo", run()).await?;
     client.start("foo").await?;
-
     println!("main: service configured");
 
     client.wait_for_start("foo").await?;
-
     println!("main: service started");
 
-    let list = client.list().await?;
-
-    println!("{:?}", list);
-
     client.shutdown().await?;
-
     future.await??;
-
     println!("main: service stopped");
 
     Ok(())
