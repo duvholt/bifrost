@@ -284,7 +284,7 @@ impl ServiceManager {
         Ok(id)
     }
 
-    pub fn list(&self) -> impl Iterator<Item = &Uuid> {
+    fn list(&self) -> impl Iterator<Item = &Uuid> {
         self.svcs.keys()
     }
 
@@ -292,7 +292,7 @@ impl ServiceManager {
         self.names.get(name).copied()
     }
 
-    pub fn resolve(&self, handle: impl IntoServiceId) -> SvcResult<Uuid> {
+    fn resolve(&self, handle: impl IntoServiceId) -> SvcResult<Uuid> {
         let id = handle.service_id();
         match &id {
             ServiceId::Name(name) => self
@@ -318,7 +318,7 @@ impl ServiceManager {
         Ok(())
     }
 
-    pub fn abort(&mut self, id: &ServiceId) -> SvcResult<()> {
+    fn abort(&mut self, id: &ServiceId) -> SvcResult<()> {
         let svc = self.get(id)?;
 
         svc.abort_handle.abort();
@@ -326,19 +326,19 @@ impl ServiceManager {
         self.remove(id)
     }
 
-    pub fn get(&self, svc: impl IntoServiceId) -> SvcResult<&ServiceInstance> {
+    fn get(&self, svc: impl IntoServiceId) -> SvcResult<&ServiceInstance> {
         let id = self.resolve(svc)?;
         Ok(&self.svcs[&id])
     }
 
-    pub fn start(&self, id: impl IntoServiceId) -> SvcResult<()> {
+    fn start(&self, id: impl IntoServiceId) -> SvcResult<()> {
         self.get(&id).and_then(|svc| {
             log::debug!("Starting {id} {}", &svc.name);
             Ok(svc.tx.send(ServiceState::Running)?)
         })
     }
 
-    pub fn stop(&self, id: impl IntoServiceId) -> SvcResult<()> {
+    fn stop(&self, id: impl IntoServiceId) -> SvcResult<()> {
         let id = self.resolve(id)?;
 
         if self.svcs[&id].state == ServiceState::Stopped {
@@ -363,7 +363,7 @@ impl ServiceManager {
         }
     }
 
-    pub async fn next_event(&mut self) -> SvcResult<()> {
+    async fn next_event(&mut self) -> SvcResult<()> {
         tokio::select! {
             event = self.control_rx.recv() => self.handle_svm_request(event.ok_or(SvcError::Shutdown)?).await,
             event = self.service_rx.recv() => self.handle_service_event(event.ok_or(SvcError::Shutdown)?).await,
@@ -478,7 +478,7 @@ impl ServiceManager {
         Ok(())
     }
 
-    pub async fn stop_multiple(&mut self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
+    async fn stop_multiple(&mut self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
         let ids = self.resolve_multiple(handles)?;
         for id in ids {
             self.stop(id)?;
@@ -498,7 +498,7 @@ impl ServiceManager {
         Ok(res)
     }
 
-    pub async fn wait_for_multiple(
+    async fn wait_for_multiple(
         &mut self,
         handles: &[impl IntoServiceId],
         target: ServiceState,
