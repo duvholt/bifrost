@@ -53,6 +53,7 @@ pub enum SvmRequest {
     List(RpcRequest<(), Vec<(Uuid, String)>>),
     Resolve(RpcRequest<ServiceId, SvcResult<Uuid>>),
     Register(RpcRequest<(String, ServiceFunc), SvcResult<Uuid>>),
+    Subscribe(RpcRequest<mpsc::Sender<ServiceEvent>, SvcResult<Uuid>>),
     Shutdown(RpcRequest<(), ()>),
 }
 
@@ -124,6 +125,52 @@ impl SvmClient {
         self.rpc(SvmRequest::Resolve, id.service_id()).await?
     }
 
+    pub async fn subscribe(&mut self) -> SvcResult<(Uuid, mpsc::Receiver<ServiceEvent>)> {
+        let (tx, rx) = mpsc::channel(10);
+
+        let uuid = self.rpc(SvmRequest::Subscribe, tx).await??;
+
+        Ok((uuid, rx))
+    }
+
+    pub async fn wait_for_state(
+        &mut self,
+        handle: impl IntoServiceId,
+        expected: ServiceState,
+    ) -> SvcResult<()> {
+        let svc_id = self.resolve(&handle).await?;
+
+        let (_cid, mut channel) = self.subscribe().await?;
+
+        while let Some(msg) = channel.recv().await {
+            if msg.id == svc_id {
+                if msg.state == expected {
+                    return Ok(());
+                }
+
+                if msg.state == ServiceState::Failed {
+                    return Err(SvcError::ServiceFailed);
+                }
+            }
+        }
+
+        Err(SvcError::Shutdown)
+    }
+
+    pub async fn wait_for_start(
+        &mut self,
+        handle: impl IntoServiceId + Send + 'static,
+    ) -> SvcResult<()> {
+        self.wait_for_state(handle, ServiceState::Running).await
+    }
+
+    pub async fn wait_for_stop(
+        &mut self,
+        handle: impl IntoServiceId + Send + 'static,
+    ) -> SvcResult<()> {
+        self.wait_for_state(handle, ServiceState::Stopped).await
+    }
+
     pub async fn status(
         &mut self,
         id: impl IntoServiceId + Send + 'static,
@@ -149,6 +196,7 @@ impl Debug for SvmRequest {
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Register(_arg0) => f.debug_tuple("Register").field(&"<service>").finish(),
             Self::Resolve(arg0) => f.debug_tuple("Resolve").field(arg0).finish(),
+            Self::Subscribe(_arg0) => f.debug_tuple("Subscribe").finish(),
             Self::Shutdown(_arg0) => f.debug_tuple("Shutdown").finish(),
         }
     }
@@ -159,6 +207,7 @@ pub struct ServiceManager {
     control_tx: mpsc::Sender<SvmRequest>,
     service_rx: mpsc::Receiver<ServiceEvent>,
     service_tx: mpsc::Sender<ServiceEvent>,
+    subscribers: BTreeMap<Uuid, mpsc::Sender<ServiceEvent>>,
     svcs: BTreeMap<Uuid, ServiceInstance>,
     names: BTreeMap<String, Uuid>,
     tasks: JoinSet<Result<(), RunSvcError>>,
@@ -180,6 +229,7 @@ impl ServiceManager {
             control_rx,
             service_tx,
             service_rx,
+            subscribers: BTreeMap::new(),
             svcs: BTreeMap::new(),
             names: BTreeMap::new(),
             tasks: JoinSet::new(),
@@ -295,6 +345,19 @@ impl ServiceManager {
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
 
+    async fn notify_subscribers(&mut self, event: ServiceEvent) {
+        let mut failed = vec![];
+        for (key, sub) in &self.subscribers {
+            log::trace!("UPDATE: [sub-{key}] {} -> {:?}", &event.id, &event.state);
+            if sub.send(event).await.is_err() {
+                failed.push(*key);
+            }
+        }
+        if !failed.is_empty() {
+            self.subscribers.retain(|k, _| !failed.contains(k));
+        }
+    }
+
     pub async fn next_event(&mut self) -> SvcResult<()> {
         tokio::select! {
             event = self.control_rx.recv() => self.handle_svm_request(event.ok_or(SvcError::Shutdown)?).await,
@@ -331,6 +394,19 @@ impl ServiceManager {
             SvmRequest::Register(rpc) => rpc.respond(|(name, svc)| self.register(&name, svc)),
 
             SvmRequest::Resolve(rpc) => rpc.respond(|id| self.resolve(&id)),
+
+            SvmRequest::Subscribe(rpc) => {
+                for (id, svc) in &self.svcs {
+                    rpc.data().send(ServiceEvent::new(*id, svc.state)).await?;
+                }
+
+                rpc.respond(|tx| {
+                    let uuid = Uuid::new_v4();
+                    self.subscribers.insert(uuid, tx);
+
+                    Ok(uuid)
+                });
+            }
 
             SvmRequest::Shutdown(rpc) => {
                 log::info!("Service managed shutting down..");
