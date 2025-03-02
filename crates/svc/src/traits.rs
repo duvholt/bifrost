@@ -66,6 +66,7 @@ pub enum ServiceState {
 #[async_trait]
 pub trait Service: Send {
     type Error: Error + Send + 'static;
+    const SIGNAL_STOP: bool = false;
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -78,6 +79,10 @@ pub trait Service: Send {
     async fn run(&mut self) -> Result<(), Self::Error>;
 
     async fn stop(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn signal_stop(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
