@@ -246,6 +246,11 @@ impl ServiceManager {
         (client, fut)
     }
 
+    /// Convenience function to create and daemonize a [`ServiceManager`].
+    pub fn spawn() -> (SvmClient, JoinHandle<SvcResult<()>>) {
+        Self::new().daemonize()
+    }
+
     /// Create a new [`SvmClient`] connected to this service manager.
     pub fn client(&self) -> SvmClient {
         SvmClient::new(self.handle())
