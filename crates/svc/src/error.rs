@@ -29,6 +29,9 @@ pub enum SvcError {
     #[error(transparent)]
     WatchRecvError(#[from] tokio::sync::watch::error::RecvError),
 
+    #[error(transparent)]
+    OneshotRecvError(#[from] tokio::sync::oneshot::error::RecvError),
+
     #[error("Service {0} not registered")]
     ServiceNameNotFound(String),
 
