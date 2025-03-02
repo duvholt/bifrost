@@ -288,10 +288,6 @@ impl ServiceManager {
         self.svcs.keys()
     }
 
-    pub fn lookup(&self, name: &str) -> Option<Uuid> {
-        self.names.get(name).copied()
-    }
-
     fn resolve(&self, handle: impl IntoServiceId) -> SvcResult<Uuid> {
         let id = handle.service_id();
         match &id {
@@ -437,47 +433,6 @@ impl ServiceManager {
         Ok(())
     }
 
-    pub async fn wait_for_state(
-        &mut self,
-        handle: ServiceId,
-        expected: ServiceState,
-    ) -> SvcResult<()> {
-        let id = self.resolve(handle)?;
-
-        loop {
-            let state = self.get(id)?.state;
-
-            if state == expected {
-                break;
-            }
-
-            if state == ServiceState::Failed {
-                return Err(SvcError::ServiceFailed);
-            }
-
-            self.next_event().await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn wait_for_start(&mut self, handle: ServiceId) -> SvcResult<()> {
-        self.wait_for_state(handle, ServiceState::Running).await
-    }
-
-    pub async fn wait_for_stop(&mut self, handle: ServiceId) -> SvcResult<()> {
-        self.wait_for_state(handle, ServiceState::Stopped).await
-    }
-
-    pub async fn start_multiple(&mut self, handles: &[ServiceId]) -> SvcResult<()> {
-        let ids = self.resolve_multiple(handles)?;
-        for id in ids {
-            self.start(id)?;
-        }
-
-        Ok(())
-    }
-
     async fn stop_multiple(&mut self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
         let ids = self.resolve_multiple(handles)?;
         for id in ids {
@@ -527,16 +482,6 @@ impl ServiceManager {
 
             self.next_event().await?;
         }
-
-        Ok(())
-    }
-
-    pub async fn wait_for_multiple_started(
-        &mut self,
-        handles: &[impl IntoServiceId],
-    ) -> SvcResult<()> {
-        self.wait_for_multiple(handles, ServiceState::Running)
-            .await?;
 
         Ok(())
     }
