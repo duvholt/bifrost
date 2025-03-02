@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio::time::sleep;
 
-use svc::error::{RunSvcError, SvcResult};
+use svc::error::SvcResult;
 use svc::manager::ServiceManager;
 use svc::traits::Service;
 
@@ -18,12 +18,6 @@ struct Simple {
 pub enum SimpleError {
     #[error("That didn't work")]
     Nope,
-}
-
-impl From<SimpleError> for RunSvcError<SimpleError> {
-    fn from(value: SimpleError) -> Self {
-        Self::ServiceError(value)
-    }
 }
 
 #[async_trait]
@@ -71,7 +65,9 @@ async fn main() -> SvcResult<()> {
         counter: 0,
     };
 
-    svm.register_standard("foo", svc)?;
+    let mut client = svm.client();
+
+    client.register_standard("foo", svc).await?;
     svm.start("foo")?;
 
     println!("main: service configured");
