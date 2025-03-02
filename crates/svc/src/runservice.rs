@@ -225,7 +225,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                     if rx.has_changed()? {
                         log::debug!(target:target, "Service failed.");
                     }
-                    if *rx.borrow_and_update() == ServiceState::Stopped {
+                    if *rx.borrow() == ServiceState::Stopped {
                         state.set(ServiceState::Stopped).await?;
                     }
                 }
