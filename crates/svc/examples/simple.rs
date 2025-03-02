@@ -58,27 +58,29 @@ async fn main() -> SvcResult<()> {
         .parse_default_env()
         .init();
 
-    let mut svm = ServiceManager::new();
+    let (mut client, future) = ServiceManager::new().daemonize();
 
     let svc = Simple {
         name: "Simple Service".to_string(),
         counter: 0,
     };
 
-    let mut client = svm.client();
-
     client.register_standard("foo", svc).await?;
-    svm.start("foo")?;
+    client.start("foo").await?;
 
     println!("main: service configured");
 
-    svm.wait_for_start("foo").await?;
+    client.wait_for_start("foo").await?;
 
     println!("main: service started");
 
-    svm.wait_for_stop("foo").await?;
+    client.wait_for_stop("foo").await?;
 
     println!("main: service stopped");
+
+    client.shutdown().await?;
+
+    future.await??;
 
     Ok(())
 }

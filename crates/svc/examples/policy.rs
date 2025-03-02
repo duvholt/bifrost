@@ -5,9 +5,9 @@ use svc::policy::{Policy, Retry};
 use svc::runservice::StandardService;
 use thiserror::Error;
 
-use svc::error::{RunSvcError, SvcResult};
+use svc::error::SvcResult;
 use svc::manager::ServiceManager;
-use svc::traits::{Service, ServiceRunner, ServiceState};
+use svc::traits::Service;
 
 #[derive(Clone)]
 struct PolicyService {
@@ -18,12 +18,6 @@ struct PolicyService {
 pub enum Error {
     #[error("Not done yet")]
     MoreToDo,
-}
-
-impl From<Error> for RunSvcError<Error> {
-    fn from(value: Error) -> Self {
-        Self::ServiceError(value)
-    }
 }
 
 #[async_trait]
@@ -46,7 +40,7 @@ async fn main() -> SvcResult<()> {
         .parse_default_env()
         .init();
 
-    let mut svm = ServiceManager::new();
+    let (mut client, future) = ServiceManager::new().daemonize();
 
     let svc = PolicyService { counter: 0 };
 
@@ -61,21 +55,16 @@ async fn main() -> SvcResult<()> {
             .with_delay(Duration::from_millis(300)),
     );
 
-    svm.register(svcr)?;
-    svm.start(NAME)?;
+    client.register(NAME, svcr).await?;
+    client.start(NAME).await?;
 
-    println!("main: service configured");
+    println!("main: service configured to try starting 5 times");
 
-    svm.wait_for_start(NAME).await?;
+    client.wait_for_start(NAME).await?;
 
     println!("main: service started");
 
-    while let Ok((_id, state)) = svm.next_event().await {
-        if state == ServiceState::Failed {
-            println!("main: Service has failed");
-            break;
-        }
-    }
+    future.await??;
 
     Ok(())
 }
