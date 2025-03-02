@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use thiserror::Error;
-use uuid::Uuid;
 
+use crate::manager::SvmRequest;
 use crate::traits::ServiceState;
 
 #[derive(Error, Debug)]
@@ -21,7 +21,7 @@ pub enum SvcError {
     UuidError(#[from] uuid::Error),
 
     #[error(transparent)]
-    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<(Uuid, ServiceState)>),
+    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<SvmRequest>),
 
     #[error(transparent)]
     WatchSendError(#[from] tokio::sync::watch::error::SendError<ServiceState>),
@@ -49,7 +49,7 @@ pub enum SvcError {
 pub enum RunSvcError {
     /* mapped errors */
     #[error(transparent)]
-    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<(Uuid, ServiceState)>),
+    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<SvmRequest>),
 
     #[error(transparent)]
     WatchSendError(#[from] tokio::sync::watch::error::SendError<ServiceState>),
