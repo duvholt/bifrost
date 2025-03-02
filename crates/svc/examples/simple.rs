@@ -58,7 +58,7 @@ async fn main() -> SvcResult<()> {
         .parse_default_env()
         .init();
 
-    let (mut client, future) = ServiceManager::new().daemonize();
+    let (mut client, future) = ServiceManager::spawn();
 
     let svc = Simple {
         name: "Simple Service".to_string(),

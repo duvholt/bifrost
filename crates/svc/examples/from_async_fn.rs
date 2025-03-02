@@ -33,7 +33,7 @@ async fn main() -> SvcResult<()> {
         .parse_default_env()
         .init();
 
-    let (mut client, future) = ServiceManager::new().daemonize();
+    let (mut client, future) = ServiceManager::spawn();
 
     client.register_function("foo", Box::pin(run())).await?;
 
