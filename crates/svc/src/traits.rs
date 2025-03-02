@@ -2,6 +2,7 @@ use std::error::Error;
 use std::future::Future;
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, watch};
 use uuid::Uuid;
 
@@ -44,7 +45,7 @@ Transition diagram for [`ServiceState`]:
 ```
 */
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ServiceState {
     /// Service is registered with the service manager, but not configured yet
     Registered,
