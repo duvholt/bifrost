@@ -3,6 +3,7 @@ use std::error::Error;
 use thiserror::Error;
 
 use crate::manager::{ServiceEvent, SvmRequest};
+use crate::serviceid::ServiceId;
 use crate::traits::ServiceState;
 
 #[derive(Error, Debug)]
@@ -38,8 +39,8 @@ pub enum SvcError {
     #[error(transparent)]
     OneshotRecvError(#[from] tokio::sync::oneshot::error::RecvError),
 
-    #[error("Service {0} not registered")]
-    ServiceNameNotFound(String),
+    #[error("Service {0:?} not registered")]
+    ServiceNotFound(ServiceId),
 
     #[error("Service {0} already exists")]
     ServiceAlreadyExists(String),

@@ -1,7 +1,7 @@
 //! A [`ServiceManager`] manages a collection of [`Service`] instances.
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::future::Future;
 use std::time::Duration;
 
@@ -14,35 +14,8 @@ use uuid::Uuid;
 use crate::error::{RunSvcError, SvcError, SvcResult};
 use crate::rpc::RpcRequest;
 use crate::runservice::StandardService;
+use crate::serviceid::{IntoServiceId, ServiceId};
 use crate::traits::{Service, ServiceRunner, ServiceState};
-
-pub trait IntoServiceId: Display + Debug {
-    fn service_id(&self, svcm: &ServiceManager) -> Option<Uuid>;
-}
-
-impl IntoServiceId for Uuid {
-    fn service_id(&self, _svcm: &ServiceManager) -> Option<Uuid> {
-        Some(*self)
-    }
-}
-
-impl IntoServiceId for &str {
-    fn service_id(&self, svcm: &ServiceManager) -> Option<Uuid> {
-        svcm.lookup(self)
-    }
-}
-
-impl IntoServiceId for Box<dyn IntoServiceId + Send> {
-    fn service_id(&self, svcm: &ServiceManager) -> Option<Uuid> {
-        (**self).service_id(svcm)
-    }
-}
-
-impl<I: IntoServiceId> IntoServiceId for &I {
-    fn service_id(&self, svcm: &ServiceManager) -> Option<Uuid> {
-        (**self).service_id(svcm)
-    }
-}
 
 pub struct ServiceInstance {
     tx: watch::Sender<ServiceState>,
@@ -74,9 +47,9 @@ impl ServiceEvent {
 
 /// A request to a [`ServiceManager`]
 pub enum SvmRequest {
-    Stop(RpcRequest<Box<dyn IntoServiceId + Send>, SvcResult<()>>),
-    Start(RpcRequest<Box<dyn IntoServiceId + Send>, SvcResult<()>>),
-    Status(RpcRequest<Box<dyn IntoServiceId + Send>, SvcResult<ServiceState>>),
+    Stop(RpcRequest<ServiceId, SvcResult<()>>),
+    Start(RpcRequest<ServiceId, SvcResult<()>>),
+    Status(RpcRequest<ServiceId, SvcResult<ServiceState>>),
     List(RpcRequest<(), Vec<(Uuid, String)>>),
     Register(RpcRequest<(String, ServiceFunc), SvcResult<Uuid>>),
     Shutdown(RpcRequest<(), ()>),
@@ -138,19 +111,19 @@ impl SvmClient {
         .await?
     }
 
-    pub async fn start(&mut self, id: impl IntoServiceId + Send + 'static) -> SvcResult<()> {
-        self.rpc(SvmRequest::Start, Box::new(id)).await?
+    pub async fn start(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
+        self.rpc(SvmRequest::Start, id.service_id()).await?
     }
 
-    pub async fn stop(&mut self, id: impl IntoServiceId + Send + 'static) -> SvcResult<()> {
-        self.rpc(SvmRequest::Stop, Box::new(id)).await?
+    pub async fn stop(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
+        self.rpc(SvmRequest::Stop, id.service_id()).await?
     }
 
     pub async fn status(
         &mut self,
         id: impl IntoServiceId + Send + 'static,
     ) -> SvcResult<ServiceState> {
-        self.rpc(SvmRequest::Status, Box::new(id)).await?
+        self.rpc(SvmRequest::Status, id.service_id()).await?
     }
 
     pub async fn list(&mut self) -> SvcResult<Vec<(Uuid, String)>> {
@@ -258,12 +231,25 @@ impl ServiceManager {
         self.names.get(name).copied()
     }
 
-    pub fn resolve(&self, id: impl IntoServiceId) -> SvcResult<Uuid> {
-        id.service_id(self)
-            .ok_or(SvcError::ServiceNameNotFound(id.to_string()))
+    pub fn resolve(&self, handle: impl IntoServiceId) -> SvcResult<Uuid> {
+        let id = handle.service_id();
+        match &id {
+            ServiceId::Name(name) => self
+                .names
+                .get(name.as_str())
+                .ok_or_else(|| SvcError::ServiceNotFound(id))
+                .copied(),
+            ServiceId::Id(uuid) => {
+                if self.svcs.contains_key(uuid) {
+                    Ok(*uuid)
+                } else {
+                    Err(SvcError::ServiceNotFound(id))
+                }
+            }
+        }
     }
 
-    fn remove(&mut self, handle: impl IntoServiceId) -> SvcResult<()> {
+    fn remove(&mut self, handle: &ServiceId) -> SvcResult<()> {
         let id = self.resolve(handle)?;
         self.svcs.remove(&id);
         self.names.retain(|_, v| *v != id);
@@ -271,8 +257,8 @@ impl ServiceManager {
         Ok(())
     }
 
-    pub fn abort(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
-        let svc = self.get(&id)?;
+    pub fn abort(&mut self, id: &ServiceId) -> SvcResult<()> {
+        let svc = self.get(id)?;
 
         svc.abort_handle.abort();
 
@@ -280,10 +266,8 @@ impl ServiceManager {
     }
 
     pub fn get(&self, svc: impl IntoServiceId) -> SvcResult<&ServiceInstance> {
-        let id = &self.resolve(svc)?;
-        self.svcs
-            .get(id)
-            .ok_or_else(|| SvcError::ServiceNameNotFound(id.to_string()))
+        let id = self.resolve(svc)?;
+        Ok(&self.svcs[&id])
     }
 
     pub fn start(&self, id: impl IntoServiceId) -> SvcResult<()> {
@@ -325,9 +309,9 @@ impl ServiceManager {
         match upd {
             SvmRequest::Start(rpc) => rpc.respond(|id| self.start(&id)),
 
-            SvmRequest::Stop(rpc) => rpc.respond(|id| self.stop(id)),
+            SvmRequest::Stop(rpc) => rpc.respond(|id| self.stop(&id)),
 
-            SvmRequest::Status(rpc) => rpc.respond(|id| Ok(self.get(id)?.state)),
+            SvmRequest::Status(rpc) => rpc.respond(|id| Ok(self.get(&id)?.state)),
 
             SvmRequest::List(rpc) => rpc.respond(|()| {
                 let mut res = vec![];
@@ -351,7 +335,7 @@ impl ServiceManager {
                     _ = tokio::time::sleep(Duration::from_secs(3)) => {
                         log::error!("Service shutdown timed out, aborting tasks..");
                         for id in &ids {
-                            self.abort(id)?;
+                            self.abort(&ServiceId::from(*id))?;
                         }
                     }
                 }
@@ -366,10 +350,10 @@ impl ServiceManager {
 
     pub async fn wait_for_state(
         &mut self,
-        handle: impl IntoServiceId,
+        handle: ServiceId,
         expected: ServiceState,
     ) -> SvcResult<()> {
-        let id = self.resolve(&handle)?;
+        let id = self.resolve(handle)?;
 
         loop {
             let state = self.get(id)?.state;
@@ -388,15 +372,15 @@ impl ServiceManager {
         Ok(())
     }
 
-    pub async fn wait_for_start(&mut self, handle: impl IntoServiceId) -> SvcResult<()> {
+    pub async fn wait_for_start(&mut self, handle: ServiceId) -> SvcResult<()> {
         self.wait_for_state(handle, ServiceState::Running).await
     }
 
-    pub async fn wait_for_stop(&mut self, handle: impl IntoServiceId) -> SvcResult<()> {
+    pub async fn wait_for_stop(&mut self, handle: ServiceId) -> SvcResult<()> {
         self.wait_for_state(handle, ServiceState::Stopped).await
     }
 
-    pub async fn start_multiple(&mut self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
+    pub async fn start_multiple(&mut self, handles: &[ServiceId]) -> SvcResult<()> {
         let ids = self.resolve_multiple(handles)?;
         for id in ids {
             self.start(id)?;
@@ -435,7 +419,7 @@ impl ServiceManager {
 
         loop {
             for m in &missing {
-                let state = self.get(m)?.state;
+                let state = self.get(*m)?.state;
 
                 if state == ServiceState::Failed {
                     return Err(SvcError::ServiceFailed);
