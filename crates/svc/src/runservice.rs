@@ -106,29 +106,38 @@ impl<S: Service> ServiceRunner for StandardService<S> {
         tx: mpsc::Sender<SvmRequest>,
     ) -> Result<(), RunSvcError> {
         let name = self.name;
+        let target = &format!("[{name}]");
         let mut svc = self.svc;
 
-        log::debug!("[{name}] Registered");
-        svc.configure().await?;
+        log::debug!(target:target, "Registered");
+        svc.configure()
+            .await
+            .map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
 
         let mut state = State::new(id, ServiceState::Registered, tx);
 
         loop {
             match state.get() {
-                ServiceState::Registered => match svc.configure().await {
-                    Ok(()) => {
-                        log::debug!("[{name}] Configured");
-                        state.set(ServiceState::Configured).await?;
+                ServiceState::Registered => {
+                    if *rx.borrow() == ServiceState::Running {
+                        match svc.configure().await {
+                            Ok(()) => {
+                                log::debug!(target:target, "Configured");
+                                state.set(ServiceState::Configured).await?;
+                            }
+                            Err(err) => {
+                                log::error!(target:target, "Failed to configure service: {err}");
+                                sleep(Duration::from_secs(3)).await;
+                            }
+                        }
+                    } else {
+                        rx.changed().await?;
                     }
-                    Err(err) => {
-                        log::error!("[{name}] Failed to configure service: {err}");
-                        sleep(Duration::from_secs(3)).await;
-                    }
-                },
+                }
 
                 ServiceState::Configured => {
-                    log::debug!("[{name}] Service configured, and is ready start.");
-                    if *rx.borrow() == ServiceState::Running {
+                    log::debug!(target:target, "Service configured, and is ready start.");
+                    if *rx.borrow_and_update() == ServiceState::Running {
                         state.set(ServiceState::Starting).await?;
                     } else {
                         rx.changed().await?
@@ -137,47 +146,72 @@ impl<S: Service> ServiceRunner for StandardService<S> {
 
                 ServiceState::Starting => match svc.start().await {
                     Ok(()) => {
-                        log::debug!("[{name}] Started");
+                        log::debug!(target:target, "Started");
                         state.set(ServiceState::Running).await?;
                     }
                     Err(err) => {
-                        log::error!("[{name}] Failed to start service: {err}");
+                        log::error!(target:target, "Failed to start service: {err}");
                         sleep(Duration::from_secs(3)).await;
                     }
                 },
 
-                ServiceState::Running => match svc.run().await {
-                    Ok(()) => {
-                        log::debug!("[{name}] Service completed successfully");
-                        state.set(ServiceState::Stopping).await?;
-                        /* sleep(Duration::from_secs(1)).await; */
-                    }
-                    Err(err) => {
-                        self.run_policy.sleep().await;
-                        if self.run_policy.should_retry(state.retry()) {
-                            log::warn!("[{name}] Service failed to start, retrying..");
-                        } else {
-                            log::error!("[{name}] Failed to run service: {err}");
-                            match svc.stop().await {
-                                Ok(()) => {
-                                    log::debug!("[{name}] Stopped failing service");
-                                }
-                                Err(err) => {
-                                    log::error!("[{name}] Failed to stop failing service: {err}");
+                ServiceState::Running => {
+                    tokio::select! {
+                        res = svc.run() => match res {
+                            Ok(()) => {
+                                log::debug!(target:target, "Service completed successfully");
+                                state.set(ServiceState::Stopping).await?;
+                            }
+                            Err(err) => {
+                                self.run_policy.sleep().await;
+                                if self.run_policy.should_retry(state.retry()) {
+                                    log::warn!(target:target, "Service failed to start, retrying..");
+                                } else {
+                                    log::error!(target:target, "Failed to run service: {err}");
+                                    match svc.stop().await {
+                                        Ok(()) => {
+                                            log::debug!(target:target, "Stopped failing service");
+                                        }
+                                        Err(err) => {
+                                            log::error!(
+                                                "Failed to stop failing service: {err}"
+                                            );
+                                        }
+                                    }
+                                    state.set(ServiceState::Failed).await?;
                                 }
                             }
-                            state.set(ServiceState::Failed).await?;
+                        },
+                        _ = rx.changed() => if *rx.borrow() == ServiceState::Stopped {
+                            if S::SIGNAL_STOP {
+                                log::debug!(target:target, "Service state change requested (graceful)");
+                                svc.signal_stop().await.map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
+                                tokio::select! {
+                                    res = svc.run() => {
+                                        log::warn!("run: {res:?}");
+                                    },
+                                    _ = sleep(Duration::from_secs(1)) => {
+                                        log::warn!("timeout");
+                                        state.set(ServiceState::Stopping).await?;
+                                    }
+                                }
+                            } else {
+                                log::debug!(target:target, "Service state change requested: {:?} -> {:?}", state.get(), *rx.borrow());
+                                if *rx.borrow_and_update() == ServiceState::Stopped {
+                                    state.set(ServiceState::Stopping).await?;
+                                }
+                            }
                         }
                     }
-                },
+                }
 
                 ServiceState::Stopping => match svc.stop().await {
                     Ok(()) => {
-                        log::debug!("[{name}] Stopping");
+                        log::debug!(target:target, "Stopping");
                         state.set(ServiceState::Stopped).await?;
                     }
                     Err(err) => {
-                        log::error!("[{name}] Failed to stop service: {err}");
+                        log::error!(target:target, "Failed to stop service: {err}");
                         sleep(Duration::from_secs(3)).await;
                     }
                 },
@@ -185,14 +219,20 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                 ServiceState::Stopped => {
                     rx.changed().await?;
                     if rx.has_changed()? {
-                        log::debug!("[{name}] Service stopped.");
+                        log::debug!(target:target, "Service stopped.");
+                    }
+                    if *rx.borrow_and_update() == ServiceState::Running {
+                        state.set(ServiceState::Starting).await?;
                     }
                 }
 
                 ServiceState::Failed => {
                     rx.changed().await?;
                     if rx.has_changed()? {
-                        log::debug!("[{name}] Service failed.");
+                        log::debug!(target:target, "Service failed.");
+                    }
+                    if *rx.borrow_and_update() == ServiceState::Stopped {
+                        state.set(ServiceState::Stopped).await?;
                     }
                 }
             }
