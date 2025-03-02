@@ -1,3 +1,4 @@
+//! Implements policies for service behavior (retry count, delay, etc).
 use std::time::Duration;
 
 use tokio::time::sleep;

@@ -1,4 +1,6 @@
-use tokio::sync::oneshot::{self, Receiver, Sender};
+//! Data types for request/response-style communication.
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::{Receiver, Sender};
 
 #[derive(Debug)]
 pub struct RpcRequest<Q, A> {
