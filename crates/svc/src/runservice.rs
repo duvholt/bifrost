@@ -25,7 +25,7 @@ impl State {
         }
     }
 
-    pub async fn set<E>(&mut self, next: ServiceState) -> Result<(), RunSvcError<E>> {
+    pub async fn set(&mut self, next: ServiceState) -> Result<(), RunSvcError> {
         self.state = next;
         self.retry = 0;
         Ok(self.tx.send((self.id, self.state)).await?)
@@ -52,6 +52,23 @@ pub struct StandardService<S: Service> {
 }
 
 impl<S: Service> StandardService<S> {
+    pub fn new(name: impl AsRef<str>, svc: S) -> Self {
+        Self {
+            name: name.as_ref().to_string(),
+            svc,
+            configure_policy: Policy::new(),
+            start_policy: Policy::new()
+                .with_delay(Duration::from_secs(1))
+                .with_retry(Retry::Limit(3)),
+            run_policy: Policy::new().with_delay(Duration::from_secs(1)),
+            stop_policy: Policy::new(),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn with_configure_policy(mut self, policy: Policy) -> Self {
         self.configure_policy = policy;
         self
@@ -74,33 +91,13 @@ impl<S: Service> StandardService<S> {
 }
 
 #[async_trait]
-impl<S: Service> ServiceRunner<S> for StandardService<S> {
-    fn new(name: impl AsRef<str>, svc: S) -> Self {
-        Self {
-            name: name.as_ref().to_string(),
-            svc,
-            configure_policy: Policy::new(),
-            start_policy: Policy::new()
-                .with_delay(Duration::from_secs(1))
-                .with_retry(Retry::Limit(3)),
-            run_policy: Policy::new().with_delay(Duration::from_secs(1)),
-            stop_policy: Policy::new(),
-        }
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
+impl<S: Service> ServiceRunner for StandardService<S> {
     async fn run(
         mut self,
         id: Uuid,
         mut rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
-    ) -> Result<(), RunSvcError<S::Error>>
-    where
-        RunSvcError<S::Error>: From<S::Error>,
-    {
+    ) -> Result<(), RunSvcError> {
         let name = self.name;
         let mut svc = self.svc;
 

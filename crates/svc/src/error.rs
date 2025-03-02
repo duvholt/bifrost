@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -41,7 +43,7 @@ pub enum SvcError {
 }
 
 #[derive(Error, Debug)]
-pub enum RunSvcError<E> {
+pub enum RunSvcError {
     /* mapped errors */
     #[error(transparent)]
     MpscSendError(#[from] tokio::sync::mpsc::error::SendError<(Uuid, ServiceState)>),
@@ -52,8 +54,9 @@ pub enum RunSvcError<E> {
     #[error(transparent)]
     WatchRecvError(#[from] tokio::sync::watch::error::RecvError),
 
+    /* errors from run service */
     #[error(transparent)]
-    ServiceError(E),
+    ServiceError(Box<dyn Error + Send>),
 }
 
 pub type SvcResult<T> = Result<T, SvcError>;

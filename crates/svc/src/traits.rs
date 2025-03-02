@@ -54,9 +54,7 @@ pub trait ServiceRunner<S: Service> {
         id: Uuid,
         rx: watch::Receiver<ServiceState>,
         tx: mpsc::Sender<(Uuid, ServiceState)>,
-    ) -> Result<(), RunSvcError<S::Error>>
-    where
-        RunSvcError<S::Error>: From<S::Error>;
+    ) -> Result<(), RunSvcError>;
 }
 
 #[async_trait]
