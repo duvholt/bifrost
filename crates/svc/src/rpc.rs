@@ -15,6 +15,10 @@ impl<Q, A> RpcRequest<Q, A> {
         (req, rx)
     }
 
+    pub fn data(&self) -> &Q {
+        &self.data
+    }
+
     pub fn respond(self, mut func: impl FnMut(Q) -> A) {
         let res = func(self.data);
         let _ = self.rsp.send(res);
