@@ -477,13 +477,11 @@ impl ServiceManager {
             missing.retain(|f| !done.contains(f));
 
             if missing.is_empty() {
-                break;
+                return Ok(());
             }
 
             self.next_event().await?;
         }
-
-        Ok(())
     }
 
     pub async fn run(mut self) -> SvcResult<()> {
