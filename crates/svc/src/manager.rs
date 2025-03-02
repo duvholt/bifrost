@@ -466,7 +466,9 @@ impl ServiceManager {
                 let state = self.get(*m)?.state;
 
                 if state == ServiceState::Failed {
-                    return Err(SvcError::ServiceFailed);
+                    if target != ServiceState::Stopped {
+                        return Err(SvcError::ServiceFailed);
+                    }
                 }
 
                 if state == target {
