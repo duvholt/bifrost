@@ -83,10 +83,7 @@ pub trait Service: Send {
 }
 
 #[async_trait]
-pub trait ServiceRunner<S: Service> {
-    fn new(name: impl AsRef<str>, svc: S) -> Self;
-    fn name(&self) -> &str;
-
+pub trait ServiceRunner {
     async fn run(
         mut self,
         id: Uuid,
