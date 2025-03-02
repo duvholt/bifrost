@@ -21,6 +21,9 @@ pub enum SvcError {
     UuidError(#[from] uuid::Error),
 
     #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error(transparent)]
     MpscSendError(#[from] tokio::sync::mpsc::error::SendError<SvmRequest>),
 
     #[error(transparent)]
