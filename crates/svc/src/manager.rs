@@ -51,6 +51,7 @@ pub enum SvmRequest {
     Start(RpcRequest<ServiceId, SvcResult<()>>),
     Status(RpcRequest<ServiceId, SvcResult<ServiceState>>),
     List(RpcRequest<(), Vec<(Uuid, String)>>),
+    Resolve(RpcRequest<ServiceId, SvcResult<Uuid>>),
     Register(RpcRequest<(String, ServiceFunc), SvcResult<Uuid>>),
     Shutdown(RpcRequest<(), ()>),
 }
@@ -119,6 +120,10 @@ impl SvmClient {
         self.rpc(SvmRequest::Stop, id.service_id()).await?
     }
 
+    pub async fn resolve(&mut self, id: impl IntoServiceId) -> SvcResult<Uuid> {
+        self.rpc(SvmRequest::Resolve, id.service_id()).await?
+    }
+
     pub async fn status(
         &mut self,
         id: impl IntoServiceId + Send + 'static,
@@ -143,6 +148,7 @@ impl Debug for SvmRequest {
             Self::Status(arg0) => f.debug_tuple("Status").field(arg0).finish(),
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Register(_arg0) => f.debug_tuple("Register").field(&"<service>").finish(),
+            Self::Resolve(arg0) => f.debug_tuple("Resolve").field(arg0).finish(),
             Self::Shutdown(_arg0) => f.debug_tuple("Shutdown").finish(),
         }
     }
@@ -323,6 +329,8 @@ impl ServiceManager {
             }),
 
             SvmRequest::Register(rpc) => rpc.respond(|(name, svc)| self.register(&name, svc)),
+
+            SvmRequest::Resolve(rpc) => rpc.respond(|id| self.resolve(&id)),
 
             SvmRequest::Shutdown(rpc) => {
                 log::info!("Service managed shutting down..");
