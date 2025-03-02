@@ -7,6 +7,43 @@ use uuid::Uuid;
 
 use crate::error::RunSvcError;
 
+/**
+State of a [`Service`] running on a [`crate::manager::ServiceManager`].
+
+Transition diagram for [`ServiceState`]:
+
+```text
+    ┌────────────────┐
+    │ Registered     ├──┐
+    │                │  │
+    └───────────┬────┘  │
+    ┌───────────▼────┐  │
+    │ Configured     │  │
+    │                │  │
+    └───────────┬────┘  │
+    ┌───────────▼────┐  │
+ ┌─►│ Starting       ├──┤
+ │  │                │  │
+ │  └───────────┬────┘  │
+ │  ┌───────────▼────┐  │
+ │  │ Running        ├──┤
+ │  │                │  │
+ │  └───────────┬────┘  │
+ │  ┌───────────▼────┐  │
+ │  │ Stopping       ├──┤
+ │  │                │  │
+ │  └───────────┬────┘  │
+ │  ┌───────────▼────┐  │
+ └──┤ Stopped        │  │
+ ┌─►│                │  │
+ │  └────────────────┘  │
+ │  ┌────────────────┐  │
+ │  │ Failed         │  │
+ └──┤                │◄─┘
+    └────────────────┘
+```
+*/
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceState {
     /// Service is registered with the service manager, but not configured yet
