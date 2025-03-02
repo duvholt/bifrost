@@ -64,7 +64,7 @@ pub enum ServiceState {
 
 #[async_trait]
 pub trait Service: Send {
-    type Error: Error + Send;
+    type Error: Error + Send + 'static;
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -95,7 +95,7 @@ pub trait ServiceRunner<S: Service> {
 }
 
 #[async_trait]
-impl<E: Error + Send, F> Service for F
+impl<E: Error + Send + 'static, F> Service for F
 where
     F: Future<Output = Result<(), E>> + Send + Unpin,
 {
