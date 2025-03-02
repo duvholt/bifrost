@@ -2,7 +2,7 @@ use std::error::Error;
 
 use thiserror::Error;
 
-use crate::manager::SvmRequest;
+use crate::manager::{ServiceEvent, SvmRequest};
 use crate::traits::ServiceState;
 
 #[derive(Error, Debug)]
@@ -22,6 +22,9 @@ pub enum SvcError {
 
     #[error(transparent)]
     MpscSendError(#[from] tokio::sync::mpsc::error::SendError<SvmRequest>),
+
+    #[error(transparent)]
+    MpscSendEventError(#[from] tokio::sync::mpsc::error::SendError<ServiceEvent>),
 
     #[error(transparent)]
     WatchSendError(#[from] tokio::sync::watch::error::SendError<ServiceState>),
@@ -53,6 +56,9 @@ pub enum RunSvcError {
 
     #[error(transparent)]
     WatchSendError(#[from] tokio::sync::watch::error::SendError<ServiceState>),
+
+    #[error(transparent)]
+    MpscSendEventError(#[from] tokio::sync::mpsc::error::SendError<ServiceEvent>),
 
     #[error(transparent)]
     WatchRecvError(#[from] tokio::sync::watch::error::RecvError),

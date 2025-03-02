@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::error::RunSvcError;
-use crate::manager::SvmRequest;
+use crate::manager::ServiceEvent;
 use crate::policy::{Policy, Retry};
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
@@ -13,11 +13,11 @@ struct State {
     id: Uuid,
     retry: u32,
     state: ServiceState,
-    tx: mpsc::Sender<SvmRequest>,
+    tx: mpsc::Sender<ServiceEvent>,
 }
 
 impl State {
-    pub fn new(id: Uuid, state: ServiceState, tx: mpsc::Sender<SvmRequest>) -> Self {
+    pub fn new(id: Uuid, state: ServiceState, tx: mpsc::Sender<ServiceEvent>) -> Self {
         Self {
             id,
             retry: 0,
@@ -29,13 +29,7 @@ impl State {
     pub async fn set(&mut self, next: ServiceState) -> Result<(), RunSvcError> {
         self.state = next;
         self.retry = 0;
-        Ok(self
-            .tx
-            .send(SvmRequest::ServiceEvent {
-                id: self.id,
-                state: self.state,
-            })
-            .await?)
+        Ok(self.tx.send(ServiceEvent::new(self.id, self.state)).await?)
     }
 
     pub fn get(&self) -> ServiceState {
@@ -103,7 +97,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
         mut self,
         id: Uuid,
         mut rx: watch::Receiver<ServiceState>,
-        tx: mpsc::Sender<SvmRequest>,
+        tx: mpsc::Sender<ServiceEvent>,
     ) -> Result<(), RunSvcError> {
         let name = self.name;
         let target = &format!("[{name}]");

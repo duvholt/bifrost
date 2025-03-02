@@ -55,14 +55,25 @@ pub type ServiceFunc = Box<
     dyn FnOnce(
             Uuid,
             watch::Receiver<ServiceState>,
-            mpsc::Sender<SvmRequest>,
+            mpsc::Sender<ServiceEvent>,
         ) -> BoxFuture<'static, Result<(), RunSvcError>>
         + Send,
 >;
 
+#[derive(Debug, Clone, Copy)]
+pub struct ServiceEvent {
+    id: Uuid,
+    state: ServiceState,
+}
+
+impl ServiceEvent {
+    pub fn new(id: Uuid, state: ServiceState) -> Self {
+        Self { id, state }
+    }
+}
+
 /// A request to a [`ServiceManager`]
 pub enum SvmRequest {
-    ServiceEvent { id: Uuid, state: ServiceState },
     Stop(RpcRequest<Box<dyn IntoServiceId + Send>, SvcResult<()>>),
     Start(RpcRequest<Box<dyn IntoServiceId + Send>, SvcResult<()>>),
     Status(RpcRequest<Box<dyn IntoServiceId + Send>, SvcResult<ServiceState>>),
@@ -154,11 +165,6 @@ impl SvmClient {
 impl Debug for SvmRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ServiceEvent { id, state } => f
-                .debug_struct("ServiceEvent")
-                .field("id", id)
-                .field("state", state)
-                .finish(),
             Self::Stop(arg0) => f.debug_tuple("Stop").field(arg0).finish(),
             Self::Start(arg0) => f.debug_tuple("Start").field(arg0).finish(),
             Self::Status(arg0) => f.debug_tuple("Status").field(arg0).finish(),
@@ -172,6 +178,8 @@ impl Debug for SvmRequest {
 pub struct ServiceManager {
     control_rx: mpsc::Receiver<SvmRequest>,
     control_tx: mpsc::Sender<SvmRequest>,
+    service_rx: mpsc::Receiver<ServiceEvent>,
+    service_tx: mpsc::Sender<ServiceEvent>,
     svcs: BTreeMap<Uuid, ServiceInstance>,
     names: BTreeMap<String, Uuid>,
     tasks: JoinSet<Result<(), RunSvcError>>,
@@ -187,9 +195,12 @@ impl Default for ServiceManager {
 impl ServiceManager {
     pub fn new() -> Self {
         let (control_tx, control_rx) = mpsc::channel(32);
+        let (service_tx, service_rx) = mpsc::channel(32);
         Self {
             control_tx,
             control_rx,
+            service_tx,
+            service_rx,
             svcs: BTreeMap::new(),
             names: BTreeMap::new(),
             tasks: JoinSet::new(),
@@ -224,7 +235,7 @@ impl ServiceManager {
         let (tx, rx) = watch::channel(ServiceState::Registered);
         let id = Uuid::new_v4();
 
-        let abort_handle = self.tasks.spawn((svc)(id, rx, self.handle()));
+        let abort_handle = self.tasks.spawn((svc)(id, rx, self.service_tx.clone()));
 
         let rec = ServiceInstance {
             tx,
@@ -295,15 +306,24 @@ impl ServiceManager {
     }
 
     pub async fn next_event(&mut self) -> SvcResult<()> {
-        let upd = self.control_rx.recv().await.ok_or(SvcError::Shutdown)?;
-        match upd {
-            SvmRequest::ServiceEvent { id, state } => {
-                let name = &self.svcs[&id].name;
-                log::trace!("[{name}] [{id}] Service is now {state:?}");
-                self.svcs.get_mut(&id).unwrap().state = state;
-            }
+        tokio::select! {
+            event = self.control_rx.recv() => self.handle_svm_request(event.ok_or(SvcError::Shutdown)?).await,
+            event = self.service_rx.recv() => self.handle_service_event(event.ok_or(SvcError::Shutdown)?).await,
+        }
+    }
 
-            SvmRequest::Start(rpc) => rpc.respond(|id| self.start(id)),
+    async fn handle_service_event(&mut self, event: ServiceEvent) -> SvcResult<()> {
+        self.notify_subscribers(event).await;
+        let name = &self.svcs[&event.id].name;
+        log::trace!("[{name}] [{}] Service is now {:?}", event.id, event.state);
+        self.svcs.get_mut(&event.id).unwrap().state = event.state;
+
+        Ok(())
+    }
+
+    async fn handle_svm_request(&mut self, upd: SvmRequest) -> SvcResult<()> {
+        match upd {
+            SvmRequest::Start(rpc) => rpc.respond(|id| self.start(&id)),
 
             SvmRequest::Stop(rpc) => rpc.respond(|id| self.stop(id)),
 

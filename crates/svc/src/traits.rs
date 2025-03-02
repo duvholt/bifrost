@@ -7,7 +7,7 @@ use tokio::sync::{mpsc, watch};
 use uuid::Uuid;
 
 use crate::error::RunSvcError;
-use crate::manager::SvmRequest;
+use crate::manager::ServiceEvent;
 
 /**
 State of a [`Service`] running on a [`crate::manager::ServiceManager`].
@@ -94,7 +94,7 @@ pub trait ServiceRunner {
         mut self,
         id: Uuid,
         rx: watch::Receiver<ServiceState>,
-        tx: mpsc::Sender<SvmRequest>,
+        tx: mpsc::Sender<ServiceEvent>,
     ) -> Result<(), RunSvcError>;
 }
 
