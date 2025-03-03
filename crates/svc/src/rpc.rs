@@ -19,7 +19,7 @@ impl<Q, A> RpcRequest<Q, A> {
         &self.data
     }
 
-    pub fn respond(self, mut func: impl FnMut(Q) -> A) {
+    pub fn respond(self, func: impl FnOnce(Q) -> A) {
         let res = func(self.data);
         let _ = self.rsp.send(res);
     }
