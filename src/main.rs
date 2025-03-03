@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use tokio::task::JoinSet;
+use svc::manager::ServiceManager;
 
 use bifrost::backend::z2m::Z2mBackend;
 use bifrost::backend::Backend;
@@ -9,6 +9,7 @@ use bifrost::error::ApiResult;
 use bifrost::mdns;
 use bifrost::server;
 use bifrost::server::appstate::AppState;
+use bifrost::server::http::HttpServer;
 
 /*
  * Formatter function to output in syslog format. This makes sense when running
@@ -59,44 +60,56 @@ fn init_logging() -> ApiResult<()> {
     }
 }
 
-async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
+#[allow(clippy::similar_names)]
+async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let bconf = &appstate.config().bridge;
     let _mdns = mdns::register_mdns(bconf.mac, bconf.ipaddress);
 
-    let mut tasks = JoinSet::new();
+    let mut mgr = appstate.manager();
 
     let svc = server::build_service(appstate.clone());
 
     log::info!("Serving mac [{}]", bconf.mac);
 
-    let certfile = &appstate.config().bifrost.cert_file;
-    let state_file = appstate.config().bifrost.state_file.clone();
+    // register plain http service
+    let http_service = HttpServer::http(bconf.ipaddress, bconf.http_port, svc.clone());
+    mgr.register_service("http", http_service).await?;
 
-    tasks.spawn(server::http_server(
-        bconf.ipaddress,
-        bconf.http_port,
-        svc.clone(),
-    ));
-    #[cfg(feature = "tls-rustls")]
-    tasks.spawn(server::https_server_rustls(
-        bconf.ipaddress,
-        bconf.https_port,
-        svc.clone(),
-        certfile.clone(),
-    ));
+    // if openssl is enabled, use that for https (since it also supports DTLS)
     #[cfg(feature = "tls-openssl")]
-    tasks.spawn(server::https_server_openssl(
+    let https_service = HttpServer::https_openssl(
         bconf.ipaddress,
         bconf.https_port,
         svc.clone(),
-        certfile.clone(),
-    ));
-    tasks.spawn(server::config_writer(appstate.res.clone(), state_file));
-    tasks.spawn(server::version_updater(
-        appstate.res.clone(),
-        appstate.updater(),
-    ));
+        &appstate.config().bifrost.cert_file,
+    )?;
 
+    // .. otherwise, if rustls is enabled, use that
+    #[cfg(all(feature = "tls-rustls", not(feature = "tls-openssl")))]
+    let https_service = HttpServer::https_rustls(
+        bconf.ipaddress,
+        bconf.https_port,
+        svc.clone(),
+        &appstate.config().bifrost.cert_file,
+    )
+    .await?;
+
+    // .. if either tls backend is enabled, register https service
+    #[cfg(any(feature = "tls-rustls", feature = "tls-openssl"))]
+    mgr.register_service("https", https_service).await?;
+
+    // register config writer
+    let svc = server::config_writer(
+        appstate.res.clone(),
+        appstate.config().bifrost.state_file.clone(),
+    );
+    mgr.register_function("config_writer", svc).await?;
+
+    // register version updater
+    let svc = server::version_updater(appstate.res.clone(), appstate.updater());
+    mgr.register_function("version_updater", svc).await?;
+
+    // register all z2m backends as services
     for (name, server) in &appstate.config().z2m.servers {
         let client = Z2mBackend::new(
             name.clone(),
@@ -105,10 +118,18 @@ async fn build_tasks(appstate: AppState) -> ApiResult<JoinSet<ApiResult<()>>> {
             appstate.res.clone(),
         )?;
         let stream = appstate.res.lock().await.backend_event_stream();
-        tasks.spawn(client.run_forever(stream));
+        let name = format!("z2m-{name}");
+        let svc = client.run_forever(stream);
+
+        mgr.register_function(name, svc).await?;
     }
 
-    Ok(tasks)
+    // finally, iterate over all services and start them
+    for (id, _name) in mgr.list().await? {
+        mgr.start(id).await?;
+    }
+
+    Ok(())
 }
 
 async fn run() -> ApiResult<()> {
@@ -120,18 +141,22 @@ async fn run() -> ApiResult<()> {
     let config = config::parse("config.yaml".into())?;
     log::debug!("Configuration loaded successfully");
 
-    let appstate = AppState::from_config(config).await?;
+    let (client, future) = ServiceManager::spawn();
 
-    let mut tasks = build_tasks(appstate).await?;
+    let appstate = AppState::from_config(config, client).await?;
 
-    loop {
-        match tasks.join_next().await {
-            None => break Ok(()),
-            Some(Ok(Ok(res))) => log::info!("Worker returned: {res:?}"),
-            Some(Ok(Err(res))) => log::error!("Worked task failed: {res:?}"),
-            Some(Err(err)) => log::error!("Error spawning from worker: {err:?}"),
+    build_tasks(&appstate).await?;
+
+    tokio::spawn(async move {
+        if matches!(tokio::signal::ctrl_c().await, Ok(())) {
+            log::warn!("Ctrl-C pressed, exiting..");
+            let _ = appstate.manager().shutdown().await;
         }
-    }
+    });
+
+    future.await??;
+
+    Ok(())
 }
 
 #[tokio::main]

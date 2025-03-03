@@ -6,6 +6,8 @@ use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
+use svc::manager::SvmClient;
+
 use crate::config::AppConfig;
 use crate::error::ApiResult;
 use crate::hue;
@@ -19,11 +21,12 @@ use crate::server::updater::VersionUpdater;
 pub struct AppState {
     conf: Arc<AppConfig>,
     upd: Arc<Mutex<VersionUpdater>>,
+    svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
 }
 
 impl AppState {
-    pub async fn from_config(config: AppConfig) -> ApiResult<Self> {
+    pub async fn from_config(config: AppConfig, svm: SvmClient) -> ApiResult<Self> {
         let certfile = &config.bifrost.cert_file;
 
         let certpath = Utf8Path::new(certfile);
@@ -66,7 +69,12 @@ impl AppState {
         let conf = Arc::new(config);
         let res = Arc::new(Mutex::new(res));
 
-        Ok(Self { conf, upd, res })
+        Ok(Self {
+            conf,
+            upd,
+            svm,
+            res,
+        })
     }
 
     #[must_use]
@@ -77,6 +85,11 @@ impl AppState {
     #[must_use]
     pub fn updater(&self) -> Arc<Mutex<VersionUpdater>> {
         self.upd.clone()
+    }
+
+    #[must_use]
+    pub fn manager(&self) -> SvmClient {
+        self.svm.clone()
     }
 
     #[must_use]
