@@ -19,6 +19,14 @@ impl<Q, A> RpcRequest<Q, A> {
         &self.data
     }
 
+    pub fn into_inner(self) -> (Q, Sender<A>) {
+        (self.data, self.rsp)
+    }
+
+    pub fn inspect(&mut self, func: impl Fn(&mut Q)) {
+        func(&mut self.data);
+    }
+
     pub fn respond(self, func: impl FnOnce(Q) -> A) {
         let res = func(self.data);
         let _ = self.rsp.send(res);
