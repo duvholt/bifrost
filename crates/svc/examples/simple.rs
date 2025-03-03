@@ -65,7 +65,7 @@ async fn main() -> SvcResult<()> {
         counter: 0,
     };
 
-    client.register_standard("foo", svc).await?;
+    client.register_service("foo", svc).await?;
     client.start("foo").await?;
 
     println!("main: service configured");

@@ -81,7 +81,7 @@ impl SvmClient {
         Ok(self.tx.send(value).await?)
     }
 
-    pub async fn register_standard<S>(&mut self, name: impl AsRef<str>, svc: S) -> SvcResult<Uuid>
+    pub async fn register_service<S>(&mut self, name: impl AsRef<str>, svc: S) -> SvcResult<Uuid>
     where
         S: Service + 'static,
     {
