@@ -2,7 +2,7 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
-use svc::error::RunSvcError;
+use svc::error::SvcError;
 use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
@@ -101,8 +101,8 @@ pub enum ApiError {
     #[error(transparent)]
     SslError(#[from] openssl::ssl::Error),
 
-    #[error(transparent)]
-    SvcError(#[from] svc::error::SvcError),
+    #[error("Service error: {0}")]
+    SvcError(String),
 
     /* zigbee2mqtt errors */
     #[error("Unexpected eof on z2m socket")]
@@ -157,9 +157,9 @@ pub enum ApiError {
     InvalidHexColor,
 }
 
-impl From<ApiError> for RunSvcError<ApiError> {
-    fn from(value: ApiError) -> Self {
-        Self::ServiceError(value)
+impl From<SvcError> for ApiError {
+    fn from(value: SvcError) -> Self {
+        Self::SvcError(value.to_string())
     }
 }
 
