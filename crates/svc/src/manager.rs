@@ -465,10 +465,8 @@ impl ServiceManager {
             for m in &missing {
                 let state = self.get(*m)?.state;
 
-                if state == ServiceState::Failed {
-                    if target != ServiceState::Stopped {
-                        return Err(SvcError::ServiceFailed);
-                    }
+                if state == ServiceState::Failed && target != ServiceState::Stopped {
+                    return Err(SvcError::ServiceFailed);
                 }
 
                 if state == target {
