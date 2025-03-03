@@ -182,13 +182,13 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                                 svc.signal_stop().await.map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
                                 tokio::select! {
                                     res = svc.run() => {
-                                        log::warn!("run: {res:?}");
+                                        log::trace!(target:target, "Service finished running within timeout: {res:?}");
                                     },
                                     _ = sleep(Duration::from_secs(1)) => {
                                         log::warn!("timeout");
-                                        state.set(ServiceState::Stopping).await?;
                                     }
                                 }
+                                state.set(ServiceState::Stopping).await?;
                             } else {
                                 log::debug!(target:target, "Service state change requested: {:?} -> {:?}", state.get(), *rx.borrow());
                                 if *rx.borrow_and_update() == ServiceState::Stopped {
