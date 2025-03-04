@@ -135,11 +135,11 @@ fn make_channels(service: ResourceLink) -> Vec<EntertainmentConfigurationChannel
 
     let mut channels: Vec<EntertainmentConfigurationChannels> = vec![];
 
-    for x in 0..7 {
+    for index in 0u16..7 {
         channels.push(EntertainmentConfigurationChannels {
-            channel_id: x,
-            position: positions[x as usize].clone(),
-            members: vec![EntertainmentConfigurationStreamMembers { service, index: x }],
+            channel_id: u32::from(index),
+            position: positions[usize::from(index)].clone(),
+            members: vec![EntertainmentConfigurationStreamMembers { service, index }],
         });
     }
 
