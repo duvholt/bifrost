@@ -320,7 +320,7 @@ pub struct Device {
     pub interviewing: bool,
     pub manufacturer: Option<String>,
     pub model_id: Option<String>,
-    pub network_address: i64,
+    pub network_address: u16,
     #[serde(default)]
     pub power_source: PowerSource,
     pub software_build_id: Option<String>,
