@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use byteorder::{WriteBytesExt, BE, LE};
 use packed_struct::prelude::*;
 
 use crate::xy::XY;
@@ -16,7 +17,6 @@ pub struct HueEntStop {
 
 #[derive(Debug, Clone)]
 pub struct HueEntSegmentConfig {
-    pub count: u16,
     pub members: Vec<u16>,
 }
 
@@ -81,6 +81,12 @@ fn check_size_valid(len: usize, header_size: usize, element_size: usize) -> HueR
 }
 
 impl HueEntSegmentConfig {
+    pub fn new(map: &[u16]) -> Self {
+        Self {
+            members: map.to_vec(),
+        }
+    }
+
     pub fn parse(data: &[u8]) -> HueResult<Self> {
         check_size_valid(data.len(), 2, 2)?;
 
@@ -89,10 +95,22 @@ impl HueEntSegmentConfig {
 
         let members = data
             .chunks_exact(2)
+            .take(count as usize)
             .map(|d| u16::from_le_bytes([d[0], d[1]]))
             .collect();
 
-        Ok(Self { count, members })
+        Ok(Self { members })
+    }
+
+    pub fn pack(&self) -> HueResult<Vec<u8>> {
+        let mut res = vec![];
+        let count = u16::try_from(self.members.len())?;
+        res.write_u16::<BE>(count)?;
+        for m in &self.members {
+            res.write_u16::<LE>(*m)?;
+        }
+
+        Ok(res)
     }
 }
 
