@@ -19,8 +19,14 @@ use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStr
 use uuid::Uuid;
 
 use ::hue::clamp::Clamp;
-use ::hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
+use ::hue::stream::HueStreamLights;
+use ::hue::xy::XY;
+use ::hue::zigbee::{
+    EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
+    HueZigbeeUpdate, ZigbeeTarget,
+};
 
+use crate::backend::z2m::stream::Z2mTarget;
 use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
@@ -28,12 +34,13 @@ use crate::hue;
 use crate::hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature,
     ColorTemperatureUpdate, ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming,
-    DimmingUpdate, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
-    LightColor, LightEffect, LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2,
-    LightEffectsV2Update, LightGradient, LightGradientMode, LightMetadata, LightUpdate, Metadata,
-    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction,
-    SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate,
-    Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    DimmingUpdate, Entertainment, EntertainmentConfiguration, EntertainmentSegment,
+    EntertainmentSegments, GroupedLight, Light, LightColor, LightEffect, LightEffectStatus,
+    LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradient,
+    LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
+    RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive,
+    SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
 use crate::model::hexcolor::HexColor;
@@ -50,6 +57,12 @@ struct LearnScene {
     pub known: HashMap<Uuid, SceneAction>,
 }
 
+struct EntStream {
+    stream: EntertainmentZigbeeStream,
+    target: Z2mTarget,
+    addrs: Vec<u16>,
+}
+
 pub struct Z2mBackend {
     name: String,
     server: Z2mServer,
@@ -59,6 +72,8 @@ pub struct Z2mBackend {
     rmap: HashMap<Uuid, String>,
     learn: HashMap<Uuid, LearnScene>,
     ignore: HashSet<String>,
+    network: HashMap<String, api::Device>,
+    entstream: Option<EntStream>,
 }
 
 impl Z2mBackend {
@@ -72,6 +87,8 @@ impl Z2mBackend {
         let rmap = HashMap::new();
         let learn = HashMap::new();
         let ignore = HashSet::new();
+        let network = HashMap::new();
+        let entstream = None;
         Ok(Self {
             name,
             server,
@@ -81,6 +98,8 @@ impl Z2mBackend {
             rmap,
             learn,
             ignore,
+            network,
+            entstream,
         })
     }
 
@@ -510,6 +529,7 @@ impl Z2mBackend {
 
             Message::BridgeDevices(ref obj) => {
                 for dev in obj {
+                    self.network.insert(dev.friendly_name.clone(), dev.clone());
                     if let Some(exp) = dev.expose_light() {
                         log::info!(
                             "[{}] Adding light {:?}: [{}] ({})",
