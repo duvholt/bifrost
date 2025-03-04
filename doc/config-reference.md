@@ -33,17 +33,23 @@ bridge:
   gateway: 10.0.0.1
   timezone: Europe/Copenhagen
 
-  # http port for emulated bridge
+  # HTTP port for emulated bridge
   #
   # beware: most client programs do NOT support non-standard ports.
   # This is for advanced users (e.g. bifrost behind a reverse proxy)
   http_port: 80
 
-  # https port for emulated bridge
+  # HTTPS port for emulated bridge
   #
   # beware: most client programs do NOT support non-standard ports.
   # This is for advanced users (e.g. bifrost behind a reverse proxy)
   https_port: 443
+
+  # DTLS port for emulated bridge (Hue Entertainment streaming)
+  #
+  # beware: client programs do NOT support non-standard ports.
+  # For advanced users (e.g. bifrost behind a port forwarded firewall)
+  entm_port: 2100
 
 # Zigbee2mqtt section
 #

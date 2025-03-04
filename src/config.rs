@@ -15,6 +15,7 @@ pub struct BridgeConfig {
     pub ipaddress: Ipv4Addr,
     pub http_port: u16,
     pub https_port: u16,
+    pub entm_port: u16,
     pub netmask: Ipv4Addr,
     pub gateway: Ipv4Addr,
     pub timezone: String,
@@ -111,6 +112,7 @@ pub fn parse(filename: &Utf8Path) -> Result<AppConfig, ConfigError> {
         .set_default("bifrost.cert_file", "cert.pem")?
         .set_default("bridge.http_port", 80)?
         .set_default("bridge.https_port", 443)?
+        .set_default("bridge.entm_port", 2100)?
         .add_source(config::File::with_name(filename.as_str()))
         .build()?;
 
