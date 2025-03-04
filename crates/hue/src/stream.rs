@@ -1,11 +1,10 @@
 use packed_struct::prelude::*;
-use packed_struct::types::bits::ByteArray;
 use uuid::Uuid;
 
-use crate::error::HueResult;
+use crate::error::{HueError, HueResult};
 use crate::xy::XY;
 
-#[derive(PrimitiveEnum_u8, Clone, Debug, Copy)]
+#[derive(PrimitiveEnum_u8, Clone, Debug, Copy, PartialEq, Eq)]
 pub enum HueStreamColorMode {
     Rgb = 0x00,
     Xy = 0x01,
@@ -55,30 +54,60 @@ impl HueStreamPacketHeader {
 pub struct HueStreamPacket {
     pub color_mode: HueStreamColorMode,
     pub area: Uuid,
+    pub lights: HueStreamLights,
 }
 
 impl HueStreamPacket {
+    pub const HEADER_SIZE: usize = HueStreamPacketHeader::SIZE;
+
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        let len = <HueStreamHeader as PackedStruct>::ByteArray::len();
-        let hdr = HueStreamHeader::unpack_from_slice(&data[..len])?;
-        debug_assert_eq!(&hdr.magic, b"HueStream");
+        let (header, body) = data.split_at(Self::HEADER_SIZE);
+        let hdr = HueStreamPacketHeader::parse(header)?;
+        let lights = HueStreamLights::parse(hdr.color_mode, body)?;
+
         Ok(Self {
             color_mode: hdr.color_mode,
-            area: Uuid::try_parse_ascii(&hdr.dest)?,
+            area: hdr.area,
+            lights,
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum HueStreamLights {
+    Rgb(Vec<Rgb16>),
+    Xy(Vec<Xy16>),
+}
+
+impl HueStreamLights {
+    pub fn parse(color_mode: HueStreamColorMode, data: &[u8]) -> HueResult<Self> {
+        let res = match color_mode {
+            HueStreamColorMode::Rgb => HueStreamLights::Rgb(
+                data.chunks_exact(7)
+                    .map(Rgb16::unpack_from_slice)
+                    .collect::<Result<_, _>>()?,
+            ),
+            HueStreamColorMode::Xy => HueStreamLights::Xy(
+                data.chunks_exact(7)
+                    .map(Xy16::unpack_from_slice)
+                    .collect::<Result<_, _>>()?,
+            ),
+        };
+
+        Ok(res)
     }
 }
 
 #[derive(PackedStruct, Clone, Debug, Copy)]
 #[packed_struct(size = "7", endian = "msb")]
-pub struct HueStreamLight {
+pub struct Rgb16 {
     pub channel: u8,
     pub r: u16,
     pub g: u16,
     pub b: u16,
 }
 
-impl HueStreamLight {
+impl Rgb16 {
     pub fn to_xy(&self) -> (XY, f64) {
         XY::from_rgb(
             (self.r / 256) as u8,
@@ -87,3 +116,14 @@ impl HueStreamLight {
         )
     }
 }
+
+#[derive(PackedStruct, Clone, Debug, Copy)]
+#[packed_struct(size = "7", endian = "msb")]
+pub struct Xy16 {
+    pub channel: u8,
+    pub x: u16,
+    pub y: u16,
+    pub b: u16,
+}
+
+impl Xy16 {}
