@@ -1,6 +1,4 @@
-use serde_json::json;
-
-use crate::z2m::api::RawMessage;
+use serde_json::{json, Value};
 
 pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
 
@@ -14,24 +12,21 @@ pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
 ///
 /// Older versions WILL NOT WORK.
 #[must_use]
-pub fn hue_zclcommand(topic: &str, cluster: &str, command: u8, data: &[u8]) -> RawMessage {
-    RawMessage {
-        topic: topic.to_string(),
-        payload: json!({
-            "zclcommand": {
-                "cluster": cluster,
-                "command": command,
-                "payload": {
-                    "data": data,
-                },
-                "options": {
-                    "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
-                    "disableDefaultResponse": true,
-                    "direction": 0,
-                    "srcEndpoint": 64,
-                    "timeout": 100.0
-                }
+pub fn hue_zclcommand(cluster: &str, command: u8, data: &[u8]) -> Value {
+    json!({
+        "zclcommand": {
+            "cluster": cluster,
+            "command": command,
+            "payload": {
+                "data": data,
+            },
+            "options": {
+                "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
+                "disableDefaultResponse": true,
+                "direction": 0,
+                "srcEndpoint": 64,
+                "timeout": 100.0
             }
-        }),
-    }
+        }
+    })
 }
