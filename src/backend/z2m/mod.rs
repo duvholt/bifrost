@@ -957,6 +957,97 @@ impl Z2mBackend {
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
+            BackendRequest::EntertainmentStart(ent_id) => {
+                let ent: &EntertainmentConfiguration = lock.get_id(ent_id)?;
+
+                let mut chans = ent.channels.clone();
+                println!("{chans:#?}");
+
+                let mut addrs = vec![];
+                let mut target = None;
+                chans.sort_by_key(|c| c.channel_id);
+                for chan in chans {
+                    for member in chan.members {
+                        let ent: &Entertainment = lock.get(&member.service)?;
+                        let light_id = ent
+                            .renderer_reference
+                            .ok_or(ApiError::NotFound(member.service.rid))?;
+                        let topic = self
+                            .rmap
+                            .get(&light_id.rid)
+                            .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
+                        let dev = self
+                            .network
+                            .get(topic)
+                            .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
+                        addrs.push(dev.network_address + member.index);
+                        target = Some(topic);
+                    }
+                }
+                drop(lock);
+
+                if let Some(target) = target {
+                    self.entstream = Some(EntStream {
+                        stream: EntertainmentZigbeeStream::new(),
+                        target: Z2mTarget::new(target),
+                        addrs,
+                    });
+                }
+
+                if let Some(es) = &mut self.entstream {
+                    let z2mreq = es.target.send(es.stream.segment_mapping(&es.addrs)?)?;
+                    let device = es.target.device.clone();
+                    self.websocket_send(socket, &device, z2mreq).await?;
+                }
+
+                if let Some(es) = &mut self.entstream {
+                    let z2mreq = es.target.send(es.stream.reset()?)?;
+                    let device = es.target.device.clone();
+                    self.websocket_send(socket, &device, z2mreq).await?;
+                }
+
+                if let Some(es) = &mut self.entstream {
+                    let zero = HueEntFrameLightRecord::new(es.addrs[0], 0, XY { x: 0.0, y: 0.0 });
+                    let z2mreq = es.target.send(es.stream.frame(vec![zero])?)?;
+                    let device = es.target.device.clone();
+                    self.websocket_send(socket, &device, z2mreq).await?;
+                }
+            }
+
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            BackendRequest::EntertainmentFrame(frame) => {
+                if let Some(es) = &mut self.entstream {
+                    let mut blks = vec![];
+
+                    if let HueStreamLights::Rgb(rgb) = frame {
+                        for light in rgb {
+                            let (xy, bright) = light.to_xy();
+
+                            let brightness = (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
+
+                            let chan = es.addrs[light.channel as usize % es.addrs.len()];
+                            let lrec = HueEntFrameLightRecord::new(chan, brightness, xy);
+
+                            blks.push(lrec);
+                        }
+                        blks.truncate(7);
+                    } else {
+                        // FIXME
+                        unimplemented!();
+                    }
+
+                    let z2mreq = es.target.send(es.stream.frame(blks)?)?;
+                    let device = es.target.device.clone();
+                    self.websocket_send(socket, &device, z2mreq).await?;
+                }
+            }
+            BackendRequest::EntertainmentStop() => {
+                if let Some(es) = &mut self.entstream.take() {
+                    let z2mreq = es.target.send(es.stream.reset()?)?;
+                    let device = es.target.device.clone();
+                    self.websocket_send(socket, &device, z2mreq).await?;
+                }
+            }
         }
 
         Ok(())
