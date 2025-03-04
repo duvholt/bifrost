@@ -952,7 +952,8 @@ impl Z2mBackend {
                 pkt = chan.recv() => {
                     let api_req = pkt?;
                     self.websocket_write(&mut socket, api_req).await?;
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    // FIXME: this used to be our "throttle" feature, but it breaks entertainment mode
+                    /* tokio::time::sleep(std::time::Duration::from_millis(100)).await; */
                 },
                 pkt = socket.next() => {
                     self.websocket_read(pkt.ok_or(ApiError::UnexpectedZ2mEof)??).await?;
