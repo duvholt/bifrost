@@ -20,7 +20,7 @@ pub enum Z2mRequest<'a> {
     Update(&'a DeviceUpdate),
 
     #[serde(untagged)]
-    Raw(&'a Value),
+    Raw(Value),
 
     #[serde(untagged)]
     Untyped {
