@@ -1,4 +1,4 @@
-use crate::error::HueResult;
+use crate::zigbee::ZigbeeMessage;
 
 /// A target for Zigbee requests
 ///
@@ -6,7 +6,8 @@ use crate::error::HueResult;
 pub trait ZigbeeTarget {
     /// The result type when sending Zigbee commands. This could be a data
     /// structure, a handle, `()`, or whatever makes sense for the impl.
-    type Result;
+    type Error;
+    type Output;
 
-    fn send(&mut self, cluster: u16, command: u8, data: &[u8]) -> HueResult<Self::Result>;
+    fn send(&mut self, msg: ZigbeeMessage) -> Result<Self::Output, Self::Error>;
 }
