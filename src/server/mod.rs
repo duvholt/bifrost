@@ -1,6 +1,7 @@
 pub mod appstate;
 pub mod banner;
 pub mod certificate;
+pub mod entertainment;
 pub mod http;
 pub mod hueevents;
 pub mod updater;
