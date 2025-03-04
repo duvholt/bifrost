@@ -18,6 +18,9 @@ pub enum HueError {
     #[error(transparent)]
     UuidError(#[from] uuid::Error),
 
+    #[error("Bad header in hue entertainment stream")]
+    HueEntertainmentBadHeader,
+
     #[error("Failed to decode Hue Zigbee Update")]
     HueZigbeeDecodeError,
 
