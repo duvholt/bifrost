@@ -155,6 +155,15 @@ pub enum ApiError {
 
     #[error("Invalid hex color")]
     InvalidHexColor,
+
+    #[error("Entertainment Stream init error")]
+    EntStreamInitError,
+
+    #[error("Entertainment Stream desynchronized")]
+    EntStreamDesync,
+
+    #[error("Invalid zigbee message")]
+    ZigbeeMessageError,
 }
 
 impl From<SvcError> for ApiError {
