@@ -64,7 +64,7 @@ pub struct EntertainmentConfigurationPosition {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationStreamMembers {
     pub service: ResourceLink,
-    pub index: u32,
+    pub index: u16,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
