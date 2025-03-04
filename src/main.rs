@@ -109,6 +109,14 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let svc = server::version_updater(appstate.res.clone(), appstate.updater());
     mgr.register_function("version_updater", svc).await?;
 
+    // register entertainment streaming listener
+    let svc = server::entertainment::EntertainmentService::new(
+        bconf.ipaddress,
+        bconf.entm_port,
+        appstate.res.clone(),
+    )?;
+    mgr.register_service("entertainment", svc).await?;
+
     // register all z2m backends as services
     for (name, server) in &appstate.config().z2m.servers {
         let client = Z2mBackend::new(
