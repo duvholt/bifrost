@@ -25,6 +25,33 @@ pub struct HueStreamHeader {
 }
 
 #[derive(Clone, Debug)]
+pub struct HueStreamPacketHeader {
+    pub color_mode: HueStreamColorMode,
+    pub area: Uuid,
+}
+
+impl HueStreamPacketHeader {
+    pub const MAGIC: &[u8] = b"HueStream";
+    pub const SIZE: usize = size_of::<<HueStreamHeader as PackedStruct>::ByteArray>();
+
+    pub fn parse(data: &[u8]) -> HueResult<Self> {
+        let len = Self::SIZE;
+        let hdr = HueStreamHeader::unpack_from_slice(&data[..len])?;
+
+        if hdr.magic != Self::MAGIC {
+            return Err(HueError::HueEntertainmentBadHeader);
+        }
+
+        let dest = Uuid::try_parse_ascii(&hdr.dest)?;
+
+        Ok(Self {
+            color_mode: hdr.color_mode,
+            area: dest,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct HueStreamPacket {
     pub color_mode: HueStreamColorMode,
     pub area: Uuid,
