@@ -103,6 +103,9 @@ pub enum ZclDataType {
     /** IEEE address (U64) type */
     ZclIeeeaddr = 0xf0,
 
+    /** 128-bit security key */
+    ZclSecurityKey = 0xf1,
+
     /** Invalid data type */
     ZclInvalid = 0xff,
 }
@@ -149,6 +152,7 @@ pub enum ZclAttrValue {
     Bytes(Vec<u8>),
     String(String),
     IeeeAddr(Vec<u8>),
+    SecurityKey([u8; 16]),
     Unsupported,
 }
 
@@ -175,6 +179,7 @@ impl Debug for ZclAttrValue {
             Self::Bytes(val) => write!(f, "hex:{}", hex::encode(val)),
             Self::String(val) => write!(f, "str:{}", &val),
             Self::IeeeAddr(val) => write!(f, "ieeeaddr {}", hex::encode(val)),
+            Self::SecurityKey(val) => write!(f, "seckey {}", hex::encode(val)),
             Self::Unsupported => write!(f, "Unsupported"),
         }
     }
@@ -240,6 +245,11 @@ impl ZclAttr {
                 ZclAttrValue::String(String::from_utf8(buf)?)
             }
             ZclDataType::ZclIeeeaddr => todo!(),
+            ZclDataType::ZclSecurityKey => {
+                let mut buf = [0; 16];
+                rdr.read_exact(&mut buf)?;
+                ZclAttrValue::SecurityKey(buf)
+            }
             ZclDataType::ZclInvalid => todo!(),
         };
 
