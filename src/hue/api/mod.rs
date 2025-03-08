@@ -41,6 +41,7 @@ pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
 };
+use serde::ser::SerializeMap;
 pub use stream::HueStreamKey;
 pub use stubs::{
     BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
@@ -60,9 +61,18 @@ use serde_json::{from_value, json, Value};
 use crate::error::{ApiError, ApiResult};
 use crate::hue::legacy_api::ApiLightStateUpdate;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Stub;
+
+impl Serialize for Stub {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_map(None)?.end()
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
