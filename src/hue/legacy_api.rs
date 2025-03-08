@@ -351,6 +351,7 @@ pub enum ApiGroupClass {
     Porch,
     Barbecue,
     Pool,
+    Free,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
