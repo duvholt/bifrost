@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::io::Write;
 
 use byteorder::{WriteBytesExt, BE, LE};
 use packed_struct::prelude::*;
@@ -18,6 +19,18 @@ pub struct HueEntStop {
 #[derive(Debug, Clone)]
 pub struct HueEntSegmentConfig {
     pub members: Vec<u16>,
+}
+
+#[derive(PackedStruct, Debug, Clone)]
+#[packed_struct(size = "2", endian = "lsb")]
+pub struct HueEntSegment {
+    pub length: u8,
+    pub index: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct HueEntSegmentLayout {
+    pub members: Vec<HueEntSegment>,
 }
 
 #[derive(PackedStruct, Debug, Clone)]
@@ -108,6 +121,42 @@ impl HueEntSegmentConfig {
         res.write_u16::<BE>(count)?;
         for m in &self.members {
             res.write_u16::<LE>(*m)?;
+        }
+
+        Ok(res)
+    }
+}
+
+impl HueEntSegmentLayout {
+    pub fn new(map: &[HueEntSegment]) -> Self {
+        Self {
+            members: map.to_vec(),
+        }
+    }
+
+    pub fn parse(data: &[u8]) -> HueResult<Self> {
+        check_size_valid(data.len(), 3, 2)?;
+
+        let (hdr, data) = data.split_at(3);
+
+        let count = hdr[2];
+
+        let members = data
+            .chunks_exact(2)
+            .take(usize::from(count))
+            .map(HueEntSegment::unpack_from_slice)
+            .collect::<Result<_, _>>()?;
+
+        Ok(Self { members })
+    }
+
+    pub fn pack(&self) -> HueResult<Vec<u8>> {
+        let mut res = vec![];
+        let count = u16::try_from(self.members.len())?;
+        res.write_u16::<LE>(0)?;
+        res.write_u16::<LE>(count)?;
+        for m in &self.members {
+            res.write_all(&m.pack()?)?;
         }
 
         Ok(res)
