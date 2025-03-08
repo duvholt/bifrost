@@ -60,6 +60,10 @@ pub struct HueStreamPacket {
 impl HueStreamPacket {
     pub const HEADER_SIZE: usize = HueStreamPacketHeader::SIZE;
 
+    pub const fn size_with_lights(nlights: usize) -> usize {
+        Self::HEADER_SIZE + nlights * 7
+    }
+
     pub fn parse(data: &[u8]) -> HueResult<Self> {
         let (header, body) = data.split_at(Self::HEADER_SIZE);
         let hdr = HueStreamPacketHeader::parse(header)?;
