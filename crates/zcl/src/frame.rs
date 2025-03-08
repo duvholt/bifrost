@@ -83,6 +83,10 @@ impl ZclFrame {
         })
     }
 
+    pub fn c2s(&self) -> bool {
+        self.flags.direction == ZclFrameDirection::ClientToServer
+    }
+
     pub fn cluster_specific(&self) -> bool {
         self.flags.frame_type == ZclFrameType::ClusterSpecific
     }
