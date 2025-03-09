@@ -1,7 +1,7 @@
 pub mod stream;
 pub mod zclcommand;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -20,10 +20,9 @@ use uuid::Uuid;
 
 use ::hue::clamp::Clamp;
 use ::hue::stream::HueStreamLights;
-use ::hue::xy::XY;
 use ::hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
-    HueZigbeeUpdate, ZigbeeTarget,
+    HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
 };
 
 use crate::backend::z2m::stream::Z2mTarget;
@@ -61,7 +60,8 @@ struct LearnScene {
 struct EntStream {
     stream: EntertainmentZigbeeStream,
     target: Z2mTarget,
-    addrs: Vec<u16>,
+    addrs: BTreeMap<String, Vec<u16>>,
+    modes: Vec<(u16, LightRecordMode)>,
 }
 
 pub struct Z2mBackend {
@@ -76,6 +76,19 @@ pub struct Z2mBackend {
     network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
     counter: u32,
+}
+
+fn z2m_set_entertainment_brightness(brightness: u8) -> Z2mRequest<'static> {
+    Z2mRequest::RawWrite(json!({
+        "cluster": EntertainmentZigbeeStream::CLUSTER,
+        "payload": {
+            "5": {
+                "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
+                "type": 32,
+                "value": brightness,
+            }
+        }
+    }))
 }
 
 impl Z2mBackend {
@@ -177,17 +190,8 @@ impl Z2mBackend {
             });
         }
 
-        // FIXME: This should be feature-detected, not always enabled
-        let enttm = Entertainment {
-            equalizer: true,
-            owner: link_device,
-            proxy: true,
-            renderer: true,
-            max_streams: None,
-            renderer_reference: Some(link_light),
-
-            // FIXME: hard-coded to values suitable for LCX005 (gradient light strip)
-            segments: Some(EntertainmentSegments {
+        let segments = if gradient.is_some() {
+            EntertainmentSegments {
                 configurable: false,
                 max_segments: 10,
                 segments: (0..7)
@@ -196,7 +200,27 @@ impl Z2mBackend {
                         length: 1,
                     })
                     .collect(),
-            }),
+            }
+        } else {
+            EntertainmentSegments {
+                configurable: false,
+                max_segments: 1,
+                segments: vec![EntertainmentSegment {
+                    start: 0,
+                    length: 1,
+                }],
+            }
+        };
+
+        // FIXME: This should be feature-detected, not always enabled
+        let enttm = Entertainment {
+            equalizer: true,
+            owner: link_device,
+            proxy: true,
+            renderer: true,
+            max_streams: None,
+            renderer_reference: Some(link_light),
+            segments: Some(segments),
         };
 
         // FIXME: The Taurus objects are seen on Hue Entertainment devices on a
@@ -970,17 +994,18 @@ impl Z2mBackend {
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
+
             BackendRequest::EntertainmentStart(ent_id) => {
                 let ent: &EntertainmentConfiguration = lock.get_id(ent_id)?;
 
                 let mut chans = ent.channels.clone();
-                println!("{chans:#?}");
 
-                let mut addrs = vec![];
-                let mut target = None;
+                let mut addrs: BTreeMap<String, Vec<u16>> = BTreeMap::new();
+                let mut targets = vec![];
                 chans.sort_by_key(|c| c.channel_id);
+
                 for chan in chans {
-                    for member in chan.members {
+                    for member in &chan.members {
                         let ent: &Entertainment = lock.get(&member.service)?;
                         let light_id = ent
                             .renderer_reference
@@ -993,35 +1018,61 @@ impl Z2mBackend {
                             .network
                             .get(topic)
                             .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
-                        addrs.push(dev.network_address + member.index);
-                        target = Some(topic);
+
+                        let segment_addr = dev.network_address + member.index;
+
+                        addrs
+                            .entry(dev.friendly_name.clone())
+                            .or_default()
+                            .push(segment_addr);
+
+                        targets.push(topic);
                     }
                 }
+                log::debug!("Entertainment addresses: {addrs:04x?}");
                 drop(lock);
 
-                if let Some(target) = target {
-                    self.entstream = Some(EntStream {
+                if let Some(target) = targets.first() {
+                    let mut modes = vec![];
+
+                    for segments in addrs.values() {
+                        let mode = if segments.len() <= 1 {
+                            LightRecordMode::Device
+                        } else {
+                            LightRecordMode::Segment
+                        };
+
+                        for seg in segments {
+                            modes.push((*seg, mode));
+                        }
+                    }
+
+                    let mut es = EntStream {
                         stream: EntertainmentZigbeeStream::new(self.counter),
                         target: Z2mTarget::new(target),
                         addrs,
-                    });
-                }
+                        modes,
+                    };
 
-                if let Some(es) = &mut self.entstream {
-                    let z2mreq = es.target.send(es.stream.segment_mapping(&es.addrs)?)?;
-                    let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, z2mreq).await?;
+                    log::debug!("Entertainment addrs: {:#?}", &es.addrs);
+                    log::debug!("Entertainment modes: {:#?}", &es.modes);
+                    for (dev, segments) in &es.addrs {
+                        let z2mreq = z2m_set_entertainment_brightness(0xFE);
+                        self.websocket_send(socket, dev, z2mreq).await?;
+
+                        if segments.len() <= 1 {
+                            continue;
+                        }
+
+                        let z2mreq = es.target.send(es.stream.segment_mapping(segments)?)?;
+                        self.websocket_send(socket, dev, z2mreq).await?;
+                    }
+
+                    self.entstream = Some(es);
                 }
 
                 if let Some(es) = &mut self.entstream {
                     let z2mreq = es.target.send(es.stream.reset()?)?;
-                    let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, z2mreq).await?;
-                }
-
-                if let Some(es) = &mut self.entstream {
-                    let zero = HueEntFrameLightRecord::new(es.addrs[0], 0, XY { x: 0.0, y: 0.0 });
-                    let z2mreq = es.target.send(es.stream.frame(vec![zero])?)?;
                     let device = es.target.device.clone();
                     self.websocket_send(socket, &device, z2mreq).await?;
                 }
@@ -1037,13 +1088,12 @@ impl Z2mBackend {
                             let (xy, bright) = light.to_xy();
 
                             let brightness = (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
-
-                            let chan = es.addrs[light.channel as usize % es.addrs.len()];
-                            let lrec = HueEntFrameLightRecord::new(chan, brightness, xy);
+                            let (chan, mode) = es.modes[light.channel as usize % es.modes.len()];
+                            let raw = xy.to_quant();
+                            let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
 
                             blks.push(lrec);
                         }
-                        blks.truncate(7);
                     } else {
                         // FIXME
                         unimplemented!();
@@ -1055,10 +1105,14 @@ impl Z2mBackend {
                 }
             }
             BackendRequest::EntertainmentStop() => {
+                log::debug!("Stopping entertainment mode..");
                 if let Some(es) = &mut self.entstream.take() {
                     let z2mreq = es.target.send(es.stream.reset()?)?;
-                    let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, z2mreq).await?;
+                    for topic in es.addrs.keys() {
+                        log::debug!("Sending stop to {topic}");
+                        self.websocket_send(socket, topic, z2mreq.clone()).await?;
+                    }
+                    self.counter = es.stream.counter();
                 }
             }
         }
