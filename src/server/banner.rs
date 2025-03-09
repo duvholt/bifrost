@@ -1,6 +1,6 @@
 use std::io::{IsTerminal, Write};
 
-use termcolor::{self, Color, ColorSpec, StandardStream, WriteColor};
+use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 
 use crate::error::ApiResult;
 
@@ -18,7 +18,7 @@ impl Rainbow {
         };
 
         Self {
-            stderr: termcolor::StandardStream::stderr(cc),
+            stderr: StandardStream::stderr(cc),
         }
     }
 
