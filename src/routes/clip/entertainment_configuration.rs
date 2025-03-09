@@ -24,7 +24,7 @@ use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 pub async fn get_resource(state: State<AppState>) -> ApiV2Result {
-    super::generic::get_resource(state, Path(RType::EntertainmentConfiguration)).await
+    generic::get_resource(state, Path(RType::EntertainmentConfiguration)).await
 }
 
 async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> impl IntoResponse {

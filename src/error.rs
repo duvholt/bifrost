@@ -69,7 +69,7 @@ pub enum ApiError {
     TungsteniteError(#[from] tokio_tungstenite::tungstenite::Error),
 
     #[error(transparent)]
-    X509DerError(#[from] x509_cert::der::Error),
+    X509DerError(#[from] der::Error),
 
     #[error(transparent)]
     X509SpkiError(#[from] x509_cert::spki::Error),

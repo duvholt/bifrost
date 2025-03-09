@@ -33,7 +33,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::hue;
 use crate::hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature,
-    ColorTemperatureUpdate, ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming,
+    ColorTemperatureUpdate, ColorUpdate, DeviceArchetype, DeviceProductData, Dimming,
     DimmingUpdate, Entertainment, EntertainmentConfiguration, EntertainmentSegment,
     EntertainmentSegments, GroupedLight, Light, LightColor, LightEffect, LightEffectStatus,
     LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradient,
@@ -46,7 +46,8 @@ use crate::hue::scene_icons;
 use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
-use crate::z2m::api::{self, ExposeLight, Message, RawMessage};
+use crate::z2m;
+use crate::z2m::api::{ExposeLight, Message, RawMessage};
 use crate::z2m::request::Z2mRequest;
 use crate::z2m::update::{DeviceColor, DeviceUpdate};
 
@@ -72,7 +73,7 @@ pub struct Z2mBackend {
     rmap: HashMap<Uuid, String>,
     learn: HashMap<Uuid, LearnScene>,
     ignore: HashSet<String>,
-    network: HashMap<String, api::Device>,
+    network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
     counter: u32,
 }
@@ -105,7 +106,7 @@ impl Z2mBackend {
         })
     }
 
-    pub async fn add_light(&mut self, apidev: &api::Device, expose: &ExposeLight) -> ApiResult<()> {
+    pub async fn add_light(&mut self, apidev: &z2m::api::Device, expose: &ExposeLight) -> ApiResult<()> {
         let name = &apidev.friendly_name;
 
         let link_device = RType::Device.deterministic(&apidev.ieee_address);
@@ -225,7 +226,7 @@ impl Z2mBackend {
         Ok(())
     }
 
-    pub async fn add_switch(&mut self, dev: &api::Device) -> ApiResult<()> {
+    pub async fn add_switch(&mut self, dev: &z2m::api::Device) -> ApiResult<()> {
         let name = &dev.friendly_name;
 
         let link_device = RType::Device.deterministic(&dev.ieee_address);
@@ -278,7 +279,7 @@ impl Z2mBackend {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub async fn add_group(&mut self, grp: &crate::z2m::api::Group) -> ApiResult<()> {
+    pub async fn add_group(&mut self, grp: &z2m::api::Group) -> ApiResult<()> {
         let room_name;
 
         if let Some(ref prefix) = self.server.group_prefix {
@@ -682,7 +683,7 @@ impl Z2mBackend {
                 .children
                 .iter()
                 .filter_map(|rl| lock.get(rl).ok())
-                .filter_map(Device::light_service)
+                .filter_map(hue::api::Device::light_service)
                 .map(|rl| rl.rid)
                 .collect();
 

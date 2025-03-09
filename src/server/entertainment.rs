@@ -139,7 +139,7 @@ impl Service for EntertainmentService {
             let (socket, _addr) = udp.accept().await?;
             let ssl = Ssl::new(ctx)?;
 
-            let mut stream = tokio_openssl::SslStream::new(ssl, socket)?;
+            let mut stream = SslStream::new(ssl, socket)?;
             Pin::new(&mut stream).accept().await?;
             match self.run_loop(stream).await {
                 Ok(()) => log::info!("Entertainment stream finished"),
