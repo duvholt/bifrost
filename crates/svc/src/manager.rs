@@ -79,7 +79,7 @@ impl SvmClient {
         Ok(rx.await?)
     }
 
-    async fn send(&mut self, value: SvmRequest) -> SvcResult<()> {
+    async fn send(&self, value: SvmRequest) -> SvcResult<()> {
         Ok(self.tx.send(value).await?)
     }
 
@@ -419,7 +419,7 @@ impl ServiceManager {
                 log::info!("Service managed shutting down..");
                 let ids: Vec<Uuid> = self.list().copied().collect();
 
-                self.stop_multiple(&ids).await?;
+                self.stop_multiple(&ids)?;
 
                 select! {
                     Ok(()) = Box::pin(self.wait_for_multiple(&ids, ServiceState::Stopped)) => {}
@@ -439,7 +439,7 @@ impl ServiceManager {
         Ok(())
     }
 
-    async fn stop_multiple(&mut self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
+    fn stop_multiple(&self, handles: &[impl IntoServiceId]) -> SvcResult<()> {
         let ids = self.resolve_multiple(handles)?;
         for id in ids {
             self.stop(id)?;
