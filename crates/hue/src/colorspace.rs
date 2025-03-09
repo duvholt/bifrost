@@ -36,7 +36,7 @@ impl Matrix3 {
                 let mut r = i + 1;
 
                 while r < 3 && (current[[r, i]]).abs() < 1e-10 {
-                    r += 1
+                    r += 1;
                 }
 
                 if r == 3 {

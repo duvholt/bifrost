@@ -87,12 +87,12 @@ pub enum HueStreamLights {
 impl HueStreamLights {
     pub fn parse(color_mode: HueStreamColorMode, data: &[u8]) -> HueResult<Self> {
         let res = match color_mode {
-            HueStreamColorMode::Rgb => HueStreamLights::Rgb(
+            HueStreamColorMode::Rgb => Self::Rgb(
                 data.chunks_exact(7)
                     .map(Rgb16::unpack_from_slice)
                     .collect::<Result<_, _>>()?,
             ),
-            HueStreamColorMode::Xy => HueStreamLights::Xy(
+            HueStreamColorMode::Xy => Self::Xy(
                 data.chunks_exact(7)
                     .map(Xy16::unpack_from_slice)
                     .collect::<Result<_, _>>()?,
