@@ -242,14 +242,14 @@ returning `0000` seems to be a safe way to detect success.
 
 ## Attributes
 
-| Attr   | Type | Desc                       | Strip | Bulb |
-|--------|------|----------------------------|-------|------|
-| `0000` | `b8` | ?                          | `0F`  | `0B` |
-| `0001` | `e8` | ?                          | `00`  | `00` |
-| `0002` | `u8` | Probably max segment count | `0A`  | N/S  |
-| `0003` | `u8` | Probably gradient-related  | `04`  | N/S  |
-| `0004` | `u8` | Probably segment count     | `07`  | N/S  |
-| `0005` | `u8` | Light balance factor       | `FE`  | `FE` |
+| Attr   | Type | Desc                       | Strip | Bulb | Firmware                               |
+|--------|------|----------------------------|-------|------|----------------------------------------|
+| `0000` | `b8` | ?                          | `0F`  | `0B` |                                        |
+| `0001` | `e8` | ?                          | `00`  | `00` |                                        |
+| `0002` | `u8` | Probably max segment count | `0A`  | N/S  |                                        |
+| `0003` | `u8` | Probably gradient-related  | `04`  | N/S  |                                        |
+| `0004` | `u8` | Probably segment count     | `07`  | N/S  |                                        |
+| `0005` | `u8` | Light balance factor       | `FE`  | `FE` | Fails on `1.76.11`, works on `1.122.2` |
 
 Notice that attributes `0002`, `0003` and `0004` are not present on the hue
 bulb. This supports the idea that these attributes are gradient-related.
