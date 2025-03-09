@@ -138,7 +138,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                     if *rx.borrow_and_update() == ServiceState::Running {
                         state.set(ServiceState::Starting).await?;
                     } else {
-                        rx.changed().await?
+                        rx.changed().await?;
                     }
                 }
 
@@ -188,7 +188,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                                     res = svc.run() => {
                                         log::trace!(target:target, "Service finished running within timeout: {res:?}");
                                     },
-                                    _ = sleep(Duration::from_secs(1)) => {
+                                    () = sleep(Duration::from_secs(1)) => {
                                         log::warn!("timeout");
                                     }
                                 }

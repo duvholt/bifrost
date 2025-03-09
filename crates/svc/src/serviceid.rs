@@ -11,8 +11,8 @@ pub enum ServiceId {
 impl Display for ServiceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ServiceId::Name(name) => write!(f, "{name}"),
-            ServiceId::Id(uuid) => write!(f, "{uuid}"),
+            Self::Name(name) => write!(f, "{name}"),
+            Self::Id(uuid) => write!(f, "{uuid}"),
         }
     }
 }

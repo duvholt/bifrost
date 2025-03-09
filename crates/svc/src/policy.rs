@@ -52,7 +52,7 @@ impl Policy {
 
     pub async fn sleep(&self) {
         if let Some(dur) = self.delay {
-            sleep(dur).await
+            sleep(dur).await;
         }
     }
 

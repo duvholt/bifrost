@@ -285,7 +285,7 @@ impl ServiceManager {
         };
 
         self.svcs.insert(id, rec);
-        self.names.insert(name.to_string(), id);
+        self.names.insert(name, id);
 
         Ok(id)
     }
@@ -423,7 +423,7 @@ impl ServiceManager {
 
                 select! {
                     Ok(()) = Box::pin(self.wait_for_multiple(&ids, ServiceState::Stopped)) => {}
-                    _ = tokio::time::sleep(Duration::from_secs(3)) => {
+                    () = tokio::time::sleep(Duration::from_secs(3)) => {
                         log::error!("Service shutdown timed out, aborting tasks..");
                         for id in &ids {
                             self.abort(&ServiceId::from(*id))?;
