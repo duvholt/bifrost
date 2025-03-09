@@ -9,7 +9,7 @@ use serde::Deserialize;
 use bifrost::error::ApiResult;
 use zcl::cluster;
 use zcl::error::ZclResult;
-use zcl::frame::{ZclFrame, ZclFrameType};
+use zcl::frame::{ZclFrame, ZclFrameDirection, ZclFrameType};
 
 #[macro_use]
 extern crate log;
@@ -99,6 +99,12 @@ fn parse(rec: &Record, no_index: bool) -> ZclResult<()> {
     let index = if no_index { 0 } else { rec.index };
 
     let describe = |cat: &str, desc: ZclResult<Option<String>>| {
+        let dir = if flags.direction == ZclFrameDirection::ClientToServer {
+            " :>"
+        } else {
+            "<: "
+        };
+
         match desc {
             Ok(Some(desc)) => {
                 if desc.is_empty() {
@@ -106,19 +112,19 @@ fn parse(rec: &Record, no_index: bool) -> ZclResult<()> {
                 }
 
                 info!(
-                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}{desc} {}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} {dir} {cat}{desc} {}",
                     hex::encode(data)
                 );
             }
             Ok(None) => {
                 warn!(
-                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}Unknown {}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} {dir} {cat}Unknown {}",
                     hex::encode(data)
                 );
             }
             Err(err) => {
                 error!(
-                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: FAILED {}: {err}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} {dir} FAILED {}: {err}",
                     hex::encode(data)
                 );
             }
