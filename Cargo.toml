@@ -83,6 +83,7 @@ server-banner = ["server", "dep:termcolor", "dep:itertools"]
 
 [profile.dev]
 debug = "limited"
+split-debuginfo = "unpacked"
 
 [dependencies]
 axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart"], default-features = false }
