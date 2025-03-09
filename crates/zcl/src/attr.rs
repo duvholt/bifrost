@@ -271,6 +271,7 @@ pub struct ZclReadAttrResp {
 }
 
 impl ZclReadAttrResp {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse(data: &[u8]) -> ZclResult<Self> {
         let mut attr = vec![];
 
@@ -289,6 +290,7 @@ pub struct ZclWriteAttr {
 }
 
 impl ZclWriteAttr {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse(data: &[u8]) -> ZclResult<Self> {
         let mut attr = vec![];
 
@@ -307,6 +309,7 @@ pub struct ZclReportAttr {
 }
 
 impl ZclReportAttr {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse(data: &[u8]) -> ZclResult<Self> {
         let mut attr = vec![];
 
