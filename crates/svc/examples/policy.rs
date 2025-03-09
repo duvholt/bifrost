@@ -35,6 +35,8 @@ impl Service for PolicyService {
 
 #[tokio::main]
 async fn main() -> SvcResult<()> {
+    const NAME: &str = "policy-service";
+
     pretty_env_logger::formatted_builder()
         .filter_level(log::LevelFilter::Debug)
         .parse_default_env()
@@ -43,8 +45,6 @@ async fn main() -> SvcResult<()> {
     let (mut client, future) = ServiceManager::spawn();
 
     let svc = PolicyService { counter: 0 };
-
-    const NAME: &str = "policy-service";
 
     // Manually construct a ServiceRunner, and set a specific policy for
     // handling errors during .run()
