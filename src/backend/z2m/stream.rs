@@ -27,7 +27,7 @@ impl ZigbeeTarget for Z2mTarget {
             _ => Err(ApiError::ZigbeeMessageError)?,
         };
 
-        let res = hue_zclcommand(cluster, msg.command, &msg.data);
+        let res = hue_zclcommand(cluster, &msg);
 
         Ok(Z2mRequest::Raw(res))
     }

@@ -1,3 +1,4 @@
+use hue::zigbee::ZigbeeMessage;
 use serde_json::{json, Value};
 
 pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
@@ -12,21 +13,21 @@ pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
 ///
 /// Older versions WILL NOT WORK.
 #[must_use]
-pub fn hue_zclcommand(cluster: &str, command: u8, data: &[u8]) -> Value {
+pub fn hue_zclcommand(cluster: &str, msg: &ZigbeeMessage) -> Value {
     json!({
         "zclcommand": {
             "cluster": cluster,
-            "command": command,
+            "command": msg.command,
             "payload": {
-                "data": data,
+                "data": msg.data,
             },
             "options": {
                 "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
-                "disableDefaultResponse": true,
+                "disableDefaultResponse": msg.ddr,
                 "direction": 0,
                 "srcEndpoint": 64,
-                "timeout": 100.0
-            }
+                "timeout": 100.0,
+            },
         }
     })
 }
