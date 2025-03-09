@@ -61,6 +61,13 @@ pub struct Position {
     pub z: f64,
 }
 
+impl Position {
+    #[must_use]
+    pub const fn new(x: f64, y: f64, z: f64) -> Self {
+        Self { x, y, z }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationStreamMembers {
     pub service: ResourceLink,
