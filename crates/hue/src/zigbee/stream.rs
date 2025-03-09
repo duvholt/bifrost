@@ -40,7 +40,7 @@ impl ZigbeeMessage {
 
 impl Default for EntertainmentZigbeeStream {
     fn default() -> Self {
-        Self::new()
+        Self::new(0)
     }
 }
 
@@ -51,11 +51,15 @@ impl EntertainmentZigbeeStream {
     pub const CMD_RESET: u8 = 3;
     pub const CMD_FRAME: u8 = 1;
 
-    pub const fn new() -> Self {
+    pub const fn new(counter: u32) -> Self {
         Self {
             smoothing: Self::DEFAULT_SMOOTHING,
-            counter: 0,
+            counter,
         }
+    }
+
+    pub const fn counter(&self) -> u32 {
+        self.counter
     }
 
     pub fn smoothing(&self) -> u16 {
