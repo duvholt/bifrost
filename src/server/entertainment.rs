@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use chrono::Utc;
 use openssl::ssl::{Ssl, SslContext, SslMethod};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 use tokio::sync::Mutex;
@@ -17,6 +18,7 @@ use svc::traits::Service;
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::EntertainmentConfiguration;
+use crate::model::throttle::{Throttle, ThrottleQueue};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
 
@@ -67,11 +69,16 @@ impl EntertainmentService {
         // look up entertainment area
         let lock = self.res.lock().await;
         let ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
-        let chans = ent.channels.clone();
+        let nlights = ent.channels.len();
         lock.backend_request(BackendRequest::EntertainmentStart(header.area))?;
         drop(lock);
 
-        let mut buf = vec![0u8; HueStreamPacket::HEADER_SIZE + chans.len() * 7];
+        let mut buf = vec![0u8; HueStreamPacket::size_with_lights(nlights)];
+
+        let mut fps = 0;
+        let mut period = Utc::now().timestamp();
+        let throttle = Throttle::from_fps(30);
+        let mut queue = ThrottleQueue::new(throttle, 2);
 
         loop {
             match timeout(Duration::from_millis(1000), rdr.read_exact(&mut buf)).await {
@@ -91,10 +98,23 @@ impl EntertainmentService {
                 return Err(ApiError::EntStreamDesync);
             }
 
-            let lock = self.res.lock().await;
-            lock.backend_request(BackendRequest::EntertainmentFrame(pkt.lights))?;
-            drop(lock);
+            if queue.push(BackendRequest::EntertainmentFrame(pkt.lights)) {
+                let ts = Utc::now().timestamp();
+                if period != ts {
+                    log::info!("Entertainment fps: {fps}");
+                    period = ts;
+                    fps = 0;
+                }
+            }
+
+            if let Some(req) = queue.pop() {
+                fps += 1;
+                self.res.lock().await.backend_request(req)?;
+            }
         }
+
+        let req = BackendRequest::EntertainmentStop();
+        self.res.lock().await.backend_request(req)?;
 
         Ok(())
     }
