@@ -58,6 +58,9 @@ multiple_crate_versions = "allow"
 missing_errors_doc      = "allow"
 missing_panics_doc      = "allow"
 
+[lints]
+workspace = true
+
 [features]
 default = [
     "server",
