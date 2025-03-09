@@ -240,7 +240,7 @@ impl ServiceManager {
         }
     }
 
-    /// Daemonize the ServiceManager, returning a (clonable) [`SvmClient`] as
+    /// Daemonize the [`ServiceManager`], returning a (clonable) [`SvmClient`] as
     /// well as a [`JoinHandle`] used to control the service manager task
     /// itself.
     #[must_use]
