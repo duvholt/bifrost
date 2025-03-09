@@ -74,6 +74,7 @@ pub struct Z2mBackend {
     ignore: HashSet<String>,
     network: HashMap<String, api::Device>,
     entstream: Option<EntStream>,
+    counter: u32,
 }
 
 impl Z2mBackend {
@@ -100,6 +101,7 @@ impl Z2mBackend {
             ignore,
             network,
             entstream,
+            counter: 0,
         })
     }
 
@@ -988,7 +990,7 @@ impl Z2mBackend {
 
                 if let Some(target) = target {
                     self.entstream = Some(EntStream {
-                        stream: EntertainmentZigbeeStream::new(),
+                        stream: EntertainmentZigbeeStream::new(self.counter),
                         target: Z2mTarget::new(target),
                         addrs,
                     });
