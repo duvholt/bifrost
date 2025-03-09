@@ -87,8 +87,6 @@ impl EntertainmentZigbeeStream {
             counter: self.counter,
         };
 
-        self.counter += 1;
-
         Ok(ZigbeeMessage::new(
             Self::CLUSTER,
             Self::CMD_RESET,
