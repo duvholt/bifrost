@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
@@ -29,7 +27,7 @@ pub async fn get_resource(state: State<AppState>) -> ApiV2Result {
 
 async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> impl IntoResponse {
     log::info!(
-        "POST: entertainment_configuration2 {}",
+        "POST: entertainment_configuration {}",
         serde_json::to_string(&req)?
     );
 
@@ -46,8 +44,8 @@ async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) ->
             .collect(),
     };
 
-    let channels = make_channels(locations.service_locations[0].service);
-    let light_services = make_services(lock.borrow_mut(), &locations.service_locations)?;
+    let channels = make_channels(&lock, &locations.service_locations)?;
+    let light_services = make_services(&lock, &locations.service_locations)?;
 
     let auto_node = find_bridge_entertainment(&lock)?;
 
@@ -93,7 +91,10 @@ async fn get_resource_id(state: State<AppState>, Path(id): Path<Uuid>) -> ApiV2R
     generic::get_resource_id(state, Path((RType::EntertainmentConfiguration, id))).await
 }
 
-fn make_channels(service: ResourceLink) -> Vec<EntertainmentConfigurationChannels> {
+fn make_channels(
+    lock: &Resources,
+    locations: &[EntertainmentConfigurationServiceLocations],
+) -> ApiResult<Vec<EntertainmentConfigurationChannels>> {
     // FIXME: These are hard-coded values fitting for an LCX005 gradient light chain
     const POSITIONS: &[Position] = &[
         Position {
@@ -135,15 +136,39 @@ fn make_channels(service: ResourceLink) -> Vec<EntertainmentConfigurationChannel
 
     let mut channels: Vec<EntertainmentConfigurationChannels> = vec![];
 
-    for index in 0u16..7 {
-        channels.push(EntertainmentConfigurationChannels {
-            channel_id: u32::from(index),
-            position: POSITIONS[usize::from(index)].clone(),
-            members: vec![EntertainmentConfigurationStreamMembers { service, index }],
-        });
+    let mut channel_id = 0;
+    for location in locations {
+        let Some(pos) = location.positions.first() else {
+            continue;
+        };
+        let ent: &Entertainment = lock.get(&location.service)?;
+
+        if let Some(segs) = &ent.segments {
+            for index in 0..segs.segments.len() {
+                channels.push(EntertainmentConfigurationChannels {
+                    channel_id,
+                    position: POSITIONS[index % POSITIONS.len()].clone(),
+                    members: vec![EntertainmentConfigurationStreamMembers {
+                        service: location.service,
+                        index: u16::try_from(index)?,
+                    }],
+                });
+                channel_id += 1;
+            }
+        } else {
+            channels.push(EntertainmentConfigurationChannels {
+                channel_id,
+                position: pos.clone(),
+                members: vec![EntertainmentConfigurationStreamMembers {
+                    service: location.service,
+                    index: 0,
+                }],
+            });
+            channel_id += 1;
+        }
     }
 
-    channels
+    Ok(channels)
 }
 
 fn make_services(
@@ -206,8 +231,8 @@ async fn put_resource_id(
                 .map(Into::into)
                 .collect(),
         };
-        channels = make_channels(locs.service_locations[0].service);
-        light_services = make_services(lock.borrow_mut(), &newlocs.service_locations)?;
+        channels = make_channels(&lock, &newlocs.service_locations)?;
+        light_services = make_services(&lock, &newlocs.service_locations)?;
         locations = Some(newlocs);
     }
 
@@ -232,6 +257,7 @@ async fn put_resource_id(
             ec.channels = channels;
             ec.light_services = light_services;
         }
+
         if let Some(proxy) = upd.stream_proxy {
             match proxy {
                 EntertainmentConfigurationStreamProxyUpdate::Auto => {
