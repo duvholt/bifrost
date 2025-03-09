@@ -13,6 +13,7 @@ pub struct ZigbeeMessage {
     pub cluster: u16,
     pub command: u8,
     pub data: Vec<u8>,
+    pub ddr: bool,
 }
 
 impl ZigbeeMessage {
@@ -21,7 +22,12 @@ impl ZigbeeMessage {
             cluster,
             command,
             data,
+            ddr: true,
         }
+    }
+
+    pub fn with_ddr(self, ddr: bool) -> Self {
+        Self { ddr, ..self }
     }
 }
 
