@@ -1,8 +1,6 @@
 use hue::zigbee::ZigbeeMessage;
 use serde_json::{json, Value};
 
-pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
-
 /// Use the low-level endpoint for `Zigbee2MQTT`, which allows free-form zigbee
 /// messages to be sent.
 ///
@@ -21,8 +19,9 @@ pub fn hue_zclcommand(cluster: &str, msg: &ZigbeeMessage) -> Value {
             "payload": {
                 "data": msg.data,
             },
+            "frametype": msg.frametype,
             "options": {
-                "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
+                "manufacturerCode": msg.mfc,
                 "disableDefaultResponse": msg.ddr,
                 "direction": 0,
                 "srcEndpoint": 64,
