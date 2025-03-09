@@ -329,7 +329,7 @@ pub struct ZclDefaultResp {
 }
 
 impl ZclDefaultResp {
-    pub fn parse(data: &[u8]) -> ZclResult<Self> {
+    pub const fn parse(data: &[u8]) -> ZclResult<Self> {
         Ok(Self {
             cmd: data[0],
             stat: data[1],

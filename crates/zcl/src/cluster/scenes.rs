@@ -4,6 +4,7 @@ use hue::zigbee::Flags;
 
 use crate::frame::{ZclFrame, ZclFrameDirection};
 
+#[must_use]
 pub fn describe(frame: &ZclFrame, data: &[u8]) -> Option<String> {
     if frame.manufacturer_specific() {
         if frame.flags.direction == ZclFrameDirection::ClientToServer {
