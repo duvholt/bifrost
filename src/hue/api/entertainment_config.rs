@@ -178,11 +178,7 @@ impl From<EntertainmentConfigurationServiceLocationsNew>
         Self {
             equalization_factor: 1.0,
             service: value.service,
-            position: if value.positions.is_empty() {
-                Position::default()
-            } else {
-                value.positions[0].clone()
-            },
+            position: value.positions.first().cloned().unwrap_or_default(),
             positions: value.positions,
         }
     }
