@@ -17,12 +17,11 @@ pub use entertainment_config::{
     EntertainmentConfigurationChannels, EntertainmentConfigurationLocations,
     EntertainmentConfigurationLocationsNew, EntertainmentConfigurationLocationsUpdate,
     EntertainmentConfigurationMetadata, EntertainmentConfigurationNew,
-    EntertainmentConfigurationPosition, EntertainmentConfigurationServiceLocations,
-    EntertainmentConfigurationServiceLocationsNew,
+    EntertainmentConfigurationServiceLocations, EntertainmentConfigurationServiceLocationsNew,
     EntertainmentConfigurationServiceLocationsUpdate, EntertainmentConfigurationStatus,
     EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
     EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
-    EntertainmentConfigurationType, EntertainmentConfigurationUpdate,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Position,
 };
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{

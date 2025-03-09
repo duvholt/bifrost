@@ -42,20 +42,20 @@ pub struct EntertainmentConfigurationLocations {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationServiceLocations {
     pub equalization_factor: f64,
-    pub position: EntertainmentConfigurationPosition,
-    pub positions: Vec<EntertainmentConfigurationPosition>,
+    pub position: Position,
+    pub positions: Vec<Position>,
     pub service: ResourceLink,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationChannels {
     pub channel_id: u32,
-    pub position: EntertainmentConfigurationPosition,
+    pub position: Position,
     pub members: Vec<EntertainmentConfigurationStreamMembers>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct EntertainmentConfigurationPosition {
+pub struct Position {
     pub x: f64,
     pub y: f64,
     pub z: f64,
@@ -172,7 +172,7 @@ impl From<EntertainmentConfigurationServiceLocationsNew>
             equalization_factor: 1.0,
             service: value.service,
             position: if value.positions.is_empty() {
-                EntertainmentConfigurationPosition::default()
+                Position::default()
             } else {
                 value.positions[0].clone()
             },
@@ -184,12 +184,12 @@ impl From<EntertainmentConfigurationServiceLocationsNew>
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationServiceLocationsUpdate {
     pub equalization_factor: Option<f64>,
-    pub positions: Vec<EntertainmentConfigurationPosition>,
+    pub positions: Vec<Position>,
     pub service: ResourceLink,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationServiceLocationsNew {
-    pub positions: Vec<EntertainmentConfigurationPosition>,
+    pub positions: Vec<Position>,
     pub service: ResourceLink,
 }

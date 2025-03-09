@@ -11,11 +11,11 @@ use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
     Bridge, Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
     EntertainmentConfigurationChannels, EntertainmentConfigurationLocations,
-    EntertainmentConfigurationNew, EntertainmentConfigurationPosition,
-    EntertainmentConfigurationServiceLocations, EntertainmentConfigurationStatus,
-    EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
-    EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
-    EntertainmentConfigurationUpdate, Light, LightMode, RType, Resource, ResourceLink, V2Reply,
+    EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocations,
+    EntertainmentConfigurationStatus, EntertainmentConfigurationStreamMembers,
+    EntertainmentConfigurationStreamProxy, EntertainmentConfigurationStreamProxyMode,
+    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, Light,
+    LightMode, Position, RType, Resource, ResourceLink, V2Reply,
 };
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_APPLICATION_ID;
@@ -95,38 +95,38 @@ async fn get_resource_id(state: State<AppState>, Path(id): Path<Uuid>) -> ApiV2R
 
 fn make_channels(service: ResourceLink) -> Vec<EntertainmentConfigurationChannels> {
     // FIXME: These are hard-coded values fitting for an LCX005 gradient light chain
-    let positions = [
-        EntertainmentConfigurationPosition {
+    const POSITIONS: &[Position] = &[
+        Position {
             x: -0.4,
             y: 0.8,
             z: -0.4,
         },
-        EntertainmentConfigurationPosition {
+        Position {
             x: -0.4,
             y: 0.8,
             z: 0.4,
         },
-        EntertainmentConfigurationPosition {
-            x: -0.21999,
+        Position {
+            x: -0.22,
             y: 0.8,
             z: 0.4,
         },
-        EntertainmentConfigurationPosition {
+        Position {
             x: 0.0,
             y: 0.8,
             z: 0.4,
         },
-        EntertainmentConfigurationPosition {
-            x: 0.21999,
+        Position {
+            x: 0.22,
             y: 0.8,
             z: 0.4,
         },
-        EntertainmentConfigurationPosition {
+        Position {
             x: 0.4,
             y: 0.8,
             z: 0.4,
         },
-        EntertainmentConfigurationPosition {
+        Position {
             x: 0.4,
             y: 0.8,
             z: -0.4,
@@ -138,7 +138,7 @@ fn make_channels(service: ResourceLink) -> Vec<EntertainmentConfigurationChannel
     for index in 0u16..7 {
         channels.push(EntertainmentConfigurationChannels {
             channel_id: u32::from(index),
-            position: positions[usize::from(index)].clone(),
+            position: POSITIONS[usize::from(index)].clone(),
             members: vec![EntertainmentConfigurationStreamMembers { service, index }],
         });
     }
