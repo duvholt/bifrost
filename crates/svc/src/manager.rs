@@ -1,3 +1,4 @@
+#![allow(clippy::future_not_send)]
 //! A [`ServiceManager`] manages a collection of [`Service`] instances.
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;

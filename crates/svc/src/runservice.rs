@@ -9,6 +9,7 @@ use crate::manager::ServiceEvent;
 use crate::policy::{Policy, Retry};
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
+#[allow(clippy::struct_field_names)]
 struct State {
     id: Uuid,
     retry: u32,
@@ -95,6 +96,7 @@ impl<S: Service> StandardService<S> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 #[async_trait]
 impl<S: Service> ServiceRunner for StandardService<S> {
     async fn run(
