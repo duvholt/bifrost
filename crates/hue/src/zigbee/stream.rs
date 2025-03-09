@@ -24,7 +24,8 @@ pub struct ZigbeeMessage {
 }
 
 impl ZigbeeMessage {
-    pub fn new(cluster: u16, command: u8, data: Vec<u8>) -> Self {
+    #[must_use]
+    pub const fn new(cluster: u16, command: u8, data: Vec<u8>) -> Self {
         Self {
             cluster,
             command,
@@ -33,6 +34,7 @@ impl ZigbeeMessage {
         }
     }
 
+    #[must_use]
     pub fn with_ddr(self, ddr: bool) -> Self {
         Self { ddr, ..self }
     }
@@ -51,6 +53,7 @@ impl EntertainmentZigbeeStream {
     pub const CMD_RESET: u8 = 3;
     pub const CMD_FRAME: u8 = 1;
 
+    #[must_use]
     pub const fn new(counter: u32) -> Self {
         Self {
             smoothing: Self::DEFAULT_SMOOTHING,
@@ -58,15 +61,17 @@ impl EntertainmentZigbeeStream {
         }
     }
 
+    #[must_use]
     pub const fn counter(&self) -> u32 {
         self.counter
     }
 
-    pub fn smoothing(&self) -> u16 {
+    #[must_use]
+    pub const fn smoothing(&self) -> u16 {
         self.smoothing
     }
 
-    pub fn set_smoothing(&mut self, smoothing: u16) {
+    pub const fn set_smoothing(&mut self, smoothing: u16) {
         self.smoothing = smoothing;
     }
 

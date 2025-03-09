@@ -60,6 +60,7 @@ pub struct HueStreamPacket {
 impl HueStreamPacket {
     pub const HEADER_SIZE: usize = HueStreamPacketHeader::SIZE;
 
+    #[must_use]
     pub const fn size_with_lights(nlights: usize) -> usize {
         Self::HEADER_SIZE + nlights * 7
     }
@@ -112,6 +113,7 @@ pub struct Rgb16 {
 }
 
 impl Rgb16 {
+    #[must_use]
     pub fn to_xy(&self) -> (XY, f64) {
         XY::from_rgb(
             (self.r / 256) as u8,

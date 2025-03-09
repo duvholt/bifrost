@@ -58,6 +58,7 @@ pub struct HueEntFrameLightRecord {
 }
 
 impl HueEntFrameLightRecord {
+    #[must_use]
     pub fn new(addr: u16, brightness: u16, color: XY) -> Self {
         Self {
             addr,
@@ -79,7 +80,7 @@ impl Debug for HueEntFrameLightRecord {
     }
 }
 
-fn check_size_valid(len: usize, header_size: usize, element_size: usize) -> HueResult<()> {
+const fn check_size_valid(len: usize, header_size: usize, element_size: usize) -> HueResult<()> {
     // Must have bytes enough for the header
     if len < header_size {
         return Err(HueError::HueZigbeeDecodeError);
@@ -94,6 +95,7 @@ fn check_size_valid(len: usize, header_size: usize, element_size: usize) -> HueR
 }
 
 impl HueEntSegmentConfig {
+    #[must_use]
     pub fn new(map: &[u16]) -> Self {
         Self {
             members: map.to_vec(),
@@ -104,6 +106,7 @@ impl HueEntSegmentConfig {
         check_size_valid(data.len(), 2, 2)?;
 
         let (hdr, data) = data.split_at(2);
+
         let count = u16::from_be_bytes([hdr[0], hdr[1]]);
 
         let members = data
@@ -128,6 +131,7 @@ impl HueEntSegmentConfig {
 }
 
 impl HueEntSegmentLayout {
+    #[must_use]
     pub fn new(map: &[HueEntSegment]) -> Self {
         Self {
             members: map.to_vec(),

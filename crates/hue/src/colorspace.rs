@@ -12,6 +12,7 @@ use crate::gamma::GammaCorrection;
 pub struct Matrix3(pub [f64; 3 * 3]);
 
 impl Matrix3 {
+    #[must_use]
     pub const fn identity() -> Self {
         Self([
             1.0, 0.0, 0.0, //
@@ -20,6 +21,7 @@ impl Matrix3 {
         ])
     }
 
+    #[must_use]
     pub fn inverted(&self) -> Option<Self> {
         let mut current = self.clone();
         let mut inverse = Self::identity();
