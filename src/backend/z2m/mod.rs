@@ -106,7 +106,11 @@ impl Z2mBackend {
         })
     }
 
-    pub async fn add_light(&mut self, apidev: &z2m::api::Device, expose: &ExposeLight) -> ApiResult<()> {
+    pub async fn add_light(
+        &mut self,
+        apidev: &z2m::api::Device,
+        expose: &ExposeLight,
+    ) -> ApiResult<()> {
         let name = &apidev.friendly_name;
 
         let link_device = RType::Device.deterministic(&apidev.ieee_address);
