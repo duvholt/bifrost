@@ -47,24 +47,45 @@ pub struct HueEntFrame {
     pub blks: Vec<HueEntFrameLightRecord>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightRecordMode {
+    Segment = 0b00000,
+    Device = 0b01011,
+}
+
 #[derive(PackedStruct, Clone)]
 #[packed_struct(size_bytes = "7", endian = "lsb", bit_numbering = "msb0")]
 pub struct HueEntFrameLightRecord {
+    /// Zigbee network address of recipient
     #[packed_field(bits = "0..=15")]
-    pub addr: u16,
-    pub brightness: u16,
+    addr: u16,
+
+    /// Field contains brightness (top 11 bits) and mode (bottom 5 bits)
+    brightness: u16,
+
+    /// Raw (packed) color value (from [`XY::to_quant()`])
     #[packed_field(bits = "32..=55")]
-    pub raw: [u8; 3],
+    raw: [u8; 3],
 }
 
 impl HueEntFrameLightRecord {
     #[must_use]
-    pub fn new(addr: u16, brightness: u16, color: XY) -> Self {
+    pub const fn new(addr: u16, brightness: u16, mode: LightRecordMode, raw: [u8; 3]) -> Self {
         Self {
             addr,
-            brightness: brightness << 5,
-            raw: color.to_quant(),
+            brightness: (brightness << 5) | (mode as u16),
+            raw,
         }
+    }
+
+    #[must_use]
+    pub const fn brightness(&self) -> u16 {
+        self.brightness >> 5
+    }
+
+    #[must_use]
+    pub const fn raw(&self) -> [u8; 3] {
+        self.raw
     }
 }
 
@@ -208,7 +229,7 @@ impl HueEntFrame {
 mod tests {
     use packed_struct::prelude::*;
 
-    use crate::{xy::XY, zigbee::HueEntFrameLightRecord};
+    use crate::zigbee::{HueEntFrameLightRecord, LightRecordMode};
 
     #[test]
     fn light_record() {
@@ -224,11 +245,26 @@ mod tests {
     }
 
     #[test]
-    fn light_record_raw() {
-        let foo = HueEntFrameLightRecord::new(0x1122, 0x7FF, XY::from_quant([0xAA, 0xBB, 0xCC]));
+    fn light_record_segment() {
+        let foo = HueEntFrameLightRecord::new(
+            0x1122,
+            0x7FF,
+            LightRecordMode::Segment,
+            [0xAA, 0xBB, 0xCC],
+        );
 
         let data = foo.pack().unwrap();
 
         assert_eq!("2211e0ffaabbcc", hex::encode(data));
+    }
+
+    #[test]
+    fn light_record_device() {
+        let foo =
+            HueEntFrameLightRecord::new(0x1122, 0x7FF, LightRecordMode::Device, [0xAA, 0xBB, 0xCC]);
+
+        let data = foo.pack().unwrap();
+
+        assert_eq!("2211ebffaabbcc", hex::encode(data));
     }
 }
