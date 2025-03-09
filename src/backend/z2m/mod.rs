@@ -725,12 +725,18 @@ impl Z2mBackend {
                 topic: format!("{topic}/{endpoint}/set"),
                 payload: serde_json::to_value(value)?,
             }
+        } else if let Z2mRequest::RawWrite(value) = &payload {
+            RawMessage {
+                topic: format!("{topic}/set/write"),
+                payload: serde_json::to_value(value)?,
+            }
         } else {
             RawMessage {
                 topic: format!("{topic}/set"),
                 payload: serde_json::to_value(payload)?,
             }
         };
+
         let json = serde_json::to_string(&api_req)?;
         log::debug!("[{}] Sending {json}", self.name);
         let msg = tungstenite::Message::text(json);
