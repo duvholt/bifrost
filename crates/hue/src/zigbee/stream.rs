@@ -10,9 +10,16 @@ pub struct EntertainmentZigbeeStream {
 
 #[derive(Debug, Clone)]
 pub struct ZigbeeMessage {
+    /// Zigbee cluster id
     pub cluster: u16,
+
+    /// Zigbee command id
     pub command: u8,
+
+    /// Zigbee Zcl data bytes
     pub data: Vec<u8>,
+
+    /// Disable default response
     pub ddr: bool,
 }
 
