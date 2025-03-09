@@ -21,6 +21,7 @@ impl Default for Policy {
 }
 
 impl Policy {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             retry: Retry::No,
@@ -28,18 +29,21 @@ impl Policy {
         }
     }
 
-    pub fn with_retry(self, retry: Retry) -> Self {
+    #[must_use]
+    pub const fn with_retry(self, retry: Retry) -> Self {
         Self { retry, ..self }
     }
 
-    pub fn with_delay(self, delay: Duration) -> Self {
+    #[must_use]
+    pub const fn with_delay(self, delay: Duration) -> Self {
         Self {
             delay: Some(delay),
             ..self
         }
     }
 
-    pub fn without_delay(self) -> Self {
+    #[must_use]
+    pub const fn without_delay(self) -> Self {
         Self {
             delay: None,
             ..self
@@ -52,7 +56,8 @@ impl Policy {
         }
     }
 
-    pub fn should_retry(&self, retry: u32) -> bool {
+    #[must_use]
+    pub const fn should_retry(&self, retry: u32) -> bool {
         match self.retry {
             Retry::No => false,
             Retry::Limit(limit) => retry < limit,

@@ -40,7 +40,8 @@ pub struct ServiceEvent {
 }
 
 impl ServiceEvent {
-    pub fn new(id: Uuid, state: ServiceState) -> Self {
+    #[must_use]
+    pub const fn new(id: Uuid, state: ServiceState) -> Self {
         Self { id, state }
     }
 }
@@ -63,7 +64,8 @@ pub struct SvmClient {
 }
 
 impl SvmClient {
-    pub fn new(tx: mpsc::Sender<SvmRequest>) -> Self {
+    #[must_use]
+    pub const fn new(tx: mpsc::Sender<SvmRequest>) -> Self {
         Self { tx }
     }
 
@@ -221,6 +223,7 @@ impl Default for ServiceManager {
 }
 
 impl ServiceManager {
+    #[must_use]
     pub fn new() -> Self {
         let (control_tx, control_rx) = mpsc::channel(32);
         let (service_tx, service_rx) = mpsc::channel(32);
@@ -240,6 +243,7 @@ impl ServiceManager {
     /// Daemonize the ServiceManager, returning a (clonable) [`SvmClient`] as
     /// well as a [`JoinHandle`] used to control the service manager task
     /// itself.
+    #[must_use]
     pub fn daemonize(self) -> (SvmClient, JoinHandle<SvcResult<()>>) {
         let client = self.client();
         let fut = tokio::task::spawn(self.run());
@@ -247,11 +251,13 @@ impl ServiceManager {
     }
 
     /// Convenience function to create and daemonize a [`ServiceManager`].
+    #[must_use]
     pub fn spawn() -> (SvmClient, JoinHandle<SvcResult<()>>) {
         Self::new().daemonize()
     }
 
     /// Create a new [`SvmClient`] connected to this service manager.
+    #[must_use]
     pub fn client(&self) -> SvmClient {
         SvmClient::new(self.handle())
     }

@@ -15,7 +15,7 @@ impl<Q, A> RpcRequest<Q, A> {
         (req, rx)
     }
 
-    pub fn data(&self) -> &Q {
+    pub const fn data(&self) -> &Q {
         &self.data
     }
 

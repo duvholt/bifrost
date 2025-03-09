@@ -17,7 +17,7 @@ struct State {
 }
 
 impl State {
-    pub fn new(id: Uuid, state: ServiceState, tx: mpsc::Sender<ServiceEvent>) -> Self {
+    pub const fn new(id: Uuid, state: ServiceState, tx: mpsc::Sender<ServiceEvent>) -> Self {
         Self {
             id,
             retry: 0,
@@ -32,7 +32,7 @@ impl State {
         Ok(self.tx.send(ServiceEvent::new(self.id, self.state)).await?)
     }
 
-    pub fn get(&self) -> ServiceState {
+    pub const fn get(&self) -> ServiceState {
         self.state
     }
 
@@ -70,22 +70,26 @@ impl<S: Service> StandardService<S> {
         &self.name
     }
 
-    pub fn with_configure_policy(mut self, policy: Policy) -> Self {
+    #[must_use]
+    pub const fn with_configure_policy(mut self, policy: Policy) -> Self {
         self.configure_policy = policy;
         self
     }
 
-    pub fn with_start_policy(mut self, policy: Policy) -> Self {
+    #[must_use]
+    pub const fn with_start_policy(mut self, policy: Policy) -> Self {
         self.start_policy = policy;
         self
     }
 
-    pub fn with_run_policy(mut self, policy: Policy) -> Self {
+    #[must_use]
+    pub const fn with_run_policy(mut self, policy: Policy) -> Self {
         self.run_policy = policy;
         self
     }
 
-    pub fn with_stop_policy(mut self, policy: Policy) -> Self {
+    #[must_use]
+    pub const fn with_stop_policy(mut self, policy: Policy) -> Self {
         self.stop_policy = policy;
         self
     }
