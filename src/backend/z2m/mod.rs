@@ -1068,13 +1068,13 @@ impl Z2mBackend {
                         self.websocket_send(socket, dev, z2mreq).await?;
                     }
 
-                    self.entstream = Some(es);
-                }
-
-                if let Some(es) = &mut self.entstream {
                     let z2mreq = es.target.send(es.stream.reset()?)?;
-                    let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, z2mreq).await?;
+                    for topic in es.addrs.keys() {
+                        log::debug!("Sending stop to {topic}");
+                        self.websocket_send(socket, topic, z2mreq.clone()).await?;
+                    }
+
+                    self.entstream = Some(es);
                 }
             }
 
