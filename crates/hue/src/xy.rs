@@ -55,6 +55,7 @@ impl XY {
         Self { x, y }
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
     pub fn to_quant(&self) -> [u8; 3] {
         let x = (self.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
