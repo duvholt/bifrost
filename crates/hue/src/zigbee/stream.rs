@@ -8,6 +8,8 @@ pub struct EntertainmentZigbeeStream {
     counter: u32,
 }
 
+pub const PHILIPS_HUE_ZIGBEE_VENDOR_ID: u16 = 0x100B;
+
 #[derive(Debug, Clone)]
 pub struct ZigbeeMessage {
     /// Zigbee cluster id
@@ -21,6 +23,12 @@ pub struct ZigbeeMessage {
 
     /// Disable default response
     pub ddr: bool,
+
+    /// Frametype
+    pub frametype: u8,
+
+    /// Manufacturer Code
+    pub mfc: Option<u16>,
 }
 
 impl ZigbeeMessage {
@@ -30,13 +38,20 @@ impl ZigbeeMessage {
             cluster,
             command,
             data,
+            frametype: 1,
             ddr: true,
+            mfc: Some(PHILIPS_HUE_ZIGBEE_VENDOR_ID),
         }
     }
 
     #[must_use]
     pub fn with_ddr(self, ddr: bool) -> Self {
         Self { ddr, ..self }
+    }
+
+    #[must_use]
+    pub fn with_mfc(self, mfc: Option<u16>) -> Self {
+        Self { mfc, ..self }
     }
 }
 
