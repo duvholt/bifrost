@@ -2,7 +2,6 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
-use hue::api::{RType, ResourceLink};
 use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
