@@ -1,6 +1,6 @@
 use hex::FromHexError;
 
-use crate::error::{ApiError, ApiResult};
+use crate::error::{HueError, HueResult};
 
 pub struct HueStreamKey {
     key: [u8; Self::BYTE_SIZE],
@@ -15,9 +15,9 @@ impl HueStreamKey {
         Self { key }
     }
 
-    pub fn write_to_slice(&self, out: &mut [u8]) -> ApiResult<()> {
+    pub fn write_to_slice(&self, out: &mut [u8]) -> HueResult<()> {
         if out.len() < Self::BYTE_SIZE {
-            return Err(ApiError::FromHexError(FromHexError::InvalidStringLength));
+            return Err(HueError::FromHexError(FromHexError::InvalidStringLength));
         }
         out[..Self::BYTE_SIZE].copy_from_slice(&self.key);
         Ok(())
@@ -28,9 +28,9 @@ impl HueStreamKey {
         hex::encode(self.key)
     }
 
-    pub fn to_hex_slice(&self, out: &mut [u8]) -> ApiResult<()> {
+    pub fn to_hex_slice(&self, out: &mut [u8]) -> HueResult<()> {
         if out.len() < Self::HEX_SIZE {
-            return Err(ApiError::FromHexError(FromHexError::InvalidStringLength));
+            return Err(HueError::FromHexError(FromHexError::InvalidStringLength));
         }
         Ok(hex::encode_to_slice(self.key, &mut out[..Self::HEX_SIZE])?)
     }
@@ -43,12 +43,12 @@ impl AsRef<[u8]> for HueStreamKey {
 }
 
 impl TryFrom<&str> for HueStreamKey {
-    type Error = ApiError;
+    type Error = HueError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut key = [0u8; 16];
         if value.len() < Self::HEX_SIZE {
-            return Err(ApiError::FromHexError(FromHexError::InvalidStringLength));
+            return Err(HueError::FromHexError(FromHexError::InvalidStringLength));
         }
 
         hex::decode_to_slice(value, &mut key)?;

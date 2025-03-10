@@ -6,13 +6,10 @@ use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::error::ApiResult;
-use crate::hue::api::{ColorGamut, DeviceProductData};
-use crate::hue::version::SwVersion;
-use crate::hue::{self, api, best_guess_timezone};
-use crate::resource::Resources;
-
-use super::date_format;
+use crate::api::{ColorGamut, DeviceProductData};
+use crate::date_format;
+use crate::version::SwVersion;
+use crate::{api, best_guess_timezone};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HueError {

@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-use crate::error::ApiResult;
-use crate::hue::{date_format, HUE_BRIDGE_V2_MODEL_ID};
+use crate::date_format;
 
 // Full request goes to {UPDATE_CHECK_URL}?deviceTypeId=BSB002&version=1
 pub const UPDATE_CHECK_URL: &str = "https://firmware.meethue.com/v1/checkupdate";

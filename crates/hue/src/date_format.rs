@@ -164,7 +164,7 @@ pub mod legacy_utc_opt {
 mod tests {
     use chrono::{DateTime, TimeZone, Utc};
 
-    use crate::error::ApiResult;
+    use crate::error::HueResult;
 
     fn date() -> (&'static str, DateTime<Utc>) {
         let dt = Utc.with_ymd_and_hms(2014, 7, 8, 9, 10, 11).unwrap();
@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn utc_de() -> ApiResult<()> {
+    fn utc_de() -> HueResult<()> {
         let (ds, d1) = date();
 
         let mut deser = serde_json::Deserializer::from_str(ds);
@@ -183,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn utc_se() -> ApiResult<()> {
+    fn utc_se() -> HueResult<()> {
         let (s1, dt) = date();
 
         let mut s2 = vec![];
