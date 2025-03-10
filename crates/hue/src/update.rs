@@ -23,8 +23,8 @@ pub struct UpdateEntry {
 }
 
 #[derive(Deserialize)]
-struct UpdateEntries {
-    updates: Vec<UpdateEntry>,
+pub struct UpdateEntries {
+    pub updates: Vec<UpdateEntry>,
 }
 
 #[must_use]
