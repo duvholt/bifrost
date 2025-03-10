@@ -303,12 +303,6 @@ resource_conversion_impl!(ZigbeeConnectivity);
 resource_conversion_impl!(ZigbeeDeviceDiscovery);
 resource_conversion_impl!(Zone);
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct V2Reply<T> {
-    pub data: Vec<T>,
-    pub errors: Vec<String>,
-}
-
 #[derive(Clone, Debug, Serialize)]
 pub struct V1Reply<'a> {
     prefix: String,
