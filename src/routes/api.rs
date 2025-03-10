@@ -102,6 +102,47 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
     Ok(rooms)
 }
 
+pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiResult<ApiScene> {
+    let lights = scene
+        .actions
+        .iter()
+        .map(|sae| res.get_id_v1(sae.target.rid))
+        .collect::<HueResult<_>>()?;
+
+    let lightstates = scene
+        .actions
+        .iter()
+        .map(|sae| {
+            Ok((
+                res.get_id_v1(sae.target.rid)?,
+                ApiLightStateUpdate::from(sae.action.clone()),
+            ))
+        })
+        .collect::<ApiResult<_>>()?;
+
+    let room_id = res.get_id_v1_index(scene.group.rid)?;
+
+    Ok(ApiScene {
+        name: scene.metadata.name.clone(),
+        scene_type: ApiSceneType::GroupScene,
+        lights,
+        lightstates,
+        owner,
+        recycle: false,
+        locked: false,
+        /* Some clients (e.g. Hue Essentials) require .appdata */
+        appdata: ApiSceneAppData {
+            data: Some(format!("xxxxx_r{room_id}")),
+            version: Some(1),
+        },
+        picture: String::new(),
+        lastupdated: Utc::now(),
+        version: ApiSceneVersion::V2 as u32,
+        image: scene.metadata.image.map(|rl| rl.rid),
+        group: Some(room_id.to_string()),
+    })
+}
+
 fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
     let mut scenes = HashMap::new();
 
@@ -110,7 +151,7 @@ fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<Str
 
         scenes.insert(
             res.get_id_v1(rr.id)?,
-            ApiScene::from_scene(res, owner.to_string(), scene)?,
+            get_scene(res, owner.to_string(), scene)?,
         );
     }
 
@@ -194,7 +235,7 @@ async fn get_api_user_resource_id(
             let link = ResourceLink::new(uuid, RType::Scene);
             let scene = lock.get::<Scene>(&link)?;
 
-            json!(ApiScene::from_scene(&lock, username, scene)?)
+            json!(get_scene(&lock, username, scene)?)
         }
         ApiResourceType::Groups => {
             let lock = state.res.lock().await;

@@ -693,49 +693,6 @@ pub struct ApiScene {
     pub group: Option<String>,
 }
 
-impl ApiScene {
-    pub fn from_scene(res: &Resources, owner: String, scene: &api::Scene) -> ApiResult<Self> {
-        let lights = scene
-            .actions
-            .iter()
-            .map(|sae| res.get_id_v1(sae.target.rid))
-            .collect::<ApiResult<_>>()?;
-
-        let lightstates = scene
-            .actions
-            .iter()
-            .map(|sae| {
-                Ok((
-                    res.get_id_v1(sae.target.rid)?,
-                    ApiLightStateUpdate::from(sae.action.clone()),
-                ))
-            })
-            .collect::<ApiResult<_>>()?;
-
-        let room_id = res.get_id_v1_index(scene.group.rid)?;
-
-        Ok(Self {
-            name: scene.metadata.name.clone(),
-            scene_type: ApiSceneType::GroupScene,
-            lights,
-            lightstates,
-            owner,
-            recycle: false,
-            locked: false,
-            /* Some clients (e.g. Hue Essentials) require .appdata */
-            appdata: ApiSceneAppData {
-                data: Some(format!("xxxxx_r{room_id}")),
-                version: Some(1),
-            },
-            picture: String::new(),
-            lastupdated: Utc::now(),
-            version: ApiSceneVersion::V2 as u32,
-            image: scene.metadata.image.map(|rl| rl.rid),
-            group: Some(room_id.to_string()),
-        })
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiSchedule {
     pub recycle: bool,
