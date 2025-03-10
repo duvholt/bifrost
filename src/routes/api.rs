@@ -74,7 +74,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
             .services
             .iter()
             .find(|rl| rl.rtype == RType::GroupedLight)
-            .ok_or(ApiError::NotFound(rr.id))?;
+            .ok_or(HueError::NotFound(rr.id))?;
 
         let glight = res.get::<GroupedLight>(uuid)?;
         let lights: Vec<String> = room
@@ -242,11 +242,11 @@ async fn get_api_user_resource_id(
             let groups = get_groups(&lock, true)?;
             let group = groups
                 .get(&id.to_string())
-                .ok_or(ApiError::V1NotFound(id))?;
+                .ok_or(HueError::V1NotFound(id))?;
 
             json!(group)
         }
-        _ => Err(ApiError::V1NotFound(id))?,
+        _ => Err(HueError::V1NotFound(id))?,
     };
 
     Ok(Json(result))
@@ -302,7 +302,7 @@ async fn put_api_user_resource_id_path(
         ApiResourceType::Lights => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "state" {
-                return Err(ApiError::V1NotFound(id))?;
+                return Err(HueError::V1NotFound(id))?;
             }
 
             let lock = state.res.lock().await;
@@ -326,7 +326,7 @@ async fn put_api_user_resource_id_path(
         ApiResourceType::Groups => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "action" {
-                return Err(ApiError::V1NotFound(id))?;
+                return Err(HueError::V1NotFound(id))?;
             }
 
             let lock = state.res.lock().await;

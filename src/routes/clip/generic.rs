@@ -55,7 +55,7 @@ async fn put_resource_id(
 
     log::warn!("PUT {rtype:?}/{id}: state update not supported");
 
-    Err(ApiError::UpdateUnsupported(rtype))
+    Err(HueError::UpdateUnsupported(rtype))?
 }
 
 async fn delete_resource_id(

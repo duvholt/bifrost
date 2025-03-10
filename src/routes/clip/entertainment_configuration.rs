@@ -199,7 +199,7 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
         .iter()
         .find(|obj| obj.rtype == RType::Entertainment)
         .copied()
-        .ok_or(ApiError::NotFound(bridge_id))?;
+        .ok_or(HueError::NotFound(bridge_id))?;
 
     Ok(bridge_ent)
 }

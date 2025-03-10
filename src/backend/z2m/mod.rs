@@ -937,7 +937,7 @@ impl Z2mBackend {
                         let index = lock
                             .aux_get(&link)?
                             .index
-                            .ok_or(ApiError::NotFound(link.rid))?;
+                            .ok_or(HueError::NotFound(link.rid))?;
 
                         let scenes = lock.get_scenes_for_room(&scene.group.rid);
                         for rid in scenes {
@@ -990,7 +990,7 @@ impl Z2mBackend {
                 let index = lock
                     .aux_get(&link)?
                     .index
-                    .ok_or(ApiError::NotFound(link.rid))?;
+                    .ok_or(HueError::NotFound(link.rid))?;
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&room) {
@@ -1013,15 +1013,15 @@ impl Z2mBackend {
                         let ent: &Entertainment = lock.get(&member.service)?;
                         let light_id = ent
                             .renderer_reference
-                            .ok_or(ApiError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(member.service.rid))?;
                         let topic = self
                             .rmap
                             .get(&light_id.rid)
-                            .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(member.service.rid))?;
                         let dev = self
                             .network
                             .get(topic)
-                            .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(member.service.rid))?;
 
                         let segment_addr = dev.network_address + member.index;
 
