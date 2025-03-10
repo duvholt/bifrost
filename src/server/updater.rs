@@ -1,8 +1,10 @@
 use chrono::{DateTime, Duration, Utc};
 
+use hue::update::{update_url_for_bridge, UpdateEntries, UpdateEntry};
+use hue::version::SwVersion;
+use hue::HUE_BRIDGE_V2_MODEL_ID;
+
 use crate::error::{ApiError, ApiResult};
-use crate::hue::update;
-use crate::hue::version::SwVersion;
 
 pub async fn fetch_updates(since_version: Option<u64>) -> ApiResult<Vec<UpdateEntry>> {
     let url = update_url_for_bridge(HUE_BRIDGE_V2_MODEL_ID, since_version.unwrap_or_default());

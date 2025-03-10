@@ -4,7 +4,7 @@ use hyper::StatusCode;
 use serde_json::{json, Value};
 
 use crate::error::ApiError;
-use crate::hue::api::V2Reply;
+use crate::routes::clip::V2Reply;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 

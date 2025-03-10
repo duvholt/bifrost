@@ -2,15 +2,14 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use hue::error::{HueError, HueResult};
 use maplit::btreeset;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
 use uuid::Uuid;
 
-use crate::backend::BackendRequest;
-use crate::error::{ApiError, ApiResult};
-use crate::hue::api::{
+use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
     Entertainment, EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
     EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
@@ -19,8 +18,11 @@ use crate::hue::api::{
     ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
-use crate::hue::event::EventBlock;
-use crate::hue::version::SwVersion;
+use hue::event::EventBlock;
+use hue::version::SwVersion;
+
+use crate::backend::BackendRequest;
+use crate::error::ApiResult;
 use crate::model::state::{AuxData, State};
 use crate::server::hueevents::HueEventStream;
 

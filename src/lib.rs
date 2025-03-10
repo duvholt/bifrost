@@ -1,7 +1,6 @@
 pub mod backend;
 pub mod config;
 pub mod error;
-pub mod hue;
 pub mod mdns;
 pub mod model;
 pub mod resource;

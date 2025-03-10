@@ -27,7 +27,6 @@ use x509_cert::time::Validity;
 use x509_cert::Certificate;
 
 use crate::error::{ApiError, ApiResult};
-use crate::hue;
 
 /// Generate a self-signed X509 certificate, closely matching the type and style
 /// used by a real Philips Hue bridge.

@@ -2,17 +2,16 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
-use svc::error::SvcError;
+use hue::api::{RType, ResourceLink};
 use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
 
+use hue::event::EventBlock;
+use hue::legacy_api::ApiResourceType;
+use svc::error::SvcError;
+
 use crate::backend::BackendRequest;
-use crate::hue::{
-    api::{RType, ResourceLink},
-    event::EventBlock,
-    legacy_api::ApiResourceType,
-};
 
 #[derive(Error, Debug)]
 pub enum ApiError {

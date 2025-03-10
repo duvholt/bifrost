@@ -5,10 +5,12 @@ use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::hue::api::{Device, DeviceUpdate, RType, V2Reply};
+use hue::api::{Device, DeviceUpdate, RType};
+
 use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;
+use crate::routes::V2Reply;
 use crate::server::appstate::AppState;
 
 async fn put_device(

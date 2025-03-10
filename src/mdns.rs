@@ -4,7 +4,6 @@ use mac_address::MacAddress;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 
 use crate::error::ApiResult;
-use crate::hue;
 
 pub fn register_mdns(mac: MacAddress, ip: Ipv4Addr) -> ApiResult<ServiceDaemon> {
     /* Create a new mDNS daemon. */

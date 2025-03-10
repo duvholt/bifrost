@@ -4,10 +4,11 @@ use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
+use hue::api::{Light, LightUpdate, RType};
+
 use crate::backend::BackendRequest;
-use crate::hue::api::{Light, LightUpdate, RType, V2Reply};
 use crate::routes::clip::generic::get_resource;
-use crate::routes::clip::ApiV2Result;
+use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 

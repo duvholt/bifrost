@@ -6,12 +6,11 @@ use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
+use hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use svc::manager::SvmClient;
 
 use crate::config::AppConfig;
 use crate::error::ApiResult;
-use crate::hue;
-use crate::hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use crate::model::state::{State, StateVersion};
 use crate::resource::Resources;
 use crate::server::certificate;

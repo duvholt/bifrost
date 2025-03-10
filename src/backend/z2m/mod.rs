@@ -18,9 +18,21 @@ use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
-use ::hue::clamp::Clamp;
-use ::hue::stream::HueStreamLights;
-use ::hue::zigbee::{
+use hue::api::{
+    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperatureUpdate,
+    ColorUpdate, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
+    EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
+    LightEffect, LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2,
+    LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource,
+    ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
+    SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+};
+use hue::clamp::Clamp;
+use hue::error::HueError;
+use hue::scene_icons;
+use hue::stream::HueStreamLights;
+use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
     HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
 };
@@ -29,19 +41,6 @@ use crate::backend::z2m::stream::Z2mTarget;
 use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
-use crate::hue;
-use crate::hue::api::{
-    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature,
-    ColorTemperatureUpdate, ColorUpdate, DeviceArchetype, DeviceProductData, Dimming,
-    DimmingUpdate, Entertainment, EntertainmentConfiguration, EntertainmentSegment,
-    EntertainmentSegments, GroupedLight, Light, LightColor, LightEffect, LightEffectStatus,
-    LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradient,
-    LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
-    RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
-};
-use crate::hue::scene_icons;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
 use crate::z2m;

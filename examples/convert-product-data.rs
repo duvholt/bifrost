@@ -8,8 +8,8 @@ use std::io::stdin;
 
 use serde_json::Deserializer;
 
-use bifrost::hue::api::DeviceProductData;
-use bifrost::hue::devicedb::{product_data, SimpleProductData};
+use hue::api::DeviceProductData;
+use hue::devicedb::{product_data, SimpleProductData};
 
 fn print_std(obj: DeviceProductData) {
     let spd = SimpleProductData {
