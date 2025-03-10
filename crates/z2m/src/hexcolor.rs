@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use hue::xy::XY;
 
-use crate::error::ApiError;
+use crate::error::Z2mError;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(into = "String", try_from = "&str")]
@@ -45,11 +45,11 @@ impl Display for HexColor {
 }
 
 impl TryFrom<&str> for HexColor {
-    type Error = ApiError;
+    type Error = Z2mError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value.len() != 7 || !value.starts_with('#') {
-            return Err(ApiError::InvalidHexColor);
+            return Err(Z2mError::InvalidHexColor);
         }
         let r = u8::from_str_radix(&value[1..3], 16)?;
         let g = u8::from_str_radix(&value[3..5], 16)?;
@@ -60,7 +60,7 @@ impl TryFrom<&str> for HexColor {
 
 #[cfg(test)]
 mod tests {
-    use crate::z2m::hexcolor::HexColor;
+    use crate::hexcolor::HexColor;
 
     #[test]
     fn make_hexcolor() {

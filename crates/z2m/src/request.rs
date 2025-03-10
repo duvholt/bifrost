@@ -1,7 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::z2m::update::DeviceUpdate;
+use crate::update::DeviceUpdate;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]

@@ -2,14 +2,11 @@
 
 use std::io::stdin;
 
-use bifrost::{
-    error::ApiResult,
-    z2m::{
-        api::{Availability, Message, RawMessage},
-        update::DeviceUpdate,
-    },
-};
 use log::LevelFilter;
+
+use bifrost::error::ApiResult;
+use z2m::api::{Availability, Message, RawMessage};
+use z2m::update::DeviceUpdate;
 
 #[tokio::main]
 #[rustfmt::skip]

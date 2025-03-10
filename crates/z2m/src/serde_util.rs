@@ -68,7 +68,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use serde_json::{from_str, to_string};
 
-    use crate::error::ApiResult;
+    use crate::error::Z2mResult;
 
     #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
     struct Foo {
@@ -92,26 +92,26 @@ mod tests {
     const FOO_LIST: &str = r#"{"foo":[42]}"#;
 
     #[test]
-    pub fn serialize_none() -> ApiResult<()> {
+    pub fn serialize_none() -> Z2mResult<()> {
         assert_eq!(to_string(&FOO_NONE)?, FOO_NONE_STR);
         Ok(())
     }
 
     #[test]
-    pub fn serialize_some() -> ApiResult<()> {
+    pub fn serialize_some() -> Z2mResult<()> {
         assert_eq!(to_string(&FOO_SOME)?, FOO_SOME_STR);
 
         Ok(())
     }
 
     #[test]
-    pub fn deserialize_false() -> ApiResult<()> {
+    pub fn deserialize_false() -> Z2mResult<()> {
         assert_eq!(from_str::<Foo>(FOO_NONE_STR)?, FOO_NONE);
         Ok(())
     }
 
     #[test]
-    pub fn deserialize_struct() -> ApiResult<()> {
+    pub fn deserialize_struct() -> Z2mResult<()> {
         assert_eq!(from_str::<Foo>(FOO_SOME_STR)?, FOO_SOME);
         Ok(())
     }

@@ -43,15 +43,14 @@ use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
 use crate::resource::Resources;
-use crate::z2m;
-use crate::z2m::api::{ExposeLight, Message, RawMessage};
-use crate::z2m::convert::{
+use z2m::api::{ExposeLight, Message, RawMessage};
+use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
-use crate::z2m::hexcolor::HexColor;
-use crate::z2m::request::Z2mRequest;
-use crate::z2m::update::{DeviceColor, DeviceUpdate};
+use z2m::hexcolor::HexColor;
+use z2m::request::Z2mRequest;
+use z2m::update::{DeviceColor, DeviceUpdate};
 
 #[derive(Debug)]
 struct LearnScene {

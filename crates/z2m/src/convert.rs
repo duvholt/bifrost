@@ -7,7 +7,7 @@ use hue::api::{
 use hue::devicedb::{hardware_platform_type, product_archetype};
 use hue::xy::XY;
 
-use crate::z2m::api::{Device, Expose, ExposeList, ExposeNumeric};
+use crate::api::{Device, Expose, ExposeList, ExposeNumeric};
 
 pub trait ExtractExposeNumeric {
     fn extract_mirek_schema(&self) -> Option<MirekSchema>;
