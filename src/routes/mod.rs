@@ -1,5 +1,6 @@
 use axum::response::{IntoResponse, Response};
 use axum::Router;
+use hue::error::HueError;
 use hyper::StatusCode;
 use serde_json::{json, Value};
 
@@ -25,9 +26,27 @@ impl IntoResponse for ApiError {
         });
 
         let status = match self {
-            Self::NotFound(_) | Self::V1NotFound(_) => StatusCode::NOT_FOUND,
-            Self::Full(_) => StatusCode::INSUFFICIENT_STORAGE,
-            Self::WrongType(_, _) => StatusCode::NOT_ACCEPTABLE,
+            Self::HueError(err) => match err {
+                HueError::FromUtf8Error(_)
+                | HueError::SerdeJson(_)
+                | HueError::TryFromIntError(_)
+                | HueError::FromHexError(_)
+                | HueError::PackedStructError(_)
+                | HueError::UuidError(_)
+                | HueError::HueEntertainmentBadHeader
+                | HueError::HueZigbeeUnknownFlags(_) => StatusCode::BAD_REQUEST,
+                HueError::UpdateUnsupported(_) | HueError::WrongType(_, _) => {
+                    StatusCode::NOT_ACCEPTABLE
+                }
+                HueError::NotFound(_) | HueError::V1NotFound(_) | HueError::AuxNotFound(_) => {
+                    StatusCode::NOT_FOUND
+                }
+                HueError::Full(_) => StatusCode::INSUFFICIENT_STORAGE,
+
+                HueError::IOError(_) | HueError::HueZigbeeDecodeError => {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+            },
             Self::DeleteDenied(_) => StatusCode::FORBIDDEN,
             Self::V1CreateUnsupported(_) => StatusCode::NOT_IMPLEMENTED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
