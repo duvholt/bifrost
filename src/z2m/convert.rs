@@ -1,18 +1,22 @@
 use std::collections::BTreeSet;
 
-use hue::xy::XY;
-
-use crate::hue::api::{
+use hue::api::{
     ColorGamut, ColorTemperature, DeviceProductData, Dimming, GamutType, LightColor, LightGradient,
     LightGradientMode, MirekSchema,
 };
-use crate::hue::devicedb::{hardware_platform_type, product_archetype};
+use hue::devicedb::{hardware_platform_type, product_archetype};
+use hue::xy::XY;
+
 use crate::z2m::api::{Device, Expose, ExposeList, ExposeNumeric};
 
-impl ExposeNumeric {
+pub trait ExtractExposeNumeric {
+    fn extract_mirek_schema(&self) -> Option<MirekSchema>;
+}
+
+impl ExtractExposeNumeric for ExposeNumeric {
     #[must_use]
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-    pub fn extract_mirek_schema(&self) -> Option<MirekSchema> {
+    fn extract_mirek_schema(&self) -> Option<MirekSchema> {
         if self.unit.as_deref() == Some("mired") {
             if let (Some(min), Some(max)) = (self.value_min, self.value_max) {
                 return Some(MirekSchema {
@@ -25,9 +29,15 @@ impl ExposeNumeric {
     }
 }
 
-impl LightColor {
+pub trait ExtractLightColor {
     #[must_use]
-    pub const fn extract_from_expose(expose: &Expose) -> Option<Self> {
+    fn extract_from_expose(expose: &Expose) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+impl ExtractLightColor for LightColor {
+    fn extract_from_expose(expose: &Expose) -> Option<Self> {
         let Expose::Composite(_) = expose else {
             return None;
         };
@@ -40,9 +50,16 @@ impl LightColor {
     }
 }
 
-impl LightGradient {
+pub trait ExtractLightGradient {
     #[must_use]
-    pub fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
+    fn extract_from_expose(expose: &ExposeList) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+impl ExtractLightGradient for LightGradient {
+    #[must_use]
+    fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
         match expose {
             ExposeList {
                 length_max: Some(max),
@@ -63,9 +80,14 @@ impl LightGradient {
     }
 }
 
-impl ColorTemperature {
+pub trait ExtractColorTemperature: Sized {
     #[must_use]
-    pub fn extract_from_expose(expose: &Expose) -> Option<Self> {
+    fn extract_from_expose(expose: &Expose) -> Option<Self>;
+}
+
+impl ExtractColorTemperature for ColorTemperature {
+    #[must_use]
+    fn extract_from_expose(expose: &Expose) -> Option<Self> {
         let Expose::Numeric(num) = expose else {
             return None;
         };
@@ -83,9 +105,14 @@ impl ColorTemperature {
     }
 }
 
-impl Dimming {
+pub trait ExtractDimming: Sized {
     #[must_use]
-    pub const fn extract_from_expose(expose: &Expose) -> Option<Self> {
+    fn extract_from_expose(expose: &Expose) -> Option<Self>;
+}
+
+impl ExtractDimming for Dimming {
+    #[must_use]
+    fn extract_from_expose(expose: &Expose) -> Option<Self> {
         let Expose::Numeric(_) = expose else {
             return None;
         };
@@ -97,9 +124,14 @@ impl Dimming {
     }
 }
 
-impl DeviceProductData {
+pub trait ExtractDeviceProductData {
     #[must_use]
-    pub fn guess_from_device(dev: &Device) -> Self {
+    fn guess_from_device(dev: &Device) -> Self;
+}
+
+impl ExtractDeviceProductData for DeviceProductData {
+    #[must_use]
+    fn guess_from_device(dev: &Device) -> Self {
         fn str_or_unknown(name: Option<&String>) -> String {
             name.map_or("<unknown>", |v| v).to_string()
         }

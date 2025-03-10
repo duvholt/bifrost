@@ -46,6 +46,10 @@ use crate::model::state::AuxData;
 use crate::resource::Resources;
 use crate::z2m;
 use crate::z2m::api::{ExposeLight, Message, RawMessage};
+use crate::z2m::convert::{
+    ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
+    ExtractLightGradient,
+};
 use crate::z2m::hexcolor::HexColor;
 use crate::z2m::request::Z2mRequest;
 use crate::z2m::update::{DeviceColor, DeviceUpdate};
@@ -155,20 +159,20 @@ impl Z2mBackend {
 
         light.dimming = expose
             .feature("brightness")
-            .and_then(Dimming::extract_from_expose);
+            .and_then(ExtractDimming::extract_from_expose);
         log::trace!("Detected dimming: {:?}", &light.dimming);
 
         light.color_temperature = expose
             .feature("color_temp")
-            .and_then(ColorTemperature::extract_from_expose);
+            .and_then(ExtractColorTemperature::extract_from_expose);
         log::trace!("Detected color temperature: {:?}", &light.color_temperature);
 
         light.color = expose
             .feature("color_xy")
-            .and_then(LightColor::extract_from_expose);
+            .and_then(ExtractLightColor::extract_from_expose);
         log::trace!("Detected color: {:?}", &light.color);
 
-        light.gradient = gradient.and_then(LightGradient::extract_from_expose);
+        light.gradient = gradient.and_then(ExtractLightGradient::extract_from_expose);
         log::trace!("Detected gradient support: {:?}", &light.gradient);
 
         if effects {
