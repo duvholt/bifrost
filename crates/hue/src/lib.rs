@@ -1,11 +1,19 @@
 #![doc = include_str!("../../../doc/hue-zigbee-format.md")]
 
+pub mod api;
 pub mod clamp;
 pub mod colorspace;
+pub mod date_format;
+pub mod devicedb;
 pub mod error;
+pub mod event;
 pub mod flags;
 pub mod gamma;
+pub mod legacy_api;
+pub mod scene_icons;
 pub mod stream;
+pub mod update;
+pub mod version;
 pub mod xy;
 pub mod zigbee;
 
