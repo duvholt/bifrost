@@ -673,24 +673,24 @@ pub struct ApiSceneAppData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiScene {
-    name: String,
+    pub name: String,
     #[serde(rename = "type")]
-    scene_type: ApiSceneType,
-    lights: Vec<String>,
+    pub scene_type: ApiSceneType,
+    pub lights: Vec<String>,
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
-    lightstates: HashMap<String, ApiLightStateUpdate>,
-    owner: String,
-    recycle: bool,
-    locked: bool,
-    appdata: ApiSceneAppData,
-    picture: String,
+    pub lightstates: HashMap<String, ApiLightStateUpdate>,
+    pub owner: String,
+    pub recycle: bool,
+    pub locked: bool,
+    pub appdata: ApiSceneAppData,
+    pub picture: String,
     #[serde(with = "date_format::legacy_utc")]
-    lastupdated: DateTime<Utc>,
-    version: u32,
+    pub lastupdated: DateTime<Utc>,
+    pub version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    image: Option<Uuid>,
+    pub image: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    group: Option<String>,
+    pub group: Option<String>,
 }
 
 impl ApiScene {
