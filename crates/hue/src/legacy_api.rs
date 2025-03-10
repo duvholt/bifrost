@@ -56,16 +56,16 @@ pub struct ApiShortConfig {
 impl Default for ApiShortConfig {
     fn default() -> Self {
         Self {
-            apiversion: hue::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
+            apiversion: crate::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
             bridgeid: "0000000000000000".to_string(),
             datastoreversion: "176".to_string(),
             factorynew: false,
             mac: MacAddress::default(),
-            modelid: hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
+            modelid: crate::HUE_BRIDGE_V2_MODEL_ID.to_string(),
             name: "Bifrost Bridge".to_string(),
             replacesbridgeid: None,
             starterkitid: String::new(),
-            swversion: hue::HUE_BRIDGE_V2_DEFAULT_SWVERSION.to_string(),
+            swversion: crate::HUE_BRIDGE_V2_DEFAULT_SWVERSION.to_string(),
         }
     }
 }
@@ -74,7 +74,7 @@ impl ApiShortConfig {
     #[must_use]
     pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
         Self {
-            bridgeid: hue::bridge_id(mac).to_uppercase(),
+            bridgeid: crate::bridge_id(mac).to_uppercase(),
             apiversion: version.get_legacy_apiversion(),
             swversion: version.get_legacy_swversion(),
             mac,

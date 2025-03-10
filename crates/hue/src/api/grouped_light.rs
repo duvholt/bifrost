@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use hue::xy::XY;
-
-use crate::hue::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink, Stub};
+use crate::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink, Stub};
+use crate::xy::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GroupedLight {

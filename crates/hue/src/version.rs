@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::hue::{HUE_BRIDGE_V2_DEFAULT_APIVERSION, HUE_BRIDGE_V2_DEFAULT_SWVERSION};
+use crate::{HUE_BRIDGE_V2_DEFAULT_APIVERSION, HUE_BRIDGE_V2_DEFAULT_SWVERSION};
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct SwVersion {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::hue::api::{
+use crate::api::{
     DeviceUpdate, EntertainmentConfigurationUpdate, GroupedLightUpdate, LightUpdate, RType,
     RoomUpdate, SceneUpdate,
 };

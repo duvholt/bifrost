@@ -3,7 +3,7 @@ use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
 
-use crate::hue::api::{RType, ResourceLink};
+use crate::api::{RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct RoomMetadata {
