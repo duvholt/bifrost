@@ -31,9 +31,3 @@ pub struct UpdateEntries {
 pub fn update_url_for_bridge(device_type_id: &str, version: u64) -> String {
     format!("{UPDATE_CHECK_URL}?deviceTypeId={device_type_id}&version={version}")
 }
-
-pub async fn fetch_updates(since_version: Option<u64>) -> ApiResult<Vec<UpdateEntry>> {
-    let url = update_url_for_bridge(HUE_BRIDGE_V2_MODEL_ID, since_version.unwrap_or_default());
-    let response: UpdateEntries = reqwest::get(url).await?.json().await?;
-    Ok(response.updates)
-}
