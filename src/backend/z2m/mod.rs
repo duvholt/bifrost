@@ -42,11 +42,11 @@ use crate::hue::api::{
     ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
-use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
 use crate::z2m;
 use crate::z2m::api::{ExposeLight, Message, RawMessage};
+use crate::z2m::hexcolor::HexColor;
 use crate::z2m::request::Z2mRequest;
 use crate::z2m::update::{DeviceColor, DeviceUpdate};
 

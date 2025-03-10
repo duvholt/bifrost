@@ -6,7 +6,7 @@ use serde_json::Value;
 use hue::xy::XY;
 
 use crate::hue::api::{LightGradientUpdate, On};
-use crate::model::hexcolor::HexColor;
+use crate::z2m::hexcolor::HexColor;
 
 #[allow(clippy::pub_underscore_fields)]
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
