@@ -199,7 +199,7 @@ be a good way to enable smooth, lightweight light transitions.
 
 ### Property: `EFFECT_TYPE`
 
-Size: 1 byte (specifically, [`EffectType`])
+Size: 1 byte (specifically, [`zigbee::EffectType`])
 
 | Name         | Value |
 |--------------|-------|
@@ -216,9 +216,9 @@ Size: 1 byte (specifically, [`EffectType`])
 | `Sunbeam`    | 0x10  |
 | `Enchant`    | 0x11  |
 
-This enables one of the specific, known effects in the [`EffectType`] enum. Most
-(all?) effects allow setting other properties (such as color xy or color
-temperature) while the effect is active.
+This enables one of the specific, known effects in the [`zigbee::EffectType`]
+enum. Most (all?) effects allow setting other properties (such as color xy or
+color temperature) while the effect is active.
 
 This is how custom effects like "Purple Fireplace" or "Blue Candle" from the Hue
 app are activated.
