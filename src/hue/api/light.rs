@@ -104,47 +104,10 @@ impl Light {
             dimming: None,
             dimming_delta: Some(Stub {}),
             dynamics: Some(LightDynamics::default()),
-            effects: Some(LightEffects {
-                status_values: LightEffect::ALL.into(),
-                status: LightEffect::NoEffect,
-                effect_values: LightEffect::ALL.into(),
-            }),
-            effects_v2: Some(LightEffectsV2 {
-                action: LightEffectValues {
-                    effect_values: LightEffect::ALL.into(),
-                },
-                status: LightEffectStatus {
-                    effect: LightEffect::NoEffect,
-                    effect_values: LightEffect::ALL.into(),
-                    parameters: None,
-                    /* parameters: Some(json!({ */
-                    /*     "color": { */
-                    /*         "xy": { */
-                    /*             "x": 0.3835, */
-                    /*             "y": 0.3881 */
-                    /*         } */
-                    /*     }, */
-                    /*     "color_temperature": { */
-                    /*         "mirek": 153, */
-                    /*         "mirek_valid": false */
-                    /*     }, */
-                    /*     "speed": 0.4087 */
-                    /* })), */
-                },
-            }),
+            effects: None,
+            effects_v2: None,
             service_id: Some(0),
             gradient: None,
-            /* Some(LightGradient { */
-            /*     mode: LightGradientMode::RandomPixelated, */
-            /*     mode_values: BTreeSet::from([ */
-            /*         LightGradientMode::InterpolatedPalette, */
-            /*         LightGradientMode::InterpolatedPaletteMirrored, */
-            /*         LightGradientMode::RandomPixelated, */
-            /*     ]), */
-            /*     points_capable: 5, */
-            /*     points: vec![], */
-            /*     pixel_count: 7, */
-            /* }) */
             identify: Identify {},
             timed_effects: Some(LightTimedEffects {
                 status_values: json!(["no_effect", "sunrise", "sunset"]),
