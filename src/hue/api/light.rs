@@ -500,7 +500,7 @@ pub enum LightEffect {
 }
 
 impl LightEffect {
-    const ALL: [Self; 11] = [
+    pub const ALL: [Self; 11] = [
         Self::Prism,
         Self::Opal,
         Self::Glisten,
