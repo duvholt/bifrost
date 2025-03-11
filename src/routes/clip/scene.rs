@@ -5,16 +5,13 @@ use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
-use crate::hue::api::{
-    RType, Resource, Scene, SceneStatus, SceneStatusUpdate, SceneUpdate, V2Reply,
-};
-use crate::model::state::AuxData;
+use crate::hue::api::{RType, Resource, Scene, SceneUpdate, V2Reply};
 use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
-use crate::z2m::request::ClientRequest;
 
 async fn post_scene(
     State(state): State<AppState>,
@@ -24,28 +21,14 @@ async fn post_scene(
 
     let scene: Scene = serde_json::from_value(req)?;
 
-    let mut lock = state.res.lock().await;
+    let lock = state.res.lock().await;
 
     let sid = lock.get_next_scene_id(&scene.group)?;
 
     let link_scene = RType::Scene.deterministic((scene.group.rid, sid));
 
-    log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
+    lock.backend_request(BackendRequest::SceneCreate(link_scene, sid, scene))?;
 
-    lock.aux_set(
-        &link_scene,
-        AuxData::new()
-            .with_topic(&scene.metadata.name)
-            .with_index(sid),
-    );
-
-    lock.z2m_request(ClientRequest::scene_store(
-        scene.group,
-        sid,
-        scene.metadata.name.clone(),
-    ))?;
-
-    lock.add(&link_scene, Resource::Scene(scene))?;
     drop(lock);
 
     V2Reply::ok(link_scene)
@@ -66,31 +49,14 @@ async fn put_scene(
 
     let upd: SceneUpdate = serde_json::from_value(put)?;
 
-    if let Some(md) = upd.metadata {
-        lock.update::<Scene>(&id, |scn| scn.metadata += md)?;
+    if let Some(md) = &upd.metadata {
+        lock.update::<Scene>(&id, |scn| scn.metadata += md.clone())?;
     }
 
-    let scene = lock.get::<Scene>(&rlink)?;
+    let _scene = lock.get::<Scene>(&rlink)?;
 
-    if let Some(recall) = upd.recall {
-        if recall.action == Some(SceneStatusUpdate::Active) {
-            let scenes = lock.get_scenes_for_room(&scene.group.rid);
-            for rid in scenes {
-                lock.update::<Scene>(&rid, |scn| {
-                    scn.status = if rid == id {
-                        Some(SceneStatus::Static)
-                    } else {
-                        Some(SceneStatus::Inactive)
-                    };
-                })?;
-            }
-
-            lock.z2m_request(ClientRequest::scene_recall(rlink))?;
-            drop(lock);
-        } else {
-            log::error!("Scene recall type not supported: {recall:?}");
-        }
-    }
+    lock.backend_request(BackendRequest::SceneUpdate(rlink, upd))?;
+    drop(lock);
 
     V2Reply::ok(rlink)
 }
@@ -104,7 +70,7 @@ async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> Ap
 
     match res.obj {
         Resource::Scene(_) => {
-            lock.z2m_request(ClientRequest::scene_remove(link))?;
+            lock.backend_request(BackendRequest::Delete(link))?;
 
             drop(lock);
 

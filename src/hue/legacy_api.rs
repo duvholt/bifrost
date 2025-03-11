@@ -324,7 +324,7 @@ impl ApiGroup {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
     pub fn from_lights_and_room(
-        glight: api::GroupedLight,
+        glight: &api::GroupedLight,
         lights: Vec<String>,
         room: api::Room,
     ) -> Self {

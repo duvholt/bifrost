@@ -14,7 +14,12 @@ use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
-use crate::hue::api::{Device, GroupedLight, Light, RType, ResourceLink, Room, Scene, V1Reply};
+
+use crate::backend::BackendRequest;
+use crate::hue::api::{
+    Device, GroupedLight, GroupedLightUpdate, Light, LightUpdate, On, RType, ResourceLink, Room,
+    Scene, SceneStatus, SceneUpdate, V1Reply,
+};
 use crate::hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
     ApiUserConfig, Capabilities, HueResult, NewUser, NewUserReply,
@@ -22,8 +27,6 @@ use crate::hue::legacy_api::{
 use crate::resource::Resources;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
-use crate::z2m::request::ClientRequest;
-use crate::z2m::update::DeviceUpdate;
 
 async fn get_api_config(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.api_short_config().await)
@@ -65,7 +68,7 @@ fn get_groups(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiGroup
             .find(|rl| rl.rtype == RType::GroupedLight)
             .ok_or(ApiError::NotFound(rr.id))?;
 
-        let glight = res.get::<GroupedLight>(uuid)?.clone();
+        let glight = res.get::<GroupedLight>(uuid)?;
         let lights: Vec<String> = room
             .children
             .iter()
@@ -207,18 +210,18 @@ async fn put_api_user_resource_id(
             let lock = state.res.lock().await;
             let uuid = lock.from_id_v1(id)?;
             let link = ResourceLink::new(uuid, RType::Light);
-            let upd: ApiLightStateUpdate = serde_json::from_value(req)?;
+            let updv1: ApiLightStateUpdate = serde_json::from_value(req)?;
 
-            let payload = DeviceUpdate::default()
-                .with_state(upd.on)
-                .with_brightness(upd.bri.map(f64::from))
-                .with_color_xy(upd.xy.map(Into::into))
-                .with_color_temp(upd.ct);
+            let upd = LightUpdate::new()
+                .with_on(updv1.on.map(On::new))
+                .with_brightness(updv1.bri)
+                .with_color_temperature(updv1.ct)
+                .with_color_xy(updv1.xy.map(Into::into));
 
-            lock.z2m_request(ClientRequest::light_update(link, payload))?;
+            lock.backend_request(BackendRequest::LightUpdate(link, upd))?;
             drop(lock);
 
-            let reply = V1Reply::for_light(id, &path).with_light_state_update(&upd)?;
+            let reply = V1Reply::for_light(id, &path).with_light_state_update(&updv1)?;
 
             Ok(Json(reply.json()))
         }
@@ -234,17 +237,17 @@ async fn put_api_user_resource_id(
             let room: &Room = lock.get(&link)?;
             let glight = room.grouped_light_service().unwrap();
 
-            let upd: ApiGroupActionUpdate = serde_json::from_value(req)?;
+            let updv1: ApiGroupActionUpdate = serde_json::from_value(req)?;
 
-            let reply = match upd {
+            let reply = match updv1 {
                 ApiGroupActionUpdate::LightUpdate(upd) => {
-                    let payload = DeviceUpdate::default()
-                        .with_state(upd.on)
+                    let updv2 = GroupedLightUpdate::new()
+                        .with_on(upd.on.map(On::new))
                         .with_brightness(upd.bri.map(f64::from))
                         .with_color_xy(upd.xy.map(Into::into))
-                        .with_color_temp(upd.ct);
+                        .with_color_temperature(upd.ct);
 
-                    lock.z2m_request(ClientRequest::group_update(*glight, payload))?;
+                    lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
                     drop(lock);
 
                     V1Reply::for_group(id, &path).with_light_state_update(&upd)?
@@ -253,7 +256,8 @@ async fn put_api_user_resource_id(
                     let scene_id = upd.scene.parse()?;
                     let scene_uuid = lock.from_id_v1(scene_id)?;
                     let rlink = RType::Scene.link_to(scene_uuid);
-                    lock.z2m_request(ClientRequest::scene_recall(rlink))?;
+                    let updv2 = SceneUpdate::new().with_recall_action(Some(SceneStatus::Static));
+                    lock.backend_request(BackendRequest::SceneUpdate(rlink, updv2))?;
                     drop(lock);
 
                     V1Reply::for_group(id, &path).add("scene", upd.scene)?

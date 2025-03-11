@@ -7,6 +7,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
 use uuid::Uuid;
 
+use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Metadata, RType,
@@ -18,14 +19,13 @@ use crate::hue::event::EventBlock;
 use crate::hue::version::SwVersion;
 use crate::model::state::{AuxData, State};
 use crate::server::hueevents::HueEventStream;
-use crate::z2m::request::ClientRequest;
 
 #[derive(Clone, Debug)]
 pub struct Resources {
     state: State,
     version: SwVersion,
     state_updates: Arc<Notify>,
-    pub z2m_updates: Sender<Arc<ClientRequest>>,
+    backend_updates: Sender<Arc<BackendRequest>>,
     hue_event_stream: HueEventStream,
 }
 
@@ -40,7 +40,7 @@ impl Resources {
             state,
             version,
             state_updates: Arc::new(Notify::new()),
-            z2m_updates: Sender::new(32),
+            backend_updates: Sender::new(32),
             hue_event_stream: HueEventStream::new(Self::HUE_EVENTS_BUFFER_SIZE),
         }
     }
@@ -437,14 +437,14 @@ impl Resources {
     }
 
     #[must_use]
-    pub fn z2m_channel(&self) -> Receiver<Arc<ClientRequest>> {
-        self.z2m_updates.subscribe()
+    pub fn backend_event_stream(&self) -> Receiver<Arc<BackendRequest>> {
+        self.backend_updates.subscribe()
     }
 
-    pub fn z2m_request(&self, req: ClientRequest) -> ApiResult<()> {
+    pub fn backend_request(&self, req: BackendRequest) -> ApiResult<()> {
         log::debug!("z2m request: {req:#?}");
 
-        self.z2m_updates.send(Arc::new(req))?;
+        self.backend_updates.send(Arc::new(req))?;
 
         Ok(())
     }

@@ -3,10 +3,8 @@ use std::ops::{AddAssign, Sub};
 use serde::{Deserialize, Serialize};
 
 use crate::hue::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
-use crate::hue::devicedb::{hardware_platform_type, product_archetype};
 use crate::hue::version::SwVersion;
 use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
-use crate::z2m;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Device {
@@ -66,32 +64,6 @@ impl DeviceProductData {
             product_name: "Hue Bridge".to_string(),
             software_version: version.get_software_version(),
             hardware_platform_type: None,
-        }
-    }
-
-    #[must_use]
-    pub fn guess_from_device(dev: &z2m::api::Device) -> Self {
-        fn str_or_unknown(name: Option<&String>) -> String {
-            name.map_or("<unknown>", |v| v).to_string()
-        }
-
-        let product_name = str_or_unknown(dev.definition.as_ref().map(|def| &def.model));
-        let model_id = str_or_unknown(dev.model_id.as_ref());
-        let manufacturer_name = str_or_unknown(dev.manufacturer.as_ref());
-        let certified = manufacturer_name == Self::SIGNIFY_MANUFACTURER_NAME;
-        let software_version = str_or_unknown(dev.software_build_id.as_ref());
-
-        let product_archetype = product_archetype(&model_id).unwrap_or_default();
-        let hardware_platform_type = hardware_platform_type(&model_id).map(ToString::to_string);
-
-        Self {
-            model_id,
-            manufacturer_name,
-            product_name,
-            product_archetype,
-            certified,
-            software_version,
-            hardware_platform_type,
         }
     }
 }

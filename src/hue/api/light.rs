@@ -6,7 +6,6 @@ use serde_json::Value;
 
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::model::types::XY;
-use crate::z2m::api::{Expose, ExposeList};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Light {
@@ -275,30 +274,6 @@ pub struct LightGradient {
     pub pixel_count: u32,
 }
 
-impl LightGradient {
-    #[must_use]
-    pub fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
-        match expose {
-            ExposeList {
-                length_max: Some(max),
-                ..
-            } => Some(Self {
-                mode: LightGradientMode::InterpolatedPalette,
-                mode_values: BTreeSet::from([
-                    LightGradientMode::InterpolatedPalette,
-                    LightGradientMode::InterpolatedPaletteMirrored,
-                    LightGradientMode::RandomPixelated,
-                ]),
-                points_capable: *max,
-                points: vec![],
-                // FIXME: we don't have this information, so guesstimate it
-                pixel_count: *max * 3,
-            }),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightGradientUpdate {
     #[serde(default)]
@@ -499,7 +474,7 @@ impl LightUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct DimmingUpdate {
     pub brightness: f64,
 }
@@ -546,7 +521,7 @@ impl ColorUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct ColorTemperatureUpdate {
     pub mirek: u32,
 }
@@ -623,19 +598,6 @@ impl LightColor {
             xy,
         }
     }
-
-    #[must_use]
-    pub const fn extract_from_expose(expose: &Expose) -> Option<Self> {
-        let Expose::Composite(_) = expose else {
-            return None;
-        };
-
-        Some(Self {
-            gamut: Some(ColorGamut::GAMUT_C),
-            gamut_type: GamutType::C,
-            xy: XY::D65_WHITE_POINT,
-        })
-    }
 }
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone)]
@@ -664,26 +626,6 @@ impl From<ColorTemperature> for Option<ColorTemperatureUpdate> {
     }
 }
 
-impl ColorTemperature {
-    #[must_use]
-    pub fn extract_from_expose(expose: &Expose) -> Option<Self> {
-        let Expose::Numeric(num) = expose else {
-            return None;
-        };
-
-        let schema_opt = num.extract_mirek_schema();
-        let mirek_valid = schema_opt.is_some();
-        let mirek_schema = schema_opt.unwrap_or(MirekSchema::DEFAULT);
-        let mirek = None;
-
-        Some(Self {
-            mirek,
-            mirek_schema,
-            mirek_valid,
-        })
-    }
-}
-
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Dimming {
     pub brightness: f64,
@@ -694,19 +636,5 @@ pub struct Dimming {
 impl From<Dimming> for f64 {
     fn from(value: Dimming) -> Self {
         value.brightness
-    }
-}
-
-impl Dimming {
-    #[must_use]
-    pub const fn extract_from_expose(expose: &Expose) -> Option<Self> {
-        let Expose::Numeric(_) = expose else {
-            return None;
-        };
-
-        Some(Self {
-            brightness: 0.0,
-            min_dim_level: None,
-        })
     }
 }
