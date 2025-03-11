@@ -108,7 +108,7 @@ state for a light (a bulb, or single segment of a multi-segment light source).
  │           │ Zigbee address (or alias)     │
  │ 1         │ for the target light          │
  ├───────────┼───────────┬───────────────────┤
- │ 2         │(low 3 bit)│ 0   0   0   0   0 │<-- 5 reserved bits MUST be zero
+ │ 2         │(low 3 bit)│ .mode (5 bit enum)│
  │           │─ ─ ─ ─ ─ ─└───────────────────┤
  │ 3         │ .brightnes (high 8 bits)      │
  ├───────────┼───────────────────────────────┤
@@ -120,6 +120,22 @@ state for a light (a bulb, or single segment of a multi-segment light source).
  └───────────┴───────────────────────────────┘
 ```
 
+The `.mode` field is an odd one. Only two values have ever been observed:
+
+```rust
+// the names might change, as we learn more about these bits
+enum LightRecordMode {
+    Segment = 0b00000,
+    Device  = 0b01011,
+}
+```
+
+Normal bulbs must be contacted with the `LightRecordMode::Device` option, while
+updates for segments on a gradient strip must use the `LightRecordMode::Segment`
+mode. Otherwise, the entire segment only lights up in the first color.
+
+Current hypothesis: This values determines if real network addresses or virtual
+segment addresses are used, but this is currently not tested.
 
 ### Command 3: Synchronize entertainment zone
 
