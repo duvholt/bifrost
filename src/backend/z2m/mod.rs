@@ -21,10 +21,11 @@ use crate::hue;
 use crate::hue::api::{
     Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature, ColorTemperatureUpdate,
     ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming, DimmingUpdate, GroupedLight,
-    Light, LightColor, LightEffect, LightEffectsV2Update, LightGradient, LightGradientMode,
-    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
-    RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall,
-    SceneStatus, SceneStatusUpdate, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    Light, LightColor, LightEffect, LightEffectStatus, LightEffectValues, LightEffects,
+    LightEffectsV2, LightEffectsV2Update, LightGradient, LightGradientMode, LightMetadata,
+    LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene,
+    SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
+    SceneStatusUpdate, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
 use crate::hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
@@ -87,6 +88,8 @@ impl Z2mBackend {
         let metadata = LightMetadata::new(DeviceArchetype::SpotBulb, name);
 
         let gradient = dev.expose_gradient();
+        let effects =
+            dev.manufacturer.as_deref() == Some(DeviceProductData::SIGNIFY_MANUFACTURER_NAME);
 
         let dev = hue::api::Device {
             product_data,
@@ -119,6 +122,25 @@ impl Z2mBackend {
 
         light.gradient = gradient.and_then(LightGradient::extract_from_expose);
         log::trace!("Detected gradient support: {:?}", &light.gradient);
+
+        if effects {
+            log::trace!("Detected Hue light: enabling effects");
+            light.effects = Some(LightEffects {
+                status_values: LightEffect::ALL.into(),
+                status: LightEffect::NoEffect,
+                effect_values: LightEffect::ALL.into(),
+            });
+            light.effects_v2 = Some(LightEffectsV2 {
+                action: LightEffectValues {
+                    effect_values: LightEffect::ALL.into(),
+                },
+                status: LightEffectStatus {
+                    effect: LightEffect::NoEffect,
+                    effect_values: LightEffect::ALL.into(),
+                    parameters: None,
+                },
+            });
+        }
 
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
