@@ -199,7 +199,7 @@ be a good way to enable smooth, lightweight light transitions.
 
 ### Property: `EFFECT_TYPE`
 
-Size: 1 byte (specifically, [`EffectType`])
+Size: 1 byte (specifically, [`zigbee::EffectType`])
 
 | Name         | Value |
 |--------------|-------|
@@ -216,9 +216,9 @@ Size: 1 byte (specifically, [`EffectType`])
 | `Sunbeam`    | 0x10  |
 | `Enchant`    | 0x11  |
 
-This enables one of the specific, known effects in the [`EffectType`] enum. Most
-(all?) effects allow setting other properties (such as color xy or color
-temperature) while the effect is active.
+This enables one of the specific, known effects in the [`zigbee::EffectType`]
+enum. Most (all?) effects allow setting other properties (such as color xy or
+color temperature) while the effect is active.
 
 This is how custom effects like "Purple Fireplace" or "Blue Candle" from the Hue
 app are activated.
@@ -277,13 +277,16 @@ color coordinate, respectively. These bytes are packed in an odd way. The
 following code snippet demonstrates how to unpack them:
 
 ```rust
+let bytes: [u8; 3] = [0x11, 0x22, 0x33];
 let x = u16::from(bytes[0]) | u16::from(bytes[1] & 0x0F) << 8;
 let y = u16::from(bytes[2]) << 4 | u16::from(bytes[1] >> 4);
 ```
 
 And packing:
 
-```rust
+```rust,no_run
+let x = 0x123;
+let y = 0x456;
 let bytes: [u8; 3] = [
     (x & 0xFF) as u8,
     (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
@@ -300,8 +303,8 @@ coordinates outside the visible light spectrum, for example.
 Other implementations all seem to make this guess about the scaling:
 
 ```rust
-const maxX = 0.7347;
-const maxY = 0.8431;
+const max_x: f32 = 0.7347;
+const max_y: f32 = 0.8431;
 ```
 
 As far as I can tell, these numbers appeared at one point in someone's
@@ -320,10 +323,10 @@ value of the "Red" coordinate, specifically.
 However, the Y value doesn't match any source I can find.
 
 If the scaling matches the Wide Gamut, the Y value (maximum height) should be
-`0.8264`. It it matches the top of the visible light area, it should be around
+`0.8264`. If it matched the top of the visible light area, it should be around
 `0.836`. I have no idea where `0.8431` comes from!
 
-From experimentation, I have determined that the most likely candidate is the
+From experimentation, I have determined that the most likely candidates are the
 outer bounds of the wide gamut, leading to the following values:
 
 ```rust
