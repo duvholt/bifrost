@@ -36,7 +36,7 @@ impl VersionUpdater {
     }
 
     pub async fn fetch_version(&mut self) -> ApiResult<SwVersion> {
-        update::fetch_updates(None)
+        fetch_updates(None)
             .await?
             .into_iter()
             .max_by(|x, y| x.version.cmp(&y.version))
