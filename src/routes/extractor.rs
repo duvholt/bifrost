@@ -11,7 +11,6 @@ use serde::Serialize;
 // (buggy) apps don't actually send. So we are forced to skip this check.
 pub struct Json<T>(pub T);
 
-#[axum::async_trait]
 impl<S, T> FromRequest<S> for Json<T>
 where
     axum::Json<T>: FromRequest<S, Rejection = JsonRejection>,

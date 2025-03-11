@@ -42,5 +42,5 @@ pub fn router() -> Router<AppState> {
         .nest("/light", light::router())
         .nest("/device", device::router())
         .nest("/grouped_light", grouped_light::router())
-        .nest("/", generic::router())
+        .merge(generic::router())
 }
