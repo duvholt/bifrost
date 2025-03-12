@@ -1,16 +1,29 @@
 use std::ops::{AddAssign, Sub};
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::hue::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink};
+use crate::hue::date_format;
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(tag = "active", rename_all = "snake_case")]
-pub enum SceneStatus {
+#[serde(rename_all = "snake_case")]
+pub enum SceneActive {
     Inactive,
     Static,
     DynamicPalette,
+}
+
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct SceneStatus {
+    pub active: SceneActive,
+    #[serde(
+        with = "date_format::utc_ms_opt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_recall: Option<DateTime<Utc>>,
 }
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -115,10 +128,10 @@ impl SceneUpdate {
     pub fn with_recall_action(self, action: Option<SceneStatus>) -> Self {
         Self {
             recall: Some(SceneRecall {
-                action: match action {
-                    Some(SceneStatus::DynamicPalette) => Some(SceneStatusUpdate::DynamicPalette),
-                    Some(SceneStatus::Static) => Some(SceneStatusUpdate::Active),
-                    Some(SceneStatus::Inactive) | None => None,
+                action: match action.map(|a| a.active) {
+                    Some(SceneActive::DynamicPalette) => Some(SceneStatusUpdate::DynamicPalette),
+                    Some(SceneActive::Static) => Some(SceneStatusUpdate::Active),
+                    Some(SceneActive::Inactive) | None => None,
                 },
                 duration: None,
                 dimming: None,

@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::model::types::XY;
@@ -28,6 +28,8 @@ pub struct Light {
     pub dynamics: Option<LightDynamics>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects: Option<LightEffects>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effects_v2: Option<LightEffectsV2>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,27 +93,56 @@ impl From<LightMetadata> for Metadata {
 
 impl Light {
     #[must_use]
-    pub const fn new(owner: ResourceLink, metadata: LightMetadata) -> Self {
+    pub fn new(owner: ResourceLink, metadata: LightMetadata) -> Self {
         Self {
-            alert: None,
+            alert: Some(LightAlert {
+                action_values: BTreeSet::from([String::from("breathe")]),
+            }),
             color: None,
             color_temperature: None,
             color_temperature_delta: Some(Stub {}),
             dimming: None,
             dimming_delta: Some(Stub {}),
-            dynamics: None,
+            dynamics: Some(LightDynamics::default()),
             effects: None,
-            service_id: None,
+            effects_v2: None,
+            service_id: Some(0),
             gradient: None,
             identify: Identify {},
-            timed_effects: None,
+            timed_effects: Some(LightTimedEffects {
+                status_values: json!(["no_effect", "sunrise", "sunset"]),
+                status: json!("no_effect"),
+                effect_values: json!(["no_effect", "sunrise", "sunset"]),
+            }),
             mode: LightMode::Normal,
             on: On { on: true },
-            product_data: None,
+            product_data: Some(LightProductData {
+                function: Some(LightFunction::Decorative),
+            }),
             metadata,
             owner,
-            powerup: None,
-            signaling: None,
+            powerup: Some(LightPowerup {
+                preset: LightPowerupPreset::Safety,
+                configured: true,
+                on: LightPowerupOn::On {
+                    on: On { on: true },
+                },
+                dimming: LightPowerupDimming::Dimming {
+                    dimming: DimmingUpdate { brightness: 100.0 },
+                },
+                color: LightPowerupColor::ColorTemperature {
+                    color_temperature: ColorTemperatureUpdate { mirek: 366 },
+                },
+            }),
+            signaling: Some(LightSignaling {
+                signal_values: vec![
+                    LightSignal::NoSignal,
+                    LightSignal::OnOff,
+                    LightSignal::OnOffColor,
+                    LightSignal::Alternating,
+                ],
+                status: Value::Null,
+            }),
         }
     }
 
@@ -123,7 +154,7 @@ impl Light {
     }
 
     #[must_use]
-    pub fn as_mirek_opt(&self) -> Option<u32> {
+    pub fn as_mirek_opt(&self) -> Option<u16> {
         self.color_temperature.as_ref().and_then(|ct| ct.mirek)
     }
 
@@ -307,6 +338,8 @@ pub struct LightPowerup {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupOn {
+    // Not a real powerup.on.mode option, but used to indicate that
+    // powerup.on itself is null
     #[default]
     None,
     Previous,
@@ -325,6 +358,8 @@ impl LightPowerupOn {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupColor {
+    // Not a real powerup.color.mode option, but used to indicate that
+    // powerup.color itself is null
     #[default]
     None,
     Previous,
@@ -346,6 +381,8 @@ impl LightPowerupColor {
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupDimming {
+    // Not a real powerup.dimming.mode option, but used to indicate that
+    // powerup.dimming itself is null
     #[default]
     None,
     Previous,
@@ -389,16 +426,106 @@ pub enum LightDynamicsStatus {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightDynamics {
     pub status: LightDynamicsStatus,
-    pub status_values: Vec<String>,
+    pub status_values: Vec<LightDynamicsStatus>,
     pub speed: f64,
     pub speed_valid: bool,
 }
 
+impl Default for LightDynamics {
+    fn default() -> Self {
+        Self {
+            status: LightDynamicsStatus::None,
+            status_values: vec![
+                LightDynamicsStatus::None,
+                LightDynamicsStatus::DynamicPalette,
+            ],
+            speed: 0.0,
+            speed_valid: false,
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum LightEffect {
+    #[default]
+    NoEffect,
+    Prism,
+    Opal,
+    Glisten,
+    Sparkle,
+    Fire,
+    Candle,
+    Underwater,
+    Cosmos,
+    Sunbeam,
+    Enchant,
+}
+
+impl LightEffect {
+    pub const ALL: [Self; 11] = [
+        Self::Prism,
+        Self::Opal,
+        Self::Glisten,
+        Self::Sparkle,
+        Self::Fire,
+        Self::Candle,
+        Self::Underwater,
+        Self::Cosmos,
+        Self::Sunbeam,
+        Self::Enchant,
+        Self::NoEffect,
+    ];
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightEffects {
-    pub status_values: Vec<String>,
-    pub status: String,
-    pub effect_values: Vec<String>,
+    pub status_values: Vec<LightEffect>,
+    pub status: LightEffect,
+    pub effect_values: Vec<LightEffect>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectsV2 {
+    pub action: LightEffectValues,
+    pub status: LightEffectStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectsV2Update {
+    #[serde(default)]
+    pub action: Option<LightEffectActionUpdate>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct LightEffectActionUpdate {
+    #[serde(default)]
+    pub effect: Option<LightEffect>,
+    pub parameters: LightEffectParameters,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct LightEffectParameters {
+    #[serde(default)]
+    pub color: Option<ColorUpdate>,
+    #[serde(default)]
+    pub color_temperature: Option<ColorTemperatureUpdate>,
+    pub speed: Option<f32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectValues {
+    pub effect_values: Vec<LightEffect>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectStatus {
+    pub effect: LightEffect,
+    pub effect_values: Vec<LightEffect>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -422,6 +549,8 @@ pub struct LightUpdate {
     pub color_temperature: Option<ColorTemperatureUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradientUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effects_v2: Option<LightEffectsV2Update>,
 }
 
 impl LightUpdate {
@@ -447,7 +576,7 @@ impl LightUpdate {
     }
 
     #[must_use]
-    pub fn with_color_temperature(self, mirek: impl Into<Option<u32>>) -> Self {
+    pub fn with_color_temperature(self, mirek: impl Into<Option<u16>>) -> Self {
         Self {
             color_temperature: mirek.into().map(ColorTemperatureUpdate::new),
             ..self
@@ -523,12 +652,12 @@ impl ColorUpdate {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct ColorTemperatureUpdate {
-    pub mirek: u32,
+    pub mirek: u16,
 }
 
 impl ColorTemperatureUpdate {
     #[must_use]
-    pub const fn new(mirek: u32) -> Self {
+    pub const fn new(mirek: u16) -> Self {
         Self { mirek }
     }
 }
@@ -615,7 +744,7 @@ impl MirekSchema {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ColorTemperature {
-    pub mirek: Option<u32>,
+    pub mirek: Option<u16>,
     pub mirek_schema: MirekSchema,
     pub mirek_valid: bool,
 }

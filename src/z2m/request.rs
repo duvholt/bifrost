@@ -1,4 +1,5 @@
 use serde::Serialize;
+use serde_json::Value;
 
 use crate::z2m::update::DeviceUpdate;
 
@@ -17,4 +18,10 @@ pub enum Z2mRequest<'a> {
 
     #[serde(untagged)]
     Update(&'a DeviceUpdate),
+
+    #[serde(untagged)]
+    Untyped {
+        endpoint: u32,
+        value: &'a Value,
+    },
 }

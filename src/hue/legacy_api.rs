@@ -288,7 +288,7 @@ pub struct ApiGroupAction {
     #[serde(skip_serializing_if = "Option::is_none")]
     xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ct: Option<u32>,
+    ct: Option<u16>,
     alert: ApiAlert,
     #[serde(skip_serializing_if = "Option::is_none")]
     colormode: Option<LightColorMode>,
@@ -381,7 +381,7 @@ pub struct ApiLightState {
     #[serde(skip_serializing_if = "Option::is_none")]
     xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ct: Option<u32>,
+    ct: Option<u16>,
     alert: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     colormode: Option<LightColorMode>,
@@ -398,7 +398,7 @@ pub struct ApiLightStateUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ct: Option<u32>,
+    pub ct: Option<u16>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

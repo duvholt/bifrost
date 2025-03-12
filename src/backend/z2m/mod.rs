@@ -21,12 +21,15 @@ use crate::hue;
 use crate::hue::api::{
     Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature, ColorTemperatureUpdate,
     ColorUpdate, Device, DeviceArchetype, DeviceProductData, Dimming, DimmingUpdate, GroupedLight,
-    Light, LightColor, LightGradient, LightMetadata, LightUpdate, Metadata, RType, Resource,
-    ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
+    Light, LightColor, LightEffect, LightEffectStatus, LightEffectValues, LightEffects,
+    LightEffectsV2, LightEffectsV2Update, LightGradient, LightGradientMode, LightMetadata,
+    LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene,
+    SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
+    SceneStatusUpdate, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
+use crate::hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
+use crate::model::clamp::Clamp;
 use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
@@ -85,6 +88,8 @@ impl Z2mBackend {
         let metadata = LightMetadata::new(DeviceArchetype::SpotBulb, name);
 
         let gradient = dev.expose_gradient();
+        let effects =
+            dev.manufacturer.as_deref() == Some(DeviceProductData::SIGNIFY_MANUFACTURER_NAME);
 
         let dev = hue::api::Device {
             product_data,
@@ -117,6 +122,25 @@ impl Z2mBackend {
 
         light.gradient = gradient.and_then(LightGradient::extract_from_expose);
         log::trace!("Detected gradient support: {:?}", &light.gradient);
+
+        if effects {
+            log::trace!("Detected Hue light: enabling effects");
+            light.effects = Some(LightEffects {
+                status_values: LightEffect::ALL.into(),
+                status: LightEffect::NoEffect,
+                effect_values: LightEffect::ALL.into(),
+            });
+            light.effects_v2 = Some(LightEffectsV2 {
+                action: LightEffectValues {
+                    effect_values: LightEffect::ALL.into(),
+                },
+                status: LightEffectStatus {
+                    effect: LightEffect::NoEffect,
+                    effect_values: LightEffect::ALL.into(),
+                    parameters: None,
+                },
+            });
+        }
 
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
@@ -234,7 +258,10 @@ impl Z2mBackend {
                     dimming: None,
                     duration: None,
                 },
-                status: Some(SceneStatus::Inactive),
+                status: Some(SceneStatus {
+                    active: SceneActive::Inactive,
+                    last_recall: None,
+                }),
             };
 
             let link_scene = RType::Scene.deterministic((link_room.rid, scn.id));
@@ -609,9 +636,17 @@ impl Z2mBackend {
             "[{}] Topic [{topic}] known as {uuid} on this z2m connection, sending event..",
             self.name
         );
-        let api_req = RawMessage {
-            payload: serde_json::to_value(payload)?,
-            topic: format!("{topic}/set"),
+
+        let api_req = if let Z2mRequest::Untyped { endpoint, value } = &payload {
+            RawMessage {
+                topic: format!("{topic}/{endpoint}/set"),
+                payload: serde_json::to_value(value)?,
+            }
+        } else {
+            RawMessage {
+                topic: format!("{topic}/set"),
+                payload: serde_json::to_value(payload)?,
+            }
         };
         let json = serde_json::to_string(&api_req)?;
         log::debug!("[{}] Sending {json}", self.name);
@@ -631,28 +666,127 @@ impl Z2mBackend {
 
         match (*req).clone() {
             BackendRequest::LightUpdate(link, upd) => {
-                // We cannot recover .mode from backend updates, since these only contain
-                // the gradient colors. So we have no choice, but to update the mode
-                // here. Otherwise, the information would be lost.
-                if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
-                    lock.update::<Light>(&link.rid, |light| {
-                        if let Some(gr) = &mut light.gradient {
-                            gr.mode = mode;
-                        }
-                    })?;
-                }
-                drop(lock);
-
                 if let Some(topic) = self.rmap.get(&link.rid) {
-                    let payload = DeviceUpdate::default()
-                        .with_state(upd.on.map(|on| on.on))
-                        .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
-                        .with_color_xy(upd.color.map(|col| col.xy))
-                        .with_gradient(upd.gradient);
-                    let z2mreq = Z2mRequest::Update(&payload);
-                    self.websocket_send(socket, topic, z2mreq).await?;
-                };
+                    // We cannot recover .mode from backend updates, since these only contain
+                    // the gradient colors. So we have no choice, but to update the mode
+                    // here. Otherwise, the information would be lost.
+                    if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
+                        lock.update::<Light>(&link.rid, |light| {
+                            if let Some(gr) = &mut light.gradient {
+                                gr.mode = mode;
+                            }
+                        })?;
+                    }
+                    let hue_effects = lock.get::<Light>(&link)?.effects.is_some();
+                    drop(lock);
+
+                    if hue_effects {
+                        let mut hz = HueZigbeeUpdate::new();
+
+                        if let Some(on) = &upd.on {
+                            hz = hz.with_on_off(on.on);
+                        }
+
+                        if let Some(grad) = &upd.gradient {
+                            hz = hz.with_gradient_colors(
+                                match grad.mode {
+                                    Some(LightGradientMode::InterpolatedPalette) => {
+                                        GradientStyle::Linear
+                                    }
+                                    Some(LightGradientMode::InterpolatedPaletteMirrored) => {
+                                        GradientStyle::Mirrored
+                                    }
+                                    Some(LightGradientMode::RandomPixelated) => {
+                                        GradientStyle::Scattered
+                                    }
+                                    None => GradientStyle::Linear,
+                                },
+                                grad.points.iter().map(|c| c.color.xy).collect(),
+                            )?;
+
+                            hz = hz.with_gradient_params(GradientParams {
+                                scale: 0x38,
+                                offset: 0x00,
+                            });
+                        }
+
+                        if let Some(br) = &upd.dimming {
+                            hz = hz.with_brightness(
+                                (br.brightness / 100.0).unit_to_u8_clamped_light(),
+                            );
+                        }
+
+                        if let Some(temp) = &upd.color_temperature {
+                            hz = hz.with_color_mirek(temp.mirek);
+                        }
+
+                        if let Some(xy) = &upd.color {
+                            hz = hz.with_color_xy(xy.xy);
+                        }
+
+                        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
+                            if let Some(fx) = &act.effect {
+                                let et = match fx {
+                                    LightEffect::NoEffect => EffectType::NoEffect,
+                                    LightEffect::Prism => EffectType::Prism,
+                                    LightEffect::Opal => EffectType::Opal,
+                                    LightEffect::Glisten => EffectType::Glisten,
+                                    LightEffect::Sparkle => EffectType::Sparkle,
+                                    LightEffect::Fire => EffectType::Fireplace,
+                                    LightEffect::Candle => EffectType::Candle,
+                                    LightEffect::Underwater => EffectType::Underwater,
+                                    LightEffect::Cosmos => EffectType::Cosmos,
+                                    LightEffect::Sunbeam => EffectType::Sunbeam,
+                                    LightEffect::Enchant => EffectType::Enchant,
+                                };
+                                hz = hz.with_effect_type(et);
+                            }
+                            if let Some(speed) = &act.parameters.speed {
+                                hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
+                            }
+                            if let Some(ct) = &act.parameters.color_temperature {
+                                hz = hz.with_color_mirek(ct.mirek);
+                            }
+                            if let Some(color) = &act.parameters.color {
+                                hz = hz.with_color_xy(color.xy);
+                            }
+                        }
+
+                        hz = hz.with_fade_speed(0x0001);
+
+                        let data = hz.to_vec()?;
+
+                        println!("{}", hex::encode(&data));
+
+                        let upd = json!({
+                            "command": {
+                                "cluster": 0xFC03,
+                                "command": 0,
+                                "payload": {
+                                    "data": data
+                                }
+                            }}
+                        );
+
+                        let z2mreq = Z2mRequest::Untyped {
+                            endpoint: 11,
+                            value: &upd,
+                        };
+
+                        self.websocket_send(socket, topic, z2mreq).await?;
+                    } else {
+                        let payload = DeviceUpdate::default()
+                            .with_state(upd.on.map(|on| on.on))
+                            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+                            .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                            .with_color_xy(upd.color.map(|col| col.xy))
+                            .with_gradient(upd.gradient);
+
+                        let z2mreq = Z2mRequest::Update(&payload);
+
+                        self.websocket_send(socket, topic, z2mreq).await?;
+                    }
+                }
             }
             BackendRequest::SceneCreate(link_scene, sid, scene) => {
                 if let Some(topic) = self.rmap.get(&scene.group.rid) {
@@ -687,11 +821,14 @@ impl Z2mBackend {
                         let scenes = lock.get_scenes_for_room(&scene.group.rid);
                         for rid in scenes {
                             lock.update::<Scene>(&rid, |scn| {
-                                scn.status = if rid == link.rid {
-                                    Some(SceneStatus::Static)
-                                } else {
-                                    Some(SceneStatus::Inactive)
-                                };
+                                scn.status = Some(SceneStatus {
+                                    active: if rid == link.rid {
+                                        SceneActive::Static
+                                    } else {
+                                        SceneActive::Inactive
+                                    },
+                                    last_recall: None,
+                                });
                             })?;
                         }
 

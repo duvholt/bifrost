@@ -39,6 +39,7 @@ impl IntoResponse for ApiError {
 pub fn router(appstate: AppState) -> Router<()> {
     Router::new()
         .nest("/api", api::router())
+        .nest("/auth", api::auth_router())
         .nest("/licenses", licenses::router())
         .nest("/clip/v2/resource", clip::router())
         .nest("/eventstream", eventstream::router())

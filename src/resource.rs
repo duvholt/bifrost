@@ -348,7 +348,8 @@ impl Resources {
             Resource::BridgeHome(_) => Some(String::from("/groups/0")),
 
             /* No id v1 */
-            Resource::BehaviorInstance(_)
+            Resource::AuthV1(_)
+            | Resource::BehaviorInstance(_)
             | Resource::DevicePower(_)
             | Resource::DeviceSoftwareUpdate(_)
             | Resource::BehaviorScript(_)

@@ -12,13 +12,18 @@ pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Ident
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
-    DimmingUpdate, GamutType, Light, LightColor, LightGradient, LightGradientMode,
-    LightGradientUpdate, LightMetadata, LightUpdate, MirekSchema, On,
+    DimmingUpdate, GamutType, Light, LightAlert, LightColor, LightDynamics, LightDynamicsStatus,
+    LightEffect, LightEffectActionUpdate, LightEffectParameters, LightEffectStatus,
+    LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightFunction,
+    LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate, LightMetadata,
+    LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
+    LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffects,
+    LightUpdate, MirekSchema, On,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
 pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
 pub use scene::{
-    Scene, SceneAction, SceneActionElement, SceneMetadata, SceneRecall, SceneStatus,
+    Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
 };
 pub use stubs::{
@@ -47,6 +52,7 @@ pub struct Stub {}
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Resource {
+    AuthV1(ResourceLink),
     BehaviorInstance(BehaviorInstance),
     BehaviorScript(BehaviorScript),
     Bridge(Bridge),
@@ -85,6 +91,7 @@ impl Resource {
     #[must_use]
     pub const fn rtype(&self) -> RType {
         match self {
+            Self::AuthV1(_) => RType::AuthV1,
             Self::BehaviorInstance(_) => RType::BehaviorInstance,
             Self::BehaviorScript(_) => RType::BehaviorScript,
             Self::Bridge(_) => RType::Bridge,
@@ -121,6 +128,7 @@ impl Resource {
 
     pub fn from_value(rtype: RType, obj: Value) -> ApiResult<Self> {
         let res = match rtype {
+            RType::AuthV1 => Self::AuthV1(from_value(obj)?),
             RType::BehaviorInstance => Self::BehaviorInstance(from_value(obj)?),
             RType::BehaviorScript => Self::BehaviorScript(from_value(obj)?),
             RType::Bridge => Self::Bridge(from_value(obj)?),
