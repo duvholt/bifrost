@@ -11,6 +11,7 @@ RUN --mount=type=bind,source=doc,target=doc \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
     <<EOF
 set -e
+apt-get -y update && apt-get install -y --no-install-recommends pkg-config libssl-dev
 cargo build --locked --release
 cp target/release/bifrost /bifrost
 EOF
