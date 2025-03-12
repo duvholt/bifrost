@@ -4,7 +4,9 @@ FROM rust:${RUST_VERSION}-slim-bookworm AS build
 WORKDIR /app
 COPY LICENSE LICENSE
 
-RUN --mount=type=bind,source=src,target=src \
+RUN --mount=type=bind,source=doc,target=doc \
+    --mount=type=bind,source=src,target=src \
+    --mount=type=bind,source=crates,target=crates \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
     <<EOF
