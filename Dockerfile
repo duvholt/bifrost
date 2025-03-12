@@ -22,6 +22,8 @@ FROM debian:bookworm-slim AS final
 
 COPY --from=build /bifrost /app/bifrost
 
+RUN apt-get -y update && apt-get install -y --no-install-recommends libssl3
+
 WORKDIR /app
 
 CMD ["/app/bifrost"]
