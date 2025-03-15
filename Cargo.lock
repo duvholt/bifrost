@@ -297,12 +297,12 @@ dependencies = [
  "p256",
  "packed_struct",
  "pretty_env_logger",
+ "quick-xml",
  "rand 0.9.0",
  "reqwest",
  "rsa",
  "rustls-pemfile",
  "serde",
- "serde-xml-rust",
  "serde_json",
  "serde_yml",
  "sha1",
@@ -1780,6 +1780,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.37.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "165859e9e55f79d67b96c5d96f4e88b6f2695a1972849c15a6a3f5c59fc2c003"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2165,17 +2175,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-xml-rust"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "662b17c24bfc6e11d411126768b727fbca2f33b7c2b6e21cdbb7cc31541c60d4"
-dependencies = [
- "serde",
- "thiserror 1.0.69",
- "xml-rs",
 ]
 
 [[package]]
@@ -3154,12 +3153,6 @@ dependencies = [
  "spki",
  "tls_codec",
 ]
-
-[[package]]
-name = "xml-rs"
-version = "0.8.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5b940ebc25896e71dd073bad2dbaa2abfe97b0a391415e22ad1326d9c54e3c4"
 
 [[package]]
 name = "yaml-rust2"

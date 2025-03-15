@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
 
+const XML_DOCTYPE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
 const SCHEMA_DEVICE_BASIC: &str = "urn:schemas-upnp-org:device:Basic:1";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,6 +195,12 @@ impl Device {
     }
 }
 
+pub fn to_xml(value: impl Serialize) -> Result<String, quick_xml::se::SeError> {
+    let mut res = XML_DOCTYPE.to_string();
+    quick_xml::se::to_writer(&mut res, &value)?;
+    Ok(res)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Icon {
     mimetype: String,
@@ -228,7 +236,7 @@ mod tests {
 
     const UUID: Uuid = uuid!("01234567-89ab-cdef-0123-456789abcdef");
 
-    use crate::model::upnp::{Device, Icon, Service};
+    use crate::model::upnp::{to_xml, Device, Icon, Service, XML_DOCTYPE};
 
     #[test]
     fn uuid_prefix() {
@@ -260,9 +268,9 @@ mod tests {
             event_sub_url: Url::parse("http://event_sub_url/").unwrap(),
         };
 
-        let a = serde_xml_rust::to_string(&svc).unwrap();
+        let a = to_xml(&svc).unwrap();
         let b = [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            XML_DOCTYPE,
             "<Service>",
             "<serviceType>http://service_type/</serviceType>",
             "<serviceId>http://service_id/</serviceId>",
@@ -271,7 +279,7 @@ mod tests {
             "<eventSubURL>http://event_sub_url/</eventSubURL>",
             "</Service>",
         ]
-        .join("");
+        .concat();
 
         assert_eq!(a, b);
     }
@@ -286,9 +294,9 @@ mod tests {
             url: Url::parse("http://example.org/icon.png").unwrap(),
         };
 
-        let a = serde_xml_rust::to_string(&icon).unwrap();
+        let a = to_xml(&icon).unwrap();
         let b = [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            XML_DOCTYPE,
             "<Icon>",
             "<mimetype>mime/type</mimetype>",
             "<width>42</width>",
@@ -297,7 +305,7 @@ mod tests {
             "<url>http://example.org/icon.png</url>",
             "</Icon>",
         ]
-        .join("");
+        .concat();
 
         assert_eq!(a, b);
     }
@@ -310,19 +318,19 @@ mod tests {
         let udn = UUID;
         let dev = Device::new(friendly_name, manufacturer, model_name, udn);
 
-        let a = serde_xml_rust::to_string(&dev).unwrap();
+        let a = to_xml(&dev).unwrap();
         let b = [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            XML_DOCTYPE,
             "<Device>",
             "<deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>",
             "<friendlyName>Plumbus</friendlyName>",
             "<manufacturer>Plumbubo Prime 51b</manufacturer>",
             "<modelName>Plumbus 9000</modelName>",
-            "<modelURL />",
+            "<modelURL/>",
             "<UDN>uuid:01234567-89ab-cdef-0123-456789abcdef</UDN>",
             "</Device>",
         ]
-        .join("");
+        .concat();
 
         assert_eq!(a, b);
     }
