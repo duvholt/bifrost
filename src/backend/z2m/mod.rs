@@ -36,13 +36,6 @@ use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
     HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
 };
-
-use crate::backend::z2m::stream::Z2mTarget;
-use crate::backend::{Backend, BackendRequest};
-use crate::config::{AppConfig, Z2mServer};
-use crate::error::{ApiError, ApiResult};
-use crate::model::state::AuxData;
-use crate::resource::Resources;
 use z2m::api::{ExposeLight, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
@@ -51,6 +44,13 @@ use z2m::convert::{
 use z2m::hexcolor::HexColor;
 use z2m::request::Z2mRequest;
 use z2m::update::{DeviceColor, DeviceUpdate};
+
+use crate::backend::z2m::stream::Z2mTarget;
+use crate::backend::{Backend, BackendRequest};
+use crate::config::{AppConfig, Z2mServer};
+use crate::error::{ApiError, ApiResult};
+use crate::model::state::AuxData;
+use crate::resource::Resources;
 
 #[derive(Debug)]
 struct LearnScene {
