@@ -223,8 +223,9 @@ pub struct Service {
 #[cfg(test)]
 mod tests {
     use url::Url;
+    use uuid::Uuid;
 
-    use crate::model::upnp::{Icon, Service};
+    use crate::model::upnp::{Device, Icon, Service};
 
     #[test]
     fn serialize_service() {
@@ -272,6 +273,31 @@ mod tests {
             "<depth>17</depth>",
             "<url>http://example.org/icon.png</url>",
             "</Icon>",
+        ]
+        .join("");
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn serialize_device() {
+        let friendly_name = "Plumbus";
+        let manufacturer = "Plumbubo Prime 51b";
+        let model_name = "Plumbus 9000";
+        let udn = Uuid::nil();
+        let dev = Device::new(friendly_name, manufacturer, model_name, udn);
+
+        let a = serde_xml_rust::to_string(&dev).unwrap();
+        let b = [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<Device>",
+            "<deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>",
+            "<friendlyName>Plumbus</friendlyName>",
+            "<manufacturer>Plumbubo Prime 51b</manufacturer>",
+            "<modelName>Plumbus 9000</modelName>",
+            "<modelURL />",
+            "<UDN>uuid::00000000-0000-0000-0000-000000000000</UDN>",
+            "</Device>",
         ]
         .join("");
 
