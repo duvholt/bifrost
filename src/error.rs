@@ -158,4 +158,10 @@ impl From<SvcError> for ApiError {
     }
 }
 
+impl ApiError {
+    pub fn service_error(value: impl ToString) -> Self {
+        Self::SvcError(value.to_string())
+    }
+}
+
 pub type ApiResult<T> = Result<T, ApiError>;
