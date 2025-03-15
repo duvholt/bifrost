@@ -317,6 +317,7 @@ async fn put_api_user_resource_id_path(
                 .with_on(updv1.on.map(On::new))
                 .with_brightness(updv1.bri)
                 .with_color_temperature(updv1.ct)
+                .with_color_hs(updv1.hs.map(Into::into))
                 .with_color_xy(updv1.xy.map(Into::into));
 
             lock.backend_request(BackendRequest::LightUpdate(link, upd))?;

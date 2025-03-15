@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
+use crate::hs::HS;
 use crate::xy::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -613,7 +614,15 @@ impl LightUpdate {
     #[must_use]
     pub fn with_color_xy(self, xy: impl Into<Option<XY>>) -> Self {
         Self {
-            color: xy.into().map(ColorUpdate::new),
+            color: self.color.or_else(|| xy.into().map(ColorUpdate::new)),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_color_hs(self, hs: impl Into<Option<HS>>) -> Self {
+        Self {
+            color: hs.into().map(|hs| XY::from_hs(hs).0).map(ColorUpdate::new),
             ..self
         }
     }
