@@ -49,6 +49,9 @@ pub enum ApiError {
     ConfigError(#[from] config::ConfigError),
 
     #[error(transparent)]
+    QuickXmlSeError(#[from] quick_xml::se::SeError),
+
+    #[error(transparent)]
     SendErrorHue(#[from] tokio::sync::broadcast::error::SendError<EventBlock>),
 
     #[error(transparent)]
