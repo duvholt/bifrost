@@ -4,19 +4,29 @@ use uuid::Uuid;
 
 const XML_DOCTYPE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
+const XMLNS: &str = "urn:schemas-upnp-org:device-1-0";
 const SCHEMA_DEVICE_BASIC: &str = "urn:schemas-upnp-org:device:Basic:1";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename = "root")]
 pub struct Root {
+    #[serde(rename = "@xmlns")]
+    xmlns: String,
+
+    #[serde(rename = "specVersion")]
     pub spec_version: SpecVersion,
+
+    #[serde(rename = "URLBase")]
     pub url_base: Url,
+
     pub device: Device,
 }
 
 impl Root {
     #[must_use]
-    pub const fn new(url_base: Url, device: Device) -> Self {
+    pub fn new(url_base: Url, device: Device) -> Self {
         Self {
+            xmlns: XMLNS.to_string(),
             spec_version: SpecVersion::VERSION_1,
             url_base,
             device,
