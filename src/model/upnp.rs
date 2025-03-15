@@ -78,7 +78,7 @@ pub struct Device {
 
     pub model_name: String,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "manufacturerURL", skip_serializing_if = "Option::is_none")]
     pub manufacturer_url: Option<Url>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
