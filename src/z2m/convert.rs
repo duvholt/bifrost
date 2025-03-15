@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
 
+use hue::xy::XY;
+
 use crate::hue::api::{
     ColorGamut, ColorTemperature, DeviceProductData, Dimming, GamutType, LightColor, LightGradient,
     LightGradientMode, MirekSchema,
 };
 use crate::hue::devicedb::{hardware_platform_type, product_archetype};
-use crate::model::types::XY;
 use crate::z2m::api::{Device, Expose, ExposeList, ExposeNumeric};
 
 impl ExposeNumeric {
@@ -53,10 +54,9 @@ impl LightGradient {
                     LightGradientMode::InterpolatedPaletteMirrored,
                     LightGradientMode::RandomPixelated,
                 ]),
-                points_capable: *max,
+                points_capable: *max.min(&5),
                 points: vec![],
-                // FIXME: we don't have this information, so guesstimate it
-                pixel_count: *max * 3,
+                pixel_count: *max.min(&7),
             }),
             _ => None,
         }
@@ -91,8 +91,8 @@ impl Dimming {
         };
 
         Some(Self {
-            brightness: 0.0,
-            min_dim_level: None,
+            brightness: 0.01,
+            min_dim_level: Some(0.01),
         })
     }
 }

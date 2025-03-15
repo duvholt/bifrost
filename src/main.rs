@@ -14,6 +14,7 @@ use bifrost::server::appstate::AppState;
  * Formatter function to output in syslog format. This makes sense when running
  * as a service (where output might go to a log file, or the system journal)
  */
+#[allow(clippy::match_same_arms)]
 fn syslog_format(
     buf: &mut pretty_env_logger::env_logger::fmt::Formatter,
     record: &log::Record,

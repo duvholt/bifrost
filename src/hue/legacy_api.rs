@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
+use crate::hue::api::ColorGamut;
 use crate::hue::version::SwVersion;
 use crate::hue::{self, api, best_guess_timezone};
 use crate::resource::Resources;
@@ -60,7 +61,7 @@ impl Default for ApiShortConfig {
         Self {
             apiversion: hue::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
             bridgeid: "0000000000000000".to_string(),
-            datastoreversion: "163".to_string(),
+            datastoreversion: "176".to_string(),
             factorynew: false,
             mac: MacAddress::default(),
             modelid: hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
@@ -76,7 +77,7 @@ impl ApiShortConfig {
     #[must_use]
     pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
         Self {
-            bridgeid: hue::bridge_id(mac),
+            bridgeid: hue::bridge_id(mac).to_uppercase(),
             apiversion: version.get_legacy_apiversion(),
             swversion: version.get_legacy_swversion(),
             mac,
@@ -101,8 +102,8 @@ pub enum ApiResourceType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
-    devicetype: String,
-    generateclientkey: Option<bool>,
+    pub devicetype: String,
+    pub generateclientkey: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -167,13 +168,6 @@ impl Default for ApiBackup {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct DeviceTypes {
-    bridge: bool,
-    lights: Vec<Value>,
-    sensors: Vec<Value>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SwUpdate {
     #[serde(with = "date_format::legacy_utc")]
@@ -195,6 +189,8 @@ impl Default for SwUpdate {
 pub enum SwUpdateState {
     NoUpdates,
     Transferring,
+    ReadyToInstall,
+    AnyReadyToInstall,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -276,22 +272,22 @@ pub enum ApiAlert {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupAction {
-    on: bool,
+    pub on: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    bri: Option<u32>,
+    pub bri: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    hue: Option<u32>,
+    pub hue: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sat: Option<u32>,
+    pub sat: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    effect: Option<ApiEffect>,
+    pub effect: Option<ApiEffect>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    xy: Option<[f64; 2]>,
+    pub xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ct: Option<u16>,
-    alert: ApiAlert,
+    pub ct: Option<u16>,
+    pub alert: ApiAlert,
     #[serde(skip_serializing_if = "Option::is_none")]
-    colormode: Option<LightColorMode>,
+    pub colormode: Option<LightColorMode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -304,20 +300,20 @@ pub enum ApiGroupType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroup {
-    name: String,
-    lights: Vec<String>,
-    action: ApiGroupAction,
+    pub name: String,
+    pub lights: Vec<String>,
+    pub action: ApiGroupAction,
 
     #[serde(rename = "type")]
-    group_type: ApiGroupType,
-    class: String,
-    recycle: bool,
-    sensors: Vec<Value>,
-    state: Value,
+    pub group_type: ApiGroupType,
+    pub class: String,
+    pub recycle: bool,
+    pub sensors: Vec<Value>,
+    pub state: Value,
     #[serde(skip_serializing_if = "Value::is_null", default)]
-    stream: Value,
+    pub stream: Value,
     #[serde(skip_serializing_if = "Value::is_null", default)]
-    locations: Value,
+    pub locations: Value,
 }
 
 impl ApiGroup {
@@ -481,9 +477,9 @@ impl ApiLight {
                 "certified": true,
                 "control": {
                     "colorgamut": [
-                        [0.6915, 0.3083 ],
-                        [0.17,   0.7    ],
-                        [0.1532, 0.0475 ],
+                        [ColorGamut::GAMUT_C.red.x,   ColorGamut::GAMUT_C.red.y  ],
+                        [ColorGamut::GAMUT_C.green.x, ColorGamut::GAMUT_C.green.y],
+                        [ColorGamut::GAMUT_C.blue.x,  ColorGamut::GAMUT_C.blue.y ],
                     ],
                     "colorgamuttype": "C",
                     "ct": {
@@ -692,7 +688,7 @@ impl Default for ApiConfig {
             internetservices: ApiInternetServices::default(),
             linkbutton: Default::default(),
             portalconnection: ConnectionState::Disconnected,
-            portalservices: Default::default(),
+            portalservices: true,
             portalstate: PortalState::default(),
             proxyaddress: "none".to_string(),
             proxyport: Default::default(),
@@ -747,6 +743,13 @@ pub struct RulesCapacity {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
+pub struct SceneCapacity {
+    #[serde(flatten)]
+    pub scenes: Capacity,
+    pub lightstates: Capacity,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct StreamingCapacity {
     pub available: u32,
     pub total: u32,
@@ -758,6 +761,7 @@ pub struct Capabilities {
     pub lights: Capacity,
     pub sensors: SensorsCapacity,
     pub groups: Capacity,
+    pub scenes: SceneCapacity,
     pub schedules: Capacity,
     pub rules: RulesCapacity,
     pub resourcelinks: Capacity,
@@ -778,14 +782,18 @@ impl Capabilities {
                 zgp: Capacity::new(64, 63),
             },
             groups: Capacity::new(64, 60),
+            scenes: SceneCapacity {
+                scenes: Capacity::new(200, 175),
+                lightstates: Capacity::new(12600, 11025),
+            },
             schedules: Capacity::new(100, 95),
             rules: RulesCapacity {
                 available: 233,
                 total: 255,
                 conditions: Capacity::new(1500, 1451),
-                actions: Capacity::new(1000, 954),
+                actions: Capacity::new(1000, 1000),
             },
-            resourcelinks: Capacity::new(64, 59),
+            resourcelinks: Capacity::new(64, 64),
             streaming: StreamingCapacity {
                 available: 1,
                 total: 1,

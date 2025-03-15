@@ -8,7 +8,6 @@ pub mod legacy_api;
 pub mod scene_icons;
 pub mod update;
 pub mod version;
-pub mod zigbee;
 
 pub const HUE_BRIDGE_V2_MODEL_ID: &str = "BSB002";
 pub const HUE_BRIDGE_V2_DEFAULT_SWVERSION: u64 = 1_968_096_020;

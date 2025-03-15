@@ -44,7 +44,7 @@ fn compare(before: &Value, after: &Value, report: bool) -> ApiResult<bool> {
 
     if !all_diffs
         .iter()
-        .any(|x| x.1.values.map(|q| !false_positive(&q)).unwrap_or(true))
+        .any(|x| x.1.values.map_or(true, |q| !false_positive(&q)))
     {
         return Ok(true);
     }
@@ -96,7 +96,8 @@ pub struct Normalizer<'a> {
 }
 
 impl<'a> Normalizer<'a> {
-    pub fn new(name: &'a str, width: usize, report: bool) -> Self {
+    #[must_use]
+    pub const fn new(name: &'a str, width: usize, report: bool) -> Self {
         Self {
             name,
             index: 0,

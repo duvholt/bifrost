@@ -2,7 +2,9 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{error::ApiError, model::types::XY};
+use hue::xy::XY;
+
+use crate::error::ApiError;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(into = "String", try_from = "&str")]

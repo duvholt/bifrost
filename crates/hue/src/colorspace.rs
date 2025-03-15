@@ -4,7 +4,7 @@
 //
 // Original code by Thomas Lochmatter
 
-use crate::model::gamma::GammaCorrection;
+use crate::gamma::GammaCorrection;
 
 pub struct ColorSpace {
     rgb: [f64; 9],

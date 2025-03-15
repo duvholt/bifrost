@@ -8,7 +8,7 @@ use bifrost::error::ApiResult;
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Url to websocket (example: ws://example.org:8080/)
+    /// Url to websocket (example: <ws://example.org:8080/>)
     url: Uri,
 }
 
@@ -45,7 +45,7 @@ async fn main() -> ApiResult<()> {
 
         if json.topic.starts_with("bridge/") {
             log::info!("Got message [{}]", json.topic);
-            println!("{}", txt);
+            println!("{txt}");
         } else {
             log::info!("No more z2m bridge messages");
             break;

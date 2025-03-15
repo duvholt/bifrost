@@ -1,5 +1,3 @@
-#![doc = include_str!("../../../doc/hue-zigbee-format.md")]
-
 use std::io::{Cursor, Read, Write};
 
 use bitflags::bitflags;
@@ -7,12 +5,9 @@ use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
-use crate::error::{ApiError, ApiResult};
-use crate::model::flags::TakeFlag;
-use crate::model::types::XY;
-
-pub const WIDE_GAMUT_MAX_X: f64 = 0.7347;
-pub const WIDE_GAMUT_MAX_Y: f64 = 0.8264;
+use crate::error::{HueError, HueResult};
+use crate::flags::TakeFlag;
+use crate::xy::XY;
 
 #[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
 pub enum EffectType {
@@ -160,7 +155,7 @@ impl HueZigbeeUpdate {
         mut self,
         style: GradientStyle,
         points: Vec<XY>,
-    ) -> ApiResult<Self> {
+    ) -> HueResult<Self> {
         self.gradient_colors = Some(GradientColors {
             header: GradientUpdateHeader {
                 nlights: u8::try_from(points.len())?,
@@ -194,7 +189,7 @@ impl HueZigbeeUpdate {
 
 #[allow(clippy::cast_possible_truncation)]
 impl HueZigbeeUpdate {
-    pub fn from_reader(rdr: &mut impl Read) -> ApiResult<Self> {
+    pub fn from_reader(rdr: &mut impl Read) -> HueResult<Self> {
         let mut hz = Self::default();
 
         let mut flags = Flags::from_bits(rdr.read_u16::<LE>()?).unwrap();
@@ -225,7 +220,7 @@ impl HueZigbeeUpdate {
         if flags.take(Flags::EFFECT_TYPE) {
             let data = rdr.read_u8()?;
             hz.effect_type =
-                Some(EffectType::from_primitive(data).ok_or(ApiError::HueZigbeeDecodeError)?);
+                Some(EffectType::from_primitive(data).ok_or(HueError::HueZigbeeDecodeError)?);
         }
 
         if flags.take(Flags::GRADIENT_COLORS) {
@@ -237,16 +232,9 @@ impl HueZigbeeUpdate {
 
             let mut points = vec![];
             for _ in 0..header.nlights {
-                let mut bytes = vec![0; 3];
+                let mut bytes = [0u8; 3];
                 rdr.read_exact(&mut bytes)?;
-
-                let x = u16::from(bytes[0]) | u16::from(bytes[1] & 0x0F) << 8;
-                let y = u16::from(bytes[2]) << 4 | u16::from(bytes[1] >> 4);
-
-                points.push(XY {
-                    x: f64::from(x) * (WIDE_GAMUT_MAX_X / f64::from(0xFFF)),
-                    y: f64::from(y) * (WIDE_GAMUT_MAX_Y / f64::from(0xFFF)),
-                });
+                points.push(XY::from_quant(bytes));
             }
             hz.gradient_colors = Some(GradientColors { header, points });
         }
@@ -265,20 +253,20 @@ impl HueZigbeeUpdate {
         if flags.is_empty() {
             Ok(hz)
         } else {
-            Err(ApiError::HueZigbeeUnknownFlags(flags.bits()))
+            Err(HueError::HueZigbeeUnknownFlags(flags.bits()))
         }
     }
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 impl HueZigbeeUpdate {
-    pub fn to_vec(&self) -> ApiResult<Vec<u8>> {
+    pub fn to_vec(&self) -> HueResult<Vec<u8>> {
         let mut cur = Cursor::new(vec![]);
         self.serialize(&mut cur)?;
         Ok(cur.into_inner())
     }
 
-    pub fn serialize(&self, wtr: &mut impl Write) -> ApiResult<()> {
+    pub fn serialize(&self, wtr: &mut impl Write) -> HueResult<()> {
         #[allow(clippy::ref_option)]
         fn opt_to_flag<T>(flags: &mut Flags, opt: &Option<T>, flag: Flags) {
             if opt.is_some() {
@@ -329,18 +317,7 @@ impl HueZigbeeUpdate {
             wtr.write_u8(len)?;
             wtr.write_all(&grad_color.header.pack()?)?;
             for point in &grad_color.points {
-                let x = (point.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
-                let y = (point.y * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_Y) + (0.5 / 4095.))) as u16;
-                debug_assert!(x < 0x1000);
-                debug_assert!(y < 0x1000);
-
-                let bytes: [u8; 3] = [
-                    (x & 0xFF) as u8,
-                    (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
-                    (y >> 4 & 0xFF) as u8,
-                ];
-
-                wtr.write_all(&bytes)?;
+                wtr.write_all(&point.to_quant())?;
             }
         }
 

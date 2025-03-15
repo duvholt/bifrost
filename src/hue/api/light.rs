@@ -4,8 +4,9 @@ use std::ops::{AddAssign, Sub};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use hue::xy::XY;
+
 use crate::hue::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
-use crate::model::types::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Light {
@@ -100,9 +101,9 @@ impl Light {
             }),
             color: None,
             color_temperature: None,
-            color_temperature_delta: Some(Stub {}),
+            color_temperature_delta: Some(Stub),
             dimming: None,
-            dimming_delta: Some(Stub {}),
+            dimming_delta: Some(Stub),
             dynamics: Some(LightDynamics::default()),
             effects: None,
             effects_v2: None,
@@ -464,17 +465,17 @@ pub enum LightEffect {
 
 impl LightEffect {
     pub const ALL: [Self; 11] = [
+        Self::NoEffect,
+        Self::Candle,
+        Self::Fire,
         Self::Prism,
+        Self::Sparkle,
         Self::Opal,
         Self::Glisten,
-        Self::Sparkle,
-        Self::Fire,
-        Self::Candle,
         Self::Underwater,
         Self::Cosmos,
         Self::Sunbeam,
         Self::Enchant,
-        Self::NoEffect,
     ];
 }
 

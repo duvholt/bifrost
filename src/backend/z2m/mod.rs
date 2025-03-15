@@ -14,6 +14,9 @@ use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
+use ::hue::clamp::Clamp;
+use ::hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
+
 use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
@@ -28,8 +31,6 @@ use crate::hue::api::{
     SceneStatusUpdate, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use crate::hue::scene_icons;
-use crate::hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
-use crate::model::clamp::Clamp;
 use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;

@@ -1,6 +1,18 @@
 [package]
 name = "bifrost"
 version = "0.1.0"
+
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[workspace.package]
 edition = "2021"
 authors = ["Christian Iversen <ci@iversenit.dk>"]
 rust-version = "1.76"
@@ -21,6 +33,30 @@ keywords = [
     "phillips-hue",
 ]
 
+[workspace]
+members = [
+    "crates/hue",
+    "crates/zcl",
+]
+
+[workspace.lints.rust]
+unstable_features = "forbid"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+all         = { level = "warn", priority = -1 }
+correctness = { level = "warn", priority = -1 }
+pedantic    = { level = "warn", priority = -1 }
+cargo       = { level = "warn", priority = -1 }
+nursery     = { level = "warn", priority = -1 }
+perf        = { level = "warn", priority = -1 }
+style       = { level = "warn", priority = -1 }
+
+multiple_crate_versions = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+
 [features]
 default = ["server", "server-banner"]
 
@@ -31,29 +67,29 @@ server-banner = ["server", "dep:termcolor", "dep:itertools"]
 axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart"], default-features = false }
 axum-core = "0.5.0"
 axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls-no-provider"], default-features = false }
-bytes = "1.9.0"
+bytes = "1.10.0"
 chrono = { version = "0.4.39", features = ["clock", "serde"], default-features = false }
-clap = { version = "4.5.27", features = ["std", "color", "derive"], default-features = false }
-config = { version = "0.15.7", default-features = false, features = ["yaml"] }
+clap = { version = "4.5.29", features = ["std", "color", "derive"], default-features = false }
+config = { version = "0.15.8", default-features = false, features = ["yaml"] }
 futures = "0.3.31"
 hyper = "1.6.0"
 iana-time-zone = "0.1.61"
 log = "0.4.25"
-mac_address = { version = "1.1.7", features = ["serde"] }
-mdns-sd = "0.13.1"
+mac_address = { version = "1.1.8", features = ["serde"] }
+mdns-sd = "0.13.2"
 mime = "0.3.17"
 rand = "0.9.0"
 serde = { version = "1.0.217", features = ["derive"], default-features = false }
 serde_json = "1.0.138"
 serde_yml = "0"
 thiserror = "2.0.11"
-tokio = { version = "1.43.0", features = ["rt-multi-thread"], default-features = false }
+tokio = { version = "1.43.0", features = ["io-util", "process", "rt-multi-thread"], default-features = false }
 tokio-stream = { version = "0.1.17", features = ["sync"], default-features = false }
 tokio-tungstenite = "0.26.1"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["normalize-path", "trace"], default-features = false }
 tracing = "0.1.41"
-uuid = { version = "1.12.1", features = ["serde", "v4", "v5"] }
+uuid = { version = "1.13.1", features = ["serde", "v4", "v5"] }
 pretty_env_logger = "0.5.0"
 camino = { version = "1.1.9", features = ["serde1"] }
 x509-cert = { version = "0.2.5", features = ["builder", "hazmat", "pem"], default-features = false }
@@ -68,12 +104,12 @@ termcolor = { version = "1.4.1", optional = true }
 itertools = { version = "0.14.0", optional = true }
 reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
 url = { version = "2.5.4", features = ["serde"] }
-clap-stdin = "0.6.0"
-packed_struct = "0.10.1"
-bitflags = "2.8.0"
-byteorder = "1.5.0"
 hex = "0.4.3"
 async-trait = "0.1.86"
+hue = { version = "0.1.0", path = "crates/hue" }
+zcl = { path = "crates/zcl" }
 
 [dev-dependencies]
+clap-stdin = "0.6.0"
 json_diff_ng = { version = "0.6.0", default-features = false }
+packed_struct = "0.10.1"

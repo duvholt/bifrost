@@ -41,9 +41,6 @@ pub enum ApiError {
     FromHexError(#[from] hex::FromHexError),
 
     #[error(transparent)]
-    PackedStructError(#[from] packed_struct::PackingError),
-
-    #[error(transparent)]
     MdnsSdError(#[from] mdns_sd::Error),
 
     #[error(transparent)]
@@ -87,6 +84,12 @@ pub enum ApiError {
 
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+
+    #[error(transparent)]
+    UuidError(#[from] uuid::Error),
+
+    #[error(transparent)]
+    HueError(#[from] hue::error::HueError),
 
     /* zigbee2mqtt errors */
     #[error("Unexpected eof on z2m socket")]
@@ -136,12 +139,6 @@ pub enum ApiError {
 
     #[error("Invalid hex color")]
     InvalidHexColor,
-
-    #[error("Failed to decode Hue Zigbee Update")]
-    HueZigbeeDecodeError,
-
-    #[error("Failed to decode Hue Zigbee Update: Unknown flags {0:04x}")]
-    HueZigbeeUnknownFlags(u16),
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;

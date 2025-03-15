@@ -1,11 +1,15 @@
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 use std::io::{stdin, BufRead, Cursor};
 
-use bifrost::error::ApiResult;
-use bifrost::hue::zigbee::{Flags, GradientColors, HueZigbeeUpdate};
 use itertools::Itertools;
 use log::warn;
 use packed_struct::PrimitiveEnumDynamicStr;
 
+use hue::zigbee::{Flags, GradientColors, HueZigbeeUpdate};
+
+use bifrost::error::ApiResult;
+
+#[must_use]
 pub fn present_gradcolors(grad: &GradientColors) -> String {
     let mut res = format!(
         "{}-{}-{}-{:<9}",
@@ -23,7 +27,7 @@ pub fn present_gradcolors(grad: &GradientColors) -> String {
 }
 
 fn show(data: &[u8]) -> ApiResult<()> {
-    let flags = Flags::from_bits((data[0] as u16) | (data[1] as u16) << 8).unwrap();
+    let flags = Flags::from_bits(u16::from(data[0]) | (u16::from(data[1]) << 8)).unwrap();
 
     let mut cur = Cursor::new(data);
     let hz = HueZigbeeUpdate::from_reader(&mut cur)?;

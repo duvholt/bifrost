@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use hue::xy::XY;
+
 use crate::hue::api::{LightGradientUpdate, On};
 use crate::model::hexcolor::HexColor;
-use crate::model::types::XY;
 
 #[allow(clippy::pub_underscore_fields)]
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

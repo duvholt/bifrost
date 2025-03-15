@@ -1,4 +1,4 @@
-#![allow(unused_variables)]
+#![allow(unused_variables, clippy::match_same_arms)]
 
 use std::io::stdin;
 
