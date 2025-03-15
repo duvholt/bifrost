@@ -152,7 +152,6 @@ impl Z2mBackend {
         self.map.insert(name.to_string(), link_light.rid);
         self.rmap.insert(link_light.rid, name.to_string());
 
-        let mut res = self.state.lock().await;
         let mut light = Light::new(link_device, metadata);
 
         light.dimming = expose
@@ -245,6 +244,7 @@ impl Z2mBackend {
             status: ZigbeeConnectivityStatus::Connected,
         };
 
+        let mut res = self.state.lock().await;
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
         res.add(&link_light, Resource::Light(light))?;
