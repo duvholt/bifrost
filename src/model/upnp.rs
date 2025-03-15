@@ -13,7 +13,7 @@ pub struct Root {
 
 impl Root {
     #[must_use]
-    pub fn new(url_base: Url, device: Device) -> Self {
+    pub const fn new(url_base: Url, device: Device) -> Self {
         Self {
             spec_version: SpecVersion::VERSION_1,
             url_base,
