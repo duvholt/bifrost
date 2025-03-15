@@ -40,6 +40,9 @@ pub enum ApiError {
     FromHexError(#[from] hex::FromHexError),
 
     #[error(transparent)]
+    UrlParseError(#[from] url::ParseError),
+
+    #[error(transparent)]
     MdnsSdError(#[from] mdns_sd::Error),
 
     #[error(transparent)]
