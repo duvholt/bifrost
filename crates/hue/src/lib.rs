@@ -9,6 +9,7 @@ pub mod error;
 pub mod event;
 pub mod flags;
 pub mod gamma;
+pub mod hs;
 pub mod legacy_api;
 pub mod scene_icons;
 pub mod stream;
