@@ -47,7 +47,7 @@ mod prefixed_uuid {
     where
         S: Serializer,
     {
-        let s = format!("{PREFIX}:{value}");
+        let s = format!("{PREFIX}{value}");
         serializer.serialize_str(&s)
     }
 
