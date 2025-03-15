@@ -222,12 +222,33 @@ pub struct Service {
 
 #[cfg(test)]
 mod tests {
+    use serde::{Deserialize, Serialize};
     use url::Url;
     use uuid::{uuid, Uuid};
 
     const UUID: Uuid = uuid!("01234567-89ab-cdef-0123-456789abcdef");
 
     use crate::model::upnp::{Device, Icon, Service};
+
+    #[test]
+    fn uuid_prefix() {
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+        struct Prefixed {
+            #[serde(with = "super::prefixed_uuid")]
+            uuid: Uuid,
+        }
+
+        let orig = Prefixed { uuid: UUID };
+        let json = serde_json::to_string(&orig).unwrap();
+
+        let expected = format!(r#"{{"uuid":"uuid:{UUID}"}}"#);
+
+        assert_eq!(json, expected);
+
+        let parsed: Prefixed = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(orig, parsed);
+    }
 
     #[test]
     fn serialize_service() {
