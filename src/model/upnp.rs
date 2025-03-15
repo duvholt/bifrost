@@ -256,7 +256,9 @@ mod tests {
 
     const UUID: Uuid = uuid!("01234567-89ab-cdef-0123-456789abcdef");
 
-    use crate::model::upnp::{to_xml, Device, Icon, Service, XML_DOCTYPE};
+    use crate::model::upnp::{
+        to_xml, Device, Icon, Root, Service, SCHEMA_DEVICE_BASIC, XMLNS, XML_DOCTYPE,
+    };
 
     #[test]
     fn uuid_prefix() {
@@ -384,6 +386,58 @@ mod tests {
             &device_body,
             "</deviceList>",
             "</Device>",
+        ]
+        .concat();
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn serialize_root() {
+        let friendly_name = "Plumbus";
+        let manufacturer = "Plumbubo Prime 51b";
+        let model_name = "Plumbus 9000";
+        let presentation_url = "index.html";
+        let model_description = "Special Fleep Edition";
+        let model_url = "portal://51b.prime.plumbubo/plumbus9000";
+        let manufacturer_url = "portal:://51b.prime.plumbubo";
+        let serial_number = "C137";
+        let model_number = "PB9000";
+        let base_url = "http://example.org/base";
+        let udn = UUID;
+        let base_url = Url::parse(base_url).unwrap();
+        let dev = Device::new(friendly_name, manufacturer, model_name, udn)
+            .with_manufacturer_url(Url::parse(manufacturer_url).unwrap())
+            .with_presentation_url(presentation_url)
+            .with_model_description(model_description)
+            .with_model_url(Url::parse(model_url).unwrap())
+            .with_model_number(model_number)
+            .with_serial_number(serial_number);
+        let root = Root::new(base_url.clone(), dev);
+
+        let a = to_xml(&root).unwrap();
+        let b = [
+            XML_DOCTYPE,
+            &format!("<root xmlns=\"{XMLNS}\">"),
+            "<specVersion>",
+            "<major>1</major>",
+            "<minor>0</minor>",
+            "</specVersion>",
+            &format!("<URLBase>{base_url}</URLBase>"),
+            "<device>",
+            &format!("<deviceType>{SCHEMA_DEVICE_BASIC}</deviceType>"),
+            &format!("<friendlyName>{friendly_name}</friendlyName>"),
+            &format!("<manufacturer>{manufacturer}</manufacturer>"),
+            &format!("<manufacturerURL>{manufacturer_url}</manufacturerURL>"),
+            &format!("<modelDescription>{model_description}</modelDescription>"),
+            &format!("<modelName>{model_name}</modelName>"),
+            &format!("<modelNumber>{model_number}</modelNumber>"),
+            &format!("<modelURL>{model_url}</modelURL>"),
+            &format!("<serialNumber>{serial_number}</serialNumber>"),
+            &format!("<UDN>uuid:{UUID}</UDN>"),
+            &format!("<presentationURL>{presentation_url}</presentationURL>"),
+            "</device>",
+            "</root>",
         ]
         .concat();
 
