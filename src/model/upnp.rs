@@ -216,8 +216,16 @@ impl Device {
 }
 
 pub fn to_xml(value: impl Serialize) -> Result<String, quick_xml::se::SeError> {
-    let mut res = XML_DOCTYPE.to_string();
-    quick_xml::se::to_writer(&mut res, &value)?;
+    let mut res = XML_DOCTYPE.to_string() + "\n";
+
+    // set up a serializer with indentation that appends to `res`
+    let mut ser = quick_xml::se::Serializer::new(&mut res);
+    ser.indent(' ', 2);
+
+    // serialize value, with final newline
+    value.serialize(ser)?;
+    res.push('\n');
+
     Ok(res)
 }
 
