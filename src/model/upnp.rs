@@ -171,9 +171,9 @@ impl Device {
     }
 
     #[must_use]
-    pub fn with_serial_number(self, value: String) -> Self {
+    pub fn with_serial_number(self, value: impl Into<String>) -> Self {
         Self {
-            serial_number: Some(value),
+            serial_number: Some(value.into()),
             ..self
         }
     }
