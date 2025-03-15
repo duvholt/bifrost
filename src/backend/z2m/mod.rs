@@ -22,11 +22,10 @@ use hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperatureUpdate,
     ColorUpdate, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
-    LightEffect, LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2,
-    LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource,
-    ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
-    SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
+    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
+    RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall,
+    SceneStatus, SceneStatusUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -174,21 +173,8 @@ impl Z2mBackend {
 
         if effects {
             log::trace!("Detected Hue light: enabling effects");
-            light.effects = Some(LightEffects {
-                status_values: LightEffect::ALL.into(),
-                status: LightEffect::NoEffect,
-                effect_values: LightEffect::ALL.into(),
-            });
-            light.effects_v2 = Some(LightEffectsV2 {
-                action: LightEffectValues {
-                    effect_values: LightEffect::ALL.into(),
-                },
-                status: LightEffectStatus {
-                    effect: LightEffect::NoEffect,
-                    effect_values: LightEffect::ALL.into(),
-                    parameters: None,
-                },
-            });
+            light.effects = Some(LightEffects::all());
+            light.effects_v2 = Some(LightEffectsV2::all());
         }
 
         let segments = if gradient.is_some() {
