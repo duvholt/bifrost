@@ -193,6 +193,16 @@ impl Device {
             ..self
         }
     }
+
+    #[must_use]
+    pub fn with_device(mut self, value: Self) -> Self {
+        self.add_device(value);
+        self
+    }
+
+    pub fn add_device(&mut self, value: Self) {
+        self.device_list.push(value);
+    }
 }
 
 pub fn to_xml(value: impl Serialize) -> Result<String, quick_xml::se::SeError> {
@@ -328,6 +338,41 @@ mod tests {
             "<modelName>Plumbus 9000</modelName>",
             "<modelURL/>",
             "<UDN>uuid:01234567-89ab-cdef-0123-456789abcdef</UDN>",
+            "</Device>",
+        ]
+        .concat();
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn serialize_device_with_subdevice() {
+        let friendly_name = "Plumbus";
+        let manufacturer = "Plumbubo Prime 51b";
+        let model_name = "Plumbus 9000";
+        let udn = UUID;
+        let mut dev = Device::new(friendly_name, manufacturer, model_name, udn);
+
+        dev.device_list.push(dev.clone());
+
+        let device_body = [
+            "<deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>",
+            "<friendlyName>Plumbus</friendlyName>",
+            "<manufacturer>Plumbubo Prime 51b</manufacturer>",
+            "<modelName>Plumbus 9000</modelName>",
+            "<modelURL/>",
+            "<UDN>uuid:01234567-89ab-cdef-0123-456789abcdef</UDN>",
+        ]
+        .concat();
+
+        let a = to_xml(&dev).unwrap();
+        let b = [
+            XML_DOCTYPE,
+            "<Device>",
+            &device_body,
+            "<deviceList>",
+            &device_body,
+            "</deviceList>",
             "</Device>",
         ]
         .concat();
