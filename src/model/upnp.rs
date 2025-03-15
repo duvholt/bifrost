@@ -223,7 +223,9 @@ pub struct Service {
 #[cfg(test)]
 mod tests {
     use url::Url;
-    use uuid::Uuid;
+    use uuid::{uuid, Uuid};
+
+    const UUID: Uuid = uuid!("01234567-89ab-cdef-0123-456789abcdef");
 
     use crate::model::upnp::{Device, Icon, Service};
 
@@ -284,7 +286,7 @@ mod tests {
         let friendly_name = "Plumbus";
         let manufacturer = "Plumbubo Prime 51b";
         let model_name = "Plumbus 9000";
-        let udn = Uuid::nil();
+        let udn = UUID;
         let dev = Device::new(friendly_name, manufacturer, model_name, udn);
 
         let a = serde_xml_rust::to_string(&dev).unwrap();
@@ -296,7 +298,7 @@ mod tests {
             "<manufacturer>Plumbubo Prime 51b</manufacturer>",
             "<modelName>Plumbus 9000</modelName>",
             "<modelURL />",
-            "<UDN>uuid::00000000-0000-0000-0000-000000000000</UDN>",
+            "<UDN>uuid:01234567-89ab-cdef-0123-456789abcdef</UDN>",
             "</Device>",
         ]
         .join("");
