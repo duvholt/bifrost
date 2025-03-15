@@ -219,3 +219,62 @@ pub struct Service {
     #[serde(rename = "eventSubURL")]
     event_sub_url: Url,
 }
+
+#[cfg(test)]
+mod tests {
+    use url::Url;
+
+    use crate::model::upnp::{Icon, Service};
+
+    #[test]
+    fn serialize_service() {
+        let svc = Service {
+            service_type: Url::parse("http://service_type/").unwrap(),
+            service_id: Url::parse("http://service_id/").unwrap(),
+            scpd_url: Url::parse("http://scpd_url/").unwrap(),
+            control_url: Url::parse("http://control_url/").unwrap(),
+            event_sub_url: Url::parse("http://event_sub_url/").unwrap(),
+        };
+
+        let a = serde_xml_rust::to_string(&svc).unwrap();
+        let b = [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<Service>",
+            "<serviceType>http://service_type/</serviceType>",
+            "<serviceId>http://service_id/</serviceId>",
+            "<SCPDURL>http://scpd_url/</SCPDURL>",
+            "<controlURL>http://control_url/</controlURL>",
+            "<eventSubURL>http://event_sub_url/</eventSubURL>",
+            "</Service>",
+        ]
+        .join("");
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn serialize_icon() {
+        let icon = Icon {
+            mimetype: "mime/type".into(),
+            width: 42,
+            height: 32,
+            depth: 17,
+            url: Url::parse("http://example.org/icon.png").unwrap(),
+        };
+
+        let a = serde_xml_rust::to_string(&icon).unwrap();
+        let b = [
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<Icon>",
+            "<mimetype>mime/type</mimetype>",
+            "<width>42</width>",
+            "<height>32</height>",
+            "<depth>17</depth>",
+            "<url>http://example.org/icon.png</url>",
+            "</Icon>",
+        ]
+        .join("");
+
+        assert_eq!(a, b);
+    }
+}
