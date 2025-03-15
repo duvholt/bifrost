@@ -1,0 +1,221 @@
+use serde::{Deserialize, Serialize};
+use url::Url;
+use uuid::Uuid;
+
+const SCHEMA_DEVICE_BASIC: &str = "urn:schemas-upnp-org:device:Basic:1";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Root {
+    pub spec_version: SpecVersion,
+    pub url_base: Url,
+    pub device: Device,
+}
+
+impl Root {
+    #[must_use]
+    pub fn new(url_base: Url, device: Device) -> Self {
+        Self {
+            spec_version: SpecVersion::VERSION_1,
+            url_base,
+            device,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecVersion {
+    pub major: u32,
+    pub minor: u32,
+}
+
+impl SpecVersion {
+    pub const VERSION_1: Self = Self { major: 1, minor: 0 };
+}
+
+impl Default for SpecVersion {
+    fn default() -> Self {
+        Self::VERSION_1
+    }
+}
+
+mod prefixed_uuid {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use uuid::Uuid;
+    const PREFIX: &str = "uuid:";
+
+    pub fn serialize<S>(value: &Uuid, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = format!("{PREFIX}:{value}");
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Uuid, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        let uuid = s
+            .strip_prefix(PREFIX)
+            .ok_or_else(|| D::Error::custom("Value does not start with 'uuid:' prefix"))?;
+
+        Uuid::parse_str(uuid).map_err(D::Error::custom)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Device {
+    pub device_type: String,
+
+    pub friendly_name: String,
+
+    pub manufacturer: String,
+
+    pub model_name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manufacturer_url: Option<Url>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_description: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_number: Option<String>,
+
+    #[serde(rename = "modelURL")]
+    pub model_url: Option<Url>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub serial_number: Option<String>,
+
+    #[serde(rename = "UDN", with = "prefixed_uuid")]
+    pub udn: Uuid,
+
+    #[serde(rename = "UPC", skip_serializing_if = "Option::is_none")]
+    pub upc: Option<String>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub icon_list: Vec<Icon>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub service_list: Vec<Service>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub device_list: Vec<Device>,
+
+    #[serde(rename = "presentationURL", skip_serializing_if = "Option::is_none")]
+    pub presentation_url: Option<String>,
+}
+
+impl Device {
+    pub fn new(
+        friendly_name: impl AsRef<str>,
+        manufacturer: impl AsRef<str>,
+        model_name: impl AsRef<str>,
+        udn: Uuid,
+    ) -> Self {
+        Self {
+            device_type: SCHEMA_DEVICE_BASIC.to_string(),
+            friendly_name: friendly_name.as_ref().into(),
+            manufacturer: manufacturer.as_ref().into(),
+            model_name: model_name.as_ref().into(),
+            manufacturer_url: None,
+            model_description: None,
+            model_number: None,
+            model_url: None,
+            serial_number: None,
+            udn,
+            upc: None,
+            icon_list: vec![],
+            service_list: vec![],
+            device_list: vec![],
+            presentation_url: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_manufacturer_url(self, value: Url) -> Self {
+        Self {
+            manufacturer_url: Some(value),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_model_description(self, value: impl Into<String>) -> Self {
+        Self {
+            model_description: Some(value.into()),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_model_number(self, value: impl Into<String>) -> Self {
+        Self {
+            model_number: Some(value.into()),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_model_url(self, value: Url) -> Self {
+        Self {
+            model_url: Some(value),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_serial_number(self, value: String) -> Self {
+        Self {
+            serial_number: Some(value),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_upc(self, value: String) -> Self {
+        Self {
+            upc: Some(value),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_presentation_url(self, value: impl Into<String>) -> Self {
+        Self {
+            presentation_url: Some(value.into()),
+            ..self
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Icon {
+    mimetype: String,
+    width: u32,
+    height: u32,
+    depth: u32,
+    url: Url,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Service {
+    #[serde(rename = "serviceType")]
+    service_type: Url,
+
+    #[serde(rename = "serviceId")]
+    service_id: Url,
+
+    #[serde(rename = "SCPDURL")]
+    scpd_url: Url,
+
+    #[serde(rename = "controlURL")]
+    control_url: Url,
+
+    #[serde(rename = "eventSubURL")]
+    event_sub_url: Url,
+}
