@@ -1,30 +1,28 @@
 use std::collections::HashMap;
 
-use axum::{
-    extract::{Path, State},
-    response::IntoResponse,
-    routing::{get, post, put},
-    Router,
-};
-
+use axum::extract::{Path, State};
+use axum::response::IntoResponse;
+use axum::routing::{get, post, put};
+use axum::Router;
 use bytes::Bytes;
 use log::{info, warn};
 use serde_json::{json, Value};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
-use crate::error::{ApiError, ApiResult};
-
 use crate::backend::BackendRequest;
+use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
     Device, GroupedLight, GroupedLightUpdate, Light, LightUpdate, On, RType, ResourceLink, Room,
     Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use crate::hue::legacy_api::{
-    ApiGroup, ApiGroupActionUpdate, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
-    ApiUserConfig, Capabilities, HueResult, NewUser, NewUserReply,
+    ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
+    ApiResourceType, ApiScene, ApiSensor, ApiUserConfig, Capabilities, HueApiResult, NewUser,
+    NewUserReply,
 };
 use crate::resource::Resources;
+use crate::routes::auth::STANDARD_CLIENT_KEY;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
@@ -33,13 +31,18 @@ async fn get_api_config(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn post_api(bytes: Bytes) -> ApiResult<impl IntoResponse> {
+    info!("post: {bytes:?}");
     let json: NewUser = serde_json::from_slice(&bytes)?;
-    info!("post: {json:?}");
+
     let res = NewUserReply {
-        clientkey: Uuid::new_v4(),
-        username: Uuid::new_v4(),
+        clientkey: if json.generateclientkey {
+            Some(STANDARD_CLIENT_KEY.to_hex())
+        } else {
+            None
+        },
+        username: Uuid::new_v4().as_simple().to_string(),
     };
-    Ok(Json(vec![HueResult::Success(res)]))
+    Ok(Json(vec![HueApiResult::Success(res)]))
 }
 
 fn get_lights(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiLight>> {
@@ -57,8 +60,12 @@ fn get_lights(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiLight
     Ok(lights)
 }
 
-fn get_groups(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiGroup>> {
+fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<String, ApiGroup>> {
     let mut rooms = HashMap::new();
+
+    if group_0 {
+        rooms.insert("0".into(), ApiGroup::make_group_0());
+    }
 
     for rr in res.get_resources_by_type(RType::Room) {
         let room: Room = rr.obj.try_into()?;
@@ -86,7 +93,7 @@ fn get_groups(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiGroup
     Ok(rooms)
 }
 
-fn get_scenes(owner: &Uuid, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
+fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
     let mut scenes = HashMap::new();
 
     for rr in res.get_resources_by_type(RType::Scene) {
@@ -94,7 +101,7 @@ fn get_scenes(owner: &Uuid, res: &MutexGuard<Resources>) -> ApiResult<HashMap<St
 
         scenes.insert(
             res.get_id_v1(rr.id)?,
-            ApiScene::from_scene(res, *owner, scene)?,
+            ApiScene::from_scene(res, owner.to_string(), scene)?,
         );
     }
 
@@ -104,31 +111,31 @@ fn get_scenes(owner: &Uuid, res: &MutexGuard<Resources>) -> ApiResult<HashMap<St
 #[allow(clippy::zero_sized_map_values)]
 async fn get_api_user(
     state: State<AppState>,
-    Path(username): Path<Uuid>,
+    Path(username): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
     let lock = state.res.lock().await;
 
     Ok(Json(ApiUserConfig {
-        config: state.api_config(username).await,
-        groups: get_groups(&lock)?,
+        config: state.api_config(username.clone()).await,
+        groups: get_groups(&lock, false)?,
         lights: get_lights(&lock)?,
         resourcelinks: HashMap::new(),
         rules: HashMap::new(),
         scenes: get_scenes(&username, &lock)?,
         schedules: HashMap::new(),
-        sensors: HashMap::new(),
+        sensors: HashMap::from([(1, ApiSensor::builtin_daylight_sensor())]),
     }))
 }
 
 async fn get_api_user_resource(
     State(state): State<AppState>,
-    Path((username, resource)): Path<(Uuid, ApiResourceType)>,
+    Path((username, artype)): Path<(String, ApiResourceType)>,
 ) -> ApiResult<Json<Value>> {
     let lock = &state.res.lock().await;
-    match resource {
+    match artype {
         ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await))),
         ApiResourceType::Lights => Ok(Json(json!(get_lights(lock)?))),
-        ApiResourceType::Groups => Ok(Json(json!(get_groups(lock)?))),
+        ApiResourceType::Groups => Ok(Json(json!(get_groups(lock, false)?))),
         ApiResourceType::Scenes => Ok(Json(json!(get_scenes(&username, lock)?))),
         ApiResourceType::Resourcelinks
         | ApiResourceType::Rules
@@ -139,7 +146,7 @@ async fn get_api_user_resource(
 }
 
 async fn post_api_user_resource(
-    Path((_username, resource)): Path<(Uuid, ApiResourceType)>,
+    Path((_username, resource)): Path<(String, ApiResourceType)>,
     Json(req): Json<Value>,
 ) -> ApiResult<Json<Value>> {
     warn!("POST v1 user resource unsupported");
@@ -153,13 +160,13 @@ async fn put_api_user_resource(
 ) -> impl IntoResponse {
     warn!("PUT v1 user resource {req:?}");
     //Json(format!("user {username} resource {resource}"))
-    Json(vec![HueResult::Success(req)])
+    Json(vec![HueApiResult::Success(req)])
 }
 
 #[allow(clippy::significant_drop_tightening)]
 async fn get_api_user_resource_id(
     State(state): State<AppState>,
-    Path((username, resource, id)): Path<(Uuid, ApiResourceType, u32)>,
+    Path((username, resource, id)): Path<(String, ApiResourceType, u32)>,
 ) -> ApiResult<impl IntoResponse> {
     log::debug!("GET v1 username={username} resource={resource:?} id={id}");
     let result = match resource {
@@ -182,7 +189,7 @@ async fn get_api_user_resource_id(
         }
         ApiResourceType::Groups => {
             let lock = state.res.lock().await;
-            let groups = get_groups(&lock)?;
+            let groups = get_groups(&lock, true)?;
             let group = groups
                 .get(&id.to_string())
                 .ok_or(ApiError::V1NotFound(id))?;
@@ -197,10 +204,10 @@ async fn get_api_user_resource_id(
 
 async fn put_api_user_resource_id(
     State(state): State<AppState>,
-    Path((_username, resource, id, path)): Path<(String, ApiResourceType, u32, String)>,
+    Path((_username, artype, id, path)): Path<(String, ApiResourceType, u32, String)>,
     Json(req): Json<Value>,
 ) -> ApiResult<Json<Value>> {
-    match resource {
+    match artype {
         ApiResourceType::Lights => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "state" {
@@ -232,8 +239,10 @@ async fn put_api_user_resource_id(
             }
 
             let lock = state.res.lock().await;
+
             let uuid = lock.from_id_v1(id)?;
             let link = ResourceLink::new(uuid, RType::Room);
+
             let room: &Room = lock.get(&link)?;
             let glight = room.grouped_light_service().unwrap();
 
@@ -250,7 +259,7 @@ async fn put_api_user_resource_id(
                     lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
                     drop(lock);
 
-                    V1Reply::for_group(id, &path).with_light_state_update(&upd)?
+                    V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?
                 }
                 ApiGroupActionUpdate::GroupUpdate(upd) => {
                     let scene_id = upd.scene.parse()?;
@@ -263,7 +272,7 @@ async fn put_api_user_resource_id(
                     lock.backend_request(BackendRequest::SceneUpdate(rlink, updv2))?;
                     drop(lock);
 
-                    V1Reply::for_group(id, &path).add("scene", upd.scene)?
+                    V1Reply::for_group_path(id, &path).add("scene", upd.scene)?
                 }
             };
 
@@ -275,7 +284,7 @@ async fn put_api_user_resource_id(
         | ApiResourceType::Scenes
         | ApiResourceType::Schedules
         | ApiResourceType::Sensors
-        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(resource)),
+        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(artype)),
     }
 }
 
@@ -293,6 +302,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(post_api))
         .route("/config", get(get_api_config))
+        .route("/nouser/config", get(get_api_config))
         .route("/newUser", get(workaround_iconnect_hue))
         .route("/{user}", get(get_api_user))
         .route("/{user}/{rtype}", get(get_api_user_resource))
@@ -300,8 +310,4 @@ pub fn router() -> Router<AppState> {
         .route("/{user}/{rtype}", put(put_api_user_resource))
         .route("/{user}/{rtype}/{id}", get(get_api_user_resource_id))
         .route("/{user}/{rtype}/{id}/{key}", put(put_api_user_resource_id))
-}
-
-pub fn auth_router() -> Router<AppState> {
-    Router::new().route("/v1", get(get_api_config))
 }

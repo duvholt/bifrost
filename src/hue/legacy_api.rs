@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::ApiResult;
-use crate::hue::api::ColorGamut;
+use crate::hue::api::{ColorGamut, DeviceProductData};
 use crate::hue::version::SwVersion;
 use crate::hue::{self, api, best_guess_timezone};
 use crate::resource::Resources;
@@ -24,7 +24,7 @@ pub struct HueError {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum HueResult<T> {
+pub enum HueApiResult<T> {
     Success(T),
     Error(HueError),
 }
@@ -103,13 +103,14 @@ pub enum ApiResourceType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
     pub devicetype: String,
-    pub generateclientkey: Option<bool>,
+    #[serde(default)]
+    pub generateclientkey: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUserReply {
-    pub username: Uuid,
-    pub clientkey: Uuid,
+    pub username: String,
+    pub clientkey: Option<String>,
 }
 
 #[allow(non_camel_case_types)]
@@ -257,20 +258,22 @@ pub struct ApiConfig {
     pub whitelist: HashMap<String, Whitelist>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiEffect {
+    #[default]
     None,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiAlert {
+    #[default]
     None,
     Select,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ApiGroupAction {
     pub on: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -299,6 +302,59 @@ pub enum ApiGroupType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum ApiGroupClass {
+    #[serde(rename = "Living room")]
+    LivingRoom,
+    Kitchen,
+    Dining,
+    Bedroom,
+    #[serde(rename = "Kids bedroom")]
+    KidsBedroom,
+    Bathroom,
+    Nursery,
+    Recreation,
+    Office,
+    Gym,
+    Hallway,
+    Toilet,
+    #[serde(rename = "Front door")]
+    FrontDoor,
+    Garage,
+    Terrace,
+    Garden,
+    Driveway,
+    Carport,
+    Other,
+
+    Home,
+    Downstairs,
+    Upstairs,
+    #[serde(rename = "Top floor")]
+    TopFloor,
+    Attic,
+    #[serde(rename = "Guest room")]
+    GuestRoom,
+    Staircase,
+    Lounge,
+    #[serde(rename = "Man cave")]
+    ManCave,
+    Computer,
+    Studio,
+    Music,
+    TV,
+    Reading,
+    Closet,
+    Storage,
+    #[serde(rename = "Laundry room")]
+    LaundryRoom,
+    Balcony,
+    Porch,
+    Barbecue,
+    Pool,
+    Free,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroup {
     pub name: String,
     pub lights: Vec<String>,
@@ -306,10 +362,10 @@ pub struct ApiGroup {
 
     #[serde(rename = "type")]
     pub group_type: ApiGroupType,
-    pub class: String,
+    pub class: ApiGroupClass,
     pub recycle: bool,
     pub sensors: Vec<Value>,
-    pub state: Value,
+    pub state: ApiGroupState,
     #[serde(skip_serializing_if = "Value::is_null", default)]
     pub stream: Value,
     #[serde(skip_serializing_if = "Value::is_null", default)]
@@ -317,6 +373,22 @@ pub struct ApiGroup {
 }
 
 impl ApiGroup {
+    #[must_use]
+    pub fn make_group_0() -> Self {
+        Self {
+            name: "Group 0".into(),
+            lights: vec![],
+            action: ApiGroupAction::default(),
+            group_type: ApiGroupType::LightGroup,
+            class: ApiGroupClass::Other,
+            recycle: false,
+            sensors: vec![],
+            state: ApiGroupState::default(),
+            stream: Value::Null,
+            locations: Value::Null,
+        }
+    }
+
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
     pub fn from_lights_and_room(
@@ -338,18 +410,18 @@ impl ApiGroup {
                 alert: ApiAlert::None,
                 colormode: None,
             },
-            class: "Bedroom".to_string(),
+            class: ApiGroupClass::Other,
             group_type: ApiGroupType::Room,
             recycle: false,
             sensors: vec![],
-            state: json!({}),
+            state: ApiGroupState::default(),
             stream: Value::Null,
             locations: Value::Null,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ApiGroupState {
     pub all_on: bool,
     pub any_on: bool,
@@ -400,6 +472,16 @@ pub struct ApiLightStateUpdate {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupUpdate {
     pub scene: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Active {
+    pub active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiGroupUpdate2 {
+    pub stream: Active,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -456,23 +538,26 @@ impl ApiLight {
         Self {
             state: ApiLightState {
                 on: light.on.on,
-                bri: light.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                bri: light
+                    .dimming
+                    .map(|dim| ((dim.brightness * 2.54) as u32).max(1)),
                 hue: None,
                 sat: None,
-                effect: None,
+                effect: Some("none".into()),
                 xy: light.color.clone().map(|col| col.xy.into()),
                 ct: light.color_temperature.clone().and_then(|ct| ct.mirek),
-                alert: String::new(),
+                alert: "select".into(),
                 colormode: Some(colormode),
                 mode: "homeautomation".to_string(),
                 reachable: true,
             },
             swupdate: SwUpdate::default(),
             name: light.metadata.name.clone(),
-            modelid: product_data.product_name,
+            modelid: product_data.model_id,
             manufacturername: product_data.manufacturer_name,
-            productname: "Hue color spot".to_string(),
-            productid: Some(product_data.model_id),
+            productname: product_data.product_name,
+            productid: product_data.hardware_platform_type,
+
             capabilities: json!({
                 "certified": true,
                 "control": {
@@ -486,8 +571,8 @@ impl ApiLight {
                         "max": 500,
                         "min": 153
                     },
-                    "maxlumen": 300,
-                    "mindimlevel": 200
+                    "maxlumen": 800,
+                    "mindimlevel": 10
                 },
                 "streaming": {
                     "proxy": true,
@@ -504,8 +589,13 @@ impl ApiLight {
                 }
             }),
             light_type: "Extended color light".to_string(),
+
+            /* FIXME: Should have form "00:11:22:33:44:55:66:77-0b" */
             uniqueid: uuid.as_simple().to_string(),
+
             swversion: product_data.software_version,
+
+            /* FIXME: Should have form "9012C6FD" */
             swconfigid: None,
         }
     }
@@ -579,7 +669,7 @@ pub struct ApiScene {
 }
 
 impl ApiScene {
-    pub fn from_scene(res: &Resources, owner: Uuid, scene: &api::Scene) -> ApiResult<Self> {
+    pub fn from_scene(res: &Resources, owner: String, scene: &api::Scene) -> ApiResult<Self> {
         let lights = scene
             .actions
             .iter()
@@ -604,7 +694,7 @@ impl ApiScene {
             scene_type: ApiSceneType::GroupScene,
             lights,
             lightstates,
-            owner: owner.to_string(),
+            owner,
             recycle: false,
             locked: false,
             /* Some clients (e.g. Hue Essentials) require .appdata */
@@ -664,6 +754,35 @@ pub struct ApiSensor {
     pub recycle: Option<bool>,
     #[serde(skip_serializing_if = "Value::is_null", default)]
     pub capabilities: Value,
+}
+
+impl ApiSensor {
+    #[must_use]
+    pub fn builtin_daylight_sensor() -> Self {
+        Self {
+            config: json!({
+                "configured": false,
+                "on": true,
+                "sunriseoffset": 30,
+                "sunsetoffset": -30
+            }),
+            manufacturername: DeviceProductData::SIGNIFY_MANUFACTURER_NAME.to_string(),
+            modelid: "PHDL00".to_string(),
+            name: "Daylight".to_string(),
+            state: json!({
+                "daylight": Value::Null,
+                "lastupdated": "none",
+            }),
+            swversion: "1.0".to_string(),
+            sensor_type: "Daylight".to_string(),
+            swupdate: None,
+            uniqueid: None,
+            diversityid: None,
+            productname: None,
+            recycle: None,
+            capabilities: Value::Null,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -773,24 +892,24 @@ impl Capabilities {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            lights: Capacity::new(63, 60),
+            lights: Capacity::new(63, 62),
             sensors: SensorsCapacity {
-                available: 240,
+                available: 249,
                 total: 250,
-                clip: Capacity::new(250, 240),
-                zll: Capacity::new(64, 63),
-                zgp: Capacity::new(64, 63),
+                clip: Capacity::new(250, 249),
+                zll: Capacity::new(64, 64),
+                zgp: Capacity::new(64, 64),
             },
             groups: Capacity::new(64, 60),
             scenes: SceneCapacity {
                 scenes: Capacity::new(200, 175),
                 lightstates: Capacity::new(12600, 11025),
             },
-            schedules: Capacity::new(100, 95),
+            schedules: Capacity::new(100, 100),
             rules: RulesCapacity {
-                available: 233,
-                total: 255,
-                conditions: Capacity::new(1500, 1451),
+                available: 250,
+                total: 250,
+                conditions: Capacity::new(1500, 1500),
                 actions: Capacity::new(1000, 1000),
             },
             resourcelinks: Capacity::new(64, 64),

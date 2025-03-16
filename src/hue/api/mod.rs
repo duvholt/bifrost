@@ -4,6 +4,7 @@ mod light;
 mod resource;
 mod room;
 mod scene;
+mod stream;
 mod stubs;
 mod update;
 
@@ -26,6 +27,7 @@ pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
 };
+pub use stream::HueStreamKey;
 pub use stubs::{
     BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
@@ -267,8 +269,13 @@ impl<'a> V1Reply<'a> {
     }
 
     #[must_use]
-    pub fn for_group(id: u32, path: &str) -> Self {
+    pub fn for_group_path(id: u32, path: &str) -> Self {
         Self::new(format!("/groups/{id}/{path}"))
+    }
+
+    #[must_use]
+    pub fn for_group(id: u32) -> Self {
+        Self::new(format!("/groups/{id}"))
     }
 
     pub fn with_light_state_update(self, upd: &ApiLightStateUpdate) -> ApiResult<Self> {
