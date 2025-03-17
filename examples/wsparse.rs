@@ -1,15 +1,12 @@
-#![allow(unused_variables, clippy::match_same_arms)]
+#![allow(clippy::match_same_arms)]
 
 use std::io::stdin;
 
-use bifrost::{
-    error::ApiResult,
-    z2m::{
-        api::{Availability, Message, RawMessage},
-        update::DeviceUpdate,
-    },
-};
 use log::LevelFilter;
+
+use bifrost::error::ApiResult;
+use z2m::api::{Availability, Message, RawMessage};
+use z2m::update::DeviceUpdate;
 
 #[tokio::main]
 #[rustfmt::skip]
@@ -76,7 +73,7 @@ async fn main() -> ApiResult<()> {
         if raw_msg.topic.ends_with("/availability") {
             let data = serde_json::from_value::<Availability>(raw_msg.payload);
 
-            let Ok(msg) = data else {
+            let Ok(_msg) = data else {
                 log::error!("INVALID LINE [availability]: {}", data.unwrap_err());
                 eprintln!("{line}");
                 eprintln!();

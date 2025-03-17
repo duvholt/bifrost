@@ -1,8 +1,8 @@
 use hue::zigbee::{ZigbeeMessage, ZigbeeTarget};
+use z2m::request::Z2mRequest;
 
 use crate::backend::z2m::zclcommand::hue_zclcommand;
 use crate::error::{ApiError, ApiResult};
-use crate::z2m::request::Z2mRequest;
 
 pub struct Z2mTarget {
     pub device: String,

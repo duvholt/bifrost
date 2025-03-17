@@ -37,6 +37,7 @@ keywords = [
 members = [
     "crates/hue",
     "crates/svc",
+    "crates/z2m",
     "crates/zcl",
 ]
 
@@ -139,6 +140,7 @@ tokio-openssl = "0.6.5"
 udp-stream = "0.0.12"
 maplit = "1.0.2"
 svc = { version = "0.1.0", path = "crates/svc" }
+z2m = { version = "0.1.0", path = "crates/z2m" }
 
 [dev-dependencies]
 clap-stdin = "0.6.0"

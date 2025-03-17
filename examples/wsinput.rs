@@ -9,7 +9,7 @@ use tokio::select;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use bifrost::error::ApiResult;
-use bifrost::z2m::api::RawMessage;
+use z2m::api::RawMessage;
 
 #[macro_use]
 extern crate log;

@@ -22,11 +22,10 @@ use hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperatureUpdate,
     ColorUpdate, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
-    LightEffect, LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2,
-    LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource,
-    ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
-    SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
+    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
+    RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall,
+    SceneStatus, SceneStatusUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -36,6 +35,14 @@ use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
     HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
 };
+use z2m::api::{ExposeLight, Message, RawMessage};
+use z2m::convert::{
+    ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
+    ExtractLightGradient,
+};
+use z2m::hexcolor::HexColor;
+use z2m::request::Z2mRequest;
+use z2m::update::{DeviceColor, DeviceUpdate};
 
 use crate::backend::z2m::stream::Z2mTarget;
 use crate::backend::{Backend, BackendRequest};
@@ -43,15 +50,6 @@ use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
 use crate::resource::Resources;
-use crate::z2m;
-use crate::z2m::api::{ExposeLight, Message, RawMessage};
-use crate::z2m::convert::{
-    ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
-    ExtractLightGradient,
-};
-use crate::z2m::hexcolor::HexColor;
-use crate::z2m::request::Z2mRequest;
-use crate::z2m::update::{DeviceColor, DeviceUpdate};
 
 #[derive(Debug)]
 struct LearnScene {
@@ -153,7 +151,6 @@ impl Z2mBackend {
         self.map.insert(name.to_string(), link_light.rid);
         self.rmap.insert(link_light.rid, name.to_string());
 
-        let mut res = self.state.lock().await;
         let mut light = Light::new(link_device, metadata);
 
         light.dimming = expose
@@ -176,21 +173,8 @@ impl Z2mBackend {
 
         if effects {
             log::trace!("Detected Hue light: enabling effects");
-            light.effects = Some(LightEffects {
-                status_values: LightEffect::ALL.into(),
-                status: LightEffect::NoEffect,
-                effect_values: LightEffect::ALL.into(),
-            });
-            light.effects_v2 = Some(LightEffectsV2 {
-                action: LightEffectValues {
-                    effect_values: LightEffect::ALL.into(),
-                },
-                status: LightEffectStatus {
-                    effect: LightEffect::NoEffect,
-                    effect_values: LightEffect::ALL.into(),
-                    parameters: None,
-                },
-            });
+            light.effects = Some(LightEffects::all());
+            light.effects_v2 = Some(LightEffectsV2::all());
         }
 
         let segments = if gradient.is_some() {
@@ -246,6 +230,7 @@ impl Z2mBackend {
             status: ZigbeeConnectivityStatus::Connected,
         };
 
+        let mut res = self.state.lock().await;
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
         res.add(&link_light, Resource::Light(light))?;

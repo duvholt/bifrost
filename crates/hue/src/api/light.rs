@@ -485,10 +485,37 @@ pub struct LightEffects {
     pub effect_values: Vec<LightEffect>,
 }
 
+impl LightEffects {
+    #[must_use]
+    pub fn all() -> Self {
+        Self {
+            status_values: Vec::from(LightEffect::ALL),
+            status: LightEffect::NoEffect,
+            effect_values: Vec::from(LightEffect::ALL),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightEffectsV2 {
     pub action: LightEffectValues,
     pub status: LightEffectStatus,
+}
+
+impl LightEffectsV2 {
+    #[must_use]
+    pub fn all() -> Self {
+        Self {
+            action: LightEffectValues {
+                effect_values: Vec::from(LightEffect::ALL),
+            },
+            status: LightEffectStatus {
+                effect: LightEffect::NoEffect,
+                effect_values: Vec::from(LightEffect::ALL),
+                parameters: None,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
