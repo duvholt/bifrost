@@ -5,7 +5,8 @@ use axum::Router;
 use hyper::HeaderMap;
 use serde_json::json;
 
-use crate::hue::api::HueStreamKey;
+use hue::api::HueStreamKey;
+
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 

@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use bifrost::error::ApiResult;
-use bifrost::hue::api::ResourceRecord;
-use bifrost::hue::legacy_api::{
-    ApiConfig, ApiGroup, ApiLight, ApiResourceLink, ApiRule, ApiScene, ApiSchedule, ApiSensor,
-};
-
 use clap::Parser;
 use clap_stdin::FileOrStdin;
 use json_diff_ng::compare_serde_values;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Deserializer, Value};
+
+use bifrost::error::ApiResult;
+use hue::api::ResourceRecord;
+use hue::legacy_api::{
+    ApiConfig, ApiGroup, ApiLight, ApiResourceLink, ApiRule, ApiScene, ApiSchedule, ApiSensor,
+};
 
 fn false_positive((a, b): &(&Value, &Value)) -> bool {
     a.is_number() && b.is_number() && a.as_f64() == b.as_f64()

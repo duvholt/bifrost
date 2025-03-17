@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::hue::api::ResourceLink;
+use crate::api::ResourceLink;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfiguration {

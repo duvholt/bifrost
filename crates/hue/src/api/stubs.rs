@@ -5,8 +5,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::hue::api::{DeviceArchetype, ResourceLink, SceneMetadata};
-use crate::hue::{best_guess_timezone, date_format};
+use crate::api::{DeviceArchetype, ResourceLink, SceneMetadata};
+use crate::{best_guess_timezone, date_format};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Bridge {

@@ -12,12 +12,12 @@ use tokio::time::timeout;
 use tokio_openssl::SslStream;
 use udp_stream::{UdpListener, UdpStream};
 
+use hue::api::EntertainmentConfiguration;
 use hue::stream::{HueStreamPacket, HueStreamPacketHeader};
 use svc::traits::Service;
 
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
-use crate::hue::api::EntertainmentConfiguration;
 use crate::model::throttle::{Throttle, ThrottleQueue};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;

@@ -2,15 +2,14 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use hue::error::{HueError, HueResult};
 use maplit::btreeset;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
 use uuid::Uuid;
 
-use crate::backend::BackendRequest;
-use crate::error::{ApiError, ApiResult};
-use crate::hue::api::{
+use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
     Entertainment, EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
     EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
@@ -19,8 +18,11 @@ use crate::hue::api::{
     ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
-use crate::hue::event::EventBlock;
-use crate::hue::version::SwVersion;
+use hue::event::EventBlock;
+use hue::version::SwVersion;
+
+use crate::backend::BackendRequest;
+use crate::error::ApiResult;
 use crate::model::state::{AuxData, State};
 use crate::server::hueevents::HueEventStream;
 
@@ -99,7 +101,7 @@ impl Resources {
         self.add_bridge(bridge_id.to_owned())
     }
 
-    pub fn aux_get(&self, link: &ResourceLink) -> ApiResult<&AuxData> {
+    pub fn aux_get(&self, link: &ResourceLink) -> HueResult<&AuxData> {
         self.state.aux_get(link)
     }
 
@@ -107,7 +109,7 @@ impl Resources {
         self.state.aux_set(link, aux);
     }
 
-    fn generate_update(obj: &Resource) -> ApiResult<Option<Update>> {
+    fn generate_update(obj: &Resource) -> HueResult<Option<Update>> {
         match obj {
             Resource::Light(light) => {
                 let upd = LightUpdate::new()
@@ -173,7 +175,7 @@ impl Resources {
 
                 Ok(Some(Update::EntertainmentConfiguration(upd)))
             }
-            obj => Err(ApiError::UpdateUnsupported(obj.rtype())),
+            obj => Err(HueError::UpdateUnsupported(obj.rtype())),
         }
     }
 
@@ -183,7 +185,7 @@ impl Resources {
         func: impl FnOnce(&mut T) -> ApiResult<()>,
     ) -> ApiResult<()>
     where
-        for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = ApiError>,
+        for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = HueError>,
     {
         let obj = self.state.get_mut(id)?;
         func(obj.try_into()?)?;
@@ -202,7 +204,7 @@ impl Resources {
 
     pub fn update<T>(&mut self, id: &Uuid, func: impl FnOnce(&mut T)) -> ApiResult<()>
     where
-        for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = ApiError>,
+        for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = HueError>,
     {
         self.try_update(id, |obj: &mut T| {
             func(obj);
@@ -369,7 +371,7 @@ impl Resources {
         Ok(())
     }
 
-    pub fn get_next_scene_id(&self, room: &ResourceLink) -> ApiResult<u32> {
+    pub fn get_next_scene_id(&self, room: &ResourceLink) -> HueResult<u32> {
         let mut set: HashSet<u32> = HashSet::new();
 
         for scene in self.get_resources_by_type(RType::Scene) {
@@ -394,19 +396,19 @@ impl Resources {
                 return Ok(x);
             }
         }
-        Err(ApiError::Full(RType::Scene))
+        Err(HueError::Full(RType::Scene))
     }
 
-    pub fn get<'a, T>(&'a self, link: &ResourceLink) -> ApiResult<&'a T>
+    pub fn get<'a, T>(&'a self, link: &ResourceLink) -> HueResult<&'a T>
     where
-        &'a T: TryFrom<&'a Resource, Error = ApiError>,
+        &'a T: TryFrom<&'a Resource, Error = HueError>,
     {
         self.get_id(link.rid)
     }
 
-    pub fn get_id<'a, T>(&'a self, id: Uuid) -> ApiResult<&'a T>
+    pub fn get_id<'a, T>(&'a self, id: Uuid) -> HueResult<&'a T>
     where
-        &'a T: TryFrom<&'a Resource, Error = ApiError>,
+        &'a T: TryFrom<&'a Resource, Error = HueError>,
     {
         self.state.get(&id)?.try_into()
     }
@@ -495,16 +497,16 @@ impl Resources {
         ResourceRecord::new(*id, self.id_v1_scope(id, res), res.clone())
     }
 
-    pub fn get_resource(&self, ty: RType, id: &Uuid) -> ApiResult<ResourceRecord> {
+    pub fn get_resource(&self, ty: RType, id: &Uuid) -> HueResult<ResourceRecord> {
         self.state
             .res
             .get(id)
             .filter(|res| res.rtype() == ty)
             .map(|res| self.make_resource_record(id, res))
-            .ok_or_else(|| ApiError::NotFound(*id))
+            .ok_or(HueError::NotFound(*id))
     }
 
-    pub fn get_resource_by_id(&self, id: &Uuid) -> ApiResult<ResourceRecord> {
+    pub fn get_resource_by_id(&self, id: &Uuid) -> HueResult<ResourceRecord> {
         self.state
             .get(id)
             .map(|res| self.make_resource_record(id, res))
@@ -549,16 +551,16 @@ impl Resources {
             .collect()
     }
 
-    pub fn get_id_v1_index(&self, uuid: Uuid) -> ApiResult<u32> {
-        self.state.id_v1(&uuid).ok_or(ApiError::NotFound(uuid))
+    pub fn get_id_v1_index(&self, uuid: Uuid) -> HueResult<u32> {
+        self.state.id_v1(&uuid).ok_or(HueError::NotFound(uuid))
     }
 
-    pub fn get_id_v1(&self, uuid: Uuid) -> ApiResult<String> {
+    pub fn get_id_v1(&self, uuid: Uuid) -> HueResult<String> {
         Ok(self.get_id_v1_index(uuid)?.to_string())
     }
 
-    pub fn from_id_v1(&self, id: u32) -> ApiResult<Uuid> {
-        self.state.from_id_v1(&id).ok_or(ApiError::V1NotFound(id))
+    pub fn from_id_v1(&self, id: u32) -> HueResult<Uuid> {
+        self.state.from_id_v1(&id).ok_or(HueError::V1NotFound(id))
     }
 
     #[must_use]

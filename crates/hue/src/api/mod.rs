@@ -57,8 +57,8 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, json, Value};
 
-use crate::error::{ApiError, ApiResult};
-use crate::hue::legacy_api::ApiLightStateUpdate;
+use crate::error::{HueError, HueResult};
+use crate::legacy_api::ApiLightStateUpdate;
 
 #[derive(Debug, Deserialize, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -189,7 +189,7 @@ impl Resource {
         }
     }
 
-    pub fn from_value(rtype: RType, obj: Value) -> ApiResult<Self> {
+    pub fn from_value(rtype: RType, obj: Value) -> HueResult<Self> {
         let res = match rtype {
             RType::AuthV1 => Self::AuthV1(from_value(obj)?),
             RType::BehaviorInstance => Self::BehaviorInstance(from_value(obj)?),
@@ -232,37 +232,37 @@ impl Resource {
 macro_rules! resource_conversion_impl {
     ( $name:ident ) => {
         impl<'a> TryFrom<&'a mut Resource> for &'a mut $name {
-            type Error = ApiError;
+            type Error = HueError;
 
             fn try_from(value: &'a mut Resource) -> Result<Self, Self::Error> {
                 if let Resource::$name(obj) = value {
                     Ok(obj)
                 } else {
-                    Err(ApiError::WrongType(RType::Light, value.rtype()))
+                    Err(HueError::WrongType(RType::Light, value.rtype()))
                 }
             }
         }
 
         impl<'a> TryFrom<&'a Resource> for &'a $name {
-            type Error = ApiError;
+            type Error = HueError;
 
             fn try_from(value: &'a Resource) -> Result<Self, Self::Error> {
                 if let Resource::$name(obj) = value {
                     Ok(obj)
                 } else {
-                    Err(ApiError::WrongType(RType::Light, value.rtype()))
+                    Err(HueError::WrongType(RType::Light, value.rtype()))
                 }
             }
         }
 
         impl TryFrom<Resource> for $name {
-            type Error = ApiError;
+            type Error = HueError;
 
             fn try_from(value: Resource) -> Result<Self, Self::Error> {
                 if let Resource::$name(obj) = value {
                     Ok(obj)
                 } else {
-                    Err(ApiError::WrongType(RType::Light, value.rtype()))
+                    Err(HueError::WrongType(RType::Light, value.rtype()))
                 }
             }
         }
@@ -303,12 +303,6 @@ resource_conversion_impl!(ZigbeeConnectivity);
 resource_conversion_impl!(ZigbeeDeviceDiscovery);
 resource_conversion_impl!(Zone);
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct V2Reply<T> {
-    pub data: Vec<T>,
-    pub errors: Vec<String>,
-}
-
 #[derive(Clone, Debug, Serialize)]
 pub struct V1Reply<'a> {
     prefix: String,
@@ -339,19 +333,19 @@ impl<'a> V1Reply<'a> {
         Self::new(format!("/groups/{id}"))
     }
 
-    pub fn with_light_state_update(self, upd: &ApiLightStateUpdate) -> ApiResult<Self> {
+    pub fn with_light_state_update(self, upd: &ApiLightStateUpdate) -> HueResult<Self> {
         self.add_option("on", upd.on)?
             .add_option("bri", upd.bri)?
             .add_option("xy", upd.xy)?
             .add_option("ct", upd.ct)
     }
 
-    pub fn add<T: Serialize>(mut self, name: &'a str, value: T) -> ApiResult<Self> {
+    pub fn add<T: Serialize>(mut self, name: &'a str, value: T) -> HueResult<Self> {
         self.success.push((name, serde_json::to_value(value)?));
         Ok(self)
     }
 
-    pub fn add_option<T: Serialize>(mut self, name: &'a str, value: Option<T>) -> ApiResult<Self> {
+    pub fn add_option<T: Serialize>(mut self, name: &'a str, value: Option<T>) -> HueResult<Self> {
         if let Some(val) = value {
             self.success.push((name, serde_json::to_value(val)?));
         }

@@ -7,13 +7,18 @@ pub mod light;
 pub mod scene;
 
 use axum::Router;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::ApiResult;
-use crate::hue::api::V2Reply;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct V2Reply<T> {
+    pub data: Vec<T>,
+    pub errors: Vec<String>,
+}
 
 type ApiV2Result = ApiResult<Json<V2Reply<Value>>>;
 

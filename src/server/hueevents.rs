@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use chrono::{DateTime, Utc};
 use tokio::sync::broadcast::{Receiver, Sender};
 
-use crate::hue::event::EventBlock;
+use hue::event::EventBlock;
 
 #[derive(Clone, Debug)]
 pub struct HueEventRecord {

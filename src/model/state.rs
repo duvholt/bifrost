@@ -1,13 +1,15 @@
-use std::{collections::BTreeMap, io::Read};
+use std::collections::BTreeMap;
+use std::io::Read;
 
 use serde::{Deserialize, Serialize};
 use serde_yml::Value;
 use uuid::Uuid;
 
+use hue::api::{DeviceArchetype, Resource, ResourceLink};
+use hue::error::{HueError, HueResult};
+use hue::version::SwVersion;
+
 use crate::error::{ApiError, ApiResult};
-use crate::hue;
-use crate::hue::api::{DeviceArchetype, Resource, ResourceLink};
-use crate::hue::version::SwVersion;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct AuxData {
@@ -207,9 +209,9 @@ impl State {
         self.aux.get(id)
     }
 
-    pub fn aux_get(&self, link: &ResourceLink) -> ApiResult<&AuxData> {
+    pub fn aux_get(&self, link: &ResourceLink) -> HueResult<&AuxData> {
         self.try_aux_get(&link.rid)
-            .ok_or_else(|| ApiError::AuxNotFound(*link))
+            .ok_or(HueError::AuxNotFound(*link))
     }
 
     pub fn aux_set(&mut self, link: &ResourceLink, aux: AuxData) {
@@ -221,12 +223,12 @@ impl State {
         self.res.get(id)
     }
 
-    pub fn get(&self, id: &Uuid) -> ApiResult<&Resource> {
-        self.try_get(id).ok_or_else(|| ApiError::NotFound(*id))
+    pub fn get(&self, id: &Uuid) -> HueResult<&Resource> {
+        self.try_get(id).ok_or(HueError::NotFound(*id))
     }
 
-    pub fn get_mut(&mut self, id: &Uuid) -> ApiResult<&mut Resource> {
-        self.res.get_mut(id).ok_or_else(|| ApiError::NotFound(*id))
+    pub fn get_mut(&mut self, id: &Uuid) -> HueResult<&mut Resource> {
+        self.res.get_mut(id).ok_or(HueError::NotFound(*id))
     }
 
     pub fn insert(&mut self, key: Uuid, value: Resource) {
@@ -237,7 +239,7 @@ impl State {
     pub fn remove(&mut self, id: &Uuid) -> ApiResult<()> {
         self.aux.remove(id);
         self.id_v1.remove(id);
-        self.res.remove(id).ok_or_else(|| ApiError::NotFound(*id))?;
+        self.res.remove(id).ok_or(HueError::NotFound(*id))?;
         Ok(())
     }
 

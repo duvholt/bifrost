@@ -18,9 +18,21 @@ use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use uuid::Uuid;
 
-use ::hue::clamp::Clamp;
-use ::hue::stream::HueStreamLights;
-use ::hue::zigbee::{
+use hue::api::{
+    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperatureUpdate,
+    ColorUpdate, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
+    EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
+    LightEffect, LightEffectStatus, LightEffectValues, LightEffects, LightEffectsV2,
+    LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource,
+    ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement,
+    SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+};
+use hue::clamp::Clamp;
+use hue::error::HueError;
+use hue::scene_icons;
+use hue::stream::HueStreamLights;
+use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
     HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
 };
@@ -29,24 +41,15 @@ use crate::backend::z2m::stream::Z2mTarget;
 use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
-use crate::hue;
-use crate::hue::api::{
-    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperature,
-    ColorTemperatureUpdate, ColorUpdate, DeviceArchetype, DeviceProductData, Dimming,
-    DimmingUpdate, Entertainment, EntertainmentConfiguration, EntertainmentSegment,
-    EntertainmentSegments, GroupedLight, Light, LightColor, LightEffect, LightEffectStatus,
-    LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradient,
-    LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
-    RoomArchetype, RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusUpdate, Stub, Taurus, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
-};
-use crate::hue::scene_icons;
-use crate::model::hexcolor::HexColor;
 use crate::model::state::AuxData;
 use crate::resource::Resources;
 use crate::z2m;
 use crate::z2m::api::{ExposeLight, Message, RawMessage};
+use crate::z2m::convert::{
+    ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
+    ExtractLightGradient,
+};
+use crate::z2m::hexcolor::HexColor;
 use crate::z2m::request::Z2mRequest;
 use crate::z2m::update::{DeviceColor, DeviceUpdate};
 
@@ -155,20 +158,20 @@ impl Z2mBackend {
 
         light.dimming = expose
             .feature("brightness")
-            .and_then(Dimming::extract_from_expose);
+            .and_then(ExtractDimming::extract_from_expose);
         log::trace!("Detected dimming: {:?}", &light.dimming);
 
         light.color_temperature = expose
             .feature("color_temp")
-            .and_then(ColorTemperature::extract_from_expose);
+            .and_then(ExtractColorTemperature::extract_from_expose);
         log::trace!("Detected color temperature: {:?}", &light.color_temperature);
 
         light.color = expose
             .feature("color_xy")
-            .and_then(LightColor::extract_from_expose);
+            .and_then(ExtractLightColor::extract_from_expose);
         log::trace!("Detected color: {:?}", &light.color);
 
-        light.gradient = gradient.and_then(LightGradient::extract_from_expose);
+        light.gradient = gradient.and_then(ExtractLightGradient::extract_from_expose);
         log::trace!("Detected gradient support: {:?}", &light.gradient);
 
         if effects {
@@ -933,7 +936,7 @@ impl Z2mBackend {
                         let index = lock
                             .aux_get(&link)?
                             .index
-                            .ok_or(ApiError::NotFound(link.rid))?;
+                            .ok_or(HueError::NotFound(link.rid))?;
 
                         let scenes = lock.get_scenes_for_room(&scene.group.rid);
                         for rid in scenes {
@@ -986,7 +989,7 @@ impl Z2mBackend {
                 let index = lock
                     .aux_get(&link)?
                     .index
-                    .ok_or(ApiError::NotFound(link.rid))?;
+                    .ok_or(HueError::NotFound(link.rid))?;
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&room) {
@@ -1009,15 +1012,15 @@ impl Z2mBackend {
                         let ent: &Entertainment = lock.get(&member.service)?;
                         let light_id = ent
                             .renderer_reference
-                            .ok_or(ApiError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(member.service.rid))?;
                         let topic = self
                             .rmap
                             .get(&light_id.rid)
-                            .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(member.service.rid))?;
                         let dev = self
                             .network
                             .get(topic)
-                            .ok_or_else(|| ApiError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(member.service.rid))?;
 
                         let segment_addr = dev.network_address + member.index;
 

@@ -6,7 +6,7 @@ use mac_address::MacAddress;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::hue::api::RoomArchetype;
+use hue::api::RoomArchetype;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BridgeConfig {

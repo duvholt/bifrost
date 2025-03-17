@@ -3,9 +3,9 @@ use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
 
-use crate::hue::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
-use crate::hue::version::SwVersion;
-use crate::hue::HUE_BRIDGE_V2_MODEL_ID;
+use crate::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
+use crate::version::SwVersion;
+use crate::HUE_BRIDGE_V2_MODEL_ID;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Device {

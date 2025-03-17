@@ -6,13 +6,10 @@ use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::error::ApiResult;
-use crate::hue::api::{ColorGamut, DeviceProductData};
-use crate::hue::version::SwVersion;
-use crate::hue::{self, api, best_guess_timezone};
-use crate::resource::Resources;
-
-use super::date_format;
+use crate::api::{ColorGamut, DeviceProductData};
+use crate::date_format;
+use crate::version::SwVersion;
+use crate::{api, best_guess_timezone};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HueError {
@@ -59,16 +56,16 @@ pub struct ApiShortConfig {
 impl Default for ApiShortConfig {
     fn default() -> Self {
         Self {
-            apiversion: hue::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
+            apiversion: crate::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
             bridgeid: "0000000000000000".to_string(),
             datastoreversion: "176".to_string(),
             factorynew: false,
             mac: MacAddress::default(),
-            modelid: hue::HUE_BRIDGE_V2_MODEL_ID.to_string(),
+            modelid: crate::HUE_BRIDGE_V2_MODEL_ID.to_string(),
             name: "Bifrost Bridge".to_string(),
             replacesbridgeid: None,
             starterkitid: String::new(),
-            swversion: hue::HUE_BRIDGE_V2_DEFAULT_SWVERSION.to_string(),
+            swversion: crate::HUE_BRIDGE_V2_DEFAULT_SWVERSION.to_string(),
         }
     }
 }
@@ -77,7 +74,7 @@ impl ApiShortConfig {
     #[must_use]
     pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
         Self {
-            bridgeid: hue::bridge_id(mac).to_uppercase(),
+            bridgeid: crate::bridge_id(mac).to_uppercase(),
             apiversion: version.get_legacy_apiversion(),
             swversion: version.get_legacy_swversion(),
             mac,
@@ -673,67 +670,24 @@ pub struct ApiSceneAppData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiScene {
-    name: String,
+    pub name: String,
     #[serde(rename = "type")]
-    scene_type: ApiSceneType,
-    lights: Vec<String>,
+    pub scene_type: ApiSceneType,
+    pub lights: Vec<String>,
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
-    lightstates: HashMap<String, ApiLightStateUpdate>,
-    owner: String,
-    recycle: bool,
-    locked: bool,
-    appdata: ApiSceneAppData,
-    picture: String,
+    pub lightstates: HashMap<String, ApiLightStateUpdate>,
+    pub owner: String,
+    pub recycle: bool,
+    pub locked: bool,
+    pub appdata: ApiSceneAppData,
+    pub picture: String,
     #[serde(with = "date_format::legacy_utc")]
-    lastupdated: DateTime<Utc>,
-    version: u32,
+    pub lastupdated: DateTime<Utc>,
+    pub version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    image: Option<Uuid>,
+    pub image: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    group: Option<String>,
-}
-
-impl ApiScene {
-    pub fn from_scene(res: &Resources, owner: String, scene: &api::Scene) -> ApiResult<Self> {
-        let lights = scene
-            .actions
-            .iter()
-            .map(|sae| res.get_id_v1(sae.target.rid))
-            .collect::<ApiResult<_>>()?;
-
-        let lightstates = scene
-            .actions
-            .iter()
-            .map(|sae| {
-                Ok((
-                    res.get_id_v1(sae.target.rid)?,
-                    ApiLightStateUpdate::from(sae.action.clone()),
-                ))
-            })
-            .collect::<ApiResult<_>>()?;
-
-        let room_id = res.get_id_v1_index(scene.group.rid)?;
-
-        Ok(Self {
-            name: scene.metadata.name.clone(),
-            scene_type: ApiSceneType::GroupScene,
-            lights,
-            lightstates,
-            owner,
-            recycle: false,
-            locked: false,
-            /* Some clients (e.g. Hue Essentials) require .appdata */
-            appdata: ApiSceneAppData {
-                data: Some(format!("xxxxx_r{room_id}")),
-                version: Some(1),
-            },
-            picture: String::new(),
-            lastupdated: Utc::now(),
-            version: ApiSceneVersion::V2 as u32,
-            image: scene.metadata.image.map(|rl| rl.rid),
-            group: Some(room_id.to_string()),
-        })
-    }
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

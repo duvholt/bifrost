@@ -1,8 +1,16 @@
 use chrono::{DateTime, Duration, Utc};
 
+use hue::update::{update_url_for_bridge, UpdateEntries, UpdateEntry};
+use hue::version::SwVersion;
+use hue::HUE_BRIDGE_V2_MODEL_ID;
+
 use crate::error::{ApiError, ApiResult};
-use crate::hue::update;
-use crate::hue::version::SwVersion;
+
+pub async fn fetch_updates(since_version: Option<u64>) -> ApiResult<Vec<UpdateEntry>> {
+    let url = update_url_for_bridge(HUE_BRIDGE_V2_MODEL_ID, since_version.unwrap_or_default());
+    let response: UpdateEntries = reqwest::get(url).await?.json().await?;
+    Ok(response.updates)
+}
 
 #[derive(Debug)]
 pub struct VersionUpdater {
@@ -28,7 +36,7 @@ impl VersionUpdater {
     }
 
     pub async fn fetch_version(&mut self) -> ApiResult<SwVersion> {
-        update::fetch_updates(None)
+        fetch_updates(None)
             .await?
             .into_iter()
             .max_by(|x, y| x.version.cmp(&y.version))

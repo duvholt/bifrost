@@ -7,9 +7,11 @@ use axum::{
 use serde_json::Value;
 use uuid::Uuid;
 
+use hue::api::{RType, Resource, ResourceLink};
+use hue::error::HueError;
+
 use crate::error::ApiError;
-use crate::hue::api::{RType, Resource, ResourceLink, V2Reply};
-use crate::routes::clip::ApiV2Result;
+use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
@@ -55,7 +57,7 @@ async fn put_resource_id(
 
     log::warn!("PUT {rtype:?}/{id}: state update not supported");
 
-    Err(ApiError::UpdateUnsupported(rtype))
+    Err(HueError::UpdateUnsupported(rtype))?
 }
 
 async fn delete_resource_id(

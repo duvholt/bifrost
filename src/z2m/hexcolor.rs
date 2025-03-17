@@ -60,7 +60,7 @@ impl TryFrom<&str> for HexColor {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::hexcolor::HexColor;
+    use crate::z2m::hexcolor::HexColor;
 
     #[test]
     fn make_hexcolor() {

@@ -3,12 +3,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::{
-    error::ApiResult,
-    hue::api::{self, ResourceLink},
-};
-
-use super::date_format;
+use crate::api::{self, ResourceLink};
+use crate::date_format;
+use crate::error::HueResult;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase", tag = "type")]
@@ -38,7 +35,7 @@ impl EventBlock {
         }
     }
 
-    pub fn update(id: &Uuid, id_v1: Option<u32>, data: api::Update) -> ApiResult<Self> {
+    pub fn update(id: &Uuid, id_v1: Option<u32>, data: api::Update) -> HueResult<Self> {
         Ok(Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),
@@ -50,7 +47,7 @@ impl EventBlock {
         })
     }
 
-    pub fn delete(link: &ResourceLink) -> ApiResult<Self> {
+    pub fn delete(link: &ResourceLink) -> HueResult<Self> {
         Ok(Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),

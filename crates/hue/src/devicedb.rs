@@ -1,4 +1,4 @@
-use crate::hue::api::{DeviceArchetype, DeviceProductData};
+use crate::api::{DeviceArchetype, DeviceProductData};
 
 // This file contains discovered product data from multiple sources,
 // including data samples from the community, and various open source or public

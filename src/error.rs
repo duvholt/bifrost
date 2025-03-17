@@ -2,17 +2,15 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
-use svc::error::SvcError;
 use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
 
+use hue::event::EventBlock;
+use hue::legacy_api::ApiResourceType;
+use svc::error::SvcError;
+
 use crate::backend::BackendRequest;
-use crate::hue::{
-    api::{RType, ResourceLink},
-    event::EventBlock,
-    legacy_api::ApiResourceType,
-};
 
 #[derive(Error, Debug)]
 pub enum ApiError {
@@ -115,34 +113,16 @@ pub enum ApiError {
     #[error("Cannot create resources of type: {0:?}")]
     V1CreateUnsupported(ApiResourceType),
 
-    #[error("Resource {0} not found")]
-    V1NotFound(u32),
-
     /* hue api v2 errors */
-    #[error("State changes not supported for: {0:?}")]
-    UpdateUnsupported(RType),
-
     #[error("Resource {0} could not be deleted")]
     DeleteDenied(Uuid),
-
-    #[error("Resource {0} not found")]
-    NotFound(Uuid),
 
     #[error("Failed to get firmware version reply from update server")]
     NoUpdateInformation,
 
-    #[error("Resource type wrong: expected {0:?} but found {1:?}")]
-    WrongType(RType, RType),
-
-    #[error("Cannot allocate any more {0:?}")]
-    Full(RType),
-
     /* bifrost errors */
     #[error("Cannot parse state file: no version field found")]
     StateVersionNotFound,
-
-    #[error("Missing auxiliary data resource {0:?}")]
-    AuxNotFound(ResourceLink),
 
     #[error("Cannot load certificate: {0:?}")]
     Certificate(Utf8PathBuf, std::io::Error),

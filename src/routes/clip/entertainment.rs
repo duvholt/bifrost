@@ -3,7 +3,8 @@ use axum::routing::get;
 use axum::Router;
 use uuid::Uuid;
 
-use crate::hue::api::RType;
+use hue::api::RType;
+
 use crate::routes::clip::generic;
 use crate::routes::clip::ApiV2Result;
 use crate::server::appstate::AppState;

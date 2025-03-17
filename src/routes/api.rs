@@ -5,23 +5,26 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
 use axum::Router;
 use bytes::Bytes;
+use chrono::Utc;
+use hue::error::{HueError, HueResult};
 use log::{info, warn};
 use serde_json::{json, Value};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
-use crate::backend::BackendRequest;
-use crate::error::{ApiError, ApiResult};
-use crate::hue::api::{
+use hue::api::{
     Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
     GroupedLightUpdate, Light, LightUpdate, On, RType, Resource, ResourceLink, Room, Scene,
     SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
-use crate::hue::legacy_api::{
+use hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
-    ApiResourceType, ApiScene, ApiSensor, ApiUserConfig, Capabilities, HueApiResult, NewUser,
-    NewUserReply,
+    ApiResourceType, ApiScene, ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor,
+    ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
 };
+
+use crate::backend::BackendRequest;
+use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
 use crate::routes::extractor::Json;
@@ -74,7 +77,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
             .services
             .iter()
             .find(|rl| rl.rtype == RType::GroupedLight)
-            .ok_or(ApiError::NotFound(rr.id))?;
+            .ok_or(HueError::NotFound(rr.id))?;
 
         let glight = res.get::<GroupedLight>(uuid)?;
         let lights: Vec<String> = room
@@ -102,6 +105,47 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
     Ok(rooms)
 }
 
+pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiResult<ApiScene> {
+    let lights = scene
+        .actions
+        .iter()
+        .map(|sae| res.get_id_v1(sae.target.rid))
+        .collect::<HueResult<_>>()?;
+
+    let lightstates = scene
+        .actions
+        .iter()
+        .map(|sae| {
+            Ok((
+                res.get_id_v1(sae.target.rid)?,
+                ApiLightStateUpdate::from(sae.action.clone()),
+            ))
+        })
+        .collect::<ApiResult<_>>()?;
+
+    let room_id = res.get_id_v1_index(scene.group.rid)?;
+
+    Ok(ApiScene {
+        name: scene.metadata.name.clone(),
+        scene_type: ApiSceneType::GroupScene,
+        lights,
+        lightstates,
+        owner,
+        recycle: false,
+        locked: false,
+        /* Some clients (e.g. Hue Essentials) require .appdata */
+        appdata: ApiSceneAppData {
+            data: Some(format!("xxxxx_r{room_id}")),
+            version: Some(1),
+        },
+        picture: String::new(),
+        lastupdated: Utc::now(),
+        version: ApiSceneVersion::V2 as u32,
+        image: scene.metadata.image.map(|rl| rl.rid),
+        group: Some(room_id.to_string()),
+    })
+}
+
 fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
     let mut scenes = HashMap::new();
 
@@ -110,7 +154,7 @@ fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<Str
 
         scenes.insert(
             res.get_id_v1(rr.id)?,
-            ApiScene::from_scene(res, owner.to_string(), scene)?,
+            get_scene(res, owner.to_string(), scene)?,
         );
     }
 
@@ -194,18 +238,18 @@ async fn get_api_user_resource_id(
             let link = ResourceLink::new(uuid, RType::Scene);
             let scene = lock.get::<Scene>(&link)?;
 
-            json!(ApiScene::from_scene(&lock, username, scene)?)
+            json!(get_scene(&lock, username, scene)?)
         }
         ApiResourceType::Groups => {
             let lock = state.res.lock().await;
             let groups = get_groups(&lock, true)?;
             let group = groups
                 .get(&id.to_string())
-                .ok_or(ApiError::V1NotFound(id))?;
+                .ok_or(HueError::V1NotFound(id))?;
 
             json!(group)
         }
-        _ => Err(ApiError::V1NotFound(id))?,
+        _ => Err(HueError::V1NotFound(id))?,
     };
 
     Ok(Json(result))
@@ -261,7 +305,7 @@ async fn put_api_user_resource_id_path(
         ApiResourceType::Lights => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "state" {
-                return Err(ApiError::V1NotFound(id))?;
+                return Err(HueError::V1NotFound(id))?;
             }
 
             let lock = state.res.lock().await;
@@ -285,7 +329,7 @@ async fn put_api_user_resource_id_path(
         ApiResourceType::Groups => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "action" {
-                return Err(ApiError::V1NotFound(id))?;
+                return Err(HueError::V1NotFound(id))?;
             }
 
             let lock = state.res.lock().await;

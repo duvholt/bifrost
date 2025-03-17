@@ -2,22 +2,24 @@ use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
+use hue::error::HueError;
 use serde_json::Value;
 use uuid::{uuid, Uuid};
 
-use crate::error::{ApiError, ApiResult};
-use crate::hue::api::{
+use hue::api::{
     Bridge, Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
     EntertainmentConfigurationChannels, EntertainmentConfigurationLocations,
     EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocations,
     EntertainmentConfigurationStatus, EntertainmentConfigurationStreamMembers,
     EntertainmentConfigurationStreamProxy, EntertainmentConfigurationStreamProxyMode,
     EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, Light,
-    LightMode, Position, RType, Resource, ResourceLink, V2Reply,
+    LightMode, Position, RType, Resource, ResourceLink,
 };
+
+use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_APPLICATION_ID;
-use crate::routes::clip::{generic, ApiV2Result};
+use crate::routes::clip::{generic, ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
@@ -199,7 +201,7 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
         .iter()
         .find(|obj| obj.rtype == RType::Entertainment)
         .copied()
-        .ok_or(ApiError::NotFound(bridge_id))?;
+        .ok_or(HueError::NotFound(bridge_id))?;
 
     Ok(bridge_ent)
 }
