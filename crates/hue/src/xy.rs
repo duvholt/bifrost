@@ -11,7 +11,7 @@ pub struct XY {
 }
 
 impl XY {
-    const COLOR_SPACE: ColorSpace = colorspace::WIDE;
+    pub const COLOR_SPACE: ColorSpace = colorspace::WIDE;
 
     #[must_use]
     pub const fn new(x: f64, y: f64) -> Self {
@@ -28,9 +28,11 @@ impl XY {
     pub fn from_rgb(red: u8, green: u8, blue: u8) -> (Self, f64) {
         let [r, g, b] = [red, green, blue].map(Clamp::unit_from_u8);
 
-        let [x, y, bright] = Self::COLOR_SPACE.rgb_to_xyy(r, g, b);
+        let [x, y, b] = Self::COLOR_SPACE.rgb_to_xyy(r, g, b);
 
-        (Self { x, y }, bright)
+        let max_y = Self::COLOR_SPACE.find_maximum_y(x, y);
+
+        (Self { x, y }, b / max_y * 255.0)
     }
 
     #[must_use]
@@ -42,9 +44,10 @@ impl XY {
 }
 
 impl XY {
+    #[must_use]
     pub fn from_quant(data: [u8; 3]) -> Self {
-        let x0 = u16::from(data[0]) | u16::from(data[1] & 0x0F) << 8;
-        let y0 = u16::from(data[2]) << 4 | u16::from(data[1] >> 4);
+        let x0 = u16::from(data[0]) | (u16::from(data[1] & 0x0F) << 8);
+        let y0 = (u16::from(data[2]) << 4) | (u16::from(data[1] >> 4));
 
         let x = f64::from(x0) * WIDE_GAMUT_MAX_X / f64::from(0xFFF);
         let y = f64::from(y0) * WIDE_GAMUT_MAX_Y / f64::from(0xFFF);
@@ -52,6 +55,8 @@ impl XY {
         Self { x, y }
     }
 
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[must_use]
     pub fn to_quant(&self) -> [u8; 3] {
         let x = (self.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
         let y = (self.y * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_Y) + (0.5 / 4095.))) as u16;
@@ -61,7 +66,7 @@ impl XY {
         [
             (x & 0xFF) as u8,
             (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)) as u8,
-            (y >> 4 & 0xFF) as u8,
+            ((y >> 4) & 0xFF) as u8,
         ]
     }
 }

@@ -18,6 +18,11 @@ workspace = true
 [dependencies]
 bitflags = "2.8.0"
 byteorder = "1.5.0"
+chrono = { version = "0.4.39", default-features = false }
 packed_struct = "0.10.1"
 serde = { version = "1.0.217", features = ["derive"] }
 thiserror = "2.0.11"
+uuid = "1.13.1"
+
+[dev-dependencies]
+hex = "0.4.3"

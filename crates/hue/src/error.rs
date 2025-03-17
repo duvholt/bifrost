@@ -15,6 +15,12 @@ pub enum HueError {
     #[error(transparent)]
     PackedStructError(#[from] packed_struct::PackingError),
 
+    #[error(transparent)]
+    UuidError(#[from] uuid::Error),
+
+    #[error("Bad header in hue entertainment stream")]
+    HueEntertainmentBadHeader,
+
     #[error("Failed to decode Hue Zigbee Update")]
     HueZigbeeDecodeError,
 

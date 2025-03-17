@@ -5,6 +5,7 @@ pub mod colorspace;
 pub mod error;
 pub mod flags;
 pub mod gamma;
+pub mod stream;
 pub mod xy;
 pub mod zigbee;
 
