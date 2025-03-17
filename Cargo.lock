@@ -963,6 +963,7 @@ dependencies = [
  "packed_struct",
  "serde",
  "thiserror 2.0.11",
+ "uuid",
 ]
 
 [[package]]
