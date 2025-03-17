@@ -30,3 +30,4 @@ uuid = { version = "1.13.1", features = ["serde", "v5"] }
 
 [dev-dependencies]
 hex = "0.4.3"
+uuid = { version = "1.13.1", features = ["v4"] }

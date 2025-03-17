@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::api::{ColorGamut, DeviceProductData};
 use crate::date_format;
+use crate::hs::RawHS;
 use crate::version::SwVersion;
 use crate::{api, best_guess_timezone};
 
@@ -489,6 +490,8 @@ pub struct ApiLightStateUpdate {
     pub xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ct: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none", flatten)]
+    pub hs: Option<RawHS>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -521,6 +524,7 @@ impl From<api::SceneAction> for ApiLightStateUpdate {
             bri: action.dimming.map(|dim| (dim.brightness * 2.54) as u32),
             xy: action.color.map(|col| col.xy.into()),
             ct: action.color_temperature.map(|ct| ct.mirek),
+            hs: None,
         }
     }
 }
