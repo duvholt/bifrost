@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::hue::api::Resource;
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum RType {
     AuthV1,
@@ -89,7 +89,7 @@ impl ResourceRecord {
     }
 }
 
-#[derive(Copy, Hash, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Copy, Hash, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceLink {
     pub rid: Uuid,
     pub rtype: RType,

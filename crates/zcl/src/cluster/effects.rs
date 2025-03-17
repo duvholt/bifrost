@@ -1,5 +1,6 @@
 use crate::frame::{ZclFrame, ZclFrameDirection};
 
+#[must_use]
 pub fn describe(frame: &ZclFrame, _data: &[u8]) -> Option<String> {
     if frame.flags.direction == ZclFrameDirection::ClientToServer {
         match frame.cmd {

@@ -20,6 +20,12 @@ pub enum Z2mRequest<'a> {
     Update(&'a DeviceUpdate),
 
     #[serde(untagged)]
+    Raw(Value),
+
+    #[serde(untagged)]
+    RawWrite(Value),
+
+    #[serde(untagged)]
     Untyped {
         endpoint: u32,
         value: &'a Value,

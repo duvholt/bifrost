@@ -4,13 +4,14 @@ use hue::zigbee::Flags;
 
 use crate::frame::{ZclFrame, ZclFrameDirection};
 
+#[must_use]
 pub fn describe(frame: &ZclFrame, data: &[u8]) -> Option<String> {
     if frame.manufacturer_specific() {
         if frame.flags.direction == ZclFrameDirection::ClientToServer {
             match frame.cmd {
                 0x02 => Some(format!(
                     "SetComposite {:?}",
-                    Flags::from_bits((data[3] as u16) | (data[4] as u16) << 8).unwrap()
+                    Flags::from_bits(u16::from(data[3]) | (u16::from(data[4]) << 8)).unwrap()
                 )),
                 _ => None,
             }

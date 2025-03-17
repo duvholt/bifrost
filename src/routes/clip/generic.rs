@@ -39,7 +39,7 @@ async fn post_resource(
     V2Reply::ok(rlink)
 }
 
-async fn get_resource_id(
+pub async fn get_resource_id(
     State(state): State<AppState>,
     Path((rtype, id)): Path<(RType, Uuid)>,
 ) -> ApiV2Result {

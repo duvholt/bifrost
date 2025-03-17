@@ -13,8 +13,9 @@ use uuid::Uuid;
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
-    Device, GroupedLight, GroupedLightUpdate, Light, LightUpdate, On, RType, ResourceLink, Room,
-    Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
+    Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
+    GroupedLightUpdate, Light, LightUpdate, On, RType, Resource, ResourceLink, Room, Scene,
+    SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use crate::hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
@@ -87,6 +88,14 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
         rooms.insert(
             res.get_id_v1(rr.id)?,
             ApiGroup::from_lights_and_room(glight, lights, room),
+        );
+    }
+
+    for rr in res.get_resources_by_type(RType::EntertainmentConfiguration) {
+        let ent: EntertainmentConfiguration = rr.obj.try_into()?;
+        rooms.insert(
+            res.get_id_v1(rr.id)?,
+            ApiGroup::from_entertainment_configuration(&ent),
         );
     }
 
@@ -202,7 +211,48 @@ async fn get_api_user_resource_id(
     Ok(Json(result))
 }
 
+#[allow(clippy::significant_drop_tightening, clippy::single_match)]
 async fn put_api_user_resource_id(
+    State(state): State<AppState>,
+    Path((username, artype, id)): Path<(String, ApiResourceType, u32)>,
+    Json(req): Json<Value>,
+) -> ApiResult<impl IntoResponse> {
+    log::debug!("PUT v1 username={username} resource={artype:?} id={id}");
+    log::debug!("JSON: {req:?}");
+    match artype {
+        ApiResourceType::Groups => {
+            let upd: ApiGroupUpdate2 = serde_json::from_value(req)?;
+            let mut lock = state.res.lock().await;
+
+            let uuid = lock.from_id_v1(id)?;
+
+            match lock.get_resource_by_id(&uuid)?.obj {
+                Resource::EntertainmentConfiguration(_ec) => {
+                    lock.update(&uuid, |ec: &mut EntertainmentConfiguration| {
+                        ec.status = if upd.stream.active {
+                            EntertainmentConfigurationStatus::Active
+                        } else {
+                            EntertainmentConfigurationStatus::Inactive
+                        };
+                    })?;
+                }
+                _ => {}
+            }
+
+            Ok(Json(V1Reply::for_group(id).json()))
+        }
+        ApiResourceType::Config
+        | ApiResourceType::Lights
+        | ApiResourceType::Resourcelinks
+        | ApiResourceType::Rules
+        | ApiResourceType::Scenes
+        | ApiResourceType::Schedules
+        | ApiResourceType::Sensors
+        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(artype)),
+    }
+}
+
+async fn put_api_user_resource_id_path(
     State(state): State<AppState>,
     Path((_username, artype, id, path)): Path<(String, ApiResourceType, u32, String)>,
     Json(req): Json<Value>,
@@ -309,5 +359,9 @@ pub fn router() -> Router<AppState> {
         .route("/{user}/{rtype}", post(post_api_user_resource))
         .route("/{user}/{rtype}", put(put_api_user_resource))
         .route("/{user}/{rtype}/{id}", get(get_api_user_resource_id))
-        .route("/{user}/{rtype}/{id}/{key}", put(put_api_user_resource_id))
+        .route("/{user}/{rtype}/{id}", put(put_api_user_resource_id))
+        .route(
+            "/{user}/{rtype}/{id}/{key}",
+            put(put_api_user_resource_id_path),
+        )
 }

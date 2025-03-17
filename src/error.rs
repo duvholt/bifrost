@@ -2,6 +2,7 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
+use svc::error::SvcError;
 use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
@@ -68,7 +69,7 @@ pub enum ApiError {
     TungsteniteError(#[from] tokio_tungstenite::tungstenite::Error),
 
     #[error(transparent)]
-    X509DerError(#[from] x509_cert::der::Error),
+    X509DerError(#[from] der::Error),
 
     #[error(transparent)]
     X509SpkiError(#[from] x509_cert::spki::Error),
@@ -90,6 +91,18 @@ pub enum ApiError {
 
     #[error(transparent)]
     HueError(#[from] hue::error::HueError),
+
+    #[error(transparent)]
+    OpenSslError(#[from] openssl::error::Error),
+
+    #[error(transparent)]
+    OpenSslErrors(#[from] openssl::error::ErrorStack),
+
+    #[error(transparent)]
+    SslError(#[from] openssl::ssl::Error),
+
+    #[error("Service error: {0}")]
+    SvcError(String),
 
     /* zigbee2mqtt errors */
     #[error("Unexpected eof on z2m socket")]
@@ -134,11 +147,29 @@ pub enum ApiError {
     #[error("Cannot load certificate: {0:?}")]
     Certificate(Utf8PathBuf, std::io::Error),
 
+    #[error("Cannot load certificate: {0:?}")]
+    CertificateOpenSSL(Utf8PathBuf, openssl::ssl::Error),
+
     #[error("Cannot parse certificate: {0:?}")]
     CertificateInvalid(Utf8PathBuf),
 
     #[error("Invalid hex color")]
     InvalidHexColor,
+
+    #[error("Entertainment Stream init error")]
+    EntStreamInitError,
+
+    #[error("Entertainment Stream desynchronized")]
+    EntStreamDesync,
+
+    #[error("Invalid zigbee message")]
+    ZigbeeMessageError,
+}
+
+impl From<SvcError> for ApiError {
+    fn from(value: SvcError) -> Self {
+        Self::SvcError(value.to_string())
+    }
 }
 
 pub type ApiResult<T> = Result<T, ApiError>;

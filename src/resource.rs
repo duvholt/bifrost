@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use maplit::btreeset;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
@@ -10,11 +11,14 @@ use uuid::Uuid;
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::hue::api::{
-    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Metadata, RType,
-    Resource, ResourceLink, ResourceRecord, RoomUpdate, TimeZone, ZigbeeConnectivity,
+    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
+    Entertainment, EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
+    EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
+    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, GroupedLight,
+    GroupedLightUpdate, Light, LightMode, LightUpdate, Metadata, On, RType, Resource, ResourceLink,
+    ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
-use crate::hue::api::{GroupedLightUpdate, LightUpdate, SceneUpdate, Update};
 use crate::hue::event::EventBlock;
 use crate::hue::version::SwVersion;
 use crate::model::state::{AuxData, State};
@@ -49,6 +53,33 @@ impl Resources {
         self.version = version;
         self.state.patch_bridge_version(&self.version);
         self.state_updates.notify_one();
+    }
+
+    pub fn reset_all_streaming(&mut self) -> ApiResult<()> {
+        for id in self.get_resource_ids_by_type(RType::Light) {
+            let light: &Light = self.get_id(id)?;
+            if light.mode != LightMode::Normal {
+                log::warn!("Clearing streaming state of Light {}", id);
+                self.update::<Light>(&id, |light| {
+                    light.mode = LightMode::Normal;
+                })?;
+            }
+        }
+
+        for id in self.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+            let ec: &EntertainmentConfiguration = self.get_id(id)?;
+            if ec.active_streamer.is_some()
+                || ec.status != EntertainmentConfigurationStatus::Inactive
+            {
+                log::warn!("Clearing streaming state of EntertainmentConfiguration {id}");
+                self.update::<EntertainmentConfiguration>(&id, |ec| {
+                    ec.active_streamer = None;
+                    ec.status = EntertainmentConfigurationStatus::Inactive;
+                })?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn read(&mut self, rdr: impl Read) -> ApiResult<()> {
@@ -112,6 +143,36 @@ impl Resources {
 
                 Ok(Some(Update::Room(upd)))
             }
+            Resource::BridgeHome(_home) => Ok(None),
+            Resource::EntertainmentConfiguration(ent) => {
+                let upd = EntertainmentConfigurationUpdate {
+                    configuration_type: Some(ent.configuration_type.clone()),
+                    metadata: Some(ent.metadata.clone()),
+                    action: None,
+                    stream_proxy: match ent.stream_proxy.mode {
+                        EntertainmentConfigurationStreamProxyMode::Auto => {
+                            Some(EntertainmentConfigurationStreamProxyUpdate::Auto)
+                        }
+                        EntertainmentConfigurationStreamProxyMode::Manual => {
+                            debug_assert!(ent.stream_proxy.node.rtype == RType::Entertainment);
+                            Some(EntertainmentConfigurationStreamProxyUpdate::Manual {
+                                node: ent.stream_proxy.node,
+                            })
+                        }
+                    },
+                    locations: Some(EntertainmentConfigurationLocationsUpdate {
+                        service_locations: ent
+                            .locations
+                            .service_locations
+                            .clone()
+                            .into_iter()
+                            .map(Into::into)
+                            .collect(),
+                    }),
+                };
+
+                Ok(Some(Update::EntertainmentConfiguration(upd)))
+            }
             obj => Err(ApiError::UpdateUnsupported(obj.rtype())),
         }
     }
@@ -129,6 +190,7 @@ impl Resources {
 
         if let Some(delta) = Self::generate_update(obj)? {
             let id_v1 = self.state.id_v1(id);
+            log::trace!("Hue event: {id_v1:?} {delta:#?}");
             self.hue_event_stream
                 .hue_event(EventBlock::update(id, id_v1, delta)?);
         }
@@ -212,14 +274,16 @@ impl Resources {
         let link_bridge_home = RType::BridgeHome.deterministic(format!("{bridge_id}HOME"));
         let link_bridge_dev = RType::Device.deterministic(link_bridge.rid);
         let link_bridge_home_dev = RType::Device.deterministic(link_bridge_home.rid);
+        let link_bridge_ent = RType::Entertainment.deterministic(link_bridge.rid);
         let link_zbdd = RType::ZigbeeDeviceDiscovery.deterministic(link_bridge.rid);
         let link_zbc = RType::ZigbeeConnectivity.deterministic(link_bridge.rid);
+        let link_bhome_glight = RType::GroupedLight.deterministic(link_bridge_home.rid);
 
         let bridge_dev = Device {
             product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost"),
-            services: vec![link_bridge, link_zbdd, link_zbc],
-            identify: None,
+            services: btreeset![link_bridge, link_zbc, link_bridge_ent, link_zbdd],
+            identify: Some(Stub),
             usertest: None,
         };
 
@@ -232,14 +296,38 @@ impl Resources {
         let bridge_home_dev = Device {
             product_data: DeviceProductData::hue_bridge_v2(&self.version),
             metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost Bridge Home"),
-            services: vec![link_bridge],
+            services: btreeset![link_bridge],
             identify: None,
             usertest: None,
         };
 
         let bridge_home = BridgeHome {
-            children: vec![link_bridge_dev],
-            services: vec![RType::GroupedLight.deterministic(link_bridge_home.rid)],
+            children: btreeset![link_bridge_dev],
+            services: btreeset![link_bhome_glight],
+        };
+
+        let bhome_glight = GroupedLight {
+            alert: json!({
+                "action_values": [
+                    "breathe",
+                ]
+            }),
+            dimming: Some(DimmingUpdate { brightness: 8.7 }),
+            color: Some(Stub),
+            color_temperature: Some(Stub),
+            color_temperature_delta: Some(Stub),
+            dimming_delta: Stub,
+            dynamics: Stub,
+            on: Some(On { on: true }),
+            owner: link_bridge_home,
+            signaling: json!({
+                "signal_values": [
+                    "alternating",
+                    "no_signal",
+                    "on_off",
+                    "on_off_color",
+                ]
+            }),
         };
 
         let zbdd = ZigbeeDeviceDiscovery {
@@ -251,12 +339,22 @@ impl Resources {
         let zbc = ZigbeeConnectivity {
             owner: link_bridge_dev,
             mac_address: String::from("11:22:33:44:55:66:77:88"),
-            status: ZigbeeConnectivityStatus::ConnectivityIssue,
+            status: ZigbeeConnectivityStatus::Connected,
             channel: Some(json!({
                 "status": "set",
                 "value": "channel_25",
             })),
             extended_pan_id: None,
+        };
+
+        let brent = Entertainment {
+            equalizer: false,
+            owner: link_bridge_dev,
+            proxy: true,
+            renderer: false,
+            max_streams: Some(1),
+            renderer_reference: None,
+            segments: None,
         };
 
         self.add(&link_bridge_dev, Resource::Device(bridge_dev))?;
@@ -265,6 +363,8 @@ impl Resources {
         self.add(&link_bridge_home, Resource::BridgeHome(bridge_home))?;
         self.add(&link_zbdd, Resource::ZigbeeDeviceDiscovery(zbdd))?;
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
+        self.add(&link_bridge_ent, Resource::Entertainment(brent))?;
+        self.add(&link_bhome_glight, Resource::GroupedLight(bhome_glight))?;
 
         Ok(())
     }
@@ -301,7 +401,14 @@ impl Resources {
     where
         &'a T: TryFrom<&'a Resource, Error = ApiError>,
     {
-        self.state.get(&link.rid)?.try_into()
+        self.get_id(link.rid)
+    }
+
+    pub fn get_id<'a, T>(&'a self, id: Uuid) -> ApiResult<&'a T>
+    where
+        &'a T: TryFrom<&'a Resource, Error = ApiError>,
+    {
+        self.state.get(&id)?.try_into()
     }
 
     /*
@@ -344,6 +451,15 @@ impl Resources {
                 .and_then(|light| self.state.id_v1(&light.rid))
                 .map(|id| format!("/lights/{id}")),
 
+            Resource::EntertainmentConfiguration(_dev) => Some(format!("/groups/{id}")),
+
+            Resource::Entertainment(ent) => {
+                let dev: &Device = self.get(&ent.owner).ok()?;
+                dev.light_service()
+                    .and_then(|light| self.state.id_v1(&light.rid))
+                    .map(|id| format!("/lights/{id}"))
+            }
+
             /* BridgeHome maps to "group 0" that seems to be present in the v1 api */
             Resource::BridgeHome(_) => Some(String::from("/groups/0")),
 
@@ -355,8 +471,6 @@ impl Resources {
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
             | Resource::Button(_)
-            | Resource::Entertainment(_)
-            | Resource::EntertainmentConfiguration(_)
             | Resource::GeofenceClient(_)
             | Resource::Geolocation(_)
             | Resource::GroupedMotion(_)
@@ -415,6 +529,26 @@ impl Resources {
             .collect()
     }
 
+    #[must_use]
+    pub fn get_resource_ids_by_type(&self, ty: RType) -> Vec<Uuid> {
+        self.state
+            .res
+            .iter()
+            .filter(|(_, r)| r.rtype() == ty)
+            .map(|(id, _res)| *id)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn get_resources_by_owner(&self, owner: ResourceLink) -> Vec<ResourceRecord> {
+        self.state
+            .res
+            .iter()
+            .filter(|(_, r)| r.owner() == Some(owner))
+            .map(|(id, res)| self.make_resource_record(id, res))
+            .collect()
+    }
+
     pub fn get_id_v1_index(&self, uuid: Uuid) -> ApiResult<u32> {
         self.state.id_v1(&uuid).ok_or(ApiError::NotFound(uuid))
     }
@@ -443,7 +577,9 @@ impl Resources {
     }
 
     pub fn backend_request(&self, req: BackendRequest) -> ApiResult<()> {
-        log::debug!("z2m request: {req:#?}");
+        if !matches!(req, BackendRequest::EntertainmentFrame(_)) {
+            log::debug!("z2m request: {req:#?}");
+        }
 
         self.backend_updates.send(Arc::new(req))?;
 

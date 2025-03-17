@@ -9,7 +9,7 @@ use crate::hue::api::HueStreamKey;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-pub const STANDARD_APPLICATION_ID: &str = "Bifrost-standard-application-id";
+pub const STANDARD_APPLICATION_ID: &str = "01010101-0202-0303-0404-050505050505";
 
 /// This 16-byte key is used for all DTLS entertainment streams
 pub const STANDARD_CLIENT_KEY: HueStreamKey = HueStreamKey::new(*b"BifrostHueTlsKey");

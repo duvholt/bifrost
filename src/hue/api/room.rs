@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
@@ -18,15 +19,15 @@ pub struct RoomMetadataUpdate {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Room {
-    pub children: Vec<ResourceLink>,
+    pub children: BTreeSet<ResourceLink>,
     pub metadata: RoomMetadata,
     #[serde(default)]
-    pub services: Vec<ResourceLink>,
+    pub services: BTreeSet<ResourceLink>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct RoomUpdate {
-    pub children: Option<Vec<ResourceLink>>,
+    pub children: Option<BTreeSet<ResourceLink>>,
     pub metadata: Option<RoomMetadataUpdate>,
 }
 

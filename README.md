@@ -31,10 +31,10 @@ To install Bifrost from source, you will need the following:
 3.  The MAC address of the network interface you want to run the server on
 4.  `build-essential` package for compiling the source code (on Debian/Ubuntu systems)
 
-First, install `build-essential` :
+First, install a few necessary build dependencies:
 
 ```sh
-sudo apt install build-essential
+sudo apt install build-essential pkg-config libssl-dev
 ```
 
 When you have these things available, install bifrost:

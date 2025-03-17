@@ -4,6 +4,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tokio::sync::broadcast::Receiver;
+use uuid::Uuid;
+
+use hue::stream::HueStreamLights;
 
 use crate::error::ApiResult;
 use crate::hue::api::{GroupedLightUpdate, LightUpdate, ResourceLink, Scene, SceneUpdate};
@@ -18,6 +21,10 @@ pub enum BackendRequest {
     GroupedLightUpdate(ResourceLink, GroupedLightUpdate),
 
     Delete(ResourceLink),
+
+    EntertainmentStart(Uuid),
+    EntertainmentFrame(HueStreamLights),
+    EntertainmentStop(),
 }
 
 #[async_trait]

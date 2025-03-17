@@ -1,7 +1,7 @@
 #![allow(clippy::struct_excessive_bools)]
 
-use std::collections::HashMap;
 use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Display};
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -58,6 +58,12 @@ pub struct IeeeAddress(#[serde(deserialize_with = "ieee_address")] u64);
 impl Debug for IeeeAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "IeeeAddress({:016x})", self.0)
+    }
+}
+
+impl Display for IeeeAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:08X}", self.0)
     }
 }
 
@@ -314,7 +320,7 @@ pub struct Device {
     pub interviewing: bool,
     pub manufacturer: Option<String>,
     pub model_id: Option<String>,
-    pub network_address: i64,
+    pub network_address: u16,
     #[serde(default)]
     pub power_source: PowerSource,
     pub software_build_id: Option<String>,

@@ -1,12 +1,13 @@
 pub mod appstate;
 pub mod banner;
 pub mod certificate;
+pub mod entertainment;
+pub mod http;
 pub mod hueevents;
 pub mod updater;
 
 use std::fs::File;
 use std::io::Write;
-use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,11 +16,8 @@ use axum::extract::Request;
 use axum::response::Response;
 use axum::routing::IntoMakeService;
 use axum::{Router, ServiceExt};
-use axum_server::service::MakeService;
-use axum_server::tls_rustls::RustlsConfig;
 
 use camino::Utf8PathBuf;
-use hyper::body::Incoming;
 use tokio::select;
 use tokio::sync::Mutex;
 use tokio::time::{sleep_until, MissedTickBehavior};
@@ -63,37 +61,6 @@ pub fn build_service(appstate: AppState) -> IntoMakeService<NormalizePath<Router
     let normalized = NormalizePathLayer::trim_trailing_slash().layer(router(appstate));
 
     ServiceExt::<Request>::into_make_service(normalized)
-}
-
-pub async fn http_server<S>(listen_addr: Ipv4Addr, listen_port: u16, svc: S) -> ApiResult<()>
-where
-    S: Send + MakeService<SocketAddr, Request<Incoming>>,
-    S::MakeFuture: Send,
-{
-    let addr = SocketAddr::from((listen_addr, listen_port));
-    log::info!("http listening on {}", addr);
-
-    axum_server::bind(addr).serve(svc).await?;
-
-    Ok(())
-}
-
-pub async fn https_server<S>(
-    listen_addr: Ipv4Addr,
-    listen_port: u16,
-    svc: S,
-    config: RustlsConfig,
-) -> ApiResult<()>
-where
-    S: Send + MakeService<SocketAddr, Request<Incoming>>,
-    S::MakeFuture: Send,
-{
-    let addr = SocketAddr::from((listen_addr, listen_port));
-    log::info!("https listening on {}", addr);
-
-    axum_server::bind_rustls(addr, config).serve(svc).await?;
-
-    Ok(())
 }
 
 pub async fn config_writer(res: Arc<Mutex<Resources>>, filename: Utf8PathBuf) -> ApiResult<()> {

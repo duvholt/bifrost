@@ -1,4 +1,6 @@
 mod device;
+mod entertainment;
+mod entertainment_config;
 mod grouped_light;
 mod light;
 mod resource;
@@ -9,7 +11,18 @@ mod stubs;
 mod update;
 
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
-
+pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
+pub use entertainment_config::{
+    EntertainmentConfiguration, EntertainmentConfigurationAction,
+    EntertainmentConfigurationChannels, EntertainmentConfigurationLocations,
+    EntertainmentConfigurationLocationsNew, EntertainmentConfigurationLocationsUpdate,
+    EntertainmentConfigurationMetadata, EntertainmentConfigurationNew,
+    EntertainmentConfigurationServiceLocations, EntertainmentConfigurationServiceLocationsNew,
+    EntertainmentConfigurationServiceLocationsUpdate, EntertainmentConfigurationStatus,
+    EntertainmentConfigurationStreamMembers, EntertainmentConfigurationStreamProxy,
+    EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Position,
+};
 pub use grouped_light::{GroupedLight, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, Delta, Dimming,
@@ -27,11 +40,11 @@ pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusUpdate, SceneUpdate,
 };
+use serde::ser::SerializeMap;
 pub use stream::HueStreamKey;
 pub use stubs::{
     BehaviorInstance, BehaviorInstanceMetadata, BehaviorScript, Bridge, BridgeHome, Button,
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
-    Entertainment, EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments,
     GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
     Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
     Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
@@ -47,9 +60,18 @@ use serde_json::{from_value, json, Value};
 use crate::error::{ApiError, ApiResult};
 use crate::hue::legacy_api::ApiLightStateUpdate;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Stub;
+
+impl Serialize for Stub {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_map(None)?.end()
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -125,6 +147,45 @@ impl Resource {
             Self::ZigbeeConnectivity(_) => RType::ZigbeeConnectivity,
             Self::ZigbeeDeviceDiscovery(_) => RType::ZigbeeDeviceDiscovery,
             Self::Zone(_) => RType::Zone,
+        }
+    }
+
+    #[allow(clippy::match_same_arms)]
+    #[must_use]
+    pub const fn owner(&self) -> Option<ResourceLink> {
+        match self {
+            Self::AuthV1(_) => None,
+            Self::BehaviorInstance(_) => None,
+            Self::BehaviorScript(_) => None,
+            Self::Bridge(obj) => Some(obj.owner),
+            Self::BridgeHome(_) => None,
+            Self::Button(obj) => Some(obj.owner),
+            Self::Device(_) => None,
+            Self::DevicePower(obj) => Some(obj.owner),
+            Self::DeviceSoftwareUpdate(obj) => Some(obj.owner),
+            Self::Entertainment(obj) => Some(obj.owner),
+            Self::EntertainmentConfiguration(_) => None,
+            Self::GeofenceClient(_) => None,
+            Self::Geolocation(_) => None,
+            Self::GroupedLight(obj) => Some(obj.owner),
+            Self::GroupedLightLevel(obj) => Some(obj.owner),
+            Self::GroupedMotion(obj) => Some(obj.owner),
+            Self::Homekit(_) => None,
+            Self::Light(obj) => Some(obj.owner),
+            Self::LightLevel(obj) => Some(obj.owner),
+            Self::Matter(_) => None,
+            Self::Motion(obj) => Some(obj.owner),
+            Self::PrivateGroup(_) => None,
+            Self::PublicImage(_) => None,
+            Self::RelativeRotary(obj) => Some(obj.owner),
+            Self::Room(_) => None,
+            Self::Scene(_) => None,
+            Self::SmartScene(_) => None,
+            Self::Taurus(obj) => Some(obj.owner),
+            Self::Temperature(obj) => Some(obj.owner),
+            Self::ZigbeeConnectivity(obj) => Some(obj.owner),
+            Self::ZigbeeDeviceDiscovery(obj) => Some(obj.owner),
+            Self::Zone(_) => None,
         }
     }
 

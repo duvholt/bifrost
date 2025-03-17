@@ -1,7 +1,7 @@
 use axum::response::{IntoResponse, Response};
 use axum::Router;
 use hyper::StatusCode;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::error::ApiError;
 use crate::hue::api::V2Reply;
@@ -21,7 +21,7 @@ impl IntoResponse for ApiError {
         log::error!("Request failed: {error_msg}");
         let res = Json(V2Reply::<Value> {
             data: vec![],
-            errors: vec![error_msg],
+            errors: vec![json!({"description": error_msg}).to_string()],
         });
 
         let status = match self {

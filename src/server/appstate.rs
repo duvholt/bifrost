@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::sync::Arc;
 
-use axum_server::tls_rustls::RustlsConfig;
 use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
+use svc::manager::SvmClient;
+
 use crate::config::AppConfig;
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 use crate::hue;
 use crate::hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use crate::model::state::{State, StateVersion};
@@ -20,11 +21,12 @@ use crate::server::updater::VersionUpdater;
 pub struct AppState {
     conf: Arc<AppConfig>,
     upd: Arc<Mutex<VersionUpdater>>,
+    svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
 }
 
 impl AppState {
-    pub async fn from_config(config: AppConfig) -> ApiResult<Self> {
+    pub async fn from_config(config: AppConfig, svm: SvmClient) -> ApiResult<Self> {
         let certfile = &config.bifrost.cert_file;
 
         let certpath = Utf8Path::new(certfile);
@@ -62,19 +64,17 @@ impl AppState {
             res.init(&hue::bridge_id(config.bridge.mac))?;
         }
 
+        res.reset_all_streaming()?;
+
         let conf = Arc::new(config);
         let res = Arc::new(Mutex::new(res));
 
-        Ok(Self { conf, upd, res })
-    }
-
-    pub async fn tls_config(&self) -> ApiResult<RustlsConfig> {
-        let certfile = &self.conf.bifrost.cert_file;
-
-        log::debug!("Loading certificate from [{certfile}]");
-        RustlsConfig::from_pem_file(&certfile, &certfile)
-            .await
-            .map_err(|e| ApiError::Certificate(certfile.to_owned(), e))
+        Ok(Self {
+            conf,
+            upd,
+            svm,
+            res,
+        })
     }
 
     #[must_use]
@@ -85,6 +85,11 @@ impl AppState {
     #[must_use]
     pub fn updater(&self) -> Arc<Mutex<VersionUpdater>> {
         self.upd.clone()
+    }
+
+    #[must_use]
+    pub fn manager(&self) -> SvmClient {
+        self.svm.clone()
     }
 
     #[must_use]

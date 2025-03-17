@@ -103,6 +103,9 @@ pub enum ZclDataType {
     /** IEEE address (U64) type */
     ZclIeeeaddr = 0xf0,
 
+    /** 128-bit security key */
+    ZclSecurityKey = 0xf1,
+
     /** Invalid data type */
     ZclInvalid = 0xff,
 }
@@ -149,6 +152,7 @@ pub enum ZclAttrValue {
     Bytes(Vec<u8>),
     String(String),
     IeeeAddr(Vec<u8>),
+    SecurityKey([u8; 16]),
     Unsupported,
 }
 
@@ -156,25 +160,26 @@ impl Debug for ZclAttrValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Null => write!(f, "Null"),
-            Self::X8(val) => write!(f, "x8:{}", val),
-            Self::X16(val) => write!(f, "x16:{}", val),
-            Self::X32(val) => write!(f, "x32:{}", val),
-            Self::Bool(val) => write!(f, "bool:{}", val),
-            Self::B8(val) => write!(f, "b8:{:02X}", val),
-            Self::B16(val) => write!(f, "b16:{:04X}", val),
-            Self::B32(val) => write!(f, "b32:{:08X}", val),
-            Self::B40(val) => write!(f, "b40:{:010X}", val),
-            Self::B48(val) => write!(f, "b48:{:012X}", val),
-            Self::B56(val) => write!(f, "b56:{:014X}", val),
-            Self::B64(val) => write!(f, "b64:{:016X}", val),
-            Self::U8(val) => write!(f, "u8:{:02X}", val),
-            Self::U16(val) => write!(f, "u16:{:04X}", val),
-            Self::U32(val) => write!(f, "u32:{:08X}", val),
-            Self::I16(val) => write!(f, "i16:{:04X}", val),
-            Self::E8(val) => write!(f, "e8:{:02X}", val),
+            Self::X8(val) => write!(f, "x8:{val}"),
+            Self::X16(val) => write!(f, "x16:{val}"),
+            Self::X32(val) => write!(f, "x32:{val}"),
+            Self::Bool(val) => write!(f, "bool:{val}"),
+            Self::B8(val) => write!(f, "b8:{val:02X}"),
+            Self::B16(val) => write!(f, "b16:{val:04X}"),
+            Self::B32(val) => write!(f, "b32:{val:08X}"),
+            Self::B40(val) => write!(f, "b40:{val:010X}"),
+            Self::B48(val) => write!(f, "b48:{val:012X}"),
+            Self::B56(val) => write!(f, "b56:{val:014X}"),
+            Self::B64(val) => write!(f, "b64:{val:016X}"),
+            Self::U8(val) => write!(f, "u8:{val:02X}"),
+            Self::U16(val) => write!(f, "u16:{val:04X}"),
+            Self::U32(val) => write!(f, "u32:{val:08X}"),
+            Self::I16(val) => write!(f, "i16:{val:04X}"),
+            Self::E8(val) => write!(f, "e8:{val:02X}"),
             Self::Bytes(val) => write!(f, "hex:{}", hex::encode(val)),
-            Self::String(val) => write!(f, "str:{}", &val),
+            Self::String(val) => write!(f, "str:{val}"),
             Self::IeeeAddr(val) => write!(f, "ieeeaddr {}", hex::encode(val)),
+            Self::SecurityKey(val) => write!(f, "seckey {}", hex::encode(val)),
             Self::Unsupported => write!(f, "Unsupported"),
         }
     }
@@ -240,6 +245,11 @@ impl ZclAttr {
                 ZclAttrValue::String(String::from_utf8(buf)?)
             }
             ZclDataType::ZclIeeeaddr => todo!(),
+            ZclDataType::ZclSecurityKey => {
+                let mut buf = [0; 16];
+                rdr.read_exact(&mut buf)?;
+                ZclAttrValue::SecurityKey(buf)
+            }
             ZclDataType::ZclInvalid => todo!(),
         };
 
@@ -261,6 +271,7 @@ pub struct ZclReadAttrResp {
 }
 
 impl ZclReadAttrResp {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse(data: &[u8]) -> ZclResult<Self> {
         let mut attr = vec![];
 
@@ -279,6 +290,7 @@ pub struct ZclWriteAttr {
 }
 
 impl ZclWriteAttr {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse(data: &[u8]) -> ZclResult<Self> {
         let mut attr = vec![];
 
@@ -297,6 +309,7 @@ pub struct ZclReportAttr {
 }
 
 impl ZclReportAttr {
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse(data: &[u8]) -> ZclResult<Self> {
         let mut attr = vec![];
 
@@ -316,7 +329,7 @@ pub struct ZclDefaultResp {
 }
 
 impl ZclDefaultResp {
-    pub fn parse(data: &[u8]) -> ZclResult<Self> {
+    pub const fn parse(data: &[u8]) -> ZclResult<Self> {
         Ok(Self {
             cmd: data[0],
             stat: data[1],

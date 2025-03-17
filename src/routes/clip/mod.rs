@@ -1,4 +1,6 @@
 pub mod device;
+pub mod entertainment;
+pub mod entertainment_configuration;
 pub mod generic;
 pub mod grouped_light;
 pub mod light;
@@ -42,5 +44,10 @@ pub fn router() -> Router<AppState> {
         .nest("/light", light::router())
         .nest("/device", device::router())
         .nest("/grouped_light", grouped_light::router())
+        .nest(
+            "/entertainment_configuration",
+            entertainment_configuration::router(),
+        )
+        .nest("/entertainment/", entertainment::router())
         .merge(generic::router())
 }

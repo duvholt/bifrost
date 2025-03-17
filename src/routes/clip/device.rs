@@ -32,8 +32,13 @@ async fn put_device(
     V2Reply::ok(rlink)
 }
 
+async fn get_device(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
+    V2Reply::ok(state.res.lock().await.get_resource(RType::Device, &id)?)
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(|state| get_resource(state, Path(RType::Device))))
+        .route("/{id}", get(get_device))
         .route("/{id}", put(put_device))
 }

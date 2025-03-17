@@ -3,12 +3,13 @@
 use std::fmt::Debug;
 use std::io::{stdin, Cursor};
 
+use clap::Parser;
 use serde::Deserialize;
 
 use bifrost::error::ApiResult;
 use zcl::cluster;
 use zcl::error::ZclResult;
-use zcl::frame::{ZclFrame, ZclFrameType};
+use zcl::frame::{ZclFrame, ZclFrameDirection, ZclFrameType};
 
 #[macro_use]
 extern crate log;
@@ -80,7 +81,7 @@ pub struct Record {
     pub data: Vec<u8>,
 }
 
-fn parse(rec: &Record) -> ZclResult<()> {
+fn parse(rec: &Record, no_index: bool) -> ZclResult<()> {
     if rec.data.is_empty() {
         return Ok(());
     }
@@ -95,9 +96,15 @@ fn parse(rec: &Record) -> ZclResult<()> {
     let flags = frame.flags;
     let cmd = frame.cmd;
     let cls = rec.cluster;
-    let index = rec.index;
+    let index = if no_index { 0 } else { rec.index };
 
     let describe = |cat: &str, desc: ZclResult<Option<String>>| {
+        let dir = if flags.direction == ZclFrameDirection::ClientToServer {
+            " :>"
+        } else {
+            "<: "
+        };
+
         match desc {
             Ok(Some(desc)) => {
                 if desc.is_empty() {
@@ -105,19 +112,19 @@ fn parse(rec: &Record) -> ZclResult<()> {
                 }
 
                 info!(
-                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}{desc} {}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} {dir} {cat}{desc} {}",
                     hex::encode(data)
                 );
             }
             Ok(None) => {
                 warn!(
-                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: {cat}Unknown {}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} {dir} {cat}Unknown {}",
                     hex::encode(data)
                 );
             }
             Err(err) => {
                 error!(
-                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} :: FAILED {}: {err}",
+                    "[{index:6}] [{src} -> {dst}] {flags:?} [{cls:04x}] {cmd:02x} {dir} FAILED {}: {err}",
                     hex::encode(data)
                 );
             }
@@ -164,18 +171,29 @@ fn parse(rec: &Record) -> ZclResult<()> {
     Ok(())
 }
 
+#[derive(Parser, Debug)]
+#[command(version, long_about = None)]
+#[command(about("Parses hue zigbee frames (as hex-encoded lines on stdin)"))]
+struct Args {
+    /// Ignore packet number (easier diffing, since all packets are numbered 0)
+    #[arg(short, name = "no-index", default_value_t = false)]
+    no_index: bool,
+}
+
 fn main() -> ApiResult<()> {
     pretty_env_logger::formatted_builder()
         .filter_level(log::LevelFilter::Debug)
         .parse_default_env()
         .init();
 
+    let args = Args::parse();
+
     for line in stdin().lines() {
         let line = line?;
 
         match serde_json::from_str::<Record>(line.trim()) {
             Ok(data) => {
-                if let Err(err) = parse(&data) {
+                if let Err(err) = parse(&data, args.no_index) {
                     error!("Failed parse: {err}");
                     eprintln!("    {line:<40}");
                     eprintln!("    {data:?}");

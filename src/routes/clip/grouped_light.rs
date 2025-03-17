@@ -34,8 +34,19 @@ async fn put_grouped_light(
     V2Reply::ok(rlink)
 }
 
+async fn get_grouped_light(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
+    V2Reply::ok(
+        state
+            .res
+            .lock()
+            .await
+            .get_resource(RType::GroupedLight, &id)?,
+    )
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(|st| get_resource(st, Path(RType::GroupedLight))))
+        .route("/{id}", get(get_grouped_light))
         .route("/{id}", put(put_grouped_light))
 }
