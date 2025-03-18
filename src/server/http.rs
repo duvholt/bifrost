@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use axum::extract::Request;
 use axum_server::accept::{Accept, DefaultAcceptor};
 use axum_server::service::{MakeService, SendService};
+use axum_server::tls_openssl::{OpenSSLAcceptor, OpenSSLConfig};
 use axum_server::{Handle, Server};
 use camino::Utf8Path;
 use futures::future::BoxFuture;
@@ -92,10 +93,6 @@ where
     }
 }
 
-#[cfg(feature = "tls-openssl")]
-use axum_server::tls_openssl::{OpenSSLAcceptor, OpenSSLConfig};
-
-#[cfg(feature = "tls-openssl")]
 impl<S, F> HttpServer<S, OpenSSLAcceptor, F, OpenSSLConfig>
 where
     Server<DefaultAcceptor>: Send,
@@ -140,50 +137,6 @@ where
         let srv = Self {
             addr,
             bind: |slf: &Self| Ok(axum_server::bind_openssl(slf.addr, slf.extra.clone())),
-            server: None,
-            svc,
-            extra: config,
-            handle: Handle::new(),
-        };
-
-        Ok(srv)
-    }
-}
-
-#[cfg(feature = "tls-rustls")]
-use axum_server::tls_rustls::{RustlsAcceptor, RustlsConfig};
-
-#[cfg(feature = "tls-rustls")]
-impl<S, F> HttpServer<S, RustlsAcceptor, F, RustlsConfig>
-where
-    Server<DefaultAcceptor>: Send,
-    Self: Service,
-    S: Send + Unpin,
-{
-    pub async fn https_rustls(
-        listen_addr: Ipv4Addr,
-        listen_port: u16,
-        svc: S,
-        certfile: &Utf8Path,
-    ) -> ApiResult<Self> {
-        use crate::error::ApiError;
-        use axum_server::tls_rustls::RustlsConfig;
-
-        log::debug!("Loading certificate from [{certfile}]");
-
-        let config = RustlsConfig::from_pem_file(certfile, certfile)
-            .await
-            .map_err(|e| ApiError::Certificate(certfile.to_owned(), e))?;
-
-        let addr = SocketAddr::from((listen_addr, listen_port));
-
-        log::info!("https listening on {}", addr);
-
-        let addr = SocketAddr::from((listen_addr, listen_port));
-
-        let srv = Self {
-            addr,
-            bind: |slf: &Self| Ok(axum_server::bind_rustls(slf.addr, slf.extra.clone())),
             server: None,
             svc,
             extra: config,

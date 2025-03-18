@@ -1155,7 +1155,10 @@ impl Backend for Z2mBackend {
         // does not check certificate validity. This is obviously neither safe
         // nor recommended.
         let connector = if self.server.disable_tls_verify.unwrap_or_default() {
-            log::warn!("[{}] TLS verification disabled; will accept any certificate!", self.name);
+            log::warn!(
+                "[{}] TLS verification disabled; will accept any certificate!",
+                self.name
+            );
             Some(Connector::NativeTls(
                 TlsConnector::builder()
                     .danger_accept_invalid_certs(true)
