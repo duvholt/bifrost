@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use maplit::btreeset;
 use native_tls::TlsConnector;
@@ -23,13 +23,13 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use hue::api::{
-    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperatureUpdate,
-    ColorUpdate, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
-    EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
-    LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
-    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
-    RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall,
-    SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
+    DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
+    EntertainmentSegment, EntertainmentSegments, GroupedLight, Light, LightEffect, LightEffects,
+    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata,
+    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
+    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -46,21 +46,15 @@ use z2m::convert::{
 };
 use z2m::hexcolor::HexColor;
 use z2m::request::Z2mRequest;
-use z2m::update::{DeviceColor, DeviceUpdate};
+use z2m::update::DeviceUpdate;
 
+use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::stream::Z2mTarget;
 use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
 use crate::resource::Resources;
-
-#[derive(Debug)]
-struct LearnScene {
-    pub expire: DateTime<Utc>,
-    pub missing: HashSet<Uuid>,
-    pub known: HashMap<Uuid, SceneAction>,
-}
 
 struct EntStream {
     stream: EntertainmentZigbeeStream,
@@ -76,7 +70,7 @@ pub struct Z2mBackend {
     state: Arc<Mutex<Resources>>,
     map: HashMap<String, Uuid>,
     rmap: HashMap<Uuid, String>,
-    learn: HashMap<Uuid, LearnScene>,
+    learner: SceneLearn,
     ignore: HashSet<String>,
     network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
@@ -105,7 +99,7 @@ impl Z2mBackend {
     ) -> ApiResult<Self> {
         let map = HashMap::new();
         let rmap = HashMap::new();
-        let learn = HashMap::new();
+        let learn = SceneLearn::new(name.clone());
         let ignore = HashSet::new();
         let network = HashMap::new();
         let entstream = None;
@@ -116,7 +110,7 @@ impl Z2mBackend {
             state,
             map,
             rmap,
-            learn,
+            learner: learn,
             ignore,
             network,
             entstream,
@@ -475,50 +469,8 @@ impl Z2mBackend {
             *light += upd;
         })?;
 
-        for learn in self.learn.values_mut() {
-            if learn.missing.remove(uuid) {
-                let upd = devupd;
-                let rlink = RType::Light.link_to(*uuid);
-                let light = res.get::<Light>(&rlink)?;
-                let mut color_temperature = None;
-                let mut color = None;
-                if let Some(DeviceColor { xy: Some(xy), .. }) = upd.color {
-                    color = Some(ColorUpdate { xy });
-                } else if let Some(mirek) = upd.color_temp {
-                    color_temperature = Some(ColorTemperatureUpdate { mirek });
-                }
-
-                learn.known.insert(
-                    *uuid,
-                    SceneAction {
-                        color,
-                        color_temperature,
-                        dimming: light.as_dimming_opt(),
-                        on: Some(light.on),
-                        gradient: None,
-                        effects: json!({}),
-                    },
-                );
-            }
-            log::info!("[{}] Learn: {learn:?}", self.name);
-        }
-
-        let keys: Vec<Uuid> = self.learn.keys().copied().collect();
-        for uuid in &keys {
-            if self.learn[uuid].missing.is_empty() {
-                let lscene = self.learn.remove(uuid).unwrap();
-                log::info!("[{}] Learned all lights {uuid}", self.name);
-                let actions: Vec<SceneActionElement> = lscene
-                    .known
-                    .into_iter()
-                    .map(|(uuid, action)| SceneActionElement {
-                        action,
-                        target: RType::Light.link_to(uuid),
-                    })
-                    .collect();
-                res.update::<Scene>(uuid, |scene| scene.actions = actions)?;
-            }
-        }
+        self.learner.learn(uuid, &res, devupd)?;
+        self.learner.collect(&mut res)?;
         drop(res);
 
         Ok(())
@@ -677,50 +629,6 @@ impl Z2mBackend {
         }
     }
 
-    fn learn_cleanup(&mut self) {
-        let now = Utc::now();
-        self.learn.retain(|uuid, lscene| {
-            let res = lscene.expire < now;
-            if !res {
-                log::warn!(
-                    "[{}] Failed to learn scene {uuid} before deadline",
-                    self.name
-                );
-            }
-            res
-        });
-    }
-
-    async fn learn_scene_recall(&mut self, lscene: &ResourceLink) -> ApiResult<()> {
-        log::info!("[{}] Recall scene: {lscene:?}", self.name);
-        let lock = self.state.lock().await;
-        let scene: &Scene = lock.get(lscene)?;
-
-        if scene.actions.is_empty() {
-            let room: &Room = lock.get(&scene.group)?;
-
-            let lights: Vec<Uuid> = room
-                .children
-                .iter()
-                .filter_map(|rl| lock.get(rl).ok())
-                .filter_map(hue::api::Device::light_service)
-                .map(|rl| rl.rid)
-                .collect();
-
-            drop(lock);
-
-            let learn = LearnScene {
-                expire: Utc::now() + Duration::seconds(5),
-                missing: HashSet::from_iter(lights),
-                known: HashMap::new(),
-            };
-
-            self.learn.insert(lscene.rid, learn);
-        }
-
-        Ok(())
-    }
-
     async fn websocket_send(
         &self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -769,7 +677,7 @@ impl Z2mBackend {
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
         req: Arc<BackendRequest>,
     ) -> ApiResult<()> {
-        self.learn_cleanup();
+        self.learner.cleanup();
 
         let mut lock = self.state.lock().await;
 
@@ -945,7 +853,11 @@ impl Z2mBackend {
                         drop(lock);
 
                         if let Some(topic) = self.rmap.get(&room).cloned() {
-                            self.learn_scene_recall(&link).await?;
+                            log::info!("[{}] Recall scene: {link:?}", self.name);
+
+                            let mut lock = self.state.lock().await;
+                            self.learner.learn_scene_recall(&link, &mut lock)?;
+
                             let z2mreq = Z2mRequest::SceneRecall(index);
                             self.websocket_send(socket, &topic, z2mreq).await?;
                         }
