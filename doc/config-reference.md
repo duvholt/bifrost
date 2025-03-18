@@ -67,8 +67,18 @@ z2m:
     #
     # Therefore, Bifrost will adjust the urls if needed.
     # A message will be logged with the rewritten url if this happens.
-    url: ws://10.00.0.100:8080
+    #
+    # NOTE: The z2m default token is literally the string "your-secret-token",
+    # so if unsure, append "/api?token=your-secret-token".
+    #
+    # Example:
+    #   If your z2m frontend is listening on 10.00.0.100:8080, this
+    #   is the resuling config:
+    url: ws://10.00.0.100:8080/api?token=your-secret-token
+
   other-server:
+    # this will work, but Bifrost will generate a warning that the url has been
+    # adapted to include "/api?token=your-secret-token"
     url: ws://10.10.0.102:8080
 
     # Group prefix [optional!]
