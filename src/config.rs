@@ -37,6 +37,7 @@ pub struct Z2mConfig {
 pub struct Z2mServer {
     pub url: Url,
     pub group_prefix: Option<String>,
+    pub disable_tls_verify: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
