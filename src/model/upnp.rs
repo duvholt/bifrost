@@ -268,6 +268,11 @@ mod tests {
         to_xml, Device, Icon, Root, Service, SCHEMA_DEVICE_BASIC, XMLNS, XML_DOCTYPE,
     };
 
+    // convert using `to_xml()`, but trim lines to avoid having to indent test results
+    fn make_xml(obj: impl Serialize) -> String {
+        to_xml(&obj).unwrap().lines().map(str::trim).collect()
+    }
+
     #[test]
     fn uuid_prefix() {
         #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -298,7 +303,7 @@ mod tests {
             event_sub_url: Url::parse("http://event_sub_url/").unwrap(),
         };
 
-        let a = to_xml(&svc).unwrap();
+        let a = make_xml(&svc);
         let b = [
             XML_DOCTYPE,
             "<Service>",
@@ -324,7 +329,7 @@ mod tests {
             url: Url::parse("http://example.org/icon.png").unwrap(),
         };
 
-        let a = to_xml(&icon).unwrap();
+        let a = make_xml(&icon);
         let b = [
             XML_DOCTYPE,
             "<Icon>",
@@ -348,7 +353,7 @@ mod tests {
         let udn = UUID;
         let dev = Device::new(friendly_name, manufacturer, model_name, udn);
 
-        let a = to_xml(&dev).unwrap();
+        let a = make_xml(&dev);
         let b = [
             XML_DOCTYPE,
             "<Device>",
@@ -385,7 +390,7 @@ mod tests {
         ]
         .concat();
 
-        let a = to_xml(&dev).unwrap();
+        let a = make_xml(&dev);
         let b = [
             XML_DOCTYPE,
             "<Device>",
@@ -423,7 +428,7 @@ mod tests {
             .with_serial_number(serial_number);
         let root = Root::new(base_url.clone(), dev);
 
-        let a = to_xml(&root).unwrap();
+        let a = make_xml(&root);
         let b = [
             XML_DOCTYPE,
             &format!("<root xmlns=\"{XMLNS}\">"),
