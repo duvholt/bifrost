@@ -73,13 +73,15 @@ default = [
 tls-openssl = [
     "axum-server/tls-openssl",
     "reqwest/native-tls",
-    "dep:openssl"
+    "tokio-tungstenite/native-tls",
+    "dep:openssl",
 ]
 
 tls-rustls  = [
     "axum-server/rustls",
     "axum-server/tls-rustls-no-provider",
-    "reqwest/rustls-tls"
+    "tokio-tungstenite/rustls",
+    "reqwest/rustls-tls",
 ]
 
 server = []
@@ -143,6 +145,8 @@ svc = { version = "0.1.0", path = "crates/svc" }
 z2m = { version = "0.1.0", path = "crates/z2m" }
 quick-xml = { version = "0.37.2", features = ["serialize"] }
 tokio-ssdp = { git = "https://github.com/chrivers/tokio-ssdp.git" }
+native-tls = "0.2.13"
+tokio-native-tls = "0.3.1"
 
 [dev-dependencies]
 clap-stdin = "0.6.0"

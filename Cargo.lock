@@ -293,6 +293,7 @@ dependencies = [
  "maplit",
  "mdns-sd",
  "mime",
+ "native-tls",
  "openssl",
  "p256",
  "packed_struct",
@@ -311,6 +312,7 @@ dependencies = [
  "termcolor",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-native-tls",
  "tokio-openssl",
  "tokio-ssdp",
  "tokio-stream",
@@ -1495,9 +1497,9 @@ dependencies = [
 
 [[package]]
 name = "native-tls"
-version = "0.2.12"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8614eb2c83d59d1c8cc974dd3f920198647674a0a035e1af1fa58707e317466"
+checksum = "87de3442987e9dbec73158d5c715e7ad9072fda936bb03d19d7fa10e00520f0e"
 dependencies = [
  "libc",
  "log",
@@ -2621,7 +2623,10 @@ checksum = "be4bf6fecd69fcdede0ec680aaf474cdab988f9de6bc73d3758f0160e3b7025a"
 dependencies = [
  "futures-util",
  "log",
+ "native-tls",
+ "rustls",
  "tokio",
+ "tokio-native-tls",
  "tungstenite",
 ]
 
@@ -2746,6 +2751,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
+ "native-tls",
  "rand 0.8.5",
  "sha1",
  "thiserror 2.0.12",
