@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use futures::{SinkExt, StreamExt};
 use maplit::btreeset;
+use native_tls::TlsConnector;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::net::TcpStream;
@@ -15,7 +16,9 @@ use tokio::select;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+    connect_async_tls_with_config, tungstenite, Connector, MaybeTlsStream, WebSocketStream,
+};
 use uuid::Uuid;
 
 use hue::api::{
@@ -1148,9 +1151,24 @@ impl Backend for Z2mBackend {
             );
         }
 
+        // if tls verification is disabled, build a TlsConnector that explicitly
+        // does not check certificate validity. This is obviously neither safe
+        // nor recommended.
+        let connector = if self.server.disable_tls_verify.unwrap_or_default() {
+            log::warn!("[{}] TLS verification disabled; will accept any certificate!", self.name);
+            Some(Connector::NativeTls(
+                TlsConnector::builder()
+                    .danger_accept_invalid_certs(true)
+                    .build()?,
+            ))
+        } else {
+            None
+        };
+
         loop {
             log::info!("[{}] Connecting to {}", self.name, &sanitized_url);
-            match connect_async(url.as_str()).await {
+            match connect_async_tls_with_config(url.as_str(), None, false, connector.clone()).await
+            {
                 Ok((socket, _)) => {
                     let res = self.event_loop(&mut chan, socket).await;
                     if let Err(err) = res {
