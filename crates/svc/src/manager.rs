@@ -417,7 +417,7 @@ impl ServiceManager {
             }
 
             SvmRequest::Shutdown(rpc) => {
-                log::info!("Service managed shutting down..");
+                log::info!("Service manager shutting down..");
                 let ids: Vec<Uuid> = self.list().copied().collect();
 
                 self.stop_multiple(&ids)?;
