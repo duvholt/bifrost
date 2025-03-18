@@ -1,3 +1,4 @@
+pub mod learn;
 pub mod stream;
 pub mod zclcommand;
 
