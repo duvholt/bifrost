@@ -72,14 +72,31 @@ z2m:
     # so if unsure, append "/api?token=your-secret-token".
     #
     # Example:
+    #
     #   If your z2m frontend is listening on 10.00.0.100:8080, this
     #   is the resuling config:
+    #
     url: ws://10.00.0.100:8080/api?token=your-secret-token
 
-  other-server:
-    # this will work, but Bifrost will generate a warning that the url has been
-    # adapted to include "/api?token=your-secret-token"
-    url: ws://10.10.0.102:8080
+  other-with-tls:
+    # This will work, but Bifrost will generate a warning that the url has been
+    # adapted to include "/api?token=your-secret-token".
+    #
+    # NOTE: Using "wss://" instead of "ws://" enables TLS for this connection.
+    url: wss://10.10.0.102:8080
+
+    # Disable TLS verify [optional!]
+    #
+    # If this parameter is included, and has a value of "true", TLS certificate
+    # verification will be disabled!
+    #
+    # NOTE: From a security standpoint, this is almost as bad as disabling
+    # encryption entirely. If having a secure connection is important to you,
+    # DO NOT enable this option.
+    #
+    # If you're using self-signed certificates, enabling this option will allow
+    # Bifrost to connect to your z2m server.
+    disable_tls_verify: false
 
     # Group prefix [optional!]
     #
