@@ -336,7 +336,7 @@ impl ServiceManager {
 
     fn start(&self, id: impl IntoServiceId) -> SvcResult<()> {
         self.get(&id).and_then(|svc| {
-            log::debug!("Starting {id} {}", &svc.name);
+            log::debug!("Starting service: {id} {}", &svc.name);
             Ok(svc.tx.send(ServiceState::Running)?)
         })
     }
@@ -348,7 +348,7 @@ impl ServiceManager {
             return Ok(());
         }
 
-        log::debug!("Stopping {id} {}", self.svcs[&id].name);
+        log::debug!("Stopping service: {id} {}", self.svcs[&id].name);
         self.get(id)
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
