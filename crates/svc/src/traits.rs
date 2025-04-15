@@ -94,7 +94,7 @@ pub trait ServiceRunner {
         mut self,
         id: Uuid,
         rx: watch::Receiver<ServiceState>,
-        tx: mpsc::Sender<ServiceEvent>,
+        tx: mpsc::UnboundedSender<ServiceEvent>,
     ) -> Result<(), RunSvcError>;
 }
 
