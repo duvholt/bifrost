@@ -132,7 +132,7 @@ impl Light {
                     dimming: DimmingUpdate { brightness: 100.0 },
                 },
                 color: LightPowerupColor::ColorTemperature {
-                    color_temperature: ColorTemperatureUpdate { mirek: 366 },
+                    color_temperature: ColorTemperatureUpdate::new(366),
                 },
             }),
             signaling: Some(LightSignaling {
@@ -194,7 +194,7 @@ impl AddAssign<LightUpdate> for Light {
         }
 
         if let Some(ct) = &mut self.color_temperature {
-            ct.mirek = upd.color_temperature.map(|c| c.mirek);
+            ct.mirek = upd.color_temperature.and_then(|c| c.mirek);
         }
 
         if let Some(col) = upd.color {
@@ -734,13 +734,13 @@ impl ColorUpdate {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct ColorTemperatureUpdate {
-    pub mirek: u16,
+    pub mirek: Option<u16>,
 }
 
 impl ColorTemperatureUpdate {
     #[must_use]
     pub const fn new(mirek: u16) -> Self {
-        Self { mirek }
+        Self { mirek: Some(mirek) }
     }
 }
 

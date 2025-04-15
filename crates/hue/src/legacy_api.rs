@@ -532,7 +532,7 @@ impl From<api::SceneAction> for ApiLightStateUpdate {
             on: action.on.map(|on| on.on),
             bri: action.dimming.map(|dim| (dim.brightness * 2.54) as u8),
             xy: action.color.map(|col| col.xy.into()),
-            ct: action.color_temperature.map(|ct| ct.mirek),
+            ct: action.color_temperature.and_then(|ct| ct.mirek),
             hs: None,
         }
     }

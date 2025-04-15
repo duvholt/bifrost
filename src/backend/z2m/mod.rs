@@ -623,8 +623,8 @@ impl Z2mBackend {
             if let Some(speed) = &act.parameters.speed {
                 hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
             }
-            if let Some(ct) = &act.parameters.color_temperature {
-                hz = hz.with_color_mirek(ct.mirek);
+            if let Some(mirek) = &act.parameters.color_temperature.and_then(|ct| ct.mirek) {
+                hz = hz.with_color_mirek(*mirek);
             }
             if let Some(color) = &act.parameters.color {
                 hz = hz.with_color_xy(color.xy);
@@ -758,7 +758,7 @@ impl Z2mBackend {
                     let mut payload = DeviceUpdate::default()
                         .with_state(upd.on.map(|on| on.on))
                         .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                        .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
                         .with_color_xy(upd.color.map(|col| col.xy));
 
                     // We don't want to send gradient updates twice, but if hue
@@ -873,7 +873,7 @@ impl Z2mBackend {
                 let payload = DeviceUpdate::default()
                     .with_state(upd.on.map(|on| on.on))
                     .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                    .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                    .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
                     .with_color_xy(upd.color.map(|col| col.xy));
 
                 if let Some(topic) = self.rmap.get(&room) {
