@@ -603,7 +603,17 @@ pub struct LightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradientUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub effects: Option<LightEffectsUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub effects_v2: Option<LightEffectsV2Update>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<ResourceLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub powerup: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamics: Option<LightDynamicsUpdate>,
 }
 
 impl LightUpdate {
