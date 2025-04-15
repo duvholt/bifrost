@@ -805,6 +805,7 @@ impl Z2mBackend {
                     }
                 }
             }
+
             BackendRequest::SceneCreate(link_scene, sid, scene) => {
                 if let Some(topic) = self.rmap.get(&scene.group.rid) {
                     log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
@@ -826,6 +827,7 @@ impl Z2mBackend {
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
+
             BackendRequest::SceneUpdate(link, upd) => {
                 if let Some(recall) = upd.recall {
                     let scene = lock.get::<Scene>(&link)?;
@@ -866,6 +868,7 @@ impl Z2mBackend {
                     }
                 }
             }
+
             BackendRequest::GroupedLightUpdate(link, upd) => {
                 let room = lock.get::<GroupedLight>(&link)?.owner.rid;
                 drop(lock);
@@ -881,6 +884,7 @@ impl Z2mBackend {
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
+
             BackendRequest::Delete(link) => {
                 if link.rtype != RType::Scene {
                     return Ok(());
@@ -1008,6 +1012,7 @@ impl Z2mBackend {
                     self.websocket_send(socket, &device, z2mreq).await?;
                 }
             }
+
             BackendRequest::EntertainmentStop() => {
                 log::debug!("Stopping entertainment mode..");
                 if let Some(es) = &mut self.entstream.take() {
