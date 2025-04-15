@@ -1,6 +1,7 @@
 //! Implements policies for service behavior (retry count, delay, etc).
 use std::time::Duration;
 
+#[cfg(feature = "manager")]
 use tokio::time::sleep;
 
 pub enum Retry {
@@ -50,6 +51,7 @@ impl Policy {
         }
     }
 
+    #[cfg(feature = "manager")]
     pub async fn sleep(&self) {
         if let Some(dur) = self.delay {
             sleep(dur).await;
