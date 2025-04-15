@@ -62,6 +62,7 @@ where
     async fn stop(&mut self) -> Result<(), ApiError> {
         log::info!("Stopping server {}", self.addr);
         self.server.take();
+        self.handle = Handle::new();
         Ok(())
     }
 
