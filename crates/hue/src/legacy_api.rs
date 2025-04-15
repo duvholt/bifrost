@@ -1,16 +1,19 @@
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
-use mac_address::MacAddress;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::api::{ColorGamut, DeviceProductData};
 use crate::date_format;
 use crate::hs::RawHS;
-use crate::version::SwVersion;
 use crate::{api, best_guess_timezone};
+
+#[cfg(feature = "mac")]
+use crate::version::SwVersion;
+#[cfg(feature = "mac")]
+use mac_address::MacAddress;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HueError {
@@ -27,9 +30,10 @@ pub enum HueApiResult<T> {
     Error(HueError),
 }
 
+#[cfg(feature = "mac")]
 pub fn serialize_lower_case_mac<S>(mac: &MacAddress, serializer: S) -> Result<S::Ok, S::Error>
 where
-    S: Serializer,
+    S: serde::Serializer,
 {
     let m = mac.bytes();
     let addr = format!(
@@ -45,8 +49,11 @@ pub struct ApiShortConfig {
     pub bridgeid: String,
     pub datastoreversion: String,
     pub factorynew: bool,
+    #[cfg(feature = "mac")]
     #[serde(serialize_with = "serialize_lower_case_mac")]
     pub mac: MacAddress,
+    #[cfg(not(feature = "mac"))]
+    pub mac: String,
     pub modelid: String,
     pub name: String,
     pub replacesbridgeid: Option<String>,
@@ -55,13 +62,14 @@ pub struct ApiShortConfig {
 }
 
 impl Default for ApiShortConfig {
+    #[allow(clippy::default_trait_access)]
     fn default() -> Self {
         Self {
             apiversion: crate::HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
             bridgeid: "0000000000000000".to_string(),
             datastoreversion: "176".to_string(),
             factorynew: false,
-            mac: MacAddress::default(),
+            mac: Default::default(),
             modelid: crate::HUE_BRIDGE_V2_MODEL_ID.to_string(),
             name: "Bifrost Bridge".to_string(),
             replacesbridgeid: None,
@@ -71,6 +79,7 @@ impl Default for ApiShortConfig {
     }
 }
 
+#[cfg(feature = "mac")]
 impl ApiShortConfig {
     #[must_use]
     pub fn from_mac_and_version(mac: MacAddress, version: &SwVersion) -> Self {
