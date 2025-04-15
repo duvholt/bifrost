@@ -3,6 +3,7 @@
 pub mod api;
 pub mod clamp;
 pub mod colorspace;
+pub mod colortemp;
 pub mod date_format;
 pub mod devicedb;
 pub mod error;
