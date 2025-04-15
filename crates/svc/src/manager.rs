@@ -18,6 +18,7 @@ use crate::runservice::StandardService;
 use crate::serviceid::{IntoServiceId, ServiceId};
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
+#[derive(Debug)]
 pub struct ServiceInstance {
     tx: watch::Sender<ServiceState>,
     name: String,
@@ -44,6 +45,16 @@ impl ServiceEvent {
     #[must_use]
     pub const fn new(id: Uuid, state: ServiceState) -> Self {
         Self { id, state }
+    }
+
+    #[must_use]
+    pub const fn id(&self) -> Uuid {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn state(&self) -> ServiceState {
+        self.state
     }
 }
 
