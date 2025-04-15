@@ -437,14 +437,17 @@ impl ServiceManager {
                     Ok(()) = Box::pin(self.wait_for_multiple(&ids, ServiceState::Stopped)) => {}
                     () = tokio::time::sleep(Duration::from_secs(3)) => {
                         log::error!("Service shutdown timed out, aborting tasks..");
+
                         for id in &ids {
+                            let si = self.get(id)?;
+                            log::error!("  ..aborting {id}: {si:?}");
                             self.abort(&ServiceId::from(*id))?;
                         }
                     }
                 }
                 log::debug!("All services stopped.");
                 self.shutdown = true;
-                rpc.respond(|_rsp| ());
+                rpc.respond(|()| ());
             }
         }
 
