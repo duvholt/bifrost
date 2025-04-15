@@ -169,6 +169,7 @@ impl Service for EntertainmentService {
     }
 
     async fn stop(&mut self) -> Result<(), Self::Error> {
+        self.udp.take();
         Ok(())
     }
 
