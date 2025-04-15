@@ -47,7 +47,7 @@ impl VersionUpdater {
     pub async fn get(&mut self) -> &SwVersion {
         let expired = self
             .last_fetch
-            .map_or(true, |time| (Utc::now() - time) > Self::CACHE_TIME);
+            .is_none_or(|time| (Utc::now() - time) > Self::CACHE_TIME);
 
         if expired {
             log::debug!("Firmware update information expired. Fetching..");
