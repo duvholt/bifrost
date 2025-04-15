@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::{DeviceArchetype, ResourceLink, SceneMetadata};
+use crate::api::{DeviceArchetype, LightFunction, ResourceLink, SceneMetadata};
 use crate::{best_guess_timezone, date_format};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -293,6 +293,10 @@ impl Metadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct MetadataUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub archetype: Option<DeviceArchetype>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<LightFunction>,
 }

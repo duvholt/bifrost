@@ -235,6 +235,11 @@ impl Sub<&Light> for &Light {
                 } else {
                     None
                 },
+                function: if self.metadata.function != rhs.metadata.function {
+                    rhs.metadata.function.clone()
+                } else {
+                    None
+                },
             });
         }
 

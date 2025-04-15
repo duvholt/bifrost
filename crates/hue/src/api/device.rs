@@ -86,6 +86,7 @@ impl DeviceUpdate {
             metadata: Some(MetadataUpdate {
                 archetype: Some(metadata.archetype),
                 name: Some(metadata.name),
+                function: None,
             }),
             ..self
         }
@@ -124,6 +125,7 @@ impl Sub<&Device> for &Device {
                 } else {
                     None
                 },
+                function: None,
             });
         }
 
