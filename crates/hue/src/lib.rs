@@ -8,7 +8,6 @@ pub mod date_format;
 pub mod devicedb;
 pub mod diff;
 pub mod error;
-pub mod event;
 pub mod flags;
 pub mod gamma;
 pub mod hs;
@@ -19,6 +18,9 @@ pub mod update;
 pub mod version;
 pub mod xy;
 pub mod zigbee;
+
+#[cfg(feature = "event")]
+pub mod event;
 
 use mac_address::MacAddress;
 
