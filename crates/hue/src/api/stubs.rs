@@ -205,6 +205,8 @@ pub struct SmartScene {
     /*     timeslot_id: 3, */
     /*     weekday: monday */
     /* }, */
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Value::is_null")]
     pub active_timeslot: Value,
     pub group: ResourceLink,
     pub metadata: SceneMetadata,
