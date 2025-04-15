@@ -605,7 +605,10 @@ impl Z2mBackend {
             });
         }
 
-        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
+        if let Some(LightEffectsV2Update {
+            action: Some(act), ..
+        }) = &upd.effects_v2
+        {
             if let Some(fx) = &act.effect {
                 let et = match fx {
                     LightEffect::NoEffect => EffectType::NoEffect,
