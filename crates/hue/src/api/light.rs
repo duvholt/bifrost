@@ -437,6 +437,18 @@ pub struct LightDynamics {
     pub speed_valid: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightDynamicsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<LightDynamicsStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_values: Option<Vec<LightDynamicsStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed_valid: Option<bool>,
+}
+
 impl Default for LightDynamics {
     fn default() -> Self {
         Self {
