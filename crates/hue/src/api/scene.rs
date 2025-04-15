@@ -100,17 +100,24 @@ pub struct SceneMetadata {
 pub struct SceneMetadataUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub appdata: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub image: Option<ResourceLink>,
     pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SceneUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub actions: Option<Vec<SceneActionElement>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub recall: Option<SceneRecall>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<SceneMetadataUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub palette: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_dynamic: Option<bool>,
 }
 
