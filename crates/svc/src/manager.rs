@@ -65,6 +65,7 @@ pub enum SvmRequest {
     Status(RpcRequest<ServiceId, SvcResult<ServiceState>>),
     List(RpcRequest<(), Vec<(Uuid, String)>>),
     Resolve(RpcRequest<ServiceId, SvcResult<Uuid>>),
+    LookupName(RpcRequest<ServiceId, SvcResult<String>>),
     Register(RpcRequest<(String, ServiceFunc), SvcResult<Uuid>>),
     Subscribe(RpcRequest<mpsc::UnboundedSender<ServiceEvent>, SvcResult<Uuid>>),
     Shutdown(RpcRequest<(), ()>),
@@ -139,6 +140,10 @@ impl SvmClient {
         self.rpc(SvmRequest::Resolve, id.service_id()).await?
     }
 
+    pub async fn lookup_name(&mut self, id: impl IntoServiceId) -> SvcResult<String> {
+        self.rpc(SvmRequest::LookupName, id.service_id()).await?
+    }
+
     pub async fn subscribe(&mut self) -> SvcResult<(Uuid, mpsc::UnboundedReceiver<ServiceEvent>)> {
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -210,6 +215,7 @@ impl Debug for SvmRequest {
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Register(_arg0) => f.debug_tuple("Register").field(&"<service>").finish(),
             Self::Resolve(arg0) => f.debug_tuple("Resolve").field(arg0).finish(),
+            Self::LookupName(arg0) => f.debug_tuple("ResolveName").field(arg0).finish(),
             Self::Subscribe(_arg0) => f.debug_tuple("Subscribe").finish(),
             Self::Shutdown(_arg0) => f.debug_tuple("Shutdown").finish(),
         }
@@ -414,6 +420,8 @@ impl ServiceManager {
             SvmRequest::Register(rpc) => rpc.respond(|(name, svc)| self.register(&name, svc)),
 
             SvmRequest::Resolve(rpc) => rpc.respond(|id| self.resolve(&id)),
+
+            SvmRequest::LookupName(rpc) => rpc.respond(|id| Ok(self.get(&id)?.name.clone())),
 
             SvmRequest::Subscribe(rpc) => {
                 for (id, svc) in &self.svcs {
