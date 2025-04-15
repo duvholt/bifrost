@@ -1,11 +1,17 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::{RType, ResourceLink};
+use crate::api::RType;
 use crate::date_format;
+
+#[cfg(feature = "rng")]
+use crate::api::ResourceLink;
+#[cfg(feature = "rng")]
 use crate::error::HueResult;
+#[cfg(feature = "rng")]
+use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase", tag = "type")]
@@ -25,6 +31,7 @@ pub struct EventBlock {
     pub event: Event,
 }
 
+#[cfg(feature = "rng")]
 impl EventBlock {
     #[must_use]
     pub fn add(data: Value) -> Self {
