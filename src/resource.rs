@@ -188,7 +188,7 @@ impl Resources {
 
         self.state_updates.notify_one();
 
-        let evt = EventBlock::add(serde_json::to_value(self.get_resource_by_id(&link.rid)?)?);
+        let evt = EventBlock::add(vec![self.get_resource_by_id(&link.rid)?]);
 
         log::trace!("Send event: {evt:?}");
 

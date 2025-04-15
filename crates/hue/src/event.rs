@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::RType;
+use crate::api::{RType, ResourceRecord};
 use crate::date_format;
 
 #[cfg(feature = "rng")]
@@ -34,11 +34,11 @@ pub struct EventBlock {
 #[cfg(feature = "rng")]
 impl EventBlock {
     #[must_use]
-    pub fn add(data: Value) -> Self {
+    pub fn add(data: Vec<ResourceRecord>) -> Self {
         Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),
-            event: Event::Add(Add { data: vec![data] }),
+            event: Event::Add(Add { data }),
         }
     }
 
@@ -74,7 +74,7 @@ impl EventBlock {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Add {
-    pub data: Vec<Value>,
+    pub data: Vec<ResourceRecord>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
