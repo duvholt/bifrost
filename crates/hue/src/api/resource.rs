@@ -73,11 +73,11 @@ impl RType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourceRecord {
     pub id: Uuid,
     #[serde(skip_serializing_if = "Option::is_none")]
-    id_v1: Option<String>,
+    pub id_v1: Option<String>,
     #[serde(flatten)]
     pub obj: Resource,
 }

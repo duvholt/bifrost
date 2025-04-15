@@ -57,10 +57,10 @@ impl Update {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateRecord {
-    id: Uuid,
-    id_v1: Option<String>,
+    pub id: Uuid,
+    pub id_v1: Option<String>,
     #[serde(flatten)]
     pub upd: Update,
 }
