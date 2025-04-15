@@ -60,6 +60,7 @@ impl Update {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateRecord {
     pub id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id_v1: Option<String>,
     #[serde(flatten)]
     pub upd: Update,
