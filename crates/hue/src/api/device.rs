@@ -36,7 +36,7 @@ impl Device {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct Identify {}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

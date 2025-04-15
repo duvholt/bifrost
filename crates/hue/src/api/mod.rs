@@ -60,7 +60,7 @@ use serde_json::{from_value, json, Value};
 use crate::error::{HueError, HueResult};
 use crate::legacy_api::ApiLightStateUpdate;
 
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Stub;
 
