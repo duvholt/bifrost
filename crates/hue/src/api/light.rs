@@ -165,10 +165,11 @@ impl Light {
     }
 
     #[must_use]
-    pub fn as_gradient_opt(&self) -> Option<Vec<XY>> {
-        self.gradient
-            .as_ref()
-            .map(|grad| grad.points.iter().map(|p| p.color.xy).collect())
+    pub fn as_gradient_opt(&self) -> Option<LightGradientUpdate> {
+        self.gradient.as_ref().map(|grad| LightGradientUpdate {
+            mode: Some(grad.mode),
+            points: grad.points.clone(),
+        })
     }
 }
 
@@ -663,14 +664,8 @@ impl LightUpdate {
     }
 
     #[must_use]
-    pub fn with_gradient(self, grad: Option<Vec<XY>>) -> Self {
-        Self {
-            gradient: grad.map(|colors| LightGradientUpdate {
-                mode: None,
-                points: colors.into_iter().map(LightGradientPoint::xy).collect(),
-            }),
-            ..self
-        }
+    pub fn with_gradient(self, gradient: Option<LightGradientUpdate>) -> Self {
+        Self { gradient, ..self }
     }
 }
 

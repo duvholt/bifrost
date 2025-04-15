@@ -26,10 +26,10 @@ use hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
     DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
     EntertainmentSegment, EntertainmentSegments, GroupedLight, Light, LightEffect, LightEffects,
-    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata,
-    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
+    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightGradientPoint,
+    LightGradientUpdate, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
+    RoomArchetype, RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
+    SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -44,7 +44,6 @@ use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
-use z2m::hexcolor::HexColor;
 use z2m::request::Z2mRequest;
 use z2m::update::DeviceUpdate;
 
@@ -459,12 +458,15 @@ impl Z2mBackend {
                 .with_brightness(devupd.brightness.map(|b| b / 254.0 * 100.0))
                 .with_color_temperature(devupd.color_temp)
                 .with_color_xy(devupd.color.and_then(|col| col.xy))
-                .with_gradient(
-                    devupd
-                        .gradient
-                        .as_ref()
-                        .map(|s| s.iter().map(HexColor::to_xy_color).collect()),
-                );
+                .with_gradient(devupd.gradient.as_ref().map(|s| {
+                    LightGradientUpdate {
+                        mode: None,
+                        points: s
+                            .iter()
+                            .map(|hc| LightGradientPoint::xy(hc.to_xy_color()))
+                            .collect(),
+                    }
+                }));
 
             *light += upd;
         })?;
