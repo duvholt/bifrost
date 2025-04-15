@@ -57,6 +57,8 @@ pub struct GroupedLightUpdate {
     pub color: Option<ColorUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<ResourceLink>,
 }
 
 impl GroupedLightUpdate {
