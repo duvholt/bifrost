@@ -27,8 +27,12 @@ pub struct Room {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct RoomUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<BTreeSet<ResourceLink>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<RoomMetadataUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub services: Option<Vec<ResourceLink>>,
 }
 
 impl Room {
