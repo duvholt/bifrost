@@ -537,6 +537,14 @@ impl LightEffectsV2 {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<LightEffectActionUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<LightEffect>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightEffectsV2Update {
     #[serde(default)]
     pub action: Option<LightEffectActionUpdate>,
