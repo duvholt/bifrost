@@ -45,7 +45,7 @@ use z2m::convert::{
     ExtractLightGradient,
 };
 use z2m::request::Z2mRequest;
-use z2m::update::DeviceUpdate;
+use z2m::update::{DeviceColorMode, DeviceUpdate};
 
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::stream::Z2mTarget;
@@ -453,11 +453,10 @@ impl Z2mBackend {
     async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
         let mut res = self.state.lock().await;
         res.update::<Light>(uuid, |light| {
-            let upd = LightUpdate::new()
+            let mut upd = LightUpdate::new()
                 .with_on(devupd.state.map(Into::into))
                 .with_brightness(devupd.brightness.map(|b| b / 254.0 * 100.0))
                 .with_color_temperature(devupd.color_temp)
-                .with_color_xy(devupd.color.and_then(|col| col.xy))
                 .with_gradient(devupd.gradient.as_ref().map(|s| {
                     LightGradientUpdate {
                         mode: None,
@@ -467,6 +466,10 @@ impl Z2mBackend {
                             .collect(),
                     }
                 }));
+
+            if devupd.color_mode != Some(DeviceColorMode::ColorTemp) {
+                upd = upd.with_color_xy(devupd.color.and_then(|col| col.xy));
+            }
 
             *light += upd;
         })?;
