@@ -38,7 +38,7 @@ pub use resource::{RType, ResourceLink, ResourceRecord};
 pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
 pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
-    SceneStatusUpdate, SceneUpdate,
+    SceneStatusEnum, SceneUpdate,
 };
 use serde::ser::SerializeMap;
 pub use stream::HueStreamKey;

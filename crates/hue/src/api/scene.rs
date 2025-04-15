@@ -28,7 +28,7 @@ pub struct SceneStatus {
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SceneStatusUpdate {
+pub enum SceneStatusEnum {
     Active,
     Static,
     DynamicPalette,
@@ -137,8 +137,8 @@ impl SceneUpdate {
         Self {
             recall: Some(SceneRecall {
                 action: match action.map(|a| a.active) {
-                    Some(SceneActive::DynamicPalette) => Some(SceneStatusUpdate::DynamicPalette),
-                    Some(SceneActive::Static) => Some(SceneStatusUpdate::Active),
+                    Some(SceneActive::DynamicPalette) => Some(SceneStatusEnum::DynamicPalette),
+                    Some(SceneActive::Static) => Some(SceneStatusEnum::Active),
                     Some(SceneActive::Inactive) | None => None,
                 },
                 duration: None,
@@ -188,7 +188,7 @@ impl Sub<&SceneMetadata> for &SceneMetadata {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SceneRecall {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub action: Option<SceneStatusUpdate>,
+    pub action: Option<SceneStatusEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]

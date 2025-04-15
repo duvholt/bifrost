@@ -28,7 +28,7 @@ use hue::api::{
     LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
     LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
     RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall,
-    SceneStatus, SceneStatusUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -920,7 +920,7 @@ impl Z2mBackend {
             BackendRequest::SceneUpdate(link, upd) => {
                 if let Some(recall) = upd.recall {
                     let scene = lock.get::<Scene>(&link)?;
-                    if recall.action == Some(SceneStatusUpdate::Active) {
+                    if recall.action == Some(SceneStatusEnum::Active) {
                         let index = lock
                             .aux_get(&link)?
                             .index
