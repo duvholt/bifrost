@@ -215,7 +215,7 @@ pub const ADOBE: ColorSpace = ColorSpace {
 mod tests {
     use std::iter::zip;
 
-    use crate::colorspace::{ColorSpace, ADOBE, SRGB, WIDE};
+    use crate::colorspace::{ADOBE, ColorSpace, SRGB, WIDE};
 
     macro_rules! compare {
         ($expr:expr, $value:expr) => {

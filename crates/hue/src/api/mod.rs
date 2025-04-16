@@ -55,7 +55,7 @@ pub use update::Update;
 use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, json, Value};
+use serde_json::{Value, from_value, json};
 
 use crate::error::{HueError, HueResult};
 use crate::legacy_api::ApiLightStateUpdate;

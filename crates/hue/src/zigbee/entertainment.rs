@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::io::Write;
 
-use byteorder::{WriteBytesExt, BE, LE};
+use byteorder::{BE, LE, WriteBytesExt};
 use packed_struct::prelude::*;
 
 use crate::xy::XY;
