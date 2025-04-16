@@ -1,11 +1,12 @@
 pub mod backend;
 pub mod service;
+pub mod websocket;
 
 use std::error::Error;
 
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{any, get};
 use axum::Router;
 use hyper::StatusCode;
 use serde::Serialize;
@@ -13,6 +14,7 @@ use serde_json::json;
 
 use bifrost_api::config::AppConfig;
 
+use crate::routes::bifrost::websocket::websocket;
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
@@ -52,4 +54,5 @@ pub fn router() -> Router<AppState> {
         .nest("/service", service::router())
         .nest("/backend", backend::router())
         .route("/config", get(get_config))
+        .route("/ws", any(websocket))
 }

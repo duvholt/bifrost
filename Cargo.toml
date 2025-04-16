@@ -75,7 +75,7 @@ debug = "limited"
 split-debuginfo = "unpacked"
 
 [dependencies]
-axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart", "tracing"], default-features = false }
+axum = { version = "0.8.1", features = ["json", "tokio", "macros", "multipart", "ws", "tracing"], default-features = false }
 axum-core = "0.5.0"
 axum-server = { version = "0.7.1", features = ["tls-openssl"], default-features = false }
 bytes = "1.10.0"
