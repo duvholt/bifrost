@@ -1,5 +1,6 @@
 pub mod config;
 pub mod error;
+pub mod service;
 
 mod client;
 pub use client::*;
