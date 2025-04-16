@@ -11,6 +11,7 @@ use hue::stream::HueStreamLights;
 
 use crate::error::ApiResult;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum BackendRequest {
     LightUpdate(ResourceLink, LightUpdate),
