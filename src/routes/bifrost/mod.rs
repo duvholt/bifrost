@@ -1,3 +1,5 @@
+pub mod service;
+
 use std::error::Error;
 
 use axum::extract::State;
@@ -45,5 +47,7 @@ async fn get_config(State(state): State<AppState>) -> BifrostApiResult<Json<AppC
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/config", get(get_config))
+    Router::new()
+        .nest("/service", service::router())
+        .route("/config", get(get_config))
 }
