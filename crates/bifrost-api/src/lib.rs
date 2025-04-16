@@ -2,6 +2,7 @@ pub mod backend;
 pub mod config;
 pub mod error;
 pub mod service;
+pub mod websocket;
 
 mod client;
 pub use client::*;
