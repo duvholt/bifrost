@@ -35,6 +35,7 @@ keywords = [
 
 [workspace]
 members = [
+    "crates/bifrost-api",
     "crates/hue",
     "crates/svc",
     "crates/z2m",
