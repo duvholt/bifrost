@@ -1,3 +1,4 @@
+pub mod backend;
 pub mod service;
 
 use std::error::Error;
@@ -49,5 +50,6 @@ async fn get_config(State(state): State<AppState>) -> BifrostApiResult<Json<AppC
 pub fn router() -> Router<AppState> {
     Router::new()
         .nest("/service", service::router())
+        .nest("/backend", backend::router())
         .route("/config", get(get_config))
 }
