@@ -1,8 +1,8 @@
+use axum::Router;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use itertools::Itertools;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;

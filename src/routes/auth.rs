@@ -1,7 +1,7 @@
+use axum::Router;
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use hyper::HeaderMap;
 use serde_json::json;
 

@@ -1,5 +1,5 @@
 use hue::zigbee::ZigbeeMessage;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Use the low-level endpoint for `Zigbee2MQTT`, which allows free-form zigbee
 /// messages to be sent.

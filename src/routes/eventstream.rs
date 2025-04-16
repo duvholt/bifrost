@@ -1,10 +1,10 @@
+use axum::Router;
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::sse::{Event, Sse};
 use axum::routing::get;
-use axum::Router;
-use futures::stream::{self, Stream};
 use futures::StreamExt;
+use futures::stream::{self, Stream};
 use tokio_stream::wrappers::BroadcastStream;
 
 use crate::error::ApiResult;

@@ -4,10 +4,10 @@ pub mod websocket;
 
 use std::error::Error;
 
+use axum::Router;
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get};
-use axum::Router;
 use hyper::StatusCode;
 use serde::Serialize;
 use serde_json::json;

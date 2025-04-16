@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
-use axum::Router;
 use bytes::Bytes;
 use chrono::Utc;
 use hue::error::{HueError, HueResult};
 use log::{info, warn};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 

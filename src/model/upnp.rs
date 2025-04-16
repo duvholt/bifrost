@@ -260,12 +260,12 @@ pub struct Service {
 mod tests {
     use serde::{Deserialize, Serialize};
     use url::Url;
-    use uuid::{uuid, Uuid};
+    use uuid::{Uuid, uuid};
 
     const UUID: Uuid = uuid!("01234567-89ab-cdef-0123-456789abcdef");
 
     use crate::model::upnp::{
-        to_xml, Device, Icon, Root, Service, SCHEMA_DEVICE_BASIC, XMLNS, XML_DOCTYPE,
+        Device, Icon, Root, SCHEMA_DEVICE_BASIC, Service, XML_DOCTYPE, XMLNS, to_xml,
     };
 
     // convert using `to_xml()`, but trim lines to avoid having to indent test results

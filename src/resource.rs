@@ -5,9 +5,9 @@ use std::sync::Arc;
 use hue::error::{HueError, HueResult};
 use maplit::btreeset;
 use serde::Serialize;
-use serde_json::{json, Value};
-use tokio::sync::broadcast::{Receiver, Sender};
+use serde_json::{Value, json};
 use tokio::sync::Notify;
+use tokio::sync::broadcast::{Receiver, Sender};
 use uuid::Uuid;
 
 use hue::api::{
@@ -158,11 +158,7 @@ impl Resources {
             .iter()
             .filter_map(|(k, v)| {
                 if let Resource::Scene(scn) = v {
-                    if &scn.group.rid == id {
-                        Some(k)
-                    } else {
-                        None
-                    }
+                    if &scn.group.rid == id { Some(k) } else { None }
                 } else {
                     None
                 }

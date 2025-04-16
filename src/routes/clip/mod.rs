@@ -6,10 +6,10 @@ pub mod scene;
 
 use entertainment_configuration as ent_conf;
 
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
-use axum::Router;
 use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

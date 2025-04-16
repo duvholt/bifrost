@@ -13,7 +13,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 authors = ["Christian Iversen <ci@iversenit.dk>"]
 rust-version = "1.85"
 description = "A Philips Hue bridge emulator backed by zigbee2mqtt"

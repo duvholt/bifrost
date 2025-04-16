@@ -1,9 +1,9 @@
+use axum::Router;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
-use hyper::header::CONTENT_TYPE;
 use hyper::HeaderMap;
+use hyper::header::CONTENT_TYPE;
 use url::Url;
 use uuid::Uuid;
 

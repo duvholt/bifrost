@@ -2,8 +2,8 @@ use serde_json::Value;
 
 use hue::api::{Device, DeviceUpdate, ResourceLink};
 
-use crate::routes::clip::ApiV2Result;
 use crate::routes::V2Reply;
+use crate::routes::clip::ApiV2Result;
 use crate::server::appstate::AppState;
 
 pub async fn put_device(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV2Result {

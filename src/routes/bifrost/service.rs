@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
+use axum::Router;
 use axum::extract::{Path, State};
 use axum::routing::{get, put};
-use axum::Router;
 use uuid::Uuid;
 
 use bifrost_api::service::{Service, ServiceList};

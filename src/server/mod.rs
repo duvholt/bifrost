@@ -25,12 +25,12 @@ use axum::{Router, ServiceExt};
 use camino::Utf8PathBuf;
 use tokio::select;
 use tokio::sync::Mutex;
-use tokio::time::{sleep_until, MissedTickBehavior};
+use tokio::time::{MissedTickBehavior, sleep_until};
 use tower::Layer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 use tower_http::trace::TraceLayer;
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
 
 use crate::error::ApiResult;
 use crate::resource::Resources;

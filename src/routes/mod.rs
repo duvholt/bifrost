@@ -1,6 +1,6 @@
+use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::response::{IntoResponse, Response};
-use axum::Router;
 use hue::error::HueError;
 use hyper::StatusCode;
 use serde_json::Value;

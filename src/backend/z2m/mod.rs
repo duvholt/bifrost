@@ -11,14 +11,14 @@ use futures::{SinkExt, StreamExt};
 use maplit::btreeset;
 use native_tls::TlsConnector;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::net::TcpStream;
 use tokio::select;
-use tokio::sync::broadcast::Receiver;
 use tokio::sync::Mutex;
+use tokio::sync::broadcast::Receiver;
 use tokio::time::sleep;
 use tokio_tungstenite::{
-    connect_async_tls_with_config, tungstenite, Connector, MaybeTlsStream, WebSocketStream,
+    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config, tungstenite,
 };
 use uuid::Uuid;
 
@@ -37,7 +37,7 @@ use hue::scene_icons;
 use hue::stream::HueStreamLights;
 use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
-    HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
+    HueZigbeeUpdate, LightRecordMode, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
 };
 use z2m::api::{ExposeLight, Message, RawMessage};
 use z2m::convert::{
