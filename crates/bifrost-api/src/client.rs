@@ -1,6 +1,6 @@
 use reqwest::{Method, Url};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::error::BifrostResult;
 

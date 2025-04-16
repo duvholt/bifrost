@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use svc::traits::ServiceState;
 use uuid::Uuid;
 
-use crate::error::BifrostResult;
 use crate::Client;
+use crate::error::BifrostResult;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Service {

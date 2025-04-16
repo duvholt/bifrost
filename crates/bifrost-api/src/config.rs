@@ -6,7 +6,7 @@ use hue::api::RoomArchetype;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{error::BifrostResult, Client};
+use crate::{Client, error::BifrostResult};
 
 #[cfg(feature = "mac")]
 use mac_address::MacAddress;
