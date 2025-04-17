@@ -2,6 +2,7 @@ pub mod device;
 pub mod entertainment_configuration;
 pub mod grouped_light;
 pub mod light;
+pub mod room;
 pub mod scene;
 
 use entertainment_configuration as ent_conf;
@@ -148,6 +149,7 @@ async fn put_resource_id(
         RType::GroupedLight => grouped_light::put_grouped_light(&state, rlink, put).await,
         RType::Light => light::put_light(&state, rlink, put).await,
         RType::Scene => scene::put_scene(&state, rlink, put).await,
+        RType::Room => room::put_room(&state, rlink, put).await,
 
         /* Allowed, but support is missing in Bifrost */
         RType::BehaviorInstance
@@ -167,7 +169,6 @@ async fn put_resource_id(
         | RType::Matter
         | RType::Motion
         | RType::RelativeRotary
-        | RType::Room
         | RType::ServiceGroup
         | RType::SmartScene
         | RType::Temperature
