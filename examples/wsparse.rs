@@ -63,6 +63,12 @@ async fn main() -> ApiResult<()> {
                 Message::BridgeConverters(ref obj) => {
                     println!("{obj:#?}");
                 },
+                Message::BridgeGroupMembersAdd(ref obj) => {
+                    println!("{obj:#?}");
+                },
+                Message::BridgeGroupMembersRemove(ref obj) => {
+                    println!("{obj:#?}");
+                },
             }
 
             continue;

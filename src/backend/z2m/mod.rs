@@ -548,6 +548,14 @@ impl Z2mBackend {
                     self.add_group(grp).await?;
                 }
             }
+
+            Message::BridgeGroupMembersAdd(_change) => {
+                log::warn!("Add group members not supported");
+            }
+
+            Message::BridgeGroupMembersRemove(_change) => {
+                log::warn!("Removing group members not supported");
+            }
         }
         Ok(())
     }
