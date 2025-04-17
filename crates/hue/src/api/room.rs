@@ -134,6 +134,17 @@ impl RoomMetadata {
     }
 }
 
+impl AddAssign<RoomUpdate> for Room {
+    fn add_assign(&mut self, rhs: RoomUpdate) {
+        if let Some(md) = rhs.metadata {
+            self.metadata += md;
+        }
+        if let Some(children) = rhs.children {
+            self.children = children;
+        }
+    }
+}
+
 impl AddAssign<RoomMetadataUpdate> for RoomMetadata {
     fn add_assign(&mut self, upd: RoomMetadataUpdate) {
         if let Some(name) = upd.name {
