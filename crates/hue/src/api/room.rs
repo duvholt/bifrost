@@ -121,7 +121,6 @@ pub enum RoomArchetype {
     TopFloor,
     Attic,
     Home,
-
 }
 
 impl RoomMetadata {
