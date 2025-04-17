@@ -549,12 +549,38 @@ impl Z2mBackend {
                 }
             }
 
-            Message::BridgeGroupMembersAdd(_change) => {
-                log::warn!("Add group members not supported");
-            }
+            Message::BridgeGroupMembersAdd(change) | Message::BridgeGroupMembersRemove(change) => {
+                if let Some(light) = self.map.get(&change.data.device) {
+                    let mut lock = self.state.lock().await;
+                    let device = lock.get::<Light>(light)?.clone();
 
-            Message::BridgeGroupMembersRemove(_change) => {
-                log::warn!("Removing group members not supported");
+                    let device_link = device.owner;
+                    if let Some(room) = self.map.get(&change.data.group) {
+                        let room_link = lock.get::<GroupedLight>(room)?.owner;
+                        let exists = lock
+                            .get::<Room>(&room_link)?
+                            .children
+                            .contains(&device_link);
+
+                        match msg {
+                            Message::BridgeGroupMembersAdd(_) => {
+                                if !exists {
+                                    lock.update(&room_link.rid, |room: &mut Room| {
+                                        room.children.insert(device_link);
+                                    })?;
+                                }
+                            }
+                            Message::BridgeGroupMembersRemove(_) => {
+                                if exists {
+                                    lock.update(&room_link.rid, |room: &mut Room| {
+                                        room.children.remove(&device_link);
+                                    })?;
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }
             }
         }
         Ok(())
