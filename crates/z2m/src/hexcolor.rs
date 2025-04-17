@@ -24,6 +24,12 @@ impl HexColor {
     pub fn to_xy_color(&self) -> XY {
         XY::from_rgb(self.r, self.g, self.b).0
     }
+
+    #[must_use]
+    pub fn from_xy_color(xy: XY, brightness: f64) -> Self {
+        let rgb = xy.to_rgb(brightness);
+        Self::new(rgb[0], rgb[1], rgb[2])
+    }
 }
 
 impl From<[u8; 3]> for HexColor {
