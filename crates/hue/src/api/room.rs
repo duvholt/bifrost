@@ -60,6 +60,14 @@ impl RoomUpdate {
             ..self
         }
     }
+
+    #[must_use]
+    pub fn with_children(self, children: BTreeSet<ResourceLink>) -> Self {
+        Self {
+            children: Some(children),
+            ..self
+        }
+    }
 }
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
