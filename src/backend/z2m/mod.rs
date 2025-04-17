@@ -493,16 +493,16 @@ impl Z2mBackend {
 
     async fn handle_bridge_message(&mut self, msg: Message) -> ApiResult<()> {
         #[allow(unused_variables)]
-        match msg {
-            Message::BridgeInfo(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeLogging(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeExtensions(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeEvent(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeDefinitions(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeState(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeConverters(ref obj) => { /* println!("{obj:#?}"); */ }
+        match &msg {
+            Message::BridgeInfo(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeLogging(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeExtensions(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeEvent(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeDefinitions(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeState(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeConverters(obj) => { /* println!("{obj:#?}"); */ }
 
-            Message::BridgeDevices(ref obj) => {
+            Message::BridgeDevices(obj) => {
                 for dev in obj {
                     self.network.insert(dev.friendly_name.clone(), dev.clone());
                     if let Some(exp) = dev.expose_light() {
@@ -537,7 +537,7 @@ impl Z2mBackend {
                 }
             }
 
-            Message::BridgeGroups(ref obj) => {
+            Message::BridgeGroups(obj) => {
                 /* println!("{obj:#?}"); */
                 for grp in obj {
                     self.add_group(grp).await?;
