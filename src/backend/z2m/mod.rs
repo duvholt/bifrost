@@ -787,9 +787,9 @@ impl Z2mBackend {
 
         let mut lock = self.state.lock().await;
 
-        match (*req).clone() {
+        match &*req {
             BackendRequest::LightUpdate(link, upd) => {
-                if let Some(topic) = self.rmap.get(&link) {
+                if let Some(topic) = self.rmap.get(link) {
                     // We cannot recover .mode from backend updates, since these only contain
                     // the gradient colors. So we have no choice, but to update the mode
                     // here. Otherwise, the information would be lost.
@@ -800,7 +800,7 @@ impl Z2mBackend {
                             }
                         })?;
                     }
-                    let hue_effects = lock.get::<Light>(&link)?.effects.is_some();
+                    let hue_effects = lock.get::<Light>(link)?.effects.is_some();
                     drop(lock);
 
                     /* step 1: send generic light update */
@@ -824,7 +824,7 @@ impl Z2mBackend {
                     /* step 2: if supported (and needed) send hue-specific effects update */
 
                     if hue_effects {
-                        let mut hz = Self::make_hue_specific_update(&upd)?;
+                        let mut hz = Self::make_hue_specific_update(upd)?;
 
                         if !hz.is_empty() {
                             hz = hz.with_fade_speed(0x0001);
@@ -857,17 +857,17 @@ impl Z2mBackend {
                     log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
 
                     lock.aux_set(
-                        &link_scene,
+                        link_scene,
                         AuxData::new()
                             .with_topic(&scene.metadata.name)
-                            .with_index(sid),
+                            .with_index(*sid),
                     );
                     let z2mreq = Z2mRequest::SceneStore {
                         name: &scene.metadata.name.clone(),
-                        id: sid,
+                        id: *sid,
                     };
 
-                    lock.add(&link_scene, Resource::Scene(scene))?;
+                    lock.add(link_scene, Resource::Scene(scene.clone()))?;
                     drop(lock);
 
                     self.websocket_send(socket, topic, z2mreq).await?;
@@ -875,11 +875,11 @@ impl Z2mBackend {
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
-                if let Some(recall) = upd.recall {
-                    let scene = lock.get::<Scene>(&link)?;
+                if let Some(recall) = &upd.recall {
+                    let scene = lock.get::<Scene>(link)?;
                     if recall.action == Some(SceneStatusEnum::Active) {
                         let index = lock
-                            .aux_get(&link)?
+                            .aux_get(link)?
                             .index
                             .ok_or(HueError::NotFound(link.rid))?;
 
@@ -897,14 +897,14 @@ impl Z2mBackend {
                             })?;
                         }
 
-                        let room = lock.get::<Scene>(&link)?.group;
+                        let room = lock.get::<Scene>(link)?.group;
                         drop(lock);
 
                         if let Some(topic) = self.rmap.get(&room).cloned() {
                             log::info!("[{}] Recall scene: {link:?}", self.name);
 
                             let mut lock = self.state.lock().await;
-                            self.learner.learn_scene_recall(&link, &mut lock)?;
+                            self.learner.learn_scene_recall(link, &mut lock)?;
 
                             let z2mreq = Z2mRequest::SceneRecall(index);
                             self.websocket_send(socket, &topic, z2mreq).await?;
@@ -916,7 +916,7 @@ impl Z2mBackend {
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                let room = lock.get::<GroupedLight>(&link)?.owner;
+                let room = lock.get::<GroupedLight>(link)?.owner;
                 drop(lock);
 
                 let payload = DeviceUpdate::default()
@@ -932,19 +932,19 @@ impl Z2mBackend {
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
-                if let Some(children) = upd.children {
-                    if let Some(topic) = self.rmap.get(&link) {
-                        let room = lock.get::<Room>(&link)?.clone();
+                if let Some(children) = &upd.children {
+                    if let Some(topic) = self.rmap.get(link) {
+                        let room = lock.get::<Room>(link)?.clone();
                         drop(lock);
 
                         let known_existing: BTreeSet<_> = room
                             .children
-                            .into_iter()
+                            .iter()
                             .filter(|device| self.rmap.contains_key(device))
                             .collect();
 
                         let known_new: BTreeSet<_> = children
-                            .into_iter()
+                            .iter()
                             .filter(|device| self.rmap.contains_key(device))
                             .collect();
 
@@ -980,9 +980,9 @@ impl Z2mBackend {
                     return Ok(());
                 }
 
-                let room = lock.get::<Scene>(&link)?.group;
+                let room = lock.get::<Scene>(link)?.group;
                 let index = lock
-                    .aux_get(&link)?
+                    .aux_get(link)?
                     .index
                     .ok_or(HueError::NotFound(link.rid))?;
                 drop(lock);
@@ -994,7 +994,7 @@ impl Z2mBackend {
             }
 
             BackendRequest::EntertainmentStart(ent_id) => {
-                let ent: &EntertainmentConfiguration = lock.get_id(ent_id)?;
+                let ent: &EntertainmentConfiguration = lock.get_id(*ent_id)?;
 
                 let mut chans = ent.channels.clone();
 
