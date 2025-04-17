@@ -68,8 +68,8 @@ pub struct Z2mBackend {
     server: Z2mServer,
     config: Arc<AppConfig>,
     state: Arc<Mutex<Resources>>,
-    map: HashMap<String, Uuid>,
-    rmap: HashMap<Uuid, String>,
+    map: HashMap<String, ResourceLink>,
+    rmap: HashMap<ResourceLink, String>,
     learner: SceneLearn,
     ignore: HashSet<String>,
     network: HashMap<String, z2m::api::Device>,
@@ -146,8 +146,8 @@ impl Z2mBackend {
             usertest: None,
         };
 
-        self.map.insert(name.to_string(), link_light.rid);
-        self.rmap.insert(link_light.rid, name.to_string());
+        self.map.insert(name.to_string(), link_light);
+        self.rmap.insert(link_light, name.to_string());
 
         let mut light = Light::new(link_device, metadata);
 
@@ -255,8 +255,8 @@ impl Z2mBackend {
             usertest: None,
         };
 
-        self.map.insert(name.to_string(), link_button.rid);
-        self.rmap.insert(link_button.rid, name.to_string());
+        self.map.insert(name.to_string(), link_button);
+        self.rmap.insert(link_button, name.to_string());
 
         let mut res = self.state.lock().await;
         let button = Button {
@@ -410,9 +410,9 @@ impl Z2mBackend {
             services: btreeset![link_glight],
         };
 
-        self.map.insert(topic.clone(), link_glight.rid);
-        self.rmap.insert(link_glight.rid, topic.clone());
-        self.rmap.insert(link_room.rid, topic.clone());
+        self.map.insert(topic.clone(), link_glight);
+        self.rmap.insert(link_glight, topic.clone());
+        self.rmap.insert(link_room, topic.clone());
 
         for id in &res.get_resource_ids_by_type(RType::BridgeHome) {
             res.update(id, |bh: &mut BridgeHome| {
@@ -565,7 +565,7 @@ impl Z2mBackend {
             return Ok(());
         };
 
-        let res = self.handle_update(val, &msg.payload).await;
+        let res = self.handle_update(&val.rid, &msg.payload).await;
         if let Err(ref err) = res {
             log::error!(
                 "Cannot parse update: {err}\n{}",
@@ -635,7 +635,7 @@ impl Z2mBackend {
         topic: &str,
         payload: Z2mRequest<'_>,
     ) -> ApiResult<()> {
-        let Some(uuid) = self.map.get(topic) else {
+        let Some(link) = self.map.get(topic) else {
             log::trace!(
                 "[{}] Topic [{topic}] unknown on this z2m connection",
                 self.name
@@ -644,7 +644,7 @@ impl Z2mBackend {
         };
 
         log::trace!(
-            "[{}] Topic [{topic}] known as {uuid} on this z2m connection, sending event..",
+            "[{}] Topic [{topic}] known as {link:?} on this z2m connection, sending event..",
             self.name
         );
 
@@ -683,7 +683,7 @@ impl Z2mBackend {
 
         match (*req).clone() {
             BackendRequest::LightUpdate(link, upd) => {
-                if let Some(topic) = self.rmap.get(&link.rid) {
+                if let Some(topic) = self.rmap.get(&link) {
                     // We cannot recover .mode from backend updates, since these only contain
                     // the gradient colors. So we have no choice, but to update the mode
                     // here. Otherwise, the information would be lost.
@@ -807,7 +807,7 @@ impl Z2mBackend {
             }
 
             BackendRequest::SceneCreate(link_scene, sid, scene) => {
-                if let Some(topic) = self.rmap.get(&scene.group.rid) {
+                if let Some(topic) = self.rmap.get(&scene.group) {
                     log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
 
                     lock.aux_set(
@@ -851,7 +851,7 @@ impl Z2mBackend {
                             })?;
                         }
 
-                        let room = lock.get::<Scene>(&link)?.group.rid;
+                        let room = lock.get::<Scene>(&link)?.group;
                         drop(lock);
 
                         if let Some(topic) = self.rmap.get(&room).cloned() {
@@ -870,7 +870,7 @@ impl Z2mBackend {
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                let room = lock.get::<GroupedLight>(&link)?.owner.rid;
+                let room = lock.get::<GroupedLight>(&link)?.owner;
                 drop(lock);
 
                 let payload = DeviceUpdate::default()
@@ -890,7 +890,7 @@ impl Z2mBackend {
                     return Ok(());
                 }
 
-                let room = lock.get::<Scene>(&link)?.group.rid;
+                let room = lock.get::<Scene>(&link)?.group;
                 let index = lock
                     .aux_get(&link)?
                     .index
@@ -920,7 +920,7 @@ impl Z2mBackend {
                             .ok_or(HueError::NotFound(member.service.rid))?;
                         let topic = self
                             .rmap
-                            .get(&light_id.rid)
+                            .get(&light_id)
                             .ok_or(HueError::NotFound(member.service.rid))?;
                         let dev = self
                             .network
