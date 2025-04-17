@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use tokio::sync::broadcast::Receiver;
 use uuid::Uuid;
 
-use hue::api::{GroupedLightUpdate, LightUpdate, ResourceLink, Scene, SceneUpdate};
+use hue::api::{GroupedLightUpdate, LightUpdate, ResourceLink, RoomUpdate, Scene, SceneUpdate};
 use hue::stream::HueStreamLights;
 
 use crate::error::ApiResult;
@@ -20,6 +20,8 @@ pub enum BackendRequest {
     SceneUpdate(ResourceLink, SceneUpdate),
 
     GroupedLightUpdate(ResourceLink, GroupedLightUpdate),
+
+    RoomUpdate(ResourceLink, RoomUpdate),
 
     Delete(ResourceLink),
 

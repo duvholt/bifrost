@@ -2,7 +2,7 @@ pub mod learn;
 pub mod stream;
 pub mod zclcommand;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -39,7 +39,7 @@ use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
     HueZigbeeUpdate, LightRecordMode, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
 };
-use z2m::api::{ExposeLight, Message, RawMessage};
+use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
@@ -146,6 +146,7 @@ impl Z2mBackend {
         };
 
         self.map.insert(name.to_string(), link_light);
+        self.rmap.insert(link_device, name.to_string());
         self.rmap.insert(link_light, name.to_string());
 
         let mut light = Light::new(link_device, metadata);
@@ -927,6 +928,50 @@ impl Z2mBackend {
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::Update(&payload);
                     self.websocket_send(socket, topic, z2mreq).await?;
+                }
+            }
+
+            BackendRequest::RoomUpdate(link, upd) => {
+                if let Some(children) = upd.children {
+                    if let Some(topic) = self.rmap.get(&link) {
+                        let room = lock.get::<Room>(&link)?.clone();
+                        drop(lock);
+
+                        let known_existing: BTreeSet<_> = room
+                            .children
+                            .into_iter()
+                            .filter(|device| self.rmap.contains_key(device))
+                            .collect();
+
+                        let known_new: BTreeSet<_> = children
+                            .into_iter()
+                            .filter(|device| self.rmap.contains_key(device))
+                            .collect();
+
+                        for add in known_new.difference(&known_existing) {
+                            let friendly_name = &self.rmap[add];
+                            let change = GroupMemberChange {
+                                device: friendly_name.to_string(),
+                                group: topic.to_string(),
+                                endpoint: None,
+                                skip_disable_reporting: None,
+                            };
+                            let z2mreq = Z2mRequest::GroupMemberAdd(change);
+                            self.websocket_send(socket, topic, z2mreq).await?;
+                        }
+
+                        for remove in known_existing.difference(&known_new) {
+                            let friendly_name = &self.rmap[remove];
+                            let change = GroupMemberChange {
+                                device: friendly_name.to_string(),
+                                group: topic.to_string(),
+                                endpoint: None,
+                                skip_disable_reporting: None,
+                            };
+                            let z2mreq = Z2mRequest::GroupMemberRemove(change);
+                            self.websocket_send(socket, topic, z2mreq).await?;
+                        }
+                    }
                 }
             }
 
