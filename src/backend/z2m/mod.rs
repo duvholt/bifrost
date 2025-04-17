@@ -863,7 +863,7 @@ impl Z2mBackend {
                             .with_index(*sid),
                     );
                     let z2mreq = Z2mRequest::SceneStore {
-                        name: &scene.metadata.name.clone(),
+                        name: &scene.metadata.name,
                         id: *sid,
                     };
 
