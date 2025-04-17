@@ -733,7 +733,7 @@ impl Z2mBackend {
         &self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
         topic: &str,
-        payload: Z2mRequest<'_>,
+        payload: &Z2mRequest<'_>,
     ) -> ApiResult<()> {
         let Some(link) = self.map.get(topic) else {
             log::trace!(
@@ -767,7 +767,7 @@ impl Z2mBackend {
             },
             _ => RawMessage {
                 topic: format!("{topic}/set"),
-                payload: serde_json::to_value(&payload)?,
+                payload: serde_json::to_value(payload)?,
             },
         };
 
@@ -819,7 +819,7 @@ impl Z2mBackend {
 
                     let z2mreq = Z2mRequest::Update(&payload);
 
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
 
                     /* step 2: if supported (and needed) send hue-specific effects update */
 
@@ -846,7 +846,7 @@ impl Z2mBackend {
                                 value: &upd,
                             };
 
-                            self.websocket_send(socket, topic, z2mreq).await?;
+                            self.websocket_send(socket, topic, &z2mreq).await?;
                         }
                     }
                 }
@@ -870,7 +870,7 @@ impl Z2mBackend {
                     lock.add(link_scene, Resource::Scene(scene.clone()))?;
                     drop(lock);
 
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
                 }
             }
 
@@ -907,7 +907,7 @@ impl Z2mBackend {
                             self.learner.learn_scene_recall(link, &mut lock)?;
 
                             let z2mreq = Z2mRequest::SceneRecall(index);
-                            self.websocket_send(socket, &topic, z2mreq).await?;
+                            self.websocket_send(socket, &topic, &z2mreq).await?;
                         }
                     } else {
                         log::error!("Scene recall type not supported: {recall:?}");
@@ -927,7 +927,7 @@ impl Z2mBackend {
 
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::Update(&payload);
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
                 }
             }
 
@@ -957,7 +957,7 @@ impl Z2mBackend {
                                 skip_disable_reporting: None,
                             };
                             let z2mreq = Z2mRequest::GroupMemberAdd(change);
-                            self.websocket_send(socket, topic, z2mreq).await?;
+                            self.websocket_send(socket, topic, &z2mreq).await?;
                         }
 
                         for remove in known_existing.difference(&known_new) {
@@ -969,7 +969,7 @@ impl Z2mBackend {
                                 skip_disable_reporting: None,
                             };
                             let z2mreq = Z2mRequest::GroupMemberRemove(change);
-                            self.websocket_send(socket, topic, z2mreq).await?;
+                            self.websocket_send(socket, topic, &z2mreq).await?;
                         }
                     }
                 }
@@ -989,7 +989,7 @@ impl Z2mBackend {
 
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::SceneRemove(index);
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
                 }
             }
 
@@ -1056,20 +1056,20 @@ impl Z2mBackend {
                     log::debug!("Entertainment modes: {:#?}", &es.modes);
                     for (dev, segments) in &es.addrs {
                         let z2mreq = z2m_set_entertainment_brightness(0xFE);
-                        self.websocket_send(socket, dev, z2mreq).await?;
+                        self.websocket_send(socket, dev, &z2mreq).await?;
 
                         if segments.len() <= 1 {
                             continue;
                         }
 
                         let z2mreq = es.target.send(es.stream.segment_mapping(segments)?)?;
-                        self.websocket_send(socket, dev, z2mreq).await?;
+                        self.websocket_send(socket, dev, &z2mreq).await?;
                     }
 
                     let z2mreq = es.target.send(es.stream.reset()?)?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, z2mreq.clone()).await?;
+                        self.websocket_send(socket, topic, &z2mreq).await?;
                     }
 
                     self.entstream = Some(es);
@@ -1099,7 +1099,7 @@ impl Z2mBackend {
 
                     let z2mreq = es.target.send(es.stream.frame(blks)?)?;
                     let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, z2mreq).await?;
+                    self.websocket_send(socket, &device, &z2mreq).await?;
                 }
             }
 
@@ -1109,7 +1109,7 @@ impl Z2mBackend {
                     let z2mreq = es.target.send(es.stream.reset()?)?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, z2mreq.clone()).await?;
+                        self.websocket_send(socket, topic, &z2mreq).await?;
                     }
                     self.counter = es.stream.counter();
                 }
