@@ -6,24 +6,24 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
 use bytes::Bytes;
 use chrono::Utc;
-use hue::error::{HueError, HueResult};
 use log::{info, warn};
 use serde_json::{Value, json};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
 
+use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
     GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
     SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
+use hue::error::{HueError, HueResult};
 use hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
     ApiResourceType, ApiScene, ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor,
     ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
 };
 
-use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;

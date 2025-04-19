@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use hue::error::{HueError, HueResult};
 use maplit::btreeset;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -10,16 +9,17 @@ use tokio::sync::Notify;
 use tokio::sync::broadcast::{Receiver, Sender};
 use uuid::Uuid;
 
+use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight, Light, LightMode,
     Metadata, On, RType, Resource, ResourceLink, ResourceRecord, Stub, TimeZone,
     ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
+use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
 use hue::version::SwVersion;
 
-use crate::backend::BackendRequest;
 use crate::error::ApiResult;
 use crate::model::state::{AuxData, State};
 use crate::server::hueevents::HueEventStream;

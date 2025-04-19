@@ -1,8 +1,8 @@
 use serde_json::Value;
 
+use bifrost_api::backend::BackendRequest;
 use hue::api::{ResourceLink, Room, RoomUpdate};
 
-use crate::backend::BackendRequest;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 

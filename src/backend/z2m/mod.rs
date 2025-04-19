@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bifrost_api::backend::BackendRequest;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use maplit::btreeset;
@@ -47,9 +48,9 @@ use z2m::convert::{
 use z2m::request::Z2mRequest;
 use z2m::update::{DeviceColorMode, DeviceUpdate};
 
+use crate::backend::Backend;
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::stream::Z2mTarget;
-use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;

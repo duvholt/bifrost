@@ -6,11 +6,10 @@ use hue::api::RType;
 use thiserror::Error;
 use tokio::task::JoinError;
 
+use bifrost_api::backend::BackendRequest;
 use hue::event::EventBlock;
 use hue::legacy_api::ApiResourceType;
 use svc::error::SvcError;
-
-use crate::backend::BackendRequest;
 
 #[derive(Error, Debug)]
 pub enum ApiError {

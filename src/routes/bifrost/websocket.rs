@@ -5,12 +5,12 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::Response;
 use tokio::select;
 
+use bifrost_api::backend::BackendRequest;
 use bifrost_api::service::Service;
 use bifrost_api::websocket::Update;
 use hue::event::EventBlock;
 use svc::manager::{ServiceEvent, SvmClient};
 
-use crate::backend::BackendRequest;
 use crate::routes::bifrost::BifrostApiResult;
 use crate::server::appstate::AppState;
 use crate::server::hueevents::HueEventRecord;
