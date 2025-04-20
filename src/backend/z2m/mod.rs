@@ -843,6 +843,7 @@ impl Z2mBackend {
                                     LightEffect::Cosmos => EffectType::Cosmos,
                                     LightEffect::Sunbeam => EffectType::Sunbeam,
                                     LightEffect::Enchant => EffectType::Enchant,
+                                    LightEffect::Sunrise => EffectType::Sunrise,
                                 };
                                 hz = hz.with_effect_type(et);
                             }

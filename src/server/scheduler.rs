@@ -5,9 +5,13 @@ use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
 use tokio_schedule::{every, Job};
 use uuid::Uuid;
 
-use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, GroupedLightUpdate,
-    LightUpdate, On, RType, Resource, ResourceLink, WakeupConfiguration,
+use hue::{
+    api::{
+        BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate,
+        GroupedLightUpdate, Light, LightEffectActionUpdate, LightEffectsV2Update, LightUpdate, On,
+        RType, Resource, ResourceLink, WakeupConfiguration,
+    },
+    clamp::Clamp,
 };
 
 use crate::{backend::BackendRequest, error::ApiResult, resource::Resources};
@@ -286,6 +290,31 @@ enum WakeupRequest {
 
 impl WakeupRequest {
     async fn on(&self, res: Arc<Mutex<Resources>>, config: WakeupConfiguration) -> ApiResult<()> {
+        let light_supports_effects = match self {
+            Self::Light(resource_link) => res
+                .lock()
+                .await
+                .get::<Light>(resource_link)?
+                .effects
+                .is_some(),
+            Self::Group(_) => false, // todo: implement when grouped light support effects
+        };
+        let use_sunrise_effect =
+            light_supports_effects && config.style == Some("sunrise".to_string());
+
+        if use_sunrise_effect {
+            self.sunrise_on(&res, &config).await?;
+        } else {
+            self.transition_to_bright_on(res, &config).await?;
+        }
+        Ok(())
+    }
+
+    async fn transition_to_bright_on(
+        &self,
+        res: Arc<Mutex<Resources>>,
+        config: &WakeupConfiguration,
+    ) -> Result<(), crate::error::ApiError> {
         // As reported by the Hue bridge
         const WAKEUP_FADE_MIREK: u16 = 447;
 
@@ -325,7 +354,37 @@ impl WakeupRequest {
                 BackendRequest::GroupedLightUpdate(*resource_link, payload)
             }
         };
-        res.lock().await.backend_request(on_backend_request)
+        res.lock().await.backend_request(on_backend_request)?;
+        Ok(())
+    }
+
+    async fn sunrise_on(
+        &self,
+        res: &Arc<Mutex<Resources>>,
+        config: &WakeupConfiguration,
+    ) -> Result<(), crate::error::ApiError> {
+        match self {
+            Self::Light(resource_link) => {
+                let mut payload = LightUpdate::default()
+                    .with_on(Some(On::new(true)))
+                    .with_brightness(Some(config.end_brightness));
+                payload.effects_v2 = Some(LightEffectsV2Update {
+                    action: Some(LightEffectActionUpdate {
+                        effect: Some(hue::api::LightEffect::Sunrise),
+                        parameters: hue::api::LightEffectParameters {
+                            color: None,
+                            color_temperature: None,
+                            speed: Some(Clamp::unit_from_u8(145)),
+                        },
+                    }),
+                });
+                res.lock()
+                    .await
+                    .backend_request(BackendRequest::LightUpdate(*resource_link, payload))?;
+            }
+            Self::Group(_resource_link) => {}
+        };
+        Ok(())
     }
 
     async fn off(&self, res: Arc<Mutex<Resources>>) -> ApiResult<()> {

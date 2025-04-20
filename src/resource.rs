@@ -400,10 +400,7 @@ impl Resources {
                 category: "automation".to_string(),
             },
             state_schema: DollarRef { dref: None },
-            supported_features: vec![
-                // "style_sunrise".to_string(),
-                "intensity".to_string(),
-            ],
+            supported_features: vec!["style_sunrise".to_string(), "intensity".to_string()],
             trigger_schema: DollarRef {
                 dref: Some("trigger.json#".to_string()),
             },
