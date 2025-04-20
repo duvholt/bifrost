@@ -12,6 +12,7 @@ use hue::{
         RType, Resource, ResourceLink, WakeupConfiguration,
     },
     clamp::Clamp,
+    effect_duration::EffectDuration,
 };
 
 use crate::{backend::BackendRequest, error::ApiResult, resource::Resources};
@@ -368,13 +369,14 @@ impl WakeupRequest {
                 let mut payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
                     .with_brightness(Some(config.end_brightness));
+                let effect_duration = EffectDuration::from_seconds(config.fade_in_duration.seconds);
                 payload.effects_v2 = Some(LightEffectsV2Update {
                     action: Some(LightEffectActionUpdate {
                         effect: Some(hue::api::LightEffect::Sunrise),
                         parameters: hue::api::LightEffectParameters {
                             color: None,
                             color_temperature: None,
-                            speed: Some(Clamp::unit_from_u8(145)),
+                            speed: Some(Clamp::unit_from_u8(effect_duration.0)),
                         },
                     }),
                 });
