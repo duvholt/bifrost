@@ -479,6 +479,7 @@ pub enum LightEffect {
     Cosmos,
     Sunbeam,
     Enchant,
+    Sunrise,
 }
 
 impl LightEffect {
