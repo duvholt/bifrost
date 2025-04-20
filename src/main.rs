@@ -111,6 +111,10 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let svc = server::version_updater(appstate.res.clone(), appstate.updater());
     mgr.register_function("version_updater", svc).await?;
 
+    // register ssdp listener
+    let svc = server::ssdp::SsdpService::new(bconf.mac, bconf.ipaddress);
+    mgr.register_service("ssdp", svc).await?;
+
     // register entertainment streaming listener
     let svc = server::entertainment::EntertainmentService::new(
         bconf.ipaddress,
