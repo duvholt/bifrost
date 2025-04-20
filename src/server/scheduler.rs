@@ -11,6 +11,7 @@ use hue::api::{
     LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink, WakeupConfiguration,
     WakeupStyle,
 };
+use hue::effect_duration::EffectDuration;
 use uuid::Uuid;
 
 use crate::{error::ApiResult, resource::Resources};
@@ -389,9 +390,11 @@ impl WakeupRequest {
                 let mut payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
                     .with_brightness(Some(config.end_brightness));
+                let effect_duration =
+                    EffectDuration::from_seconds(config.fade_in_duration.seconds)?;
                 payload.timed_effects = Some(LightTimedEffectsUpdate {
                     effect: Some(LightTimedEffect::Sunrise),
-                    duration: Some(145),
+                    duration: Some(effect_duration.0 as u32 * 1000),
                 });
                 res.lock()
                     .await
