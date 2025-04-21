@@ -132,7 +132,7 @@ impl WakeupJob {
     }
 
     fn start_time(&self) -> Result<NaiveTime, &'static str> {
-        let job_time = &self.configuration.when.time_point.time;
+        let job_time = self.configuration.when.time_point.time();
         let scheduled_wakeup_time =
             NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0).ok_or("naive time")?;
         // although the scheduled time in the Hue app is the time when lights are at full brightness
@@ -199,11 +199,11 @@ impl WakeupJob {
 }
 
 fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
-    let weekdays = configuration.when.weekdays();
+    let weekdays = configuration.when.recurrence_days.as_ref();
 
     let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
         || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
-        |weekdays| Box::new(weekdays.into_iter().map(ScheduleType::Recurring)),
+        |weekdays| Box::new(weekdays.iter().copied().map(ScheduleType::Recurring)),
     );
     schedule_types
         .map(|schedule_type| WakeupJob {

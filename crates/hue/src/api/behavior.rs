@@ -120,26 +120,22 @@ pub mod configuration {
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub struct When {
-        #[serde(rename = "recurrence_days")]
-        pub recurrence_days: Option<Vec<String>>,
-        #[serde(rename = "time_point")]
+        pub recurrence_days: Option<Vec<Weekday>>,
         pub time_point: TimePoint,
     }
 
-    impl When {
-        pub fn weekdays(&self) -> Option<Vec<Weekday>> {
-            self.recurrence_days
-                .as_ref()
-                .map(|days| days.iter().filter_map(|w| w.parse().ok()).collect())
-        }
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(tag = "type", rename_all = "snake_case")]
+    pub enum TimePoint {
+        Time { time: Time },
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    pub struct TimePoint {
-        pub time: Time,
-        #[serde(rename = "type")]
-        // time
-        pub type_field: String,
+    impl TimePoint {
+        pub const fn time(&self) -> &Time {
+            match self {
+                Self::Time { time } => time,
+            }
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -165,7 +161,6 @@ pub struct BehaviorInstanceUpdate {
     pub configuration: Option<BehaviorInstanceConfiguration>,
     pub enabled: Option<bool>,
     pub metadata: Option<BehaviorInstanceMetadata>,
-    // trigger
 }
 
 impl BehaviorInstanceUpdate {
