@@ -7,17 +7,17 @@ use maplit::btreeset;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
-use uuid::{uuid, Uuid};
+use uuid::Uuid;
 
 use hue::api::{
-    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, Bridge, BridgeHome, Device,
-    DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate, DollarRef, Entertainment,
-    EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
-    EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
-    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, GroupedLight,
-    GroupedLightUpdate, Light, LightMode, LightUpdate, Metadata, On, RType, Resource, ResourceLink,
-    ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
+    BehaviorInstanceUpdate, BehaviorScript, Bridge, BridgeHome, Device, DeviceArchetype,
+    DeviceProductData, DeviceUpdate, DimmingUpdate, Entertainment, EntertainmentConfiguration,
+    EntertainmentConfigurationLocationsUpdate, EntertainmentConfigurationStatus,
+    EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
+    EntertainmentConfigurationUpdate, GroupedLight, GroupedLightUpdate, Light, LightMode,
+    LightUpdate, Metadata, On, RType, Resource, ResourceLink, ResourceRecord, RoomUpdate,
+    SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscovery,
 };
 use hue::event::EventBlock;
 use hue::version::SwVersion;
@@ -383,30 +383,11 @@ impl Resources {
     }
 
     pub fn add_behavior_scripts(&mut self) -> ApiResult<()> {
-        let wake_up_link = ResourceLink::new(
-            uuid!("ff8957e3-2eb9-4699-a0c8-ad2cb3ede704"),
-            RType::BehaviorScript,
-        );
-        let wake_up = BehaviorScript {
-            configuration_schema: DollarRef {
-                dref: Some("basic_wake_up_config.json#".to_string()),
-            },
-            description:
-                "Get your body in the mood to wake up by fading on the lights in the morning."
-                    .to_string(),
-            max_number_instances: None,
-            metadata: BehaviorScriptMetadata {
-                name: "Basic wake up routine".to_string(),
-                category: "automation".to_string(),
-            },
-            state_schema: DollarRef { dref: None },
-            supported_features: vec!["style_sunrise".to_string(), "intensity".to_string()],
-            trigger_schema: DollarRef {
-                dref: Some("trigger.json#".to_string()),
-            },
-            version: "0.0.1".to_string(),
-        };
-        self.add(&wake_up_link, Resource::BehaviorScript(wake_up))?;
+        let wake_up_link = ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript);
+        self.add(
+            &wake_up_link,
+            Resource::BehaviorScript(BehaviorScript::wake_up()),
+        )?;
 
         Ok(())
     }
