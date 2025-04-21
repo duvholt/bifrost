@@ -4,6 +4,7 @@ pub mod certificate;
 pub mod entertainment;
 pub mod http;
 pub mod hueevents;
+pub mod ssdp;
 pub mod updater;
 
 use std::fs::File;

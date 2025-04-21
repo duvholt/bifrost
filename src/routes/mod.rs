@@ -15,6 +15,7 @@ pub mod clip;
 pub mod eventstream;
 pub mod extractor;
 pub mod licenses;
+pub mod upnp;
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
@@ -61,6 +62,7 @@ pub fn router(appstate: AppState) -> Router<()> {
         .nest("/api", api::router())
         .nest("/auth", auth::router())
         .nest("/licenses", licenses::router())
+        .nest("/description.xml", upnp::router())
         .nest("/clip/v2/resource", clip::router())
         .nest("/eventstream", eventstream::router())
         .with_state(appstate)

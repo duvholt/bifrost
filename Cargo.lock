@@ -297,6 +297,7 @@ dependencies = [
  "p256",
  "packed_struct",
  "pretty_env_logger",
+ "quick-xml",
  "rand 0.9.0",
  "reqwest",
  "rsa",
@@ -311,6 +312,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tokio-openssl",
+ "tokio-ssdp",
  "tokio-stream",
  "tokio-tungstenite",
  "tokio-util",
@@ -1087,7 +1089,7 @@ dependencies = [
  "http-body",
  "hyper",
  "pin-project-lite",
- "socket2",
+ "socket2 0.5.8",
  "tokio",
  "tower-service",
  "tracing",
@@ -1429,7 +1431,7 @@ dependencies = [
  "if-addrs",
  "log",
  "mio",
- "socket2",
+ "socket2 0.5.8",
 ]
 
 [[package]]
@@ -1779,6 +1781,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.37.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "165859e9e55f79d67b96c5d96f4e88b6f2695a1972849c15a6a3f5c59fc2c003"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1790,7 +1802,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2",
+ "socket2 0.5.8",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
@@ -1825,7 +1837,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2",
+ "socket2 0.5.8",
  "tracing",
  "windows-sys 0.59.0",
 ]
@@ -2297,6 +2309,16 @@ checksum = "7fcf8323ef1faaee30a44a340193b1ac6814fd9b7b4e88e9d4519a3e4abe1cfd"
 
 [[package]]
 name = "socket2"
+version = "0.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f7916fc008ca5542385b89a3d3ce689953c143e9304a9bf8beec1de48994c0d"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
+name = "socket2"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c970269d99b64e60ec3bd6ad27270092a5394c4e309314b18ae3fe575695fbe8"
@@ -2519,7 +2541,7 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2",
+ "socket2 0.5.8",
  "tokio-macros",
  "windows-sys 0.52.0",
 ]
@@ -2563,6 +2585,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f6d0975eaace0cf0fcadee4e4aaa5da15b5c079146f2cffb67c113be122bf37"
 dependencies = [
  "rustls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-ssdp"
+version = "0.1.0"
+source = "git+https://github.com/chrivers/tokio-ssdp.git#3aecd14e644d27dd645c76edbb9ad1fe243b78ee"
+dependencies = [
+ "httparse",
+ "httpdate",
+ "log",
+ "rand 0.8.5",
+ "socket2 0.4.10",
  "tokio",
 ]
 

@@ -40,10 +40,16 @@ pub enum ApiError {
     FromHexError(#[from] hex::FromHexError),
 
     #[error(transparent)]
+    UrlParseError(#[from] url::ParseError),
+
+    #[error(transparent)]
     MdnsSdError(#[from] mdns_sd::Error),
 
     #[error(transparent)]
     ConfigError(#[from] config::ConfigError),
+
+    #[error(transparent)]
+    QuickXmlSeError(#[from] quick_xml::se::SeError),
 
     #[error(transparent)]
     SendErrorHue(#[from] tokio::sync::broadcast::error::SendError<EventBlock>),
@@ -148,6 +154,12 @@ pub enum ApiError {
 
 impl From<SvcError> for ApiError {
     fn from(value: SvcError) -> Self {
+        Self::SvcError(value.to_string())
+    }
+}
+
+impl ApiError {
+    pub fn service_error(value: impl ToString) -> Self {
         Self::SvcError(value.to_string())
     }
 }

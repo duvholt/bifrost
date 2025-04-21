@@ -6,7 +6,7 @@ use bifrost::backend::z2m::Z2mBackend;
 use bifrost::backend::Backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
-use bifrost::mdns;
+use bifrost::mdns::MdnsService;
 use bifrost::server;
 use bifrost::server::appstate::AppState;
 use bifrost::server::http::HttpServer;
@@ -63,9 +63,11 @@ fn init_logging() -> ApiResult<()> {
 #[allow(clippy::similar_names)]
 async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let bconf = &appstate.config().bridge;
-    let _mdns = mdns::register_mdns(bconf.mac, bconf.ipaddress);
 
     let mut mgr = appstate.manager();
+
+    mgr.register_service("mdns", MdnsService::new(bconf.mac, bconf.ipaddress))
+        .await?;
 
     let svc = server::build_service(appstate.clone());
 
@@ -108,6 +110,10 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     // register version updater
     let svc = server::version_updater(appstate.res.clone(), appstate.updater());
     mgr.register_function("version_updater", svc).await?;
+
+    // register ssdp listener
+    let svc = server::ssdp::SsdpService::new(bconf.mac, bconf.ipaddress);
+    mgr.register_service("ssdp", svc).await?;
 
     // register entertainment streaming listener
     let svc = server::entertainment::EntertainmentService::new(
