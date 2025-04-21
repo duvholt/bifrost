@@ -15,6 +15,7 @@ mod zigbee_device_discovery;
 pub use behavior::{
     BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
     BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, WakeupConfiguration,
+    WakeupStyle,
 };
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
