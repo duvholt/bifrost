@@ -11,7 +11,7 @@ use uuid::Uuid;
 use hue::api::{
     BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, GroupedLightUpdate,
     Light, LightEffectActionUpdate, LightEffectsV2Update, LightUpdate, On, RType, Resource,
-    ResourceLink, WakeupConfiguration,
+    ResourceLink, WakeupConfiguration, WakeupStyle,
 };
 use hue::clamp::Clamp;
 use hue::effect_duration::EffectDuration;
@@ -304,7 +304,7 @@ impl WakeupRequest {
             Self::Group(_) => false, // todo: implement when grouped light support effects
         };
         let use_sunrise_effect =
-            light_supports_effects && config.style == Some("sunrise".to_string());
+            light_supports_effects && config.style == Some(WakeupStyle::Sunrise);
 
         if use_sunrise_effect {
             self.sunrise_on(&res, &config).await?;

@@ -93,10 +93,17 @@ pub struct WakeupConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub turn_lights_off_after: Option<configuration::Duration>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub style: Option<String>,
+    pub style: Option<WakeupStyle>,
     pub when: configuration::When,
     #[serde(rename = "where")]
     pub where_field: Vec<configuration::Where>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum WakeupStyle {
+    Sunrise,
+    Basic,
 }
 
 pub mod configuration {
