@@ -162,6 +162,7 @@ impl From<SvcError> for ApiError {
 }
 
 impl ApiError {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn service_error(value: impl ToString) -> Self {
         Self::SvcError(value.to_string())
     }
