@@ -577,6 +577,63 @@ impl Z2mBackend {
         Ok(())
     }
 
+    #[allow(clippy::match_same_arms)]
+    fn make_hue_specific_update(upd: &LightUpdate) -> ApiResult<HueZigbeeUpdate> {
+        let mut hz = HueZigbeeUpdate::new();
+
+        if let Some(grad) = &upd.gradient {
+            hz = hz.with_gradient_colors(
+                match grad.mode {
+                    Some(LightGradientMode::InterpolatedPalette) => GradientStyle::Linear,
+                    Some(LightGradientMode::InterpolatedPaletteMirrored) => GradientStyle::Mirrored,
+                    Some(LightGradientMode::RandomPixelated) => GradientStyle::Scattered,
+                    None => GradientStyle::Linear,
+                },
+                grad.points.iter().map(|c| c.color.xy).collect(),
+            )?;
+
+            hz = hz.with_gradient_params(GradientParams {
+                scale: match grad.mode {
+                    Some(LightGradientMode::InterpolatedPalette) => 0x28,
+                    Some(LightGradientMode::InterpolatedPaletteMirrored) => 0x18,
+                    Some(LightGradientMode::RandomPixelated) => 0x38,
+                    None => 0x18,
+                },
+                offset: 0x00,
+            });
+        }
+
+        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
+            if let Some(fx) = &act.effect {
+                let et = match fx {
+                    LightEffect::NoEffect => EffectType::NoEffect,
+                    LightEffect::Prism => EffectType::Prism,
+                    LightEffect::Opal => EffectType::Opal,
+                    LightEffect::Glisten => EffectType::Glisten,
+                    LightEffect::Sparkle => EffectType::Sparkle,
+                    LightEffect::Fire => EffectType::Fireplace,
+                    LightEffect::Candle => EffectType::Candle,
+                    LightEffect::Underwater => EffectType::Underwater,
+                    LightEffect::Cosmos => EffectType::Cosmos,
+                    LightEffect::Sunbeam => EffectType::Sunbeam,
+                    LightEffect::Enchant => EffectType::Enchant,
+                };
+                hz = hz.with_effect_type(et);
+            }
+            if let Some(speed) = &act.parameters.speed {
+                hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
+            }
+            if let Some(ct) = &act.parameters.color_temperature {
+                hz = hz.with_color_mirek(ct.mirek);
+            }
+            if let Some(color) = &act.parameters.color {
+                hz = hz.with_color_xy(color.xy);
+            }
+        }
+
+        Ok(hz)
+    }
+
     async fn websocket_read(&mut self, pkt: tungstenite::Message) -> ApiResult<()> {
         let tungstenite::Message::Text(txt) = pkt else {
             log::error!("[{}] Received non-text message on websocket :(", self.name);
