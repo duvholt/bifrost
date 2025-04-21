@@ -754,111 +754,51 @@ impl Z2mBackend {
                     let hue_effects = lock.get::<Light>(&link)?.effects.is_some();
                     drop(lock);
 
+                    /* step 1: send generic light update */
+                    let mut payload = DeviceUpdate::default()
+                        .with_state(upd.on.map(|on| on.on))
+                        .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+                        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                        .with_color_xy(upd.color.map(|col| col.xy));
+
+                    // We don't want to send gradient updates twice, but if hue
+                    // effects are not supported for this light, this is the best
+                    // (and only) way to do it
+                    if !hue_effects {
+                        payload = payload.with_gradient(upd.gradient.clone());
+                    }
+
+                    let z2mreq = Z2mRequest::Update(&payload);
+
+                    self.websocket_send(socket, topic, z2mreq).await?;
+
+                    /* step 2: if supported (and needed) send hue-specific effects update */
+
                     if hue_effects {
-                        let mut hz = HueZigbeeUpdate::new();
+                        let mut hz = Self::make_hue_specific_update(&upd)?;
 
-                        if let Some(on) = &upd.on {
-                            hz = hz.with_on_off(on.on);
-                        }
+                        if !hz.is_empty() {
+                            hz = hz.with_fade_speed(0x0001);
 
-                        if let Some(grad) = &upd.gradient {
-                            hz = hz.with_gradient_colors(
-                                match grad.mode {
-                                    Some(LightGradientMode::InterpolatedPalette) => {
-                                        GradientStyle::Linear
+                            let data = hz.to_vec()?;
+                            log::debug!("Sending hue-specific frame: {}", hex::encode(&data));
+
+                            let upd = json!({
+                                "command": {
+                                    "cluster": 0xFC03,
+                                    "command": 0,
+                                    "payload": {
+                                        "data": data
                                     }
-                                    Some(LightGradientMode::InterpolatedPaletteMirrored) => {
-                                        GradientStyle::Mirrored
-                                    }
-                                    Some(LightGradientMode::RandomPixelated) => {
-                                        GradientStyle::Scattered
-                                    }
-                                    None => GradientStyle::Linear,
-                                },
-                                grad.points.iter().map(|c| c.color.xy).collect(),
-                            )?;
-
-                            hz = hz.with_gradient_params(GradientParams {
-                                scale: 0x38,
-                                offset: 0x00,
-                            });
-                        }
-
-                        if let Some(br) = &upd.dimming {
-                            hz = hz.with_brightness(
-                                (br.brightness / 100.0).unit_to_u8_clamped_light(),
+                                }}
                             );
+                            let z2mreq = Z2mRequest::Untyped {
+                                endpoint: 11,
+                                value: &upd,
+                            };
+
+                            self.websocket_send(socket, topic, z2mreq).await?;
                         }
-
-                        if let Some(temp) = &upd.color_temperature {
-                            hz = hz.with_color_mirek(temp.mirek);
-                        }
-
-                        if let Some(xy) = &upd.color {
-                            hz = hz.with_color_xy(xy.xy);
-                        }
-
-                        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
-                            if let Some(fx) = &act.effect {
-                                let et = match fx {
-                                    LightEffect::NoEffect => EffectType::NoEffect,
-                                    LightEffect::Prism => EffectType::Prism,
-                                    LightEffect::Opal => EffectType::Opal,
-                                    LightEffect::Glisten => EffectType::Glisten,
-                                    LightEffect::Sparkle => EffectType::Sparkle,
-                                    LightEffect::Fire => EffectType::Fireplace,
-                                    LightEffect::Candle => EffectType::Candle,
-                                    LightEffect::Underwater => EffectType::Underwater,
-                                    LightEffect::Cosmos => EffectType::Cosmos,
-                                    LightEffect::Sunbeam => EffectType::Sunbeam,
-                                    LightEffect::Enchant => EffectType::Enchant,
-                                };
-                                hz = hz.with_effect_type(et);
-                            }
-                            if let Some(speed) = &act.parameters.speed {
-                                hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
-                            }
-                            if let Some(ct) = &act.parameters.color_temperature {
-                                hz = hz.with_color_mirek(ct.mirek);
-                            }
-                            if let Some(color) = &act.parameters.color {
-                                hz = hz.with_color_xy(color.xy);
-                            }
-                        }
-
-                        hz = hz.with_fade_speed(0x0001);
-
-                        let data = hz.to_vec()?;
-
-                        println!("{}", hex::encode(&data));
-
-                        let upd = json!({
-                            "command": {
-                                "cluster": 0xFC03,
-                                "command": 0,
-                                "payload": {
-                                    "data": data
-                                }
-                            }}
-                        );
-
-                        let z2mreq = Z2mRequest::Untyped {
-                            endpoint: 11,
-                            value: &upd,
-                        };
-
-                        self.websocket_send(socket, topic, z2mreq).await?;
-                    } else {
-                        let payload = DeviceUpdate::default()
-                            .with_state(upd.on.map(|on| on.on))
-                            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                            .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
-                            .with_color_xy(upd.color.map(|col| col.xy))
-                            .with_gradient(upd.gradient);
-
-                        let z2mreq = Z2mRequest::Update(&payload);
-
-                        self.websocket_send(socket, topic, z2mreq).await?;
                     }
                 }
             }
