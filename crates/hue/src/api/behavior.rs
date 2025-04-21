@@ -2,7 +2,7 @@ use std::ops::AddAssign;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use uuid::Uuid;
+use uuid::{uuid, Uuid};
 
 use super::DollarRef;
 
@@ -17,6 +17,33 @@ pub struct BehaviorScript {
     pub supported_features: Vec<String>,
     pub trigger_schema: DollarRef,
     pub version: String,
+}
+
+impl BehaviorScript {
+    pub const WAKE_UP_ID: Uuid = uuid!("ff8957e3-2eb9-4699-a0c8-ad2cb3ede704");
+
+    #[must_use]
+    pub fn wake_up() -> Self {
+        Self {
+            configuration_schema: DollarRef {
+                dref: Some("basic_wake_up_config.json#".to_string()),
+            },
+            description:
+                "Get your body in the mood to wake up by fading on the lights in the morning."
+                    .to_string(),
+            max_number_instances: None,
+            metadata: BehaviorScriptMetadata {
+                name: "Basic wake up routine".to_string(),
+                category: "automation".to_string(),
+            },
+            state_schema: DollarRef { dref: None },
+            supported_features: vec!["style_sunrise".to_string(), "intensity".to_string()],
+            trigger_schema: DollarRef {
+                dref: Some("trigger.json#".to_string()),
+            },
+            version: "0.0.1".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
