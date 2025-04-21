@@ -77,8 +77,6 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let http_service = HttpServer::http(bconf.ipaddress, bconf.http_port, svc.clone());
     mgr.register_service("http", http_service).await?;
 
-    // if openssl is enabled, use that for https (since it also supports DTLS)
-    #[cfg(feature = "tls-openssl")]
     let https_service = HttpServer::https_openssl(
         bconf.ipaddress,
         bconf.https_port,
@@ -86,18 +84,7 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
         &appstate.config().bifrost.cert_file,
     )?;
 
-    // .. otherwise, if rustls is enabled, use that
-    #[cfg(all(feature = "tls-rustls", not(feature = "tls-openssl")))]
-    let https_service = HttpServer::https_rustls(
-        bconf.ipaddress,
-        bconf.https_port,
-        svc.clone(),
-        &appstate.config().bifrost.cert_file,
-    )
-    .await?;
-
     // .. if either tls backend is enabled, register https service
-    #[cfg(any(feature = "tls-rustls", feature = "tls-openssl"))]
     mgr.register_service("https", https_service).await?;
 
     // register config writer

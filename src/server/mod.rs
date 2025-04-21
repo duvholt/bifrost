@@ -1,5 +1,7 @@
-pub mod appstate;
+#[cfg(feature = "server-banner")]
 pub mod banner;
+
+pub mod appstate;
 pub mod certificate;
 pub mod entertainment;
 pub mod http;

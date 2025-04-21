@@ -105,6 +105,9 @@ pub enum ApiError {
     #[error(transparent)]
     SslError(#[from] openssl::ssl::Error),
 
+    #[error(transparent)]
+    NativeTlsError(#[from] native_tls::Error),
+
     #[error("Service error: {0}")]
     SvcError(String),
 
