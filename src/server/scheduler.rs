@@ -2,7 +2,10 @@ use std::{iter, sync::Arc, time::Duration};
 
 use bifrost_api::backend::BackendRequest;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
-use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
+use tokio::spawn;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tokio_schedule::{Job, every};
 
 use hue::api::{
