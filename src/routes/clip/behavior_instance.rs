@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    routing::put,
+    routing::{get, put},
     Json, Router,
 };
 use serde_json::Value;
@@ -9,7 +9,7 @@ use uuid::Uuid;
 use hue::api::BehaviorInstance;
 use hue::api::{BehaviorInstanceUpdate, RType};
 
-use crate::routes::clip::{ApiV2Result, V2Reply};
+use crate::routes::clip::{generic, ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
 async fn put_behavior_instance(
@@ -35,6 +35,12 @@ async fn put_behavior_instance(
     V2Reply::ok(rlink)
 }
 
+async fn get_resource_id(state: State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
+    generic::get_resource_id(state, Path((RType::BehaviorInstance, id))).await
+}
+
 pub fn router() -> Router<AppState> {
-    Router::new().route("/{id}", put(put_behavior_instance))
+    Router::new()
+        .route("/{id}", get(get_resource_id))
+        .route("/{id}", put(put_behavior_instance))
 }
