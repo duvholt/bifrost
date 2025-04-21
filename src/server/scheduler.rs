@@ -218,7 +218,7 @@ fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) 
 
     let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
         || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
-        |weekdays| Box::new(weekdays.clone().into_iter().map(ScheduleType::Recurring)),
+        |weekdays| Box::new(weekdays.iter().copied().map(ScheduleType::Recurring)),
     );
     schedule_types
         .map(|schedule_type| WakeupJob {
