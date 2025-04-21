@@ -1,8 +1,6 @@
-use axum::{
-    extract::{Path, State},
-    routing::{get, put},
-    Json, Router,
-};
+use axum::extract::{Path, State};
+use axum::routing::{get, put};
+use axum::{Json, Router};
 use serde_json::Value;
 use uuid::Uuid;
 

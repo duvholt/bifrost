@@ -1,21 +1,24 @@
 use std::{iter, sync::Arc, time::Duration};
 
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
-use tokio::{spawn, sync::Mutex, task::JoinHandle, time::sleep};
+use tokio::spawn;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tokio_schedule::{every, Job};
 use uuid::Uuid;
 
-use hue::{
-    api::{
-        BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate,
-        GroupedLightUpdate, Light, LightEffectActionUpdate, LightEffectsV2Update, LightUpdate, On,
-        RType, Resource, ResourceLink, WakeupConfiguration,
-    },
-    clamp::Clamp,
-    effect_duration::EffectDuration,
+use hue::api::{
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, GroupedLightUpdate,
+    Light, LightEffectActionUpdate, LightEffectsV2Update, LightUpdate, On, RType, Resource,
+    ResourceLink, WakeupConfiguration,
 };
+use hue::clamp::Clamp;
+use hue::effect_duration::EffectDuration;
 
-use crate::{backend::BackendRequest, error::ApiResult, resource::Resources};
+use crate::backend::BackendRequest;
+use crate::error::ApiResult;
+use crate::resource::Resources;
 
 #[derive(Debug)]
 pub struct Scheduler {
