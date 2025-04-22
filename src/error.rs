@@ -5,7 +5,6 @@ use camino::Utf8PathBuf;
 use hue::api::RType;
 use thiserror::Error;
 use tokio::task::JoinError;
-use uuid::Uuid;
 
 use hue::event::EventBlock;
 use hue::legacy_api::ApiResourceType;
@@ -124,9 +123,6 @@ pub enum ApiError {
     V1CreateUnsupported(ApiResourceType),
 
     /* hue api v2 errors */
-    #[error("Resource {0} could not be deleted")]
-    DeleteDenied(Uuid),
-
     #[error("Failed to get firmware version reply from update server")]
     NoUpdateInformation,
 
