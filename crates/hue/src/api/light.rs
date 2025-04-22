@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::hs::HS;
+use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -636,6 +637,17 @@ impl LightUpdate {
             }),
             ..self
         }
+    }
+}
+
+impl From<&ApiLightStateUpdate> for LightUpdate {
+    fn from(upd: &ApiLightStateUpdate) -> Self {
+        Self::new()
+            .with_on(upd.on.map(On::new))
+            .with_brightness(upd.bri.map(|b| f64::from(b) / 2.54))
+            .with_color_temperature(upd.ct)
+            .with_color_hs(upd.hs.map(Into::into))
+            .with_color_xy(upd.xy.map(Into::into))
     }
 }
 
