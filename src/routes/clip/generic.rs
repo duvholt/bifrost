@@ -68,7 +68,7 @@ async fn delete_resource_id(
 
     state.res.lock().await.get_resource(rtype, &id)?;
 
-    Err(ApiError::DeleteDenied(id))?
+    Err(ApiError::DeleteNotYetSupported(rtype))?
 }
 
 pub fn router() -> Router<AppState> {

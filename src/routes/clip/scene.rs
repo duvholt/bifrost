@@ -5,7 +5,7 @@ use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
-use hue::api::{RType, Resource, Scene, SceneUpdate};
+use hue::api::{RType, Scene, SceneUpdate};
 
 use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
@@ -67,18 +67,14 @@ async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> Ap
     let link = RType::Scene.link_to(id);
 
     let lock = state.res.lock().await;
-    let res = lock.get_resource(RType::Scene, &id)?;
 
-    match res.obj {
-        Resource::Scene(_) => {
-            lock.backend_request(BackendRequest::Delete(link))?;
+    let _scene: &Scene = lock.get(&link)?;
 
-            drop(lock);
+    lock.backend_request(BackendRequest::Delete(link))?;
 
-            V2Reply::ok(link)
-        }
-        _ => Err(ApiError::DeleteDenied(id))?,
-    }
+    drop(lock);
+
+    V2Reply::ok(link)
 }
 
 pub fn router() -> Router<AppState> {
