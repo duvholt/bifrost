@@ -58,6 +58,7 @@ pub struct Scene {
     /* }, */
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub palette: Value,
+    #[serde(default)]
     pub speed: f64,
     pub status: Option<SceneStatus>,
     #[serde(default)]
