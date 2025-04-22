@@ -2,6 +2,7 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
+use hue::api::RType;
 use thiserror::Error;
 use tokio::task::JoinError;
 use uuid::Uuid;
@@ -128,6 +129,25 @@ pub enum ApiError {
 
     #[error("Failed to get firmware version reply from update server")]
     NoUpdateInformation,
+
+    /* bifrost errors: routes */
+    #[error("Creating object of type {0:?} is not yet supported by Bifrost")]
+    CreateNotYetSupported(RType),
+
+    #[error("Creating object of type {0:?} is not allowed by hue protocol")]
+    CreateNotAllowed(RType),
+
+    #[error("Updating object of type {0:?} is not yet supported by Bifrost")]
+    UpdateNotYetSupported(RType),
+
+    #[error("Updating object of type {0:?} is not allowed by hue protocol")]
+    UpdateNotAllowed(RType),
+
+    #[error("Deleting object of type {0:?} is not yet supported by Bifrost")]
+    DeleteNotYetSupported(RType),
+
+    #[error("Deleting object of type {0:?} is not allowed by hue protocol")]
+    DeleteNotAllowed(RType),
 
     /* bifrost errors */
     #[error("Cannot parse state file: no version field found")]
