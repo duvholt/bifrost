@@ -346,11 +346,7 @@ async fn put_api_user_resource_id_path(
 
             let reply = match updv1 {
                 ApiGroupActionUpdate::LightUpdate(upd) => {
-                    let updv2 = GroupedLightUpdate::new()
-                        .with_on(upd.on.map(On::new))
-                        .with_brightness(upd.bri.map(|b| f64::from(b) / 2.54))
-                        .with_color_xy(upd.xy.map(Into::into))
-                        .with_color_temperature(upd.ct);
+                    let updv2 = GroupedLightUpdate::from(&upd);
 
                     lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
                     drop(lock);
