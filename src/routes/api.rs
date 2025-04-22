@@ -328,7 +328,6 @@ async fn put_api_user_resource_id_path(
             Ok(Json(reply.json()))
         }
         ApiResourceType::Groups => {
-            log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
             if path != "action" {
                 return Err(HueError::V1NotFound(id))?;
             }
