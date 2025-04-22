@@ -1,4 +1,3 @@
-use axum::extract::{Path, State};
 use hue::error::HueError;
 use serde_json::Value;
 use uuid::{uuid, Uuid};
@@ -17,10 +16,9 @@ use crate::error::ApiResult;
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_APPLICATION_ID;
 use crate::routes::clip::{ApiV2Result, V2Reply};
-use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-pub async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
+pub async fn post_resource(state: &AppState, req: Value) -> ApiV2Result {
     log::info!(
         "POST: entertainment_configuration {}",
         serde_json::to_string(&req)?
@@ -195,11 +193,7 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
     Ok(bridge_ent)
 }
 
-pub async fn put_resource_id(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    Json(put): Json<Value>,
-) -> ApiV2Result {
+pub async fn put_resource_id(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
     let rtype = RType::EntertainmentConfiguration;
 
     log::info!("PUT {rtype:?}/{id}");

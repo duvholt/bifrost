@@ -1,4 +1,3 @@
-use axum::extract::{Path, State};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -6,14 +5,9 @@ use hue::api::{GroupedLight, GroupedLightUpdate, RType};
 
 use crate::backend::BackendRequest;
 use crate::routes::clip::{ApiV2Result, V2Reply};
-use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-pub async fn put_grouped_light(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    Json(put): Json<Value>,
-) -> ApiV2Result {
+pub async fn put_grouped_light(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
     log::info!("PUT grouped_light/{id}");
     log::debug!("json data\n{}", serde_json::to_string_pretty(&put)?);
 

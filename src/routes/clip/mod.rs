@@ -4,6 +4,8 @@ pub mod grouped_light;
 pub mod light;
 pub mod scene;
 
+use entertainment_configuration as ent_conf;
+
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
@@ -71,10 +73,8 @@ async fn post_resource(
     log::info!("POST: {rtype:?} {}", serde_json::to_string(&req)?);
 
     match rtype {
-        RType::EntertainmentConfiguration => {
-            entertainment_configuration::post_resource(State(state), Json(req)).await
-        }
-        RType::Scene => scene::post_scene(State(state), Json(req)).await,
+        RType::EntertainmentConfiguration => ent_conf::post_resource(&state, req).await,
+        RType::Scene => scene::post_scene(&state, req).await,
 
         /* Not supported yet by Bifrost */
         RType::BehaviorInstance
@@ -143,15 +143,11 @@ async fn put_resource_id(
 
     match rtype {
         /* Allowed + supported */
-        RType::Device => device::put_device(State(state), Path(id), Json(put)).await,
-        RType::EntertainmentConfiguration => {
-            entertainment_configuration::put_resource_id(State(state), Path(id), Json(put)).await
-        }
-        RType::GroupedLight => {
-            grouped_light::put_grouped_light(State(state), Path(id), Json(put)).await
-        }
-        RType::Light => light::put_light(State(state), Path(id), Json(put)).await,
-        RType::Scene => scene::put_scene(State(state), Path(id), Json(put)).await,
+        RType::Device => device::put_device(&state, id, put).await,
+        RType::EntertainmentConfiguration => ent_conf::put_resource_id(&state, id, put).await,
+        RType::GroupedLight => grouped_light::put_grouped_light(&state, id, put).await,
+        RType::Light => light::put_light(&state, id, put).await,
+        RType::Scene => scene::put_scene(&state, id, put).await,
 
         /* Allowed, but support is missing in Bifrost */
         RType::BehaviorInstance
@@ -210,7 +206,7 @@ async fn delete_resource_id(
     log::info!("DELETE {rtype:?}/{id}");
 
     match rtype {
-        RType::Scene => scene::delete_scene(State(state), Path(id)).await,
+        RType::Scene => scene::delete_scene(&state, id).await,
 
         /* Allowed, but support is missing in Bifrost */
         RType::BehaviorInstance

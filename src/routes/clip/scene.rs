@@ -1,4 +1,3 @@
-use axum::extract::{Path, State};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -6,10 +5,9 @@ use hue::api::{RType, Scene, SceneUpdate};
 
 use crate::backend::BackendRequest;
 use crate::routes::clip::{ApiV2Result, V2Reply};
-use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-pub async fn post_scene(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
+pub async fn post_scene(state: &AppState, req: Value) -> ApiV2Result {
     log::info!("POST: scene {}", serde_json::to_string(&req)?);
 
     let scene: Scene = serde_json::from_value(req)?;
@@ -27,11 +25,7 @@ pub async fn post_scene(State(state): State<AppState>, Json(req): Json<Value>) -
     V2Reply::ok(link_scene)
 }
 
-pub async fn put_scene(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    Json(put): Json<Value>,
-) -> ApiV2Result {
+pub async fn put_scene(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
     log::info!("PUT scene/{id}");
     log::debug!("json data\n{}", serde_json::to_string_pretty(&put)?);
 
@@ -54,7 +48,7 @@ pub async fn put_scene(
     V2Reply::ok(rlink)
 }
 
-pub async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
+pub async fn delete_scene(state: &AppState, id: Uuid) -> ApiV2Result {
     log::info!("DELETE scene/{id}");
     let link = RType::Scene.link_to(id);
 
