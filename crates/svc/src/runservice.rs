@@ -67,6 +67,7 @@ impl<S: Service> StandardService<S> {
         }
     }
 
+    #[allow(clippy::missing_const_for_fn)]
     pub fn name(&self) -> &str {
         &self.name
     }
