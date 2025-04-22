@@ -15,15 +15,20 @@ use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct V2Error {
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct V2Reply<T> {
     pub data: Vec<T>,
-    pub errors: Vec<String>,
+    pub errors: Vec<V2Error>,
 }
 
 type ApiV2Result = ApiResult<Json<V2Reply<Value>>>;
 
+#[allow(clippy::unnecessary_wraps)]
 impl<T: Serialize> V2Reply<T> {
-    #[allow(clippy::unnecessary_wraps)]
     fn ok(obj: T) -> ApiV2Result {
         Ok(Json(V2Reply {
             data: vec![serde_json::to_value(obj)?],
@@ -31,7 +36,6 @@ impl<T: Serialize> V2Reply<T> {
         }))
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn list(data: Vec<T>) -> ApiV2Result {
         Ok(Json(V2Reply {
             data: data
