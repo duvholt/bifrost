@@ -1,14 +1,12 @@
 use serde_json::Value;
-use uuid::Uuid;
 
-use hue::api::{Light, LightUpdate, RType};
+use hue::api::{Light, LightUpdate, ResourceLink};
 
 use crate::backend::BackendRequest;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
-pub async fn put_light(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
-    let rlink = RType::Light.link_to(id);
+pub async fn put_light(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV2Result {
     let lock = state.res.lock().await;
 
     let _ = lock.get::<Light>(&rlink)?;

@@ -193,9 +193,7 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
     Ok(bridge_ent)
 }
 
-pub async fn put_resource_id(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
-    let rtype = RType::EntertainmentConfiguration;
-
+pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV2Result {
     let upd: EntertainmentConfigurationUpdate = serde_json::from_value(put)?;
 
     let mut lock = state.res.lock().await;
@@ -219,8 +217,7 @@ pub async fn put_resource_id(state: &AppState, id: Uuid, put: Value) -> ApiV2Res
     }
 
     if let Some(action) = &upd.action {
-        let ent: &EntertainmentConfiguration =
-            lock.get(&RType::EntertainmentConfiguration.link_to(id))?;
+        let ent: &EntertainmentConfiguration = lock.get(&rlink)?;
         let svc = ent.light_services.clone();
 
         lock.update::<Light>(&svc[0].rid, |light| {
@@ -233,7 +230,7 @@ pub async fn put_resource_id(state: &AppState, id: Uuid, put: Value) -> ApiV2Res
 
     let bridge_ent = find_bridge_entertainment(&lock)?;
 
-    lock.update::<EntertainmentConfiguration>(&id, |ec| {
+    lock.update::<EntertainmentConfiguration>(&rlink.rid, |ec| {
         if let Some(_locations) = upd.locations {
             ec.locations = locations.unwrap();
             ec.channels = channels;
@@ -277,8 +274,6 @@ pub async fn put_resource_id(state: &AppState, id: Uuid, put: Value) -> ApiV2Res
     })?;
 
     drop(lock);
-
-    let rlink = ResourceLink::new(id, rtype);
 
     V2Reply::ok(rlink)
 }

@@ -1,7 +1,6 @@
 use serde_json::Value;
-use uuid::Uuid;
 
-use hue::api::{RType, Scene, SceneUpdate};
+use hue::api::{RType, ResourceLink, Scene, SceneUpdate};
 
 use crate::backend::BackendRequest;
 use crate::routes::clip::{ApiV2Result, V2Reply};
@@ -23,14 +22,13 @@ pub async fn post_scene(state: &AppState, req: Value) -> ApiV2Result {
     V2Reply::ok(link_scene)
 }
 
-pub async fn put_scene(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
-    let rlink = RType::Scene.link_to(id);
+pub async fn put_scene(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV2Result {
     let mut lock = state.res.lock().await;
 
     let upd: SceneUpdate = serde_json::from_value(put)?;
 
     if let Some(md) = &upd.metadata {
-        lock.update::<Scene>(&id, |scn| scn.metadata += md.clone())?;
+        lock.update::<Scene>(&rlink.rid, |scn| scn.metadata += md.clone())?;
     }
 
     let _scene = lock.get::<Scene>(&rlink)?;
@@ -41,16 +39,14 @@ pub async fn put_scene(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
     V2Reply::ok(rlink)
 }
 
-pub async fn delete_scene(state: &AppState, id: Uuid) -> ApiV2Result {
-    let link = RType::Scene.link_to(id);
-
+pub async fn delete_scene(state: &AppState, rlink: ResourceLink) -> ApiV2Result {
     let lock = state.res.lock().await;
 
-    let _scene: &Scene = lock.get(&link)?;
+    let _scene: &Scene = lock.get(&rlink)?;
 
-    lock.backend_request(BackendRequest::Delete(link))?;
+    lock.backend_request(BackendRequest::Delete(rlink))?;
 
     drop(lock);
 
-    V2Reply::ok(link)
+    V2Reply::ok(rlink)
 }

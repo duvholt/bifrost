@@ -142,13 +142,15 @@ async fn put_resource_id(
     log::info!("PUT {rtype:?}/{id}");
     log::debug!("Json data:\n{}", serde_json::to_string_pretty(&put)?);
 
+    let rlink = rtype.link_to(id);
+
     match rtype {
         /* Allowed + supported */
-        RType::Device => device::put_device(&state, id, put).await,
-        RType::EntertainmentConfiguration => ent_conf::put_resource_id(&state, id, put).await,
-        RType::GroupedLight => grouped_light::put_grouped_light(&state, id, put).await,
-        RType::Light => light::put_light(&state, id, put).await,
-        RType::Scene => scene::put_scene(&state, id, put).await,
+        RType::Device => device::put_device(&state, rlink, put).await,
+        RType::EntertainmentConfiguration => ent_conf::put_resource_id(&state, rlink, put).await,
+        RType::GroupedLight => grouped_light::put_grouped_light(&state, rlink, put).await,
+        RType::Light => light::put_light(&state, rlink, put).await,
+        RType::Scene => scene::put_scene(&state, rlink, put).await,
 
         /* Allowed, but support is missing in Bifrost */
         RType::BehaviorInstance
@@ -206,8 +208,10 @@ async fn delete_resource_id(
 ) -> ApiV2Result {
     log::info!("DELETE {rtype:?}/{id}");
 
+    let rlink = rtype.link_to(id);
+
     match rtype {
-        RType::Scene => scene::delete_scene(&state, id).await,
+        RType::Scene => scene::delete_scene(&state, rlink).await,
 
         /* Allowed, but support is missing in Bifrost */
         RType::BehaviorInstance
