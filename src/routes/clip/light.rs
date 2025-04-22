@@ -1,13 +1,10 @@
 use axum::extract::{Path, State};
-use axum::routing::{get, put};
-use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
 use hue::api::{Light, LightUpdate, RType};
 
 use crate::backend::BackendRequest;
-use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
@@ -32,15 +29,4 @@ pub async fn put_light(
     drop(lock);
 
     V2Reply::ok(rlink)
-}
-
-async fn get_light(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
-    V2Reply::ok(state.res.lock().await.get_resource(RType::Light, &id)?)
-}
-
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/", get(|state| get_resource(state, Path(RType::Light))))
-        .route("/{id}", get(get_light))
-        .route("/{id}", put(put_light))
 }
