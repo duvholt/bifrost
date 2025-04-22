@@ -347,7 +347,7 @@ async fn put_api_user_resource_id_path(
                 ApiGroupActionUpdate::LightUpdate(upd) => {
                     let updv2 = GroupedLightUpdate::new()
                         .with_on(upd.on.map(On::new))
-                        .with_brightness(upd.bri.map(f64::from))
+                        .with_brightness(upd.bri.map(|b| f64::from(b) / 2.54))
                         .with_color_xy(upd.xy.map(Into::into))
                         .with_color_temperature(upd.ct);
 
