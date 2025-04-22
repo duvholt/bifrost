@@ -485,7 +485,7 @@ pub struct ApiLightStateUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bri: Option<u32>,
+    pub bri: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xy: Option<[f64; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -521,7 +521,7 @@ impl From<api::SceneAction> for ApiLightStateUpdate {
     fn from(action: api::SceneAction) -> Self {
         Self {
             on: action.on.map(|on| on.on),
-            bri: action.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+            bri: action.dimming.map(|dim| (dim.brightness * 2.54) as u8),
             xy: action.color.map(|col| col.xy.into()),
             ct: action.color_temperature.map(|ct| ct.mirek),
             hs: None,
