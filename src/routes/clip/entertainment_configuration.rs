@@ -1,6 +1,4 @@
 use axum::extract::{Path, State};
-use axum::routing::{delete, get, post, put};
-use axum::Router;
 use hue::error::HueError;
 use serde_json::Value;
 use uuid::{uuid, Uuid};
@@ -15,16 +13,12 @@ use hue::api::{
     LightMode, Position, RType, Resource, ResourceLink,
 };
 
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_APPLICATION_ID;
-use crate::routes::clip::{generic, ApiV2Result, V2Reply};
+use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
-
-pub async fn get_resource(state: State<AppState>) -> ApiV2Result {
-    generic::get_resource(state, Path(RType::EntertainmentConfiguration)).await
-}
 
 pub async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
     log::info!(
@@ -86,10 +80,6 @@ pub async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>
     drop(lock);
 
     V2Reply::ok(rlink)
-}
-
-async fn get_resource_id(state: State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
-    generic::get_resource_id(state, Path((RType::EntertainmentConfiguration, id))).await
 }
 
 fn make_channels(
@@ -300,24 +290,4 @@ pub async fn put_resource_id(
     let rlink = ResourceLink::new(id, rtype);
 
     V2Reply::ok(rlink)
-}
-
-async fn delete_resource_id(
-    State(state): State<AppState>,
-    Path((rtype, id)): Path<(RType, Uuid)>,
-) -> ApiV2Result {
-    log::info!("DELETE {rtype:?}/{id}");
-
-    state.res.lock().await.get_resource(rtype, &id)?;
-
-    Err(ApiError::DeleteNotYetSupported(rtype))?
-}
-
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/", get(get_resource))
-        .route("/", post(post_resource))
-        .route("/{id}", get(get_resource_id))
-        .route("/{id}", put(put_resource_id))
-        .route("/{id}", delete(delete_resource_id))
 }
