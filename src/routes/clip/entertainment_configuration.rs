@@ -26,7 +26,7 @@ pub async fn get_resource(state: State<AppState>) -> ApiV2Result {
     generic::get_resource(state, Path(RType::EntertainmentConfiguration)).await
 }
 
-async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
+pub async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
     log::info!(
         "POST: entertainment_configuration {}",
         serde_json::to_string(&req)?
@@ -205,7 +205,7 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
     Ok(bridge_ent)
 }
 
-async fn put_resource_id(
+pub async fn put_resource_id(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(put): Json<Value>,

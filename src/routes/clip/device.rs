@@ -13,7 +13,7 @@ use crate::routes::extractor::Json;
 use crate::routes::V2Reply;
 use crate::server::appstate::AppState;
 
-async fn put_device(
+pub async fn put_device(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(put): Json<Value>,

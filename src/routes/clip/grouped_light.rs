@@ -12,7 +12,7 @@ use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-async fn put_grouped_light(
+pub async fn put_grouped_light(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(put): Json<Value>,

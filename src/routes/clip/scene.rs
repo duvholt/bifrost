@@ -12,7 +12,7 @@ use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-async fn post_scene(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
+pub async fn post_scene(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
     log::info!("POST: scene {}", serde_json::to_string(&req)?);
 
     let scene: Scene = serde_json::from_value(req)?;
@@ -30,7 +30,7 @@ async fn post_scene(State(state): State<AppState>, Json(req): Json<Value>) -> Ap
     V2Reply::ok(link_scene)
 }
 
-async fn put_scene(
+pub async fn put_scene(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(put): Json<Value>,
@@ -57,7 +57,7 @@ async fn put_scene(
     V2Reply::ok(rlink)
 }
 
-async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
+pub async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
     log::info!("DELETE scene/{id}");
     let link = RType::Scene.link_to(id);
 
