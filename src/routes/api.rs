@@ -327,7 +327,9 @@ async fn put_api_user_resource_id_path(
 
             Ok(Json(reply.json()))
         }
-        ApiResourceType::Groups => {
+
+        /* handle groups, exceot for group 0 ("all groups") */
+        ApiResourceType::Groups if id != 0 => {
             if path != "action" {
                 return Err(HueError::V1NotFound(id))?;
             }
@@ -372,6 +374,39 @@ async fn put_api_user_resource_id_path(
 
             Ok(Json(reply.json()))
         }
+
+        /* handle group 0 ("all groups") */
+        ApiResourceType::Groups => {
+            if path != "action" {
+                return Err(HueError::V1NotFound(id))?;
+            }
+
+            let lock = state.res.lock().await;
+
+            let updv1: ApiGroupActionUpdate = serde_json::from_value(req)?;
+
+            let reply = match updv1 {
+                ApiGroupActionUpdate::LightUpdate(upd) => {
+                    let updv2 = GroupedLightUpdate::from(&upd);
+
+                    for res in lock.get_resources_by_type(RType::GroupedLight) {
+                        let link = RType::GroupedLight.link_to(res.id);
+                        let req = BackendRequest::GroupedLightUpdate(link, updv2.clone());
+                        lock.backend_request(req)?;
+                    }
+
+                    drop(lock);
+
+                    V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?
+                }
+                ApiGroupActionUpdate::GroupUpdate(_api_group_update) => {
+                    return Err(HueError::V1NotFound(id))?;
+                }
+            };
+
+            Ok(Json(reply.json()))
+        }
+
         ApiResourceType::Config
         | ApiResourceType::Resourcelinks
         | ApiResourceType::Rules
