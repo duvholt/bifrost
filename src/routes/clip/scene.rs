@@ -1,5 +1,4 @@
 use axum::extract::{Path, State};
-use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use serde_json::Value;
@@ -8,16 +7,12 @@ use uuid::Uuid;
 use hue::api::{RType, Scene, SceneUpdate};
 
 use crate::backend::BackendRequest;
-use crate::error::{ApiError, ApiResult};
 use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
-async fn post_scene(
-    State(state): State<AppState>,
-    Json(req): Json<Value>,
-) -> ApiResult<impl IntoResponse> {
+async fn post_scene(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
     log::info!("POST: scene {}", serde_json::to_string(&req)?);
 
     let scene: Scene = serde_json::from_value(req)?;

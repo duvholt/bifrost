@@ -1,5 +1,4 @@
 use axum::extract::{Path, State};
-use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use hue::error::HueError;
@@ -27,7 +26,7 @@ pub async fn get_resource(state: State<AppState>) -> ApiV2Result {
     generic::get_resource(state, Path(RType::EntertainmentConfiguration)).await
 }
 
-async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> impl IntoResponse {
+async fn post_resource(State(state): State<AppState>, Json(req): Json<Value>) -> ApiV2Result {
     log::info!(
         "POST: entertainment_configuration {}",
         serde_json::to_string(&req)?
