@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use hue::api::{
     Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, On, RType, Resource, ResourceLink, Room, Scene,
+    GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
     SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use hue::legacy_api::{
@@ -313,12 +313,7 @@ async fn put_api_user_resource_id_path(
             let link = ResourceLink::new(uuid, RType::Light);
             let updv1: ApiLightStateUpdate = serde_json::from_value(req)?;
 
-            let upd = LightUpdate::new()
-                .with_on(updv1.on.map(On::new))
-                .with_brightness(updv1.bri)
-                .with_color_temperature(updv1.ct)
-                .with_color_hs(updv1.hs.map(Into::into))
-                .with_color_xy(updv1.xy.map(Into::into));
+            let upd = LightUpdate::from(&updv1);
 
             lock.backend_request(BackendRequest::LightUpdate(link, upd))?;
             drop(lock);
