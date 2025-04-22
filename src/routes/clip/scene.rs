@@ -1,13 +1,10 @@
 use axum::extract::{Path, State};
-use axum::routing::{delete, get, post, put};
-use axum::Router;
 use serde_json::Value;
 use uuid::Uuid;
 
 use hue::api::{RType, Scene, SceneUpdate};
 
 use crate::backend::BackendRequest;
-use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
@@ -70,12 +67,4 @@ pub async fn delete_scene(State(state): State<AppState>, Path(id): Path<Uuid>) -
     drop(lock);
 
     V2Reply::ok(link)
-}
-
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/", get(|state| get_resource(state, Path(RType::Scene))))
-        .route("/", post(post_scene))
-        .route("/{id}", put(put_scene))
-        .route("/{id}", delete(delete_scene))
 }
