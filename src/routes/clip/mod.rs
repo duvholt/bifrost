@@ -10,7 +10,7 @@ use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
-use hue::api::RType;
+use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -136,15 +136,13 @@ pub async fn get_resource_id(
 
 async fn put_resource_id(
     State(state): State<AppState>,
-    Path((rtype, id)): Path<(RType, Uuid)>,
+    Path(rlink): Path<ResourceLink>,
     Json(put): Json<Value>,
 ) -> ApiV2Result {
-    log::info!("PUT {rtype:?}/{id}");
+    log::info!("PUT {rlink:?}");
     log::debug!("Json data:\n{}", serde_json::to_string_pretty(&put)?);
 
-    let rlink = rtype.link_to(id);
-
-    match rtype {
+    match rlink.rtype {
         /* Allowed + supported */
         RType::Device => device::put_device(&state, rlink, put).await,
         RType::EntertainmentConfiguration => ent_conf::put_resource_id(&state, rlink, put).await,
@@ -179,9 +177,13 @@ async fn put_resource_id(
         | RType::ZigbeeDeviceDiscovery
         | RType::Zone => {
             /* check that the resource exists, otherwise we should return 404 */
-            state.res.lock().await.get_resource(rtype, &id)?;
+            state
+                .res
+                .lock()
+                .await
+                .get_resource(rlink.rtype, &rlink.rid)?;
 
-            let err = ApiError::UpdateNotYetSupported(rtype);
+            let err = ApiError::UpdateNotYetSupported(rlink.rtype);
             log::warn!("{err}");
             Err(err)
         }
@@ -195,7 +197,7 @@ async fn put_resource_id(
         | RType::PublicImage
         | RType::Taurus
         | RType::Tamper => {
-            let err = ApiError::UpdateNotAllowed(rtype);
+            let err = ApiError::UpdateNotAllowed(rlink.rtype);
             log::error!("{err}");
             Err(err)
         }
@@ -204,13 +206,11 @@ async fn put_resource_id(
 
 async fn delete_resource_id(
     State(state): State<AppState>,
-    Path((rtype, id)): Path<(RType, Uuid)>,
+    Path(rlink): Path<ResourceLink>,
 ) -> ApiV2Result {
-    log::info!("DELETE {rtype:?}/{id}");
+    log::info!("DELETE {rlink:?}");
 
-    let rlink = rtype.link_to(id);
-
-    match rtype {
+    match rlink.rtype {
         RType::Scene => scene::delete_scene(&state, rlink).await,
 
         /* Allowed, but support is missing in Bifrost */
@@ -224,9 +224,13 @@ async fn delete_resource_id(
         | RType::SmartScene
         | RType::Zone => {
             /* check that the resource exists, otherwise we should return 404 */
-            state.res.lock().await.get_resource(rtype, &id)?;
+            state
+                .res
+                .lock()
+                .await
+                .get_resource(rlink.rtype, &rlink.rid)?;
 
-            let err = ApiError::DeleteNotYetSupported(rtype);
+            let err = ApiError::DeleteNotYetSupported(rlink.rtype);
             log::error!("err");
             Err(err)
         }
@@ -260,7 +264,7 @@ async fn delete_resource_id(
         | RType::ZgpConnectivity
         | RType::ZigbeeConnectivity
         | RType::ZigbeeDeviceDiscovery => {
-            let err = ApiError::DeleteNotAllowed(rtype);
+            let err = ApiError::DeleteNotAllowed(rlink.rtype);
             log::error!("{err}");
             Err(err)
         }
@@ -272,7 +276,7 @@ pub fn router() -> Router<AppState> {
         .route("/", get(get_all_resources))
         .route("/{rtype}", get(get_resource))
         .route("/{rtype}", post(post_resource))
-        .route("/{rtype}/{id}", get(get_resource_id))
-        .route("/{rtype}/{id}", put(put_resource_id))
-        .route("/{rtype}/{id}", delete(delete_resource_id))
+        .route("/{rtype}/{rid}", get(get_resource_id))
+        .route("/{rtype}/{rid}", put(put_resource_id))
+        .route("/{rtype}/{rid}", delete(delete_resource_id))
 }
