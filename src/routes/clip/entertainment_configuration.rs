@@ -196,9 +196,6 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
 pub async fn put_resource_id(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
     let rtype = RType::EntertainmentConfiguration;
 
-    log::info!("PUT {rtype:?}/{id}");
-    log::debug!("json data\n{}", serde_json::to_string_pretty(&put)?);
-
     let upd: EntertainmentConfigurationUpdate = serde_json::from_value(put)?;
 
     let mut lock = state.res.lock().await;

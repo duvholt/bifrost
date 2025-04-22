@@ -8,8 +8,6 @@ use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
 pub async fn post_scene(state: &AppState, req: Value) -> ApiV2Result {
-    log::info!("POST: scene {}", serde_json::to_string(&req)?);
-
     let scene: Scene = serde_json::from_value(req)?;
 
     let lock = state.res.lock().await;
@@ -26,13 +24,8 @@ pub async fn post_scene(state: &AppState, req: Value) -> ApiV2Result {
 }
 
 pub async fn put_scene(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
-    log::info!("PUT scene/{id}");
-    log::debug!("json data\n{}", serde_json::to_string_pretty(&put)?);
-
     let rlink = RType::Scene.link_to(id);
     let mut lock = state.res.lock().await;
-
-    log::info!("PUT scene/{id}: updating");
 
     let upd: SceneUpdate = serde_json::from_value(put)?;
 
@@ -49,7 +42,6 @@ pub async fn put_scene(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
 }
 
 pub async fn delete_scene(state: &AppState, id: Uuid) -> ApiV2Result {
-    log::info!("DELETE scene/{id}");
     let link = RType::Scene.link_to(id);
 
     let lock = state.res.lock().await;

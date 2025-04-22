@@ -70,7 +70,8 @@ async fn post_resource(
     Path(rtype): Path<RType>,
     Json(req): Json<Value>,
 ) -> impl IntoResponse {
-    log::info!("POST: {rtype:?} {}", serde_json::to_string(&req)?);
+    log::info!("POST {rtype:?}");
+    log::debug!("Json data:\n{}", serde_json::to_string_pretty(&req)?);
 
     match rtype {
         RType::EntertainmentConfiguration => ent_conf::post_resource(&state, req).await,
@@ -139,7 +140,7 @@ async fn put_resource_id(
     Json(put): Json<Value>,
 ) -> ApiV2Result {
     log::info!("PUT {rtype:?}/{id}");
-    log::debug!("json data\n{}", serde_json::to_string_pretty(&put)?);
+    log::debug!("Json data:\n{}", serde_json::to_string_pretty(&put)?);
 
     match rtype {
         /* Allowed + supported */

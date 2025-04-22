@@ -8,9 +8,6 @@ use crate::routes::V2Reply;
 use crate::server::appstate::AppState;
 
 pub async fn put_device(state: &AppState, id: Uuid, put: Value) -> ApiV2Result {
-    log::info!("PUT device/{id}");
-    log::debug!("json data\n{}", serde_json::to_string_pretty(&put)?);
-
     let rlink = RType::Device.link_to(id);
 
     let upd: DeviceUpdate = serde_json::from_value(put)?;
