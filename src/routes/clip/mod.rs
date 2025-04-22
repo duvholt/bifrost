@@ -15,9 +15,14 @@ use crate::routes::extractor::Json;
 use crate::server::appstate::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct V2Error {
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct V2Reply<T> {
     pub data: Vec<T>,
-    pub errors: Vec<String>,
+    pub errors: Vec<V2Error>,
 }
 
 type ApiV2Result = ApiResult<Json<V2Reply<Value>>>;
