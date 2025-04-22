@@ -1,7 +1,5 @@
 pub mod device;
-pub mod entertainment;
 pub mod entertainment_configuration;
-pub mod generic;
 pub mod grouped_light;
 pub mod light;
 pub mod scene;
