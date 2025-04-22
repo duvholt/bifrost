@@ -1,13 +1,10 @@
 use axum::extract::{Path, State};
-use axum::routing::{get, put};
-use axum::Router;
 
 use serde_json::Value;
 use uuid::Uuid;
 
 use hue::api::{Device, DeviceUpdate, RType};
 
-use crate::routes::clip::generic::get_resource;
 use crate::routes::clip::ApiV2Result;
 use crate::routes::extractor::Json;
 use crate::routes::V2Reply;
@@ -32,15 +29,4 @@ pub async fn put_device(
         .update::<Device>(&id, |obj| *obj += upd)?;
 
     V2Reply::ok(rlink)
-}
-
-async fn get_device(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiV2Result {
-    V2Reply::ok(state.res.lock().await.get_resource(RType::Device, &id)?)
-}
-
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/", get(|state| get_resource(state, Path(RType::Device))))
-        .route("/{id}", get(get_device))
-        .route("/{id}", put(put_device))
 }
