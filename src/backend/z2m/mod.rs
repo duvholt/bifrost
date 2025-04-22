@@ -407,7 +407,7 @@ impl Z2mBackend {
             if let Some(icon) = &room_conf.icon {
                 metadata.archetype = *icon;
             }
-        };
+        }
 
         let room = Room {
             children,

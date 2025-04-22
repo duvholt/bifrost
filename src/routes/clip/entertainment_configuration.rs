@@ -292,7 +292,7 @@ async fn put_resource_id(
                     ec.active_streamer = None;
                     ec.status = EntertainmentConfigurationStatus::Inactive;
                 }
-            };
+            }
         }
     })?;
 

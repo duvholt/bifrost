@@ -85,7 +85,7 @@ fn check(orig: &[u8]) -> ApiResult<()> {
         warn!("DIFF:");
         warn!("  {} before", hex::encode(orig));
         warn!("  {} after", hex::encode(&data));
-    };
+    }
 
     Ok(())
 }

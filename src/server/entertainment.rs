@@ -62,7 +62,7 @@ impl EntertainmentService {
         match timeout(TIMEOUT, fill_buffer_to(&mut rdr, len)).await {
             Ok(Err(_)) | Err(_) => return Err(ApiError::EntStreamInitError),
             Ok(Ok(())) => {}
-        };
+        }
 
         let header = HueStreamPacketHeader::parse(rdr.buffer())?;
 
@@ -84,7 +84,7 @@ impl EntertainmentService {
             match timeout(Duration::from_millis(1000), rdr.read_exact(&mut buf)).await {
                 Ok(Err(_)) | Err(_) => break,
                 Ok(Ok(_)) => {}
-            };
+            }
 
             let pkt = HueStreamPacket::parse(&buf)?;
 

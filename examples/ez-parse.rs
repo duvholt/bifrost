@@ -128,7 +128,7 @@ fn parse(rec: &Record, no_index: bool) -> ZclResult<()> {
                     hex::encode(data)
                 );
             }
-        };
+        }
     };
 
     if frame.flags.frame_type == ZclFrameType::ProfileWide {
