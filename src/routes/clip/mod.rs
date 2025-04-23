@@ -13,7 +13,6 @@ use axum::Router;
 use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
 use crate::routes::extractor::Json;
@@ -129,9 +128,9 @@ async fn post_resource(
 
 pub async fn get_resource_id(
     State(state): State<AppState>,
-    Path((rtype, id)): Path<(RType, Uuid)>,
+    Path(rlink): Path<ResourceLink>,
 ) -> ApiV2Result {
-    V2Reply::ok(state.res.lock().await.get_resource(rtype, &id)?)
+    V2Reply::ok(state.res.lock().await.get_resource(&rlink)?)
 }
 
 async fn put_resource_id(
@@ -177,11 +176,7 @@ async fn put_resource_id(
         | RType::ZigbeeDeviceDiscovery
         | RType::Zone => {
             /* check that the resource exists, otherwise we should return 404 */
-            state
-                .res
-                .lock()
-                .await
-                .get_resource(rlink.rtype, &rlink.rid)?;
+            state.res.lock().await.get_resource(&rlink)?;
 
             let err = ApiError::UpdateNotYetSupported(rlink.rtype);
             log::warn!("{err}");
@@ -224,11 +219,7 @@ async fn delete_resource_id(
         | RType::SmartScene
         | RType::Zone => {
             /* check that the resource exists, otherwise we should return 404 */
-            state
-                .res
-                .lock()
-                .await
-                .get_resource(rlink.rtype, &rlink.rid)?;
+            state.res.lock().await.get_resource(&rlink)?;
 
             let err = ApiError::DeleteNotYetSupported(rlink.rtype);
             log::error!("err");

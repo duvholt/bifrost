@@ -505,13 +505,13 @@ impl Resources {
         ResourceRecord::new(*id, self.id_v1_scope(id, res), res.clone())
     }
 
-    pub fn get_resource(&self, ty: RType, id: &Uuid) -> HueResult<ResourceRecord> {
+    pub fn get_resource(&self, rlink: &ResourceLink) -> HueResult<ResourceRecord> {
         self.state
             .res
-            .get(id)
-            .filter(|res| res.rtype() == ty)
-            .map(|res| self.make_resource_record(id, res))
-            .ok_or(HueError::NotFound(*id))
+            .get(&rlink.rid)
+            .filter(|res| res.rtype() == rlink.rtype)
+            .map(|res| self.make_resource_record(&rlink.rid, res))
+            .ok_or(HueError::NotFound(rlink.rid))
     }
 
     pub fn get_resource_by_id(&self, id: &Uuid) -> HueResult<ResourceRecord> {
