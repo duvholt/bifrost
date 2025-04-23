@@ -7,9 +7,9 @@ use bifrost::backend::Backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
 use bifrost::mdns::MdnsService;
-use bifrost::server;
 use bifrost::server::appstate::AppState;
 use bifrost::server::http::HttpServer;
+use bifrost::server::{self, Protocol};
 
 /*
  * Formatter function to output in syslog format. This makes sense when running
@@ -69,18 +69,20 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     mgr.register_service("mdns", MdnsService::new(bconf.mac, bconf.ipaddress))
         .await?;
 
-    let svc = server::build_service(appstate.clone());
-
     log::info!("Serving mac [{}]", bconf.mac);
 
     // register plain http service
-    let http_service = HttpServer::http(bconf.ipaddress, bconf.http_port, svc.clone());
+    let http_service = HttpServer::http(
+        bconf.ipaddress,
+        bconf.http_port,
+        server::build_service(Protocol::Http, appstate.clone()),
+    );
     mgr.register_service("http", http_service).await?;
 
     let https_service = HttpServer::https_openssl(
         bconf.ipaddress,
         bconf.https_port,
-        svc.clone(),
+        server::build_service(Protocol::Https, appstate.clone()),
         &appstate.config().bifrost.cert_file,
     )?;
 
