@@ -11,13 +11,14 @@ pub mod updater;
 
 use std::fs::File;
 use std::io::Write;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Body;
-use axum::extract::Request;
+use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
+use axum::extract::{ConnectInfo, Request};
 use axum::response::Response;
-use axum::routing::IntoMakeService;
 use axum::{Router, ServiceExt};
 
 use camino::Utf8PathBuf;
@@ -35,6 +36,36 @@ use crate::routes;
 use crate::server::appstate::AppState;
 use crate::server::updater::VersionUpdater;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Protocol {
+    Http,
+    Https,
+}
+
+fn trace_layer_make_span_with(request: &Request, protocol: Protocol) -> Span {
+    let addr = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED), |ci| ci.0.ip());
+
+    match protocol {
+        Protocol::Https => info_span!(
+            "https",
+            client = ?addr,
+            method = ?request.method(),
+            uri = ?request.uri(),
+            status = tracing::field::Empty,
+        ),
+        Protocol::Http => info_span!(
+            "http",
+            client = ?addr,
+            method = ?request.method(),
+            uri = ?request.uri(),
+            status = tracing::field::Empty,
+        ),
+    }
+}
+
 fn trace_layer_on_response(response: &Response<Body>, latency: Duration, span: &Span) {
     span.record(
         "latency",
@@ -43,27 +74,22 @@ fn trace_layer_on_response(response: &Response<Body>, latency: Duration, span: &
     span.record("status", tracing::field::display(response.status()));
 }
 
-fn router(appstate: AppState) -> Router<()> {
+fn router(protocol: Protocol, appstate: AppState) -> Router<()> {
     routes::router(appstate).layer(
         TraceLayer::new_for_http()
-            .make_span_with(|request: &Request| {
-                info_span!(
-                    "http",
-                    method = ?request.method(),
-                    uri = ?request.uri(),
-                    status = tracing::field::Empty,
-                    /* latency = tracing::field::Empty, */
-                )
-            })
+            .make_span_with(move |request: &Request| trace_layer_make_span_with(request, protocol))
             .on_response(trace_layer_on_response),
     )
 }
 
 #[must_use]
-pub fn build_service(appstate: AppState) -> IntoMakeService<NormalizePath<Router>> {
-    let normalized = NormalizePathLayer::trim_trailing_slash().layer(router(appstate));
+pub fn build_service(
+    protocol: Protocol,
+    appstate: AppState,
+) -> IntoMakeServiceWithConnectInfo<NormalizePath<Router>, SocketAddr> {
+    let normalized = NormalizePathLayer::trim_trailing_slash().layer(router(protocol, appstate));
 
-    ServiceExt::<Request>::into_make_service(normalized)
+    ServiceExt::<Request>::into_make_service_with_connect_info(normalized)
 }
 
 pub async fn config_writer(res: Arc<Mutex<Resources>>, filename: Utf8PathBuf) -> ApiResult<()> {
