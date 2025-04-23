@@ -27,7 +27,6 @@ pub struct V2Reply<T> {
 
 type ApiV2Result = ApiResult<Json<V2Reply<Value>>>;
 
-#[allow(clippy::unnecessary_wraps)]
 impl<T: Serialize> V2Reply<T> {
     fn ok(obj: T) -> ApiV2Result {
         Ok(Json(V2Reply {

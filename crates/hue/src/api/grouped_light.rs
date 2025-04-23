@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink, Stub};
+use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -99,5 +100,16 @@ impl GroupedLightUpdate {
             },
             ..self
         }
+    }
+}
+
+/* conversion from v1 api */
+impl From<&ApiLightStateUpdate> for GroupedLightUpdate {
+    fn from(upd: &ApiLightStateUpdate) -> Self {
+        Self::new()
+            .with_on(upd.on.map(On::new))
+            .with_brightness(upd.bri.map(|b| f64::from(b) / 2.54))
+            .with_color_xy(upd.xy.map(XY::from))
+            .with_color_temperature(upd.ct)
     }
 }

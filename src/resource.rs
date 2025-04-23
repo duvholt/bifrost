@@ -437,15 +437,17 @@ impl Resources {
     fn id_v1_scope(&self, id: &Uuid, res: &Resource) -> Option<String> {
         let id = self.state.id_v1(id)?;
         match res {
-            Resource::GroupedLight(_) => Some(format!("/groups/{id}")),
             Resource::Light(_) => Some(format!("/lights/{id}")),
             Resource::Scene(_) => Some(format!("/scenes/{id}")),
 
-            /* Rooms map to their grouped_light service's id_v1 */
-            Resource::Room(room) => room
-                .grouped_light_service()
-                .and_then(|glight| self.state.id_v1(&glight.rid))
-                .map(|id| format!("/groups/{id}")),
+            /* GroupedLights are mapped to their (room) owner's id_v1 */
+            Resource::GroupedLight(grp) => {
+                let id = self.state.id_v1(&grp.owner.rid)?;
+                Some(format!("/groups/{id}"))
+            }
+
+            /* Rooms are mapped directly */
+            Resource::Room(_) => Some(format!("/groups/{id}")),
 
             /* Devices (that are lights) map to the light service's id_v1 */
             Resource::Device(dev) => dev

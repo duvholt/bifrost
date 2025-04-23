@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use hue::api::{
     Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, On, RType, Resource, ResourceLink, Room, Scene,
+    GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
     SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use hue::legacy_api::{
@@ -313,12 +313,7 @@ async fn put_api_user_resource_id_path(
             let link = ResourceLink::new(uuid, RType::Light);
             let updv1: ApiLightStateUpdate = serde_json::from_value(req)?;
 
-            let upd = LightUpdate::new()
-                .with_on(updv1.on.map(On::new))
-                .with_brightness(updv1.bri)
-                .with_color_temperature(updv1.ct)
-                .with_color_hs(updv1.hs.map(Into::into))
-                .with_color_xy(updv1.xy.map(Into::into));
+            let upd = LightUpdate::from(&updv1);
 
             lock.backend_request(BackendRequest::LightUpdate(link, upd))?;
             drop(lock);
@@ -327,8 +322,9 @@ async fn put_api_user_resource_id_path(
 
             Ok(Json(reply.json()))
         }
-        ApiResourceType::Groups => {
-            log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
+
+        /* handle groups, exceot for group 0 ("all groups") */
+        ApiResourceType::Groups if id != 0 => {
             if path != "action" {
                 return Err(HueError::V1NotFound(id))?;
             }
@@ -345,11 +341,7 @@ async fn put_api_user_resource_id_path(
 
             let reply = match updv1 {
                 ApiGroupActionUpdate::LightUpdate(upd) => {
-                    let updv2 = GroupedLightUpdate::new()
-                        .with_on(upd.on.map(On::new))
-                        .with_brightness(upd.bri.map(f64::from))
-                        .with_color_xy(upd.xy.map(Into::into))
-                        .with_color_temperature(upd.ct);
+                    let updv2 = GroupedLightUpdate::from(&upd);
 
                     lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
                     drop(lock);
@@ -373,6 +365,39 @@ async fn put_api_user_resource_id_path(
 
             Ok(Json(reply.json()))
         }
+
+        /* handle group 0 ("all groups") */
+        ApiResourceType::Groups => {
+            if path != "action" {
+                return Err(HueError::V1NotFound(id))?;
+            }
+
+            let lock = state.res.lock().await;
+
+            let updv1: ApiGroupActionUpdate = serde_json::from_value(req)?;
+
+            let reply = match updv1 {
+                ApiGroupActionUpdate::LightUpdate(upd) => {
+                    let updv2 = GroupedLightUpdate::from(&upd);
+
+                    for res in lock.get_resources_by_type(RType::GroupedLight) {
+                        let link = RType::GroupedLight.link_to(res.id);
+                        let req = BackendRequest::GroupedLightUpdate(link, updv2.clone());
+                        lock.backend_request(req)?;
+                    }
+
+                    drop(lock);
+
+                    V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?
+                }
+                ApiGroupActionUpdate::GroupUpdate(_api_group_update) => {
+                    return Err(HueError::V1NotFound(id))?;
+                }
+            };
+
+            Ok(Json(reply.json()))
+        }
+
         ApiResourceType::Config
         | ApiResourceType::Resourcelinks
         | ApiResourceType::Rules
