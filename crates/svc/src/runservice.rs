@@ -37,7 +37,7 @@ impl State {
         self.state
     }
 
-    pub fn retry(&mut self) -> u32 {
+    pub const fn retry(&mut self) -> u32 {
         let res = self.retry;
         self.retry += 1;
         res

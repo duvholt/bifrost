@@ -108,7 +108,7 @@ impl<'a> Normalizer<'a> {
         }
     }
 
-    pub fn error(&mut self) {
+    pub const fn error(&mut self) {
         self.errors += 1;
     }
 
