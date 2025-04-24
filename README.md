@@ -34,7 +34,7 @@ To install Bifrost from source, you will need the following:
 First, install a few necessary build dependencies:
 
 ```sh
-sudo apt install build-essential pkg-config libssl-dev
+sudo apt install build-essential pkg-config libssl3 libssl-dev
 ```
 
 When you have these things available, install bifrost:
@@ -120,11 +120,6 @@ At this point, you're running a Bifrost bridge.
 The Philips Hue app should be able to find it on your network!
 
 ### Docker
-
-> [!WARNING]
-> Docker support was [merged recently](https://github.com/chrivers/bifrost/pull/2).
-> If you encounter any bugs, or have suggestions, feel free to leave your feedback
-> [here](#problems-questions-feedback).
 
 #### Docker Installation
 

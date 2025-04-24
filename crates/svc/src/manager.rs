@@ -18,6 +18,7 @@ use crate::runservice::StandardService;
 use crate::serviceid::{IntoServiceId, ServiceId};
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
+#[derive(Debug)]
 pub struct ServiceInstance {
     tx: watch::Sender<ServiceState>,
     name: String,
@@ -44,6 +45,16 @@ impl ServiceEvent {
     #[must_use]
     pub const fn new(id: Uuid, state: ServiceState) -> Self {
         Self { id, state }
+    }
+
+    #[must_use]
+    pub const fn id(&self) -> Uuid {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn state(&self) -> ServiceState {
+        self.state
     }
 }
 
@@ -336,7 +347,7 @@ impl ServiceManager {
 
     fn start(&self, id: impl IntoServiceId) -> SvcResult<()> {
         self.get(&id).and_then(|svc| {
-            log::debug!("Starting {id} {}", &svc.name);
+            log::debug!("Starting service: {id} {}", &svc.name);
             Ok(svc.tx.send(ServiceState::Running)?)
         })
     }
@@ -348,7 +359,7 @@ impl ServiceManager {
             return Ok(());
         }
 
-        log::debug!("Stopping {id} {}", self.svcs[&id].name);
+        log::debug!("Stopping service: {id} {}", self.svcs[&id].name);
         self.get(id)
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
@@ -417,7 +428,7 @@ impl ServiceManager {
             }
 
             SvmRequest::Shutdown(rpc) => {
-                log::info!("Service managed shutting down..");
+                log::info!("Service manager shutting down..");
                 let ids: Vec<Uuid> = self.list().copied().collect();
 
                 self.stop_multiple(&ids)?;
@@ -426,14 +437,17 @@ impl ServiceManager {
                     Ok(()) = Box::pin(self.wait_for_multiple(&ids, ServiceState::Stopped)) => {}
                     () = tokio::time::sleep(Duration::from_secs(3)) => {
                         log::error!("Service shutdown timed out, aborting tasks..");
+
                         for id in &ids {
+                            let si = self.get(id)?;
+                            log::error!("  ..aborting {id}: {si:?}");
                             self.abort(&ServiceId::from(*id))?;
                         }
                     }
                 }
                 log::debug!("All services stopped.");
                 self.shutdown = true;
-                rpc.respond(|_rsp| ());
+                rpc.respond(|()| ());
             }
         }
 

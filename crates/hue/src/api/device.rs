@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
 use crate::version::SwVersion;
@@ -22,6 +23,10 @@ pub struct Device {
 pub struct DeviceUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<MetadataUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub services: Option<Vec<ResourceLink>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub product_data: Option<Value>,
 }
 
 impl Device {
@@ -31,7 +36,7 @@ impl Device {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct Identify {}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -81,7 +86,9 @@ impl DeviceUpdate {
             metadata: Some(MetadataUpdate {
                 archetype: Some(metadata.archetype),
                 name: Some(metadata.name),
+                function: None,
             }),
+            ..self
         }
     }
 }
@@ -118,6 +125,7 @@ impl Sub<&Device> for &Device {
                 } else {
                     None
                 },
+                function: None,
             });
         }
 

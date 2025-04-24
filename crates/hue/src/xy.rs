@@ -37,7 +37,11 @@ impl XY {
 
         let max_y = Self::COLOR_SPACE.find_maximum_y(x, y);
 
-        (Self { x, y }, b / max_y * 255.0)
+        if max_y > f64::EPSILON {
+            (Self { x, y }, b / max_y * 255.0)
+        } else {
+            (Self::D65_WHITE_POINT, 0.0)
+        }
     }
 
     #[must_use]

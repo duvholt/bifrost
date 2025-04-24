@@ -9,7 +9,7 @@ use crate::hs::HS;
 use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Light {
     pub owner: ResourceLink,
     pub metadata: LightMetadata,
@@ -32,8 +32,7 @@ pub struct Light {
     pub effects: Option<LightEffects>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects_v2: Option<LightEffectsV2>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub service_id: Option<u32>,
+    pub service_id: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradient>,
     #[serde(default)]
@@ -66,7 +65,7 @@ pub struct LightMetadata {
     pub fixed_mired: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightProductData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<LightFunction>,
@@ -108,7 +107,7 @@ impl Light {
             dynamics: Some(LightDynamics::default()),
             effects: None,
             effects_v2: None,
-            service_id: Some(0),
+            service_id: 0,
             gradient: None,
             identify: Identify {},
             timed_effects: Some(LightTimedEffects {
@@ -235,6 +234,11 @@ impl Sub<&Light> for &Light {
                 } else {
                     None
                 },
+                function: if self.metadata.function != rhs.metadata.function {
+                    rhs.metadata.function.clone()
+                } else {
+                    None
+                },
             });
         }
 
@@ -270,7 +274,7 @@ pub enum LightMode {
     Streaming,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightAlert {
     action_values: BTreeSet<String>,
 }
@@ -315,7 +319,7 @@ pub struct LightGradientUpdate {
     pub points: Vec<LightGradientPoint>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LightPowerupPreset {
     Safety,
@@ -324,7 +328,7 @@ pub enum LightPowerupPreset {
     Custom,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LightPowerup {
     pub preset: LightPowerupPreset,
 
@@ -337,7 +341,7 @@ pub struct LightPowerup {
     pub color: LightPowerupColor,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupOn {
     // Not a real powerup.on.mode option, but used to indicate that
@@ -357,7 +361,7 @@ impl LightPowerupOn {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupColor {
     // Not a real powerup.color.mode option, but used to indicate that
@@ -380,7 +384,7 @@ impl LightPowerupColor {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LightPowerupDimming {
     // Not a real powerup.dimming.mode option, but used to indicate that
@@ -400,7 +404,7 @@ impl LightPowerupDimming {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightSignaling {
     pub signal_values: Vec<LightSignal>,
     #[serde(default)]
@@ -408,7 +412,7 @@ pub struct LightSignaling {
     pub status: Value,
 }
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LightSignal {
     #[default]
@@ -418,19 +422,31 @@ pub enum LightSignal {
     Alternating,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LightDynamicsStatus {
     DynamicPalette,
     None,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LightDynamics {
     pub status: LightDynamicsStatus,
     pub status_values: Vec<LightDynamicsStatus>,
     pub speed: f64,
     pub speed_valid: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightDynamicsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<LightDynamicsStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_values: Option<Vec<LightDynamicsStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed_valid: Option<bool>,
 }
 
 impl Default for LightDynamics {
@@ -447,7 +463,7 @@ impl Default for LightDynamics {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LightEffect {
     #[default]
@@ -480,7 +496,7 @@ impl LightEffect {
     ];
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightEffects {
     pub status_values: Vec<LightEffect>,
     pub status: LightEffect,
@@ -498,7 +514,7 @@ impl LightEffects {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightEffectsV2 {
     pub action: LightEffectValues,
     pub status: LightEffectStatus,
@@ -518,6 +534,14 @@ impl LightEffectsV2 {
             },
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LightEffectsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<LightEffectActionUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<LightEffect>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -544,12 +568,12 @@ pub struct LightEffectParameters {
     pub speed: Option<f32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightEffectValues {
     pub effect_values: Vec<LightEffect>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightEffectStatus {
     pub effect: LightEffect,
     pub effect_values: Vec<LightEffect>,
@@ -557,7 +581,7 @@ pub struct LightEffectStatus {
     pub parameters: Option<Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightTimedEffects {
     pub status_values: Value,
     pub status: Value,
@@ -579,7 +603,17 @@ pub struct LightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradientUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub effects: Option<LightEffectsUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub effects_v2: Option<LightEffectsV2Update>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<ResourceLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub powerup: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamics: Option<LightDynamicsUpdate>,
 }
 
 impl LightUpdate {
@@ -651,7 +685,7 @@ impl From<&ApiLightStateUpdate> for LightUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub struct DimmingUpdate {
     pub brightness: f64,
 }
@@ -698,7 +732,7 @@ impl ColorUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct ColorTemperatureUpdate {
     pub mirek: u16,
 }
@@ -710,7 +744,7 @@ impl ColorTemperatureUpdate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ColorGamut {
     pub red: XY,
     pub green: XY,
@@ -749,7 +783,7 @@ impl ColorGamut {
     };
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum GamutType {
     A,
     B,
@@ -758,7 +792,7 @@ pub enum GamutType {
     Other,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LightColor {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gamut: Option<ColorGamut>,
@@ -777,7 +811,7 @@ impl LightColor {
     }
 }
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone)]
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct MirekSchema {
     pub mirek_minimum: u32,
     pub mirek_maximum: u32,
@@ -790,7 +824,7 @@ impl MirekSchema {
     };
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ColorTemperature {
     pub mirek: Option<u16>,
     pub mirek_schema: MirekSchema,

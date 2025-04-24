@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::{DeviceArchetype, ResourceLink, SceneMetadata};
+use crate::api::{DeviceArchetype, LightFunction, ResourceLink, SceneMetadata};
 use crate::{best_guess_timezone, date_format};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -205,6 +205,8 @@ pub struct SmartScene {
     /*     timeslot_id: 3, */
     /*     weekday: monday */
     /* }, */
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Value::is_null")]
     pub active_timeslot: Value,
     pub group: ResourceLink,
     pub metadata: SceneMetadata,
@@ -293,6 +295,10 @@ impl Metadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct MetadataUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub archetype: Option<DeviceArchetype>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<LightFunction>,
 }

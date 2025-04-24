@@ -44,7 +44,7 @@ fn compare(before: &Value, after: &Value, report: bool) -> ApiResult<bool> {
 
     if !all_diffs
         .iter()
-        .any(|x| x.1.values.map_or(true, |q| !false_positive(&q)))
+        .any(|x| x.1.values.is_none_or(|q| !false_positive(&q)))
     {
         return Ok(true);
     }
@@ -108,7 +108,7 @@ impl<'a> Normalizer<'a> {
         }
     }
 
-    pub fn error(&mut self) {
+    pub const fn error(&mut self) {
         self.errors += 1;
     }
 

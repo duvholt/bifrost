@@ -37,7 +37,7 @@ impl State {
         self.state
     }
 
-    pub fn retry(&mut self) -> u32 {
+    pub const fn retry(&mut self) -> u32 {
         let res = self.retry;
         self.retry += 1;
         res
@@ -67,6 +67,7 @@ impl<S: Service> StandardService<S> {
         }
     }
 
+    #[allow(clippy::missing_const_for_fn)]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -109,7 +110,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
         let target = &format!("[{name}]");
         let mut svc = self.svc;
 
-        log::debug!(target:target, "Registered");
+        log::trace!(target:target, "Registered");
         svc.configure()
             .await
             .map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
@@ -122,7 +123,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                     if *rx.borrow() == ServiceState::Running {
                         match svc.configure().await {
                             Ok(()) => {
-                                log::debug!(target:target, "Configured");
+                                log::trace!(target:target, "Configured");
                                 state.set(ServiceState::Configured).await?;
                             }
                             Err(err) => {
@@ -136,7 +137,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                 }
 
                 ServiceState::Configured => {
-                    log::debug!(target:target, "Service configured, and is ready start.");
+                    log::trace!(target:target, "Service configured, and is ready start.");
                     if *rx.borrow_and_update() == ServiceState::Running {
                         state.set(ServiceState::Starting).await?;
                     } else {
@@ -184,7 +185,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                         },
                         _ = rx.changed() => if *rx.borrow() == ServiceState::Stopped {
                             if S::SIGNAL_STOP {
-                                log::debug!(target:target, "Service state change requested (graceful)");
+                                log::trace!(target:target, "Service state change requested (graceful)");
                                 svc.signal_stop().await.map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
                                 tokio::select! {
                                     res = svc.run() => {
@@ -196,7 +197,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                                 }
                                 state.set(ServiceState::Stopping).await?;
                             } else {
-                                log::debug!(target:target, "Service state change requested: {:?} -> {:?}", state.get(), *rx.borrow());
+                                log::trace!(target:target, "Service state change requested: {:?} -> {:?}", state.get(), *rx.borrow());
                                 if *rx.borrow_and_update() == ServiceState::Stopped {
                                     state.set(ServiceState::Stopping).await?;
                                 }
@@ -207,7 +208,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
 
                 ServiceState::Stopping => match svc.stop().await {
                     Ok(()) => {
-                        log::debug!(target:target, "Stopping");
+                        log::trace!(target:target, "Stopping");
                         state.set(ServiceState::Stopped).await?;
                     }
                     Err(err) => {

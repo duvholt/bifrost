@@ -9,6 +9,7 @@ use hue::zigbee::{Flags, GradientColors, HueZigbeeUpdate};
 
 use bifrost::error::ApiResult;
 
+#[allow(clippy::format_push_string)]
 #[must_use]
 pub fn present_gradcolors(grad: &GradientColors) -> String {
     let mut res = format!(
@@ -85,7 +86,7 @@ fn check(orig: &[u8]) -> ApiResult<()> {
         warn!("DIFF:");
         warn!("  {} before", hex::encode(orig));
         warn!("  {} after", hex::encode(&data));
-    };
+    }
 
     Ok(())
 }
