@@ -9,12 +9,15 @@ use crate::api::Resource;
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum RType {
+    /// Only used in [`ResourceLink`] references
     AuthV1,
     BehaviorInstance,
     BehaviorScript,
     Bridge,
     BridgeHome,
     Button,
+    CameraMotion,
+    Contact,
     Device,
     DevicePower,
     DeviceSoftwareUpdate,
@@ -29,16 +32,22 @@ pub enum RType {
     Light,
     LightLevel,
     Matter,
+    MatterFabric,
     Motion,
+    /// Only used in [`ResourceLink`] references
     PrivateGroup,
+    /// Only used in [`ResourceLink`] references
     PublicImage,
     RelativeRotary,
     Room,
     Scene,
+    ServiceGroup,
     SmartScene,
     #[serde(rename = "taurus_7455")]
     Taurus,
+    Tamper,
     Temperature,
+    ZgpConnectivity,
     ZigbeeConnectivity,
     ZigbeeDeviceDiscovery,
     Zone,

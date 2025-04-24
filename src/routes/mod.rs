@@ -51,7 +51,14 @@ impl IntoResponse for ApiError {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
             },
-            Self::DeleteDenied(_) => StatusCode::FORBIDDEN,
+
+            Self::CreateNotAllowed(_)
+            | Self::UpdateNotAllowed(_)
+            | Self::DeleteNotAllowed(_)
+            | Self::CreateNotYetSupported(_)
+            | Self::UpdateNotYetSupported(_)
+            | Self::DeleteNotYetSupported(_) => StatusCode::FORBIDDEN,
+
             Self::V1CreateUnsupported(_) => StatusCode::NOT_IMPLEMENTED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };

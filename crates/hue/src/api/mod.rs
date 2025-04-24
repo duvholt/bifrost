@@ -109,6 +109,14 @@ pub enum Resource {
     ZigbeeConnectivity(ZigbeeConnectivity),
     ZigbeeDeviceDiscovery(ZigbeeDeviceDiscovery),
     Zone(Zone),
+
+    /* Unmapped variants */
+    CameraMotion(Value),
+    Contact(Value),
+    MatterFabric(Value),
+    ServiceGroup(Value),
+    Tamper(Value),
+    ZgpConnectivity(Value),
 }
 
 impl Resource {
@@ -121,6 +129,8 @@ impl Resource {
             Self::Bridge(_) => RType::Bridge,
             Self::BridgeHome(_) => RType::BridgeHome,
             Self::Button(_) => RType::Button,
+            Self::CameraMotion(_) => RType::CameraMotion,
+            Self::Contact(_) => RType::Contact,
             Self::Device(_) => RType::Device,
             Self::DevicePower(_) => RType::DevicePower,
             Self::DeviceSoftwareUpdate(_) => RType::DeviceSoftwareUpdate,
@@ -135,15 +145,19 @@ impl Resource {
             Self::Light(_) => RType::Light,
             Self::LightLevel(_) => RType::LightLevel,
             Self::Matter(_) => RType::Matter,
+            Self::MatterFabric(_) => RType::MatterFabric,
             Self::Motion(_) => RType::Motion,
             Self::PrivateGroup(_) => RType::PrivateGroup,
             Self::PublicImage(_) => RType::PublicImage,
             Self::RelativeRotary(_) => RType::RelativeRotary,
             Self::Room(_) => RType::Room,
             Self::Scene(_) => RType::Scene,
+            Self::ServiceGroup(_) => RType::ServiceGroup,
             Self::SmartScene(_) => RType::SmartScene,
+            Self::Tamper(_) => RType::Tamper,
             Self::Taurus(_) => RType::Taurus,
             Self::Temperature(_) => RType::Temperature,
+            Self::ZgpConnectivity(_) => RType::ZgpConnectivity,
             Self::ZigbeeConnectivity(_) => RType::ZigbeeConnectivity,
             Self::ZigbeeDeviceDiscovery(_) => RType::ZigbeeDeviceDiscovery,
             Self::Zone(_) => RType::Zone,
@@ -186,6 +200,14 @@ impl Resource {
             Self::ZigbeeConnectivity(obj) => Some(obj.owner),
             Self::ZigbeeDeviceDiscovery(obj) => Some(obj.owner),
             Self::Zone(_) => None,
+
+            /* Unmapped variants */
+            Self::CameraMotion(_) => None,
+            Self::Contact(_) => None,
+            Self::MatterFabric(_) => None,
+            Self::ServiceGroup(_) => None,
+            Self::Tamper(_) => None,
+            Self::ZgpConnectivity(_) => None,
         }
     }
 
@@ -223,6 +245,12 @@ impl Resource {
             RType::ZigbeeConnectivity => Self::ZigbeeConnectivity(from_value(obj)?),
             RType::ZigbeeDeviceDiscovery => Self::ZigbeeDeviceDiscovery(from_value(obj)?),
             RType::Zone => Self::Zone(from_value(obj)?),
+            RType::CameraMotion => Self::CameraMotion(obj),
+            RType::Contact => Self::Contact(obj),
+            RType::MatterFabric => Self::MatterFabric(obj),
+            RType::ServiceGroup => Self::ServiceGroup(obj),
+            RType::Tamper => Self::Tamper(obj),
+            RType::ZgpConnectivity => Self::ZgpConnectivity(obj),
         };
         Ok(res)
     }

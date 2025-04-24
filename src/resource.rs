@@ -470,28 +470,34 @@ impl Resources {
             /* No id v1 */
             Resource::AuthV1(_)
             | Resource::BehaviorInstance(_)
-            | Resource::DevicePower(_)
-            | Resource::DeviceSoftwareUpdate(_)
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
             | Resource::Button(_)
+            | Resource::CameraMotion(_)
+            | Resource::Contact(_)
+            | Resource::DevicePower(_)
+            | Resource::DeviceSoftwareUpdate(_)
             | Resource::GeofenceClient(_)
             | Resource::Geolocation(_)
-            | Resource::GroupedMotion(_)
             | Resource::GroupedLightLevel(_)
+            | Resource::GroupedMotion(_)
             | Resource::Homekit(_)
             | Resource::LightLevel(_)
             | Resource::Matter(_)
+            | Resource::MatterFabric(_)
             | Resource::Motion(_)
             | Resource::PrivateGroup(_)
             | Resource::PublicImage(_)
             | Resource::RelativeRotary(_)
+            | Resource::ServiceGroup(_)
             | Resource::SmartScene(_)
+            | Resource::Tamper(_)
             | Resource::Taurus(_)
             | Resource::Temperature(_)
+            | Resource::ZgpConnectivity(_)
             | Resource::ZigbeeConnectivity(_)
-            | Resource::Zone(_)
-            | Resource::ZigbeeDeviceDiscovery(_) => None,
+            | Resource::ZigbeeDeviceDiscovery(_)
+            | Resource::Zone(_) => None,
         }
     }
 
@@ -499,13 +505,13 @@ impl Resources {
         ResourceRecord::new(*id, self.id_v1_scope(id, res), res.clone())
     }
 
-    pub fn get_resource(&self, ty: RType, id: &Uuid) -> HueResult<ResourceRecord> {
+    pub fn get_resource(&self, rlink: &ResourceLink) -> HueResult<ResourceRecord> {
         self.state
             .res
-            .get(id)
-            .filter(|res| res.rtype() == ty)
-            .map(|res| self.make_resource_record(id, res))
-            .ok_or(HueError::NotFound(*id))
+            .get(&rlink.rid)
+            .filter(|res| res.rtype() == rlink.rtype)
+            .map(|res| self.make_resource_record(&rlink.rid, res))
+            .ok_or(HueError::NotFound(rlink.rid))
     }
 
     pub fn get_resource_by_id(&self, id: &Uuid) -> HueResult<ResourceRecord> {
