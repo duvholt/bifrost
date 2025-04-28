@@ -145,8 +145,6 @@ pub async fn version_updater(
 
     let mut version = upd.lock().await.get().await.clone();
 
-    res.lock().await.update_bridge_version(version.clone());
-
     loop {
         interval.tick().await;
 
