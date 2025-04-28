@@ -44,9 +44,6 @@ pub enum HueError {
     #[error("Resource {0} not found")]
     V1NotFound(u32),
 
-    #[error("Missing auxiliary data resource {0:?}")]
-    AuxNotFound(uuid::Uuid),
-
     #[error("Cannot allocate any more {0:?}")]
     Full(RType),
 

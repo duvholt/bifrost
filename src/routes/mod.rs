@@ -46,9 +46,7 @@ impl IntoResponse for ApiError {
                     StatusCode::NOT_ACCEPTABLE
                 }
 
-                HueError::NotFound(_) | HueError::V1NotFound(_) | HueError::AuxNotFound(_) => {
-                    StatusCode::NOT_FOUND
-                }
+                HueError::NotFound(_) | HueError::V1NotFound(_) => StatusCode::NOT_FOUND,
 
                 HueError::Full(_) => StatusCode::INSUFFICIENT_STORAGE,
 
@@ -56,6 +54,8 @@ impl IntoResponse for ApiError {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
             },
+
+            Self::AuxNotFound(_) => StatusCode::NOT_FOUND,
 
             Self::CreateNotAllowed(_) | Self::UpdateNotAllowed(_) | Self::DeleteNotAllowed(_) => {
                 StatusCode::METHOD_NOT_ALLOWED

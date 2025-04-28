@@ -204,8 +204,8 @@ impl State {
         }
     }
 
-    pub fn aux_get(&self, id: &Uuid) -> HueResult<&AuxData> {
-        self.aux.get(id).ok_or(HueError::AuxNotFound(*id))
+    pub fn aux_get(&self, id: &Uuid) -> ApiResult<&AuxData> {
+        self.aux.get(id).ok_or(ApiError::AuxNotFound(*id))
     }
 
     pub fn aux_set(&mut self, id: Uuid, aux: AuxData) {

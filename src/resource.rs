@@ -99,7 +99,7 @@ impl Resources {
         self.add_bridge(bridge_id.to_owned())
     }
 
-    pub fn aux_get(&self, link: &ResourceLink) -> HueResult<&AuxData> {
+    pub fn aux_get(&self, link: &ResourceLink) -> ApiResult<&AuxData> {
         self.state.aux_get(&link.rid)
     }
 

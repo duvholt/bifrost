@@ -146,6 +146,9 @@ pub enum ApiError {
     DeleteNotAllowed(RType),
 
     /* bifrost errors */
+    #[error("Missing auxiliary data resource {0:?}")]
+    AuxNotFound(uuid::Uuid),
+
     #[error("Cannot parse state file: no version field found")]
     StateVersionNotFound,
 
