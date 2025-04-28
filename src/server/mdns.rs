@@ -71,7 +71,12 @@ impl Service for MdnsService {
         self.signal = Some(tx);
         self.daemon = Some(mdns);
 
-        log::info!("Registered service {}.{}", &instance_name, &service_type);
+        log::info!(
+            "Registered service {}.{} as {}",
+            &instance_name,
+            &service_type,
+            &service_hostname
+        );
 
         Ok(())
     }
