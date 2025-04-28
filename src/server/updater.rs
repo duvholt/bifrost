@@ -35,6 +35,18 @@ impl VersionUpdater {
         }
     }
 
+    #[must_use]
+    pub fn with_default_version() -> Self {
+        Self {
+            version: Some(SwVersion::default()),
+            last_fetch: Some(Utc::now()),
+        }
+    }
+
+    pub const fn reset_cache(&mut self) {
+        self.last_fetch = None;
+    }
+
     pub async fn fetch_version(&mut self) -> ApiResult<SwVersion> {
         fetch_updates(None)
             .await?
