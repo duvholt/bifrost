@@ -95,11 +95,11 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
         appstate.res.clone(),
         appstate.config().bifrost.state_file.clone(),
     );
-    mgr.register_function("config_writer", svc).await?;
+    mgr.register_function("config-writer", svc).await?;
 
     // register version updater
     let svc = server::version_updater(appstate.res.clone(), appstate.updater());
-    mgr.register_function("version_updater", svc).await?;
+    mgr.register_function("version-updater", svc).await?;
 
     // register ssdp listener
     let svc = server::ssdp::SsdpService::new(bconf.mac, bconf.ipaddress, appstate.updater());
