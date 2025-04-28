@@ -48,9 +48,11 @@ impl Service for MdnsService {
         let service_addr = self.ip.to_string();
         let service_port = 443;
 
+        let bridge_id = hue::bridge_id(self.mac);
+
         let properties = [
+            ("bridgeid", bridge_id.as_str()),
             ("modelid", hue::HUE_BRIDGE_V2_MODEL_ID),
-            ("bridgeid", &hue::bridge_id(self.mac)),
         ];
 
         let service_info = ServiceInfo::new(
