@@ -1,7 +1,8 @@
 use std::fmt::{self, Debug};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
+use siphasher::sip::SipHasher13;
 use uuid::Uuid;
 
 use crate::api::Resource;
@@ -110,7 +111,7 @@ impl Hash for RType {
 }
 
 fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
+    let mut s = SipHasher13::new();
     t.hash(&mut s);
     s.finish()
 }
