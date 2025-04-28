@@ -120,7 +120,7 @@ pub async fn config_writer(res: Arc<Mutex<Resources>>, filename: Utf8PathBuf) ->
         let new_state = res.lock().await.serialize()?;
 
         /* If state is not actually changed, try again */
-        if old_state == new_state {
+        if old_state == new_state && filename.exists() {
             continue;
         }
 
