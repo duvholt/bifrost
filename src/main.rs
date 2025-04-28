@@ -40,6 +40,7 @@ fn init_logging() -> ApiResult<()> {
     const DEFAULT_LOG_FILTERS: &[&str] = &[
         "debug",
         "mdns_sd=off",
+        "tokio_ssdp=info",
         "tower_http::trace::on_request=info",
         "h2=info",
         "axum::rejection=trace",
