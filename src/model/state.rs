@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_yml::Value;
 use uuid::Uuid;
 
-use hue::api::{DeviceArchetype, Resource, ResourceLink};
+use hue::api::{DeviceArchetype, Resource};
 use hue::error::{HueError, HueResult};
 use hue::version::SwVersion;
 
@@ -204,18 +204,12 @@ impl State {
         }
     }
 
-    #[must_use]
-    pub fn try_aux_get(&self, id: &Uuid) -> Option<&AuxData> {
-        self.aux.get(id)
+    pub fn aux_get(&self, id: &Uuid) -> HueResult<&AuxData> {
+        self.aux.get(id).ok_or(HueError::AuxNotFound(*id))
     }
 
-    pub fn aux_get(&self, link: &ResourceLink) -> HueResult<&AuxData> {
-        self.try_aux_get(&link.rid)
-            .ok_or(HueError::AuxNotFound(*link))
-    }
-
-    pub fn aux_set(&mut self, link: &ResourceLink, aux: AuxData) {
-        self.aux.insert(link.rid, aux);
+    pub fn aux_set(&mut self, id: Uuid, aux: AuxData) {
+        self.aux.insert(id, aux);
     }
 
     #[must_use]
