@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
@@ -18,7 +19,7 @@ use crate::server::updater::VersionUpdater;
 
 #[derive(Clone)]
 pub struct AppState {
-    conf: Arc<AppConfig>,
+    conf: Arc<ArcSwap<AppConfig>>,
     upd: Arc<Mutex<VersionUpdater>>,
     svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
@@ -65,7 +66,7 @@ impl AppState {
 
         res.reset_all_streaming()?;
 
-        let conf = Arc::new(config);
+        let conf = Arc::new(ArcSwap::from_pointee(config));
         let res = Arc::new(Mutex::new(res));
 
         Ok(Self {
@@ -78,7 +79,11 @@ impl AppState {
 
     #[must_use]
     pub fn config(&self) -> Arc<AppConfig> {
-        self.conf.clone()
+        self.conf.load_full()
+    }
+
+    pub fn replace_config(&self, config: AppConfig) {
+        self.conf.store(Arc::new(config));
     }
 
     #[must_use]
@@ -93,20 +98,21 @@ impl AppState {
 
     #[must_use]
     pub async fn api_short_config(&self) -> ApiShortConfig {
-        let mac = self.conf.bridge.mac;
+        let mac = self.conf.load().bridge.mac;
         ApiShortConfig::from_mac_and_version(mac, self.upd.lock().await.get().await)
     }
 
     pub async fn api_config(&self, username: String) -> ApiResult<ApiConfig> {
-        let tz = tzfile::Tz::named(&self.conf.bridge.timezone)?;
+        let conf = self.conf.load();
+        let tz = tzfile::Tz::named(&conf.bridge.timezone)?;
         let localtime = Utc::now().with_timezone(&&tz).naive_local();
 
         let res = ApiConfig {
             short_config: self.api_short_config().await,
-            ipaddress: self.conf.bridge.ipaddress,
-            netmask: self.conf.bridge.netmask,
-            gateway: self.conf.bridge.gateway,
-            timezone: self.conf.bridge.timezone.clone(),
+            ipaddress: conf.bridge.ipaddress,
+            netmask: conf.bridge.netmask,
+            gateway: conf.bridge.gateway,
+            timezone: conf.bridge.timezone.clone(),
             whitelist: HashMap::from([(
                 username,
                 Whitelist {
