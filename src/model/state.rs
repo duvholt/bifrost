@@ -144,7 +144,7 @@ impl State {
                 continue;
             }
 
-            if pd.software_version == software_version {
+            if pd.software_version >= software_version {
                 log::info!("Bridge device {uuid} already on newest firmware version");
             } else {
                 log::info!(
