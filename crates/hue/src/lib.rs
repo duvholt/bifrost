@@ -43,3 +43,20 @@ pub fn bridge_id_raw(mac: MacAddress) -> [u8; 8] {
 pub fn bridge_id(mac: MacAddress) -> String {
     hex::encode(bridge_id_raw(mac))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::version::SwVersion;
+    use crate::{HUE_BRIDGE_V2_DEFAULT_APIVERSION, HUE_BRIDGE_V2_DEFAULT_SWVERSION};
+
+    /// verify that `HUE_BRIDGE_V2_DEFAULT_SWVERSION` and
+    /// `HUE_BRIDGE_V2_DEFAULT_APIVERSION` are synchronized
+    #[test]
+    fn test_default_version_match() {
+        let ver = SwVersion::new(HUE_BRIDGE_V2_DEFAULT_SWVERSION, String::new());
+        assert_eq!(
+            HUE_BRIDGE_V2_DEFAULT_APIVERSION,
+            ver.get_legacy_apiversion()
+        );
+    }
+}
