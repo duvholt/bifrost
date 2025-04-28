@@ -6,9 +6,9 @@ use bifrost::backend::z2m::Z2mBackend;
 use bifrost::backend::Backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
-use bifrost::mdns::MdnsService;
 use bifrost::server::appstate::AppState;
 use bifrost::server::http::HttpServer;
+use bifrost::server::mdns::MdnsService;
 use bifrost::server::{self, Protocol};
 
 /*

@@ -6,6 +6,7 @@ pub mod certificate;
 pub mod entertainment;
 pub mod http;
 pub mod hueevents;
+pub mod mdns;
 pub mod ssdp;
 pub mod updater;
 
