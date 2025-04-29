@@ -97,9 +97,8 @@ impl AppState {
         ApiShortConfig::from_mac_and_version(mac, self.upd.lock().await.get().await)
     }
 
-    #[must_use]
-    pub async fn api_config(&self, username: String) -> ApiConfig {
-        ApiConfig {
+    pub async fn api_config(&self, username: String) -> ApiResult<ApiConfig> {
+        let res = ApiConfig {
             short_config: self.api_short_config().await,
             ipaddress: self.conf.bridge.ipaddress,
             netmask: self.conf.bridge.netmask,
@@ -114,6 +113,8 @@ impl AppState {
                 },
             )]),
             ..ApiConfig::default()
-        }
+        };
+
+        Ok(res)
     }
 }
