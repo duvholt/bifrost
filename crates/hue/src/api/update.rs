@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use uuid::Uuid;
 
 use crate::api::{
     DeviceUpdate, EntertainmentConfigurationUpdate, GroupedLightUpdate, LightUpdate, RType,
@@ -57,45 +56,6 @@ impl Update {
             Self::SmartScene(_) => RType::SmartScene,
             Self::ZigbeeDeviceDiscovery(_) => RType::ZigbeeDeviceDiscovery,
             Self::Zone(_) => RType::Zone,
-        }
-    }
-
-    #[must_use]
-    pub fn id_v1_scope(&self, id: u32, uuid: &Uuid) -> Option<String> {
-        match self {
-            Self::BehaviorInstance(_)
-            | Self::Bridge(_)
-            | Self::BridgeHome(_)
-            | Self::Geolocation(_)
-            | Self::ZigbeeDeviceDiscovery(_)
-            | Self::Zone(_) => None,
-
-            Self::Room(_) | Self::GroupedLight(_) | Self::EntertainmentConfiguration(_) => {
-                Some(format!("/groups/{id}"))
-            }
-            Self::Device(_) => Some(format!("/device/{id}")),
-            Self::Light(_) => Some(format!("/lights/{id}")),
-            Self::Scene(_) | Self::SmartScene(_) => Some(format!("/scenes/{uuid}")),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateRecord {
-    pub id: Uuid,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id_v1: Option<String>,
-    #[serde(flatten)]
-    pub upd: Update,
-}
-
-impl UpdateRecord {
-    #[must_use]
-    pub fn new(uuid: &Uuid, id_v1: Option<u32>, upd: Update) -> Self {
-        Self {
-            id: *uuid,
-            id_v1: id_v1.and_then(|id| upd.id_v1_scope(id, uuid)),
-            upd,
         }
     }
 }

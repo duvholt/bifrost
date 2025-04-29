@@ -49,7 +49,7 @@ impl IntoResponse for ApiError {
                 }
                 HueError::Full(_) => StatusCode::INSUFFICIENT_STORAGE,
 
-                HueError::IOError(_) | HueError::HueZigbeeDecodeError => {
+                HueError::IOError(_) | HueError::HueZigbeeDecodeError | HueError::Undiffable => {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
             },
