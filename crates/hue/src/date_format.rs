@@ -52,9 +52,7 @@ macro_rules! date_deserializer_local {
             use serde::{self, de::Error, Deserialize};
             let s = String::deserialize(deserializer)?;
             let dt = chrono::NaiveDateTime::parse_from_str(&s, $fmt).map_err(Error::custom)?;
-            dt.and_local_timezone(Local)
-                .single()
-                .ok_or_else(|| Error::custom("Localtime conversion failed"))
+            Ok(dt)
         }
     };
 }
@@ -132,11 +130,11 @@ pub mod utc_ms_opt {
     date_deserializer_utc_opt!(DateTime<Utc>, super::FORMAT_MS);
 }
 
-pub mod legacy_local {
-    use chrono::{DateTime, Local};
+pub mod legacy_naive {
+    use chrono::NaiveDateTime;
 
-    date_serializer!(DateTime<Local>, super::FORMAT_LOCAL);
-    date_deserializer_local!(DateTime<Local>, super::FORMAT_LOCAL);
+    date_serializer!(NaiveDateTime, super::FORMAT_LOCAL);
+    date_deserializer_local!(NaiveDateTime, super::FORMAT_LOCAL);
 }
 
 pub mod legacy_local_opt {

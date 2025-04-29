@@ -1,6 +1,6 @@
 use std::{collections::HashMap, net::Ipv4Addr};
 
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use mac_address::MacAddress;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
@@ -251,8 +251,8 @@ pub struct ApiConfig {
     pub timezone: String,
     #[serde(with = "date_format::legacy_utc", rename = "UTC")]
     pub utc: DateTime<Utc>,
-    #[serde(with = "date_format::legacy_local")]
-    pub localtime: DateTime<Local>,
+    #[serde(with = "date_format::legacy_naive")]
+    pub localtime: NaiveDateTime,
     pub whitelist: HashMap<String, Whitelist>,
 }
 
@@ -801,7 +801,7 @@ impl Default for ApiConfig {
             gateway: Ipv4Addr::UNSPECIFIED,
             timezone: best_guess_timezone(),
             utc: Utc::now(),
-            localtime: Local::now(),
+            localtime: Local::now().naive_local(),
             whitelist: HashMap::new(),
         }
     }
