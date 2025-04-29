@@ -16,7 +16,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
+
+    - name: Syntax check
+      run: cargo check --all-targets --workspace
+
+    - name: Lint check
+      run: cargo clippy --all-targets --workspace
+
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --workspace
+
+    - name: Run format check
+      run: cargo fmt --check --all
