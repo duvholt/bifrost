@@ -11,13 +11,10 @@ use tokio::sync::Notify;
 use uuid::Uuid;
 
 use hue::api::{
-    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DeviceUpdate, DimmingUpdate,
-    Entertainment, EntertainmentConfiguration, EntertainmentConfigurationLocationsUpdate,
-    EntertainmentConfigurationStatus, EntertainmentConfigurationStreamProxyMode,
-    EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, GroupedLight,
-    GroupedLightUpdate, Light, LightMode, LightUpdate, Metadata, On, RType, Resource, ResourceLink,
-    ResourceRecord, RoomUpdate, SceneUpdate, Stub, TimeZone, Update, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
+    Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
+    EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight, Light, LightMode,
+    Metadata, On, RType, Resource, ResourceLink, ResourceRecord, Stub, TimeZone,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
 use hue::event::EventBlock;
 use hue::version::SwVersion;
@@ -108,76 +105,6 @@ impl Resources {
 
     pub fn aux_set(&mut self, link: &ResourceLink, aux: AuxData) {
         self.state.aux_set(link, aux);
-    }
-
-    fn generate_update(obj: &Resource) -> HueResult<Option<Update>> {
-        match obj {
-            Resource::Light(light) => {
-                let upd = LightUpdate::new()
-                    .with_brightness(light.dimming)
-                    .with_on(light.on)
-                    .with_color_temperature(light.as_mirek_opt())
-                    .with_color_xy(light.as_color_opt())
-                    .with_gradient(light.as_gradient_opt());
-
-                Ok(Some(Update::Light(upd)))
-            }
-            Resource::GroupedLight(glight) => {
-                let upd = GroupedLightUpdate::new()
-                    .with_on(glight.on)
-                    .with_brightness(glight.as_brightness_opt());
-
-                Ok(Some(Update::GroupedLight(upd)))
-            }
-            Resource::Scene(scene) => {
-                let upd = SceneUpdate::new()
-                    .with_actions(Some(scene.actions.clone()))
-                    .with_recall_action(scene.status);
-
-                Ok(Some(Update::Scene(upd)))
-            }
-            Resource::Device(device) => {
-                let upd = DeviceUpdate::new().with_metadata(device.metadata.clone());
-
-                Ok(Some(Update::Device(upd)))
-            }
-            Resource::Room(room) => {
-                let upd = RoomUpdate::new().with_metadata(room.metadata.clone());
-
-                Ok(Some(Update::Room(upd)))
-            }
-            Resource::BridgeHome(_home) => Ok(None),
-            Resource::EntertainmentConfiguration(ent) => {
-                let upd = EntertainmentConfigurationUpdate {
-                    configuration_type: Some(ent.configuration_type.clone()),
-                    metadata: Some(ent.metadata.clone()),
-                    action: None,
-                    stream_proxy: match ent.stream_proxy.mode {
-                        EntertainmentConfigurationStreamProxyMode::Auto => {
-                            Some(EntertainmentConfigurationStreamProxyUpdate::Auto)
-                        }
-                        EntertainmentConfigurationStreamProxyMode::Manual => {
-                            debug_assert!(ent.stream_proxy.node.rtype == RType::Entertainment);
-                            Some(EntertainmentConfigurationStreamProxyUpdate::Manual {
-                                node: ent.stream_proxy.node,
-                            })
-                        }
-                    },
-                    locations: Some(EntertainmentConfigurationLocationsUpdate {
-                        service_locations: ent
-                            .locations
-                            .service_locations
-                            .clone()
-                            .into_iter()
-                            .map(Into::into)
-                            .collect(),
-                    }),
-                };
-
-                Ok(Some(Update::EntertainmentConfiguration(upd)))
-            }
-            obj => Err(HueError::UpdateUnsupported(obj.rtype())),
-        }
     }
 
     pub fn try_update<T: Serialize>(
