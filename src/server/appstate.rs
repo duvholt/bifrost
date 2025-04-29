@@ -98,6 +98,9 @@ impl AppState {
     }
 
     pub async fn api_config(&self, username: String) -> ApiResult<ApiConfig> {
+        let tz = tzfile::Tz::named(&self.conf.bridge.timezone)?;
+        let localtime = Utc::now().with_timezone(&&tz).naive_local();
+
         let res = ApiConfig {
             short_config: self.api_short_config().await,
             ipaddress: self.conf.bridge.ipaddress,
@@ -112,6 +115,7 @@ impl AppState {
                     name: "User#foo".to_string(),
                 },
             )]),
+            localtime,
             ..ApiConfig::default()
         };
 
