@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::api::{self, ResourceLink};
+use crate::api::{RType, ResourceLink};
 use crate::date_format;
 use crate::error::HueResult;
 
@@ -35,14 +35,17 @@ impl EventBlock {
         }
     }
 
-    pub fn update(id: &Uuid, id_v1: Option<u32>, data: api::Update) -> HueResult<Self> {
+    pub fn update(id: &Uuid, id_v1: Option<String>, rtype: RType, data: Value) -> HueResult<Self> {
         Ok(Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),
             event: Event::Update(Update {
-                data: vec![serde_json::to_value(api::UpdateRecord::new(
-                    id, id_v1, data,
-                ))?],
+                data: vec![ObjectUpdate {
+                    id: *id,
+                    id_v1,
+                    rtype,
+                    data,
+                }],
             }),
         })
     }
@@ -68,8 +71,19 @@ pub struct Add {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ObjectUpdate {
+    pub id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id_v1: Option<String>,
+    #[serde(rename = "type")]
+    pub rtype: RType,
+    #[serde(flatten)]
+    pub data: Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Update {
-    pub data: Vec<Value>,
+    pub data: Vec<ObjectUpdate>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

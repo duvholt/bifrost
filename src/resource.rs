@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use hue::error::{HueError, HueResult};
 use maplit::btreeset;
+use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::Notify;
@@ -179,7 +180,7 @@ impl Resources {
         }
     }
 
-    pub fn try_update<T>(
+    pub fn try_update<T: Serialize>(
         &mut self,
         id: &Uuid,
         func: impl FnOnce(&mut T) -> ApiResult<()>,
@@ -187,22 +188,33 @@ impl Resources {
     where
         for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = HueError>,
     {
-        let obj = self.state.get_mut(id)?;
-        func(obj.try_into()?)?;
+        let id_v1 = self.id_v1_scope(id, self.state.get(id)?);
+        let resource = self.state.get_mut(id)?;
 
-        if let Some(delta) = Self::generate_update(obj)? {
-            let id_v1 = self.state.id_v1(id);
+        let obj: &mut T = resource.try_into()?;
+
+        // capture before and after serializations of object
+        let before = serde_json::to_value(&obj)?;
+        func(obj)?;
+        let after = serde_json::to_value(&obj)?;
+
+        // if the function affected a meaningful difference, send an update event
+        if let Some(delta) = hue::diff::event_update_diff(before, after)? {
             log::trace!("Hue event: {id_v1:?} {delta:#?}");
-            self.hue_event_stream
-                .hue_event(EventBlock::update(id, id_v1, delta)?);
-        }
+            self.hue_event_stream.hue_event(EventBlock::update(
+                id,
+                id_v1,
+                resource.rtype(),
+                delta,
+            )?);
 
-        self.state_updates.notify_one();
+            self.state_updates.notify_one();
+        }
 
         Ok(())
     }
 
-    pub fn update<T>(&mut self, id: &Uuid, func: impl FnOnce(&mut T)) -> ApiResult<()>
+    pub fn update<T: Serialize>(&mut self, id: &Uuid, func: impl FnOnce(&mut T)) -> ApiResult<()>
     where
         for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = HueError>,
     {
