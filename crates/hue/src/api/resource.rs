@@ -174,3 +174,45 @@ impl Debug for ResourceLink {
         write!(f, "{rtype}/{rid}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use uuid::uuid;
+
+    use crate::api::RType;
+
+    #[test]
+    fn rlink_hash_uses_input() {
+        let a = RType::Room.deterministic("foo");
+        let b = RType::Room.deterministic("bar");
+
+        // these must be different - otherwise we forgot to use input
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn rlink_hash_uses_rtype() {
+        let a = RType::Room.deterministic("foo");
+        let b = RType::Scene.deterministic("foo");
+
+        // these must be different - otherwise we forgot to use type
+        assert_ne!(a, b);
+    }
+
+    macro_rules! assert_hash {
+        ($rtype:path, $uuid:expr) => {
+            assert_eq!($rtype.deterministic("foo").rid, uuid!($uuid));
+        };
+    }
+
+    #[test]
+    fn rlink_hash_deterministic() {
+        assert_hash!(RType::AuthV1, "9c9dc594-12c4-5db8-bc01-3bd26c09cf0f");
+        assert_hash!(RType::Device, "fa83ad4c-fbd8-519c-b543-d7aaf2041c75");
+        assert_hash!(RType::Light, "020d5289-53f8-5051-ac97-7ea60043223e");
+        assert_hash!(RType::Room, "03585677-7f50-5379-b7a6-8c4d70d63c67");
+        assert_hash!(RType::GroupedLight, "b2126c4a-16e3-59f4-b11f-4c674c9130f5");
+        assert_hash!(RType::Scene, "02808610-c1ec-5774-8eaf-453b83cf1981");
+        assert_hash!(RType::Zone, "1cc85d96-7bb6-5e75-938c-df4207136480");
+    }
+}
