@@ -52,6 +52,9 @@ pub enum HueError {
 
     #[error("Resource type wrong: expected {0:?} but found {1:?}")]
     WrongType(RType, RType),
+
+    #[error("Cannot generate json difference between non-map objects")]
+    Undiffable,
 }
 
 pub type HueResult<T> = Result<T, HueError>;

@@ -6,6 +6,7 @@ pub mod colorspace;
 pub mod colortemp;
 pub mod date_format;
 pub mod devicedb;
+pub mod diff;
 pub mod error;
 pub mod event;
 pub mod flags;
