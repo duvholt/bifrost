@@ -169,7 +169,7 @@ async fn get_api_user(
     let lock = state.res.lock().await;
 
     Ok(Json(ApiUserConfig {
-        config: state.api_config(username.clone()).await,
+        config: state.api_config(username.clone()).await?,
         groups: get_groups(&lock, false)?,
         lights: get_lights(&lock)?,
         resourcelinks: HashMap::new(),
@@ -186,7 +186,7 @@ async fn get_api_user_resource(
 ) -> ApiResult<Json<Value>> {
     let lock = &state.res.lock().await;
     match artype {
-        ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await))),
+        ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await?))),
         ApiResourceType::Lights => Ok(Json(json!(get_lights(lock)?))),
         ApiResourceType::Groups => Ok(Json(json!(get_groups(lock, false)?))),
         ApiResourceType::Scenes => Ok(Json(json!(get_scenes(&username, lock)?))),
