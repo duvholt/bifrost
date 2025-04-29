@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::api::Resource;
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum RType {
     /// Only used in [`ResourceLink`] references
@@ -51,6 +51,62 @@ pub enum RType {
     ZigbeeConnectivity,
     ZigbeeDeviceDiscovery,
     Zone,
+}
+
+/// Manually implement Hash, so any future additions/reordering of [`RType`]
+/// does not affect output of [`RType::deterministic()`]
+impl Hash for RType {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // these are all set in stone!
+        //
+        // never change any of these assignments.
+        //
+        // use a new unique number for future variants
+        let index: u64 = match self {
+            Self::AuthV1 => 0,
+            Self::BehaviorInstance => 1,
+            Self::BehaviorScript => 2,
+            Self::Bridge => 3,
+            Self::BridgeHome => 4,
+            Self::Button => 5,
+            Self::Device => 6,
+            Self::DevicePower => 7,
+            Self::DeviceSoftwareUpdate => 8,
+            Self::Entertainment => 9,
+            Self::EntertainmentConfiguration => 10,
+            Self::GeofenceClient => 11,
+            Self::Geolocation => 12,
+            Self::GroupedLight => 13,
+            Self::GroupedLightLevel => 14,
+            Self::GroupedMotion => 15,
+            Self::Homekit => 16,
+            Self::Light => 17,
+            Self::LightLevel => 18,
+            Self::Matter => 19,
+            Self::Motion => 20,
+            Self::PrivateGroup => 21,
+            Self::PublicImage => 22,
+            Self::RelativeRotary => 23,
+            Self::Room => 24,
+            Self::Scene => 25,
+            Self::SmartScene => 26,
+            Self::Taurus => 27,
+            Self::Temperature => 28,
+            Self::ZigbeeConnectivity => 29,
+            Self::ZigbeeDeviceDiscovery => 30,
+            Self::Zone => 31,
+
+            /* Added later, so not sorted alphabetically */
+            Self::CameraMotion => 32,
+            Self::Contact => 33,
+            Self::MatterFabric => 34,
+            Self::ServiceGroup => 35,
+            Self::Tamper => 36,
+            Self::ZgpConnectivity => 37,
+        };
+
+        index.hash(state);
+    }
 }
 
 fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
