@@ -37,7 +37,7 @@ impl AppState {
         }
 
         let mut res;
-        let upd = Arc::new(Mutex::new(VersionUpdater::new()));
+        let upd = Arc::new(Mutex::new(VersionUpdater::with_default_version()));
         let swversion = upd.lock().await.get().await.clone();
 
         if let Ok(fd) = File::open(&config.bifrost.state_file) {

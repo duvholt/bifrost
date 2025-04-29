@@ -6,9 +6,9 @@ use bifrost::backend::z2m::Z2mBackend;
 use bifrost::backend::Backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
-use bifrost::mdns::MdnsService;
 use bifrost::server::appstate::AppState;
 use bifrost::server::http::HttpServer;
+use bifrost::server::mdns::MdnsService;
 use bifrost::server::{self, Protocol};
 
 /*
@@ -40,6 +40,7 @@ fn init_logging() -> ApiResult<()> {
     const DEFAULT_LOG_FILTERS: &[&str] = &[
         "debug",
         "mdns_sd=off",
+        "tokio_ssdp=info",
         "tower_http::trace::on_request=info",
         "h2=info",
         "axum::rejection=trace",
@@ -101,7 +102,7 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     mgr.register_function("version_updater", svc).await?;
 
     // register ssdp listener
-    let svc = server::ssdp::SsdpService::new(bconf.mac, bconf.ipaddress);
+    let svc = server::ssdp::SsdpService::new(bconf.mac, bconf.ipaddress, appstate.updater());
     mgr.register_service("ssdp", svc).await?;
 
     // register entertainment streaming listener

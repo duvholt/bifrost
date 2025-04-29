@@ -6,6 +6,7 @@ pub mod certificate;
 pub mod entertainment;
 pub mod http;
 pub mod hueevents;
+pub mod mdns;
 pub mod ssdp;
 pub mod updater;
 
@@ -143,8 +144,6 @@ pub async fn version_updater(
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     let mut version = upd.lock().await.get().await.clone();
-
-    res.lock().await.update_bridge_version(version.clone());
 
     loop {
         interval.tick().await;

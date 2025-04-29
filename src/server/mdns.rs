@@ -44,13 +44,15 @@ impl Service for MdnsService {
         mdns.enable_interface(IpAddr::from(self.ip))?;
         let service_type = "_hue._tcp.local.";
         let instance_name = format!("bifrost-{}", hex::encode(self.mac.bytes()));
-        let service_hostname = format!("{instance_name}.{service_type}");
+        let service_hostname = format!("{instance_name}.local.");
         let service_addr = self.ip.to_string();
-        let service_port = 80;
+        let service_port = 443;
+
+        let bridge_id = hue::bridge_id(self.mac);
 
         let properties = [
+            ("bridgeid", bridge_id.as_str()),
             ("modelid", hue::HUE_BRIDGE_V2_MODEL_ID),
-            ("bridgeid", &hue::bridge_id(self.mac)),
         ];
 
         let service_info = ServiceInfo::new(
@@ -69,7 +71,12 @@ impl Service for MdnsService {
         self.signal = Some(tx);
         self.daemon = Some(mdns);
 
-        log::info!("Registered service {}.{}", &instance_name, &service_type);
+        log::info!(
+            "Registered service {}.{} as {}",
+            &instance_name,
+            &service_type,
+            &service_hostname
+        );
 
         Ok(())
     }

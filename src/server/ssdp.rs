@@ -1,17 +1,21 @@
 use std::net::Ipv4Addr;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use mac_address::MacAddress;
 use tokio::sync::watch::{self, Receiver, Sender};
+use tokio::sync::Mutex;
 use tokio_ssdp::{Device, Server};
 
 use svc::traits::Service;
 use uuid::Uuid;
 
 use crate::error::ApiError;
+use crate::server::updater::VersionUpdater;
 
 pub struct SsdpService {
     service: Option<Server>,
+    updater: Arc<Mutex<VersionUpdater>>,
     usn: Uuid,
     mac: MacAddress,
     ip: Ipv4Addr,
@@ -21,9 +25,10 @@ pub struct SsdpService {
 
 impl SsdpService {
     #[must_use]
-    pub fn new(mac: MacAddress, ip: Ipv4Addr) -> Self {
+    pub fn new(mac: MacAddress, ip: Ipv4Addr, updater: Arc<Mutex<VersionUpdater>>) -> Self {
         Self {
             service: None,
+            updater,
             mac,
             ip,
             usn: Uuid::new_v5(&Uuid::NAMESPACE_OID, &mac.bytes()),
@@ -45,16 +50,29 @@ impl Service for SsdpService {
     async fn start(&mut self) -> Result<(), Self::Error> {
         let location = format!("http://{}:80/description.xml", self.ip);
 
-        let usn = self.usn.to_string();
+        let legacy_api_version = self
+            .updater
+            .lock()
+            .await
+            .get()
+            .await
+            .get_legacy_apiversion();
 
+        let usn = format!("uuid:{}", self.usn);
+        let usn_rootdev = format!("{usn}::upnp:rootdevice");
+
+        // It's uncertain if these Device settings are valid according to the UPnP
+        // spec, but they exactly match the format sent out by real hue bridges
         let server_fut = Server::new([
-            Device::new(&usn, "urn:schemas-upnp-org:device:basic:1", &location),
-            Device::new(&usn, "upnp:rootdevice", &location),
-            Device::new(&usn, "", &location),
+            Device::raw(&usn, &usn, &location),
+            Device::raw(&usn, "urn:schemas-upnp-org:device:basic:1", &location),
+            Device::raw(&usn_rootdev, "upnp:rootdevice", &location),
         ])
         .extra_header("hue-bridgeid", hue::bridge_id(self.mac).to_uppercase())
+        // enable workarounds to make Hue Essentials work
         .partial_request_workaround(true)
-        .server_name("Hue/1.0 UPnP/1.0 IpBridge/1.69.0");
+        // Hue Essentials strikes again: server name must look like this
+        .server_name(format!("Hue/1.0 UPnP/1.0 IpBridge/{legacy_api_version}"));
 
         let (tx, rx) = watch::channel(false);
         self.shutdown = Some(rx);
