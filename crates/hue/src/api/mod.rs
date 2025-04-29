@@ -50,7 +50,7 @@ pub use stubs::{
     Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
     ZigbeeDeviceDiscovery, Zone,
 };
-pub use update::{Update, UpdateRecord};
+pub use update::Update;
 
 use std::fmt::Debug;
 
