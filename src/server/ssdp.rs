@@ -80,9 +80,9 @@ impl Service for SsdpService {
         // It's uncertain if these Device settings are valid according to the UPnP
         // spec, but they exactly match the format sent out by real hue bridges
         let server_fut = Server::new([
+            Device::raw(&usn_rootdev, "upnp:rootdevice", &location),
             Device::raw(&usn, &usn, &location),
             Device::raw(&usn, "urn:schemas-upnp-org:device:basic:1", &location),
-            Device::raw(&usn_rootdev, "upnp:rootdevice", &location),
         ])
         .extra_header("hue-bridgeid", hue::bridge_id(self.mac).to_uppercase())
         // enable workarounds to make Hue Essentials work
