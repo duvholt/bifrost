@@ -131,3 +131,19 @@ impl Service for SsdpService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use mac_address::MacAddress;
+    use uuid::uuid;
+
+    use crate::server::ssdp::hue_bridge_usn;
+
+    #[test]
+    fn usn_generation() {
+        let expected = uuid!("2f402f80-da50-11e1-9b23-112233445566");
+        let generated = hue_bridge_usn(MacAddress::new([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]));
+
+        assert_eq!(generated, expected);
+    }
+}
