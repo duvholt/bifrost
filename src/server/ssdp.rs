@@ -47,7 +47,7 @@ impl SsdpService {
             updater,
             mac,
             ip,
-            usn: Uuid::new_v5(&Uuid::NAMESPACE_OID, &mac.bytes()),
+            usn: hue_bridge_usn(mac),
             shutdown: None,
             signal: None,
         }
