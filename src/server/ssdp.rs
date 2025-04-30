@@ -23,6 +23,22 @@ pub struct SsdpService {
     shutdown: Option<Receiver<bool>>,
 }
 
+/// Prefix used in all USN for hue bridges
+///
+/// The USN is constructed like so:
+///
+///    {PREFIX}-{MAC}
+///
+/// Example: 2f402f80-da50-11e1-9b23-112233445566
+const HUE_BRIDGE_USN_PREFIX: &str = "2f402f80-da50-11e1-9b23";
+
+#[must_use]
+pub fn hue_bridge_usn(mac: MacAddress) -> Uuid {
+    let hexmac = hex::encode(mac.bytes());
+    let uuid_str = format!("{HUE_BRIDGE_USN_PREFIX}-{hexmac}");
+    Uuid::try_parse(&uuid_str).unwrap()
+}
+
 impl SsdpService {
     #[must_use]
     pub fn new(mac: MacAddress, ip: Ipv4Addr, updater: Arc<Mutex<VersionUpdater>>) -> Self {
