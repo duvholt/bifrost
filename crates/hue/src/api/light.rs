@@ -171,6 +171,15 @@ impl Light {
             points: grad.points.clone(),
         })
     }
+
+    #[must_use]
+    pub fn is_streaming(&self) -> bool {
+        self.mode == LightMode::Streaming
+    }
+
+    pub const fn stop_streaming(&mut self) {
+        self.mode = LightMode::Normal;
+    }
 }
 
 impl AddAssign<LightUpdate> for Light {

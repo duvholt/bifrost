@@ -16,6 +16,18 @@ pub struct EntertainmentConfiguration {
     pub active_streamer: Option<ResourceLink>,
 }
 
+impl EntertainmentConfiguration {
+    #[must_use]
+    pub fn is_streaming(&self) -> bool {
+        self.active_streamer.is_some() || self.status != EntertainmentConfigurationStatus::Inactive
+    }
+
+    pub const fn stop_streaming(&mut self) {
+        self.active_streamer = None;
+        self.status = EntertainmentConfigurationStatus::Inactive;
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum EntertainmentConfigurationStatus {
