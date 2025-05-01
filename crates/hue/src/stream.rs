@@ -36,6 +36,10 @@ impl HueStreamPacketHeader {
 
     pub fn parse(data: &[u8]) -> HueResult<Self> {
         let len = Self::SIZE;
+        if data.len() < len {
+            return Err(HueError::HueEntertainmentBadHeader);
+        }
+
         let hdr = HueStreamHeader::unpack_from_slice(&data[..len])?;
 
         if hdr.magic != Self::MAGIC {
