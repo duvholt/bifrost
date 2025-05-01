@@ -135,13 +135,13 @@ impl EntertainmentService {
                 return Err(ApiError::EntStreamDesync);
             }
 
-            if queue.push(BackendRequest::EntertainmentFrame(pkt.lights)) {
-                let ts = Utc::now().timestamp();
-                if period != ts {
-                    log::info!("Entertainment fps: {fps}");
-                    period = ts;
-                    fps = 0;
-                }
+            queue.push(BackendRequest::EntertainmentFrame(pkt.lights));
+
+            let ts = Utc::now().timestamp();
+            if period != ts {
+                log::info!("Entertainment fps: {fps}");
+                period = ts;
+                fps = 0;
             }
 
             if let Some(req) = queue.pop() {
