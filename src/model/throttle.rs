@@ -28,6 +28,11 @@ impl Throttle {
     }
 
     #[must_use]
+    pub const fn interval(&self) -> Duration {
+        self.interval
+    }
+
+    #[must_use]
     pub fn elapsed_since(&self, now: DateTime<Utc>) -> Duration {
         now - self.last_update
     }
