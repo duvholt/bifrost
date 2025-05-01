@@ -162,11 +162,11 @@ impl Service for EntertainmentService {
 
     async fn run(&mut self) -> Result<(), Self::Error> {
         let Some(udp) = self.udp.clone() else {
-            return Err(ApiError::SvcError("Udp not initialized".to_string()));
+            return Err(ApiError::service_error("Udp not initialized"));
         };
 
         let Some(ctx) = self.ctx.as_ref() else {
-            return Err(ApiError::SvcError("Ctx not initialized".to_string()));
+            return Err(ApiError::service_error("Ctx not initialized"));
         };
 
         loop {
