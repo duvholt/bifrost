@@ -166,6 +166,9 @@ pub enum ApiError {
     #[error("Entertainment Stream init error")]
     EntStreamInitError,
 
+    #[error("Entertainment Stream timeout")]
+    EntStreamTimeout,
+
     #[error("Entertainment Stream desynchronized")]
     EntStreamDesync,
 
