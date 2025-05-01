@@ -53,6 +53,29 @@ impl EntertainmentService {
         Ok(res)
     }
 
+    async fn read_frame(sess: &mut SslStream<UdpStream>, buf: &mut [u8]) -> ApiResult<usize> {
+        const TIMEOUT: Duration = Duration::from_millis(1000);
+
+        match timeout(TIMEOUT, sess.read(buf)).await {
+            Ok(Err(err)) if err.kind() == ErrorKind::UnexpectedEof => {
+                log::debug!("Sync stream stopped by sender");
+                Ok(0)
+            }
+            Ok(Err(err)) => {
+                log::error!("Error while trying to read sync data: {err:?}");
+                Err(ApiError::EntStreamDesync)
+            }
+            Err(_) => {
+                log::warn!("Timeout while waiting for sync data");
+                Err(ApiError::EntStreamTimeout)
+            }
+            Ok(Ok(n)) => {
+                log::trace!("Read {n} bytes of sync data");
+                Ok(n)
+            }
+        }
+    }
+
     pub async fn run_loop(&self, sess: SslStream<UdpStream>) -> ApiResult<()> {
         const TIMEOUT: Duration = Duration::from_millis(1000);
 
