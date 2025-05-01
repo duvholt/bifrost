@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -82,8 +83,21 @@ impl EntertainmentService {
 
         loop {
             match timeout(Duration::from_millis(1000), rdr.read_exact(&mut buf)).await {
-                Ok(Err(_)) | Err(_) => break,
-                Ok(Ok(_)) => {}
+                Ok(Err(err)) if err.kind() == ErrorKind::UnexpectedEof => {
+                    log::debug!("Sync stream stopped by sender");
+                    break;
+                }
+                Ok(Err(err)) => {
+                    log::error!("Error while trying to read sync data: {err:?}");
+                    return Err(ApiError::EntStreamDesync);
+                }
+                Err(_) => {
+                    log::warn!("Timeout while waiting for sync data");
+                    return Err(ApiError::EntStreamTimeout);
+                }
+                Ok(Ok(n)) => {
+                    log::trace!("Read {n} bytes of sync data");
+                }
             }
 
             let pkt = HueStreamPacket::parse(&buf)?;
