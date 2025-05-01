@@ -89,7 +89,7 @@ impl EntertainmentService {
             let pkt = HueStreamPacket::parse(&buf)?;
 
             if pkt.color_mode != header.color_mode {
-                log::error!("Entertainment Mode color_mode changes mid-stream.");
+                log::error!("Entertainment Mode color_mode changed mid-stream.");
                 return Err(ApiError::EntStreamDesync);
             }
 
