@@ -127,9 +127,6 @@ impl EntertainmentService {
             }
         }
 
-        let req = BackendRequest::EntertainmentStop();
-        self.res.lock().await.backend_request(req)?;
-
         Ok(())
     }
 }
@@ -179,6 +176,9 @@ impl Service for EntertainmentService {
                 Ok(()) => log::info!("Entertainment stream finished"),
                 Err(err) => log::error!("Entertainment stream error: {err}"),
             }
+
+            let req = BackendRequest::EntertainmentStop();
+            self.res.lock().await.backend_request(req)?;
         }
     }
 
