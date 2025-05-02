@@ -39,7 +39,7 @@ use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
-use z2m::request::Z2mRequest;
+use z2m::request::{Z2mPayload, Z2mRequest};
 use z2m::update::{DeviceColorMode, DeviceUpdate};
 
 use crate::backend::Backend;
@@ -758,16 +758,11 @@ impl Z2mBackend {
                             let data = hz.to_vec()?;
                             log::debug!("Sending hue-specific frame: {}", hex::encode(&data));
 
-                            let upd = json!({
-                                "command": {
-                                    "cluster": 0xFC03,
-                                    "command": 0,
-                                    "payload": {
-                                        "data": data
-                                    }
-                                }
-                            });
-                            let z2mreq = Z2mRequest::Raw(upd);
+                            let z2mreq = Z2mRequest::Command {
+                                cluster: 0xFC03,
+                                command: 0,
+                                payload: Z2mPayload { data },
+                            };
 
                             z2mws.send(topic, &z2mreq).await?;
                         }
