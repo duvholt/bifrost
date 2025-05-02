@@ -876,14 +876,7 @@ impl Z2mBackend {
 
                         for add in known_new.difference(&known_existing) {
                             let friendly_name = &self.rmap[add];
-                            let change = GroupMemberChange {
-                                device: friendly_name.to_string(),
-                                group: topic.to_string(),
-                                endpoint: None,
-                                skip_disable_reporting: None,
-                            };
-                            let z2mreq = Z2mRequest::GroupMemberAdd(change);
-                            z2mws.send(topic, &z2mreq).await?;
+                            z2mws.send_group_member_add(topic, friendly_name).await?;
                         }
 
                         for remove in known_existing.difference(&known_new) {

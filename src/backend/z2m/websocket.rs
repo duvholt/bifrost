@@ -5,6 +5,7 @@ use futures::{SinkExt, Stream};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use z2m::api::GroupMemberChange;
 use z2m::update::DeviceUpdate;
 use z2m::{api::RawMessage, request::Z2mRequest};
 
@@ -71,6 +72,22 @@ impl Z2mWebSocket {
 
     pub async fn send_update(&mut self, topic: &str, payload: &DeviceUpdate) -> ApiResult<()> {
         let z2mreq = Z2mRequest::Update(payload);
+
+        self.send(topic, &z2mreq).await
+    }
+
+    pub async fn send_group_member_add(
+        &mut self,
+        topic: &str,
+        friendly_name: &str,
+    ) -> ApiResult<()> {
+        let change = GroupMemberChange {
+            device: friendly_name.to_string(),
+            group: topic.to_string(),
+            endpoint: None,
+            skip_disable_reporting: None,
+        };
+        let z2mreq = Z2mRequest::GroupMemberAdd(change);
 
         self.send(topic, &z2mreq).await
     }
