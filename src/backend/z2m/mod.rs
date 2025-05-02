@@ -658,7 +658,7 @@ impl Z2mBackend {
             return Err(ApiError::UnexpectedZ2mReply(pkt));
         };
 
-        let raw_msg: Result<RawMessage, _> = serde_json::from_str(&txt);
+        let raw_msg = serde_json::from_str::<RawMessage>(&txt);
 
         let msg = raw_msg.map_err(|err| {
             log::error!(
@@ -930,10 +930,7 @@ impl Z2mBackend {
 
             BackendRequest::EntertainmentFrame(frame) => {
                 if let Some(es) = &mut self.entstream {
-                    let blks = es.generate_frame(frame);
-
-                    let message = es.stream.frame(blks)?;
-                    z2mws.send_zigbee_message(&es.target, &message).await?;
+                    es.frame(z2mws, frame).await?;
                 }
             }
 

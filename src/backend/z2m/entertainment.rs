@@ -128,4 +128,15 @@ impl EntStream {
 
         Ok(())
     }
+
+    pub async fn frame(
+        &mut self,
+        z2mws: &mut Z2mWebSocket,
+        frame: &HueStreamLights,
+    ) -> ApiResult<()> {
+        let blks = self.generate_frame(frame);
+
+        let message = self.stream.frame(blks)?;
+        z2mws.send_zigbee_message(&self.target, &message).await
+    }
 }
