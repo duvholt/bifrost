@@ -38,8 +38,8 @@ use hue::error::HueError;
 use hue::scene_icons;
 use hue::stream::HueStreamLights;
 use hue::zigbee::{
-    EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
-    HueZigbeeUpdate, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
+    EffectType, GradientParams, GradientStyle, HueEntFrameLightRecord, HueZigbeeUpdate,
+    ZigbeeTarget,
 };
 use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
 use z2m::convert::{
@@ -52,7 +52,6 @@ use z2m::update::{DeviceColorMode, DeviceUpdate};
 use crate::backend::Backend;
 use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
-use crate::backend::z2m::stream::Z2mTarget;
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
@@ -70,19 +69,6 @@ pub struct Z2mBackend {
     network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
     counter: u32,
-}
-
-fn z2m_set_entertainment_brightness(brightness: u8) -> Z2mRequest<'static> {
-    Z2mRequest::RawWrite(json!({
-        "cluster": EntertainmentZigbeeStream::CLUSTER,
-        "payload": {
-            "5": {
-                "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
-                "type": 32,
-                "value": brightness,
-            }
-        }
-    }))
 }
 
 impl Z2mBackend {
@@ -1027,18 +1013,12 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(target) = targets.first() {
-                    let modes = EntStream::addrs_to_light_modes(&addrs);
-                    let mut es = EntStream {
-                        stream: EntertainmentZigbeeStream::new(self.counter),
-                        target: Z2mTarget::new(target),
-                        addrs,
-                        modes,
-                    };
+                    let mut es = EntStream::new(self.counter, target, addrs);
 
                     log::debug!("Entertainment addrs: {:#?}", &es.addrs);
                     log::debug!("Entertainment modes: {:#?}", &es.modes);
                     for (dev, segments) in &es.addrs {
-                        let z2mreq = z2m_set_entertainment_brightness(0xFE);
+                        let z2mreq = EntStream::z2m_set_entertainment_brightness(0xFE);
                         self.websocket_send(socket, dev, &z2mreq).await?;
 
                         if segments.len() <= 1 {
