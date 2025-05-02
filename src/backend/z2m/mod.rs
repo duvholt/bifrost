@@ -2,23 +2,24 @@ pub mod learn;
 pub mod stream;
 pub mod zclcommand;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bifrost_api::backend::BackendRequest;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use maplit::btreeset;
 use native_tls::TlsConnector;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::net::TcpStream;
 use tokio::select;
-use tokio::sync::broadcast::Receiver;
 use tokio::sync::Mutex;
+use tokio::sync::broadcast::Receiver;
 use tokio::time::sleep;
 use tokio_tungstenite::{
-    connect_async_tls_with_config, tungstenite, Connector, MaybeTlsStream, WebSocketStream,
+    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config, tungstenite,
 };
 use uuid::Uuid;
 
@@ -26,10 +27,10 @@ use hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
     DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
     EntertainmentSegment, EntertainmentSegments, GroupedLight, Light, LightEffect, LightEffects,
-    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata,
-    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
+    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightGradientPoint,
+    LightGradientUpdate, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
+    RoomArchetype, RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
+    SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -37,20 +38,19 @@ use hue::scene_icons;
 use hue::stream::HueStreamLights;
 use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
-    HueZigbeeUpdate, LightRecordMode, ZigbeeTarget, PHILIPS_HUE_ZIGBEE_VENDOR_ID,
+    HueZigbeeUpdate, LightRecordMode, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
 };
-use z2m::api::{ExposeLight, Message, RawMessage};
+use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
-use z2m::hexcolor::HexColor;
 use z2m::request::Z2mRequest;
-use z2m::update::DeviceUpdate;
+use z2m::update::{DeviceColorMode, DeviceUpdate};
 
+use crate::backend::Backend;
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::stream::Z2mTarget;
-use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
@@ -147,6 +147,7 @@ impl Z2mBackend {
         };
 
         self.map.insert(name.to_string(), link_light);
+        self.rmap.insert(link_device, name.to_string());
         self.rmap.insert(link_light, name.to_string());
 
         let mut light = Light::new(link_device, metadata);
@@ -454,17 +455,23 @@ impl Z2mBackend {
     async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
         let mut res = self.state.lock().await;
         res.update::<Light>(uuid, |light| {
-            let upd = LightUpdate::new()
+            let mut upd = LightUpdate::new()
                 .with_on(devupd.state.map(Into::into))
                 .with_brightness(devupd.brightness.map(|b| b / 254.0 * 100.0))
                 .with_color_temperature(devupd.color_temp)
-                .with_color_xy(devupd.color.and_then(|col| col.xy))
-                .with_gradient(
-                    devupd
-                        .gradient
-                        .as_ref()
-                        .map(|s| s.iter().map(HexColor::to_xy_color).collect()),
-                );
+                .with_gradient(devupd.gradient.as_ref().map(|s| {
+                    LightGradientUpdate {
+                        mode: None,
+                        points: s
+                            .iter()
+                            .map(|hc| LightGradientPoint::xy(hc.to_xy_color()))
+                            .collect(),
+                    }
+                }));
+
+            if devupd.color_mode != Some(DeviceColorMode::ColorTemp) {
+                upd = upd.with_color_xy(devupd.color.and_then(|col| col.xy));
+            }
 
             *light += upd;
         })?;
@@ -543,6 +550,40 @@ impl Z2mBackend {
                     self.add_group(grp).await?;
                 }
             }
+
+            Message::BridgeGroupMembersAdd(change) | Message::BridgeGroupMembersRemove(change) => {
+                if let Some(light) = self.map.get(&change.data.device) {
+                    let mut lock = self.state.lock().await;
+                    let device = lock.get::<Light>(light)?.clone();
+
+                    let device_link = device.owner;
+                    if let Some(room) = self.map.get(&change.data.group) {
+                        let room_link = lock.get::<GroupedLight>(room)?.owner;
+                        let exists = lock
+                            .get::<Room>(&room_link)?
+                            .children
+                            .contains(&device_link);
+
+                        match msg {
+                            Message::BridgeGroupMembersAdd(_) => {
+                                if !exists {
+                                    lock.update(&room_link.rid, |room: &mut Room| {
+                                        room.children.insert(device_link);
+                                    })?;
+                                }
+                            }
+                            Message::BridgeGroupMembersRemove(_) => {
+                                if exists {
+                                    lock.update(&room_link.rid, |room: &mut Room| {
+                                        room.children.remove(&device_link);
+                                    })?;
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -603,7 +644,10 @@ impl Z2mBackend {
             });
         }
 
-        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
+        if let Some(LightEffectsV2Update {
+            action: Some(act), ..
+        }) = &upd.effects_v2
+        {
             if let Some(fx) = &act.effect {
                 let et = match fx {
                     LightEffect::NoEffect => EffectType::NoEffect,
@@ -623,8 +667,8 @@ impl Z2mBackend {
             if let Some(speed) = &act.parameters.speed {
                 hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
             }
-            if let Some(ct) = &act.parameters.color_temperature {
-                hz = hz.with_color_mirek(ct.mirek);
+            if let Some(mirek) = &act.parameters.color_temperature.and_then(|ct| ct.mirek) {
+                hz = hz.with_color_mirek(*mirek);
             }
             if let Some(color) = &act.parameters.color {
                 hz = hz.with_color_xy(color.xy);
@@ -690,7 +734,7 @@ impl Z2mBackend {
         &self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
         topic: &str,
-        payload: Z2mRequest<'_>,
+        payload: &Z2mRequest<'_>,
     ) -> ApiResult<()> {
         let Some(link) = self.map.get(topic) else {
             log::trace!(
@@ -705,21 +749,27 @@ impl Z2mBackend {
             self.name
         );
 
-        let api_req = if let Z2mRequest::Untyped { endpoint, value } = &payload {
-            RawMessage {
+        let api_req = match &payload {
+            Z2mRequest::Untyped { endpoint, value } => RawMessage {
                 topic: format!("{topic}/{endpoint}/set"),
                 payload: serde_json::to_value(value)?,
-            }
-        } else if let Z2mRequest::RawWrite(value) = &payload {
-            RawMessage {
+            },
+            Z2mRequest::RawWrite(value) => RawMessage {
                 topic: format!("{topic}/set/write"),
                 payload: serde_json::to_value(value)?,
-            }
-        } else {
-            RawMessage {
+            },
+            Z2mRequest::GroupMemberAdd(value) => RawMessage {
+                topic: "bridge/request/group/members/add".into(),
+                payload: serde_json::to_value(value)?,
+            },
+            Z2mRequest::GroupMemberRemove(value) => RawMessage {
+                topic: "bridge/request/group/members/remove".into(),
+                payload: serde_json::to_value(value)?,
+            },
+            _ => RawMessage {
                 topic: format!("{topic}/set"),
                 payload: serde_json::to_value(payload)?,
-            }
+            },
         };
 
         let json = serde_json::to_string(&api_req)?;
@@ -738,9 +788,9 @@ impl Z2mBackend {
 
         let mut lock = self.state.lock().await;
 
-        match (*req).clone() {
+        match &*req {
             BackendRequest::LightUpdate(link, upd) => {
-                if let Some(topic) = self.rmap.get(&link) {
+                if let Some(topic) = self.rmap.get(link) {
                     // We cannot recover .mode from backend updates, since these only contain
                     // the gradient colors. So we have no choice, but to update the mode
                     // here. Otherwise, the information would be lost.
@@ -751,14 +801,14 @@ impl Z2mBackend {
                             }
                         })?;
                     }
-                    let hue_effects = lock.get::<Light>(&link)?.effects.is_some();
+                    let hue_effects = lock.get::<Light>(link)?.effects.is_some();
                     drop(lock);
 
                     /* step 1: send generic light update */
                     let mut payload = DeviceUpdate::default()
                         .with_state(upd.on.map(|on| on.on))
                         .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                        .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
                         .with_color_xy(upd.color.map(|col| col.xy));
 
                     // We don't want to send gradient updates twice, but if hue
@@ -770,12 +820,12 @@ impl Z2mBackend {
 
                     let z2mreq = Z2mRequest::Update(&payload);
 
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
 
                     /* step 2: if supported (and needed) send hue-specific effects update */
 
                     if hue_effects {
-                        let mut hz = Self::make_hue_specific_update(&upd)?;
+                        let mut hz = Self::make_hue_specific_update(upd)?;
 
                         if !hz.is_empty() {
                             hz = hz.with_fade_speed(0x0001);
@@ -797,7 +847,7 @@ impl Z2mBackend {
                                 value: &upd,
                             };
 
-                            self.websocket_send(socket, topic, z2mreq).await?;
+                            self.websocket_send(socket, topic, &z2mreq).await?;
                         }
                     }
                 }
@@ -808,29 +858,29 @@ impl Z2mBackend {
                     log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
 
                     lock.aux_set(
-                        &link_scene,
+                        link_scene,
                         AuxData::new()
                             .with_topic(&scene.metadata.name)
-                            .with_index(sid),
+                            .with_index(*sid),
                     );
                     let z2mreq = Z2mRequest::SceneStore {
-                        name: &scene.metadata.name.clone(),
-                        id: sid,
+                        name: &scene.metadata.name,
+                        id: *sid,
                     };
 
-                    lock.add(&link_scene, Resource::Scene(scene))?;
+                    lock.add(link_scene, Resource::Scene(scene.clone()))?;
                     drop(lock);
 
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
                 }
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
-                if let Some(recall) = upd.recall {
-                    let scene = lock.get::<Scene>(&link)?;
+                if let Some(recall) = &upd.recall {
+                    let scene = lock.get::<Scene>(link)?;
                     if recall.action == Some(SceneStatusEnum::Active) {
                         let index = lock
-                            .aux_get(&link)?
+                            .aux_get(link)?
                             .index
                             .ok_or(HueError::NotFound(link.rid))?;
 
@@ -848,17 +898,17 @@ impl Z2mBackend {
                             })?;
                         }
 
-                        let room = lock.get::<Scene>(&link)?.group;
+                        let room = lock.get::<Scene>(link)?.group;
                         drop(lock);
 
                         if let Some(topic) = self.rmap.get(&room).cloned() {
                             log::info!("[{}] Recall scene: {link:?}", self.name);
 
                             let mut lock = self.state.lock().await;
-                            self.learner.learn_scene_recall(&link, &mut lock)?;
+                            self.learner.learn_scene_recall(link, &mut lock)?;
 
                             let z2mreq = Z2mRequest::SceneRecall(index);
-                            self.websocket_send(socket, &topic, z2mreq).await?;
+                            self.websocket_send(socket, &topic, &z2mreq).await?;
                         }
                     } else {
                         log::error!("Scene recall type not supported: {recall:?}");
@@ -867,18 +917,62 @@ impl Z2mBackend {
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                let room = lock.get::<GroupedLight>(&link)?.owner;
+                let room = lock.get::<GroupedLight>(link)?.owner;
                 drop(lock);
 
                 let payload = DeviceUpdate::default()
                     .with_state(upd.on.map(|on| on.on))
                     .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                    .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                    .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
                     .with_color_xy(upd.color.map(|col| col.xy));
 
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::Update(&payload);
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
+                }
+            }
+
+            BackendRequest::RoomUpdate(link, upd) => {
+                if let Some(children) = &upd.children {
+                    if let Some(topic) = self.rmap.get(link) {
+                        let room = lock.get::<Room>(link)?.clone();
+                        drop(lock);
+
+                        let known_existing: BTreeSet<_> = room
+                            .children
+                            .iter()
+                            .filter(|device| self.rmap.contains_key(device))
+                            .collect();
+
+                        let known_new: BTreeSet<_> = children
+                            .iter()
+                            .filter(|device| self.rmap.contains_key(device))
+                            .collect();
+
+                        for add in known_new.difference(&known_existing) {
+                            let friendly_name = &self.rmap[add];
+                            let change = GroupMemberChange {
+                                device: friendly_name.to_string(),
+                                group: topic.to_string(),
+                                endpoint: None,
+                                skip_disable_reporting: None,
+                            };
+                            let z2mreq = Z2mRequest::GroupMemberAdd(change);
+                            self.websocket_send(socket, topic, &z2mreq).await?;
+                        }
+
+                        for remove in known_existing.difference(&known_new) {
+                            let friendly_name = &self.rmap[remove];
+                            let change = GroupMemberChange {
+                                device: friendly_name.to_string(),
+                                group: topic.to_string(),
+                                endpoint: None,
+                                skip_disable_reporting: None,
+                            };
+                            let z2mreq = Z2mRequest::GroupMemberRemove(change);
+                            self.websocket_send(socket, topic, &z2mreq).await?;
+                        }
+                    }
                 }
             }
 
@@ -887,21 +981,21 @@ impl Z2mBackend {
                     return Ok(());
                 }
 
-                let room = lock.get::<Scene>(&link)?.group;
+                let room = lock.get::<Scene>(link)?.group;
                 let index = lock
-                    .aux_get(&link)?
+                    .aux_get(link)?
                     .index
                     .ok_or(HueError::NotFound(link.rid))?;
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::SceneRemove(index);
-                    self.websocket_send(socket, topic, z2mreq).await?;
+                    self.websocket_send(socket, topic, &z2mreq).await?;
                 }
             }
 
             BackendRequest::EntertainmentStart(ent_id) => {
-                let ent: &EntertainmentConfiguration = lock.get_id(ent_id)?;
+                let ent: &EntertainmentConfiguration = lock.get_id(*ent_id)?;
 
                 let mut chans = ent.channels.clone();
 
@@ -963,20 +1057,20 @@ impl Z2mBackend {
                     log::debug!("Entertainment modes: {:#?}", &es.modes);
                     for (dev, segments) in &es.addrs {
                         let z2mreq = z2m_set_entertainment_brightness(0xFE);
-                        self.websocket_send(socket, dev, z2mreq).await?;
+                        self.websocket_send(socket, dev, &z2mreq).await?;
 
                         if segments.len() <= 1 {
                             continue;
                         }
 
                         let z2mreq = es.target.send(es.stream.segment_mapping(segments)?)?;
-                        self.websocket_send(socket, dev, z2mreq).await?;
+                        self.websocket_send(socket, dev, &z2mreq).await?;
                     }
 
                     let z2mreq = es.target.send(es.stream.reset()?)?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, z2mreq.clone()).await?;
+                        self.websocket_send(socket, topic, &z2mreq).await?;
                     }
 
                     self.entstream = Some(es);
@@ -1006,7 +1100,7 @@ impl Z2mBackend {
 
                     let z2mreq = es.target.send(es.stream.frame(blks)?)?;
                     let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, z2mreq).await?;
+                    self.websocket_send(socket, &device, &z2mreq).await?;
                 }
             }
 
@@ -1016,7 +1110,7 @@ impl Z2mBackend {
                     let z2mreq = es.target.send(es.stream.reset()?)?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, z2mreq.clone()).await?;
+                        self.websocket_send(socket, topic, &z2mreq).await?;
                     }
                     self.counter = es.stream.counter();
                 }

@@ -205,7 +205,7 @@ pub enum OnLevel {
     Value(u8),
 }
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone)]
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceColorMode {
     ColorTemp,

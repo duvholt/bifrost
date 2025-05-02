@@ -27,6 +27,18 @@ pub struct SceneStatus {
 }
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct SceneStatusUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<SceneActive>,
+    #[serde(
+        with = "date_format::utc_ms_opt",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_recall: Option<DateTime<Utc>>,
+}
+
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SceneStatusEnum {
     Active,
@@ -119,6 +131,8 @@ pub struct SceneUpdate {
     pub speed: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_dynamic: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<SceneStatusUpdate>,
 }
 
 impl SceneUpdate {

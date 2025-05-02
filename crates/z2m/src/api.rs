@@ -42,6 +42,38 @@ pub enum Message {
 
     #[serde(rename = "bridge/converters")]
     BridgeConverters(Value),
+
+    #[serde(rename = "bridge/response/group/members/add")]
+    BridgeGroupMembersAdd(GroupMemberChangeResponse),
+
+    #[serde(rename = "bridge/response/group/members/remove")]
+    BridgeGroupMembersRemove(GroupMemberChangeResponse),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub enum Endpoint {
+    #[default]
+    Default,
+    #[serde(untagged)]
+    Name(String),
+    #[serde(untagged)]
+    Number(u32),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GroupMemberChangeResponse {
+    pub data: GroupMemberChange,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GroupMemberChange {
+    pub device: String,
+    pub group: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<Endpoint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skip_disable_reporting: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]

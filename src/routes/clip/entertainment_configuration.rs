@@ -1,6 +1,6 @@
 use hue::error::HueError;
 use serde_json::Value;
-use uuid::{uuid, Uuid};
+use uuid::{Uuid, uuid};
 
 use hue::api::{
     Bridge, Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,

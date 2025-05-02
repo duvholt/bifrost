@@ -23,7 +23,7 @@ impl From<RawHS> for HS {
 
 #[cfg(test)]
 mod tests {
-    use crate::hs::{RawHS, HS};
+    use crate::hs::{HS, RawHS};
 
     macro_rules! compare {
         ($expr:expr, $value:expr) => {

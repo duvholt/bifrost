@@ -2,8 +2,8 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::{FromRequest, Request};
 use axum::response::IntoResponse;
 use bytes::Bytes;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 // Simple wrapper around axum::Json, which skips the header requirements.
 //

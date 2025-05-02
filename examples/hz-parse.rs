@@ -1,5 +1,5 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-use std::io::{stdin, BufRead, Cursor};
+use std::io::{BufRead, Cursor, stdin};
 
 use itertools::Itertools;
 use log::warn;

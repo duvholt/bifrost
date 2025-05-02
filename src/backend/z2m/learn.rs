@@ -93,7 +93,7 @@ impl SceneLearn {
             if let Some(DeviceColor { xy: Some(xy), .. }) = upd.color {
                 color = Some(ColorUpdate { xy });
             } else if let Some(mirek) = upd.color_temp {
-                color_temperature = Some(ColorTemperatureUpdate { mirek });
+                color_temperature = Some(ColorTemperatureUpdate::new(mirek));
             }
 
             learn.known.insert(

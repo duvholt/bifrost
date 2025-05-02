@@ -14,6 +14,7 @@ type SmartSceneUpdate = Value;
 type ZoneUpdate = Value;
 type GeolocationUpdate = Value;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Update {

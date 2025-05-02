@@ -9,7 +9,7 @@ use std::io::stdin;
 use serde_json::Deserializer;
 
 use hue::api::DeviceProductData;
-use hue::devicedb::{product_data, SimpleProductData};
+use hue::devicedb::{SimpleProductData, product_data};
 
 fn print_std(obj: DeviceProductData) {
     let spd = SimpleProductData {

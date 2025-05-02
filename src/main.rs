@@ -2,8 +2,8 @@ use std::io::Write;
 
 use svc::manager::ServiceManager;
 
-use bifrost::backend::z2m::Z2mBackend;
 use bifrost::backend::Backend;
+use bifrost::backend::z2m::Z2mBackend;
 use bifrost::config;
 use bifrost::error::ApiResult;
 use bifrost::server::appstate::AppState;

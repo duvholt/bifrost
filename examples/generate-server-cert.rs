@@ -1,7 +1,7 @@
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 use clap::Parser;
-use der::{pem::LineEnding, EncodePem};
+use der::{EncodePem, pem::LineEnding};
 use mac_address::MacAddress;
 use p256::pkcs8::EncodePrivateKey;
 use rsa::rand_core::OsRng;

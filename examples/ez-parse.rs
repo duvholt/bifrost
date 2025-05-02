@@ -1,7 +1,7 @@
 #![allow(clippy::cast_possible_truncation, clippy::match_same_arms)]
 
 use std::fmt::Debug;
-use std::io::{stdin, Cursor};
+use std::io::{Cursor, stdin};
 
 use clap::Parser;
 use serde::Deserialize;

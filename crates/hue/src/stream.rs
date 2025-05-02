@@ -1,4 +1,5 @@
 use packed_struct::prelude::*;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{HueError, HueResult};
@@ -78,7 +79,7 @@ impl HueStreamPacket {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum HueStreamLights {
     Rgb(Vec<Rgb16>),
     Xy(Vec<Xy16>),
@@ -103,7 +104,7 @@ impl HueStreamLights {
     }
 }
 
-#[derive(PackedStruct, Clone, Debug, Copy)]
+#[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
 #[packed_struct(size = "7", endian = "msb")]
 pub struct Rgb16 {
     pub channel: u8,
@@ -123,7 +124,7 @@ impl Rgb16 {
     }
 }
 
-#[derive(PackedStruct, Clone, Debug, Copy)]
+#[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
 #[packed_struct(size = "7", endian = "msb")]
 pub struct Xy16 {
     pub channel: u8,

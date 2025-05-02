@@ -1,6 +1,6 @@
+use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::response::{IntoResponse, Response};
-use axum::Router;
 use hue::error::HueError;
 use hyper::StatusCode;
 use serde_json::Value;
@@ -12,6 +12,7 @@ use crate::server::appstate::AppState;
 
 pub mod api;
 pub mod auth;
+pub mod bifrost;
 pub mod clip;
 pub mod eventstream;
 pub mod extractor;
@@ -82,6 +83,7 @@ pub fn router(appstate: AppState) -> Router<()> {
         .nest("/description.xml", upnp::router())
         .nest("/clip/v2/resource", clip::router())
         .nest("/eventstream", eventstream::router())
+        .nest("/bifrost", bifrost::router())
         .with_state(appstate)
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024))
 }

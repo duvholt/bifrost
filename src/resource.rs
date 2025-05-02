@@ -2,24 +2,24 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use hue::error::{HueError, HueResult};
 use maplit::btreeset;
 use serde::Serialize;
-use serde_json::{json, Value};
-use tokio::sync::broadcast::{Receiver, Sender};
+use serde_json::{Value, json};
 use tokio::sync::Notify;
+use tokio::sync::broadcast::{Receiver, Sender};
 use uuid::Uuid;
 
+use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight, Light, LightMode,
     Metadata, On, RType, Resource, ResourceLink, ResourceRecord, Stub, TimeZone,
     ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
 };
+use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
 use hue::version::SwVersion;
 
-use crate::backend::BackendRequest;
 use crate::error::ApiResult;
 use crate::model::state::{AuxData, State};
 use crate::server::hueevents::HueEventStream;
@@ -158,11 +158,7 @@ impl Resources {
             .iter()
             .filter_map(|(k, v)| {
                 if let Resource::Scene(scn) = v {
-                    if &scn.group.rid == id {
-                        Some(k)
-                    } else {
-                        None
-                    }
+                    if &scn.group.rid == id { Some(k) } else { None }
                 } else {
                     None
                 }
@@ -188,7 +184,7 @@ impl Resources {
 
         self.state_updates.notify_one();
 
-        let evt = EventBlock::add(serde_json::to_value(self.get_resource_by_id(&link.rid)?)?);
+        let evt = EventBlock::add(vec![self.get_resource_by_id(&link.rid)?]);
 
         log::trace!("Send event: {evt:?}");
 

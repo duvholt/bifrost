@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::{fmt::Debug, io::Cursor};
 
-use byteorder::{ReadBytesExt, LE};
+use byteorder::{LE, ReadBytesExt};
 use packed_struct::prelude::*;
 
 use crate::error::{ZclError, ZclResult};

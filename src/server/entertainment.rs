@@ -12,11 +12,11 @@ use tokio::time::timeout;
 use tokio_openssl::SslStream;
 use udp_stream::{UdpListener, UdpStream};
 
+use bifrost_api::backend::BackendRequest;
 use hue::api::EntertainmentConfiguration;
 use hue::stream::{HueStreamPacket, HueStreamPacketHeader};
 use svc::traits::Service;
 
-use crate::backend::BackendRequest;
 use crate::error::{ApiError, ApiResult};
 use crate::model::throttle::{Throttle, ThrottleQueue};
 use crate::resource::Resources;

@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use mac_address::MacAddress;
-use tokio::sync::watch::{self, Receiver, Sender};
 use tokio::sync::Mutex;
+use tokio::sync::watch::{self, Receiver, Sender};
 use tokio_ssdp::{Device, Server};
 
 use svc::traits::Service;

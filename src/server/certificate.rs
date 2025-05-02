@@ -15,16 +15,16 @@ use rsa::pkcs8::SubjectPublicKeyInfoRef;
 use rsa::rand_core::OsRng;
 use sha1::Sha1;
 use sha2::Digest;
+use x509_cert::Certificate;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::builder::{Builder, CertificateBuilder, Profile};
 use x509_cert::certificate::CertificateInner;
 use x509_cert::der::{Decode, Encode};
-use x509_cert::ext::pkix::{self, name::GeneralName, ExtendedKeyUsage};
+use x509_cert::ext::pkix::{self, ExtendedKeyUsage, name::GeneralName};
 use x509_cert::name::Name;
 use x509_cert::serial_number::SerialNumber;
 use x509_cert::spki::SubjectPublicKeyInfoOwned;
 use x509_cert::time::Validity;
-use x509_cert::Certificate;
 
 use crate::error::{ApiError, ApiResult};
 
@@ -128,10 +128,12 @@ pub fn extract_common_name(rdr: impl Read) -> ApiResult<Option<String>> {
         let cert = Certificate::from_der(&chunk?)?;
 
         for name in cert.tbs_certificate.subject.0 {
-            if let [AttributeTypeAndValue {
-                oid: COMMON_NAME,
-                value,
-            }] = name.0.as_slice()
+            if let [
+                AttributeTypeAndValue {
+                    oid: COMMON_NAME,
+                    value,
+                },
+            ] = name.0.as_slice()
             {
                 return Ok(Some(String::from_utf8(value.value().to_vec())?));
             }

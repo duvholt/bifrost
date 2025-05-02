@@ -1,13 +1,18 @@
 use std::error::Error;
-use std::future::Future;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, watch};
-use uuid::Uuid;
 
+#[cfg(feature = "manager")]
 use crate::error::RunSvcError;
+#[cfg(feature = "manager")]
 use crate::manager::ServiceEvent;
+#[cfg(feature = "manager")]
+use std::future::Future;
+#[cfg(feature = "manager")]
+use tokio::sync::{mpsc, watch};
+#[cfg(feature = "manager")]
+use uuid::Uuid;
 
 /**
 State of a [`Service`] running on a [`crate::manager::ServiceManager`].
@@ -88,16 +93,18 @@ pub trait Service: Send {
     }
 }
 
+#[cfg(feature = "manager")]
 #[async_trait]
 pub trait ServiceRunner {
     async fn run(
         mut self,
         id: Uuid,
         rx: watch::Receiver<ServiceState>,
-        tx: mpsc::Sender<ServiceEvent>,
+        tx: mpsc::UnboundedSender<ServiceEvent>,
     ) -> Result<(), RunSvcError>;
 }
 
+#[cfg(feature = "manager")]
 #[async_trait]
 impl<E: Error + Send + 'static, F> Service for F
 where

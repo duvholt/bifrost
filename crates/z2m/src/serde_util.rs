@@ -3,7 +3,7 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use serde::de::{Deserialize, Deserializer, Unexpected};
-use serde::{de, Serialize, Serializer};
+use serde::{Serialize, Serializer, de};
 
 pub fn deserialize_struct_or_false<'de, T, D>(d: D) -> Result<Option<T>, D::Error>
 where

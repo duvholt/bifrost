@@ -25,11 +25,12 @@ use axum::{Router, ServiceExt};
 use camino::Utf8PathBuf;
 use tokio::select;
 use tokio::sync::Mutex;
-use tokio::time::{sleep_until, MissedTickBehavior};
+use tokio::time::{MissedTickBehavior, sleep_until};
 use tower::Layer;
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 use tower_http::trace::TraceLayer;
-use tracing::{info_span, Span};
+use tracing::{Span, info_span};
 
 use crate::error::ApiResult;
 use crate::resource::Resources;
@@ -88,7 +89,12 @@ pub fn build_service(
     protocol: Protocol,
     appstate: AppState,
 ) -> IntoMakeServiceWithConnectInfo<NormalizePath<Router>, SocketAddr> {
-    let normalized = NormalizePathLayer::trim_trailing_slash().layer(router(protocol, appstate));
+    let cors_layer = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(AllowOrigin::any())
+        .allow_headers(Any);
+    let normalized = NormalizePathLayer::trim_trailing_slash()
+        .layer(router(protocol, appstate).layer(cors_layer));
 
     ServiceExt::<Request>::into_make_service_with_connect_info(normalized)
 }

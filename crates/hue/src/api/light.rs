@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::hs::HS;
@@ -132,7 +132,7 @@ impl Light {
                     dimming: DimmingUpdate { brightness: 100.0 },
                 },
                 color: LightPowerupColor::ColorTemperature {
-                    color_temperature: ColorTemperatureUpdate { mirek: 366 },
+                    color_temperature: ColorTemperatureUpdate::new(366),
                 },
             }),
             signaling: Some(LightSignaling {
@@ -165,10 +165,11 @@ impl Light {
     }
 
     #[must_use]
-    pub fn as_gradient_opt(&self) -> Option<Vec<XY>> {
-        self.gradient
-            .as_ref()
-            .map(|grad| grad.points.iter().map(|p| p.color.xy).collect())
+    pub fn as_gradient_opt(&self) -> Option<LightGradientUpdate> {
+        self.gradient.as_ref().map(|grad| LightGradientUpdate {
+            mode: Some(grad.mode),
+            points: grad.points.clone(),
+        })
     }
 }
 
@@ -194,7 +195,7 @@ impl AddAssign<LightUpdate> for Light {
         }
 
         if let Some(ct) = &mut self.color_temperature {
-            ct.mirek = upd.color_temperature.map(|c| c.mirek);
+            ct.mirek = upd.color_temperature.and_then(|c| c.mirek);
         }
 
         if let Some(col) = upd.color {
@@ -546,8 +547,10 @@ pub struct LightEffectsUpdate {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightEffectsV2Update {
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<LightEffectActionUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -663,14 +666,8 @@ impl LightUpdate {
     }
 
     #[must_use]
-    pub fn with_gradient(self, grad: Option<Vec<XY>>) -> Self {
-        Self {
-            gradient: grad.map(|colors| LightGradientUpdate {
-                mode: None,
-                points: colors.into_iter().map(LightGradientPoint::xy).collect(),
-            }),
-            ..self
-        }
+    pub fn with_gradient(self, gradient: Option<LightGradientUpdate>) -> Self {
+        Self { gradient, ..self }
     }
 }
 
@@ -734,13 +731,13 @@ impl ColorUpdate {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct ColorTemperatureUpdate {
-    pub mirek: u16,
+    pub mirek: Option<u16>,
 }
 
 impl ColorTemperatureUpdate {
     #[must_use]
     pub const fn new(mirek: u16) -> Self {
-        Self { mirek }
+        Self { mirek: Some(mirek) }
     }
 }
 

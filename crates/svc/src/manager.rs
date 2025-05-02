@@ -30,7 +30,7 @@ pub type ServiceFunc = Box<
     dyn FnOnce(
             Uuid,
             watch::Receiver<ServiceState>,
-            mpsc::Sender<ServiceEvent>,
+            mpsc::UnboundedSender<ServiceEvent>,
         ) -> BoxFuture<'static, Result<(), RunSvcError>>
         + Send,
 >;
@@ -65,19 +65,20 @@ pub enum SvmRequest {
     Status(RpcRequest<ServiceId, SvcResult<ServiceState>>),
     List(RpcRequest<(), Vec<(Uuid, String)>>),
     Resolve(RpcRequest<ServiceId, SvcResult<Uuid>>),
+    LookupName(RpcRequest<ServiceId, SvcResult<String>>),
     Register(RpcRequest<(String, ServiceFunc), SvcResult<Uuid>>),
-    Subscribe(RpcRequest<mpsc::Sender<ServiceEvent>, SvcResult<Uuid>>),
+    Subscribe(RpcRequest<mpsc::UnboundedSender<ServiceEvent>, SvcResult<Uuid>>),
     Shutdown(RpcRequest<(), ()>),
 }
 
 #[derive(Clone)]
 pub struct SvmClient {
-    tx: mpsc::Sender<SvmRequest>,
+    tx: mpsc::UnboundedSender<SvmRequest>,
 }
 
 impl SvmClient {
     #[must_use]
-    pub const fn new(tx: mpsc::Sender<SvmRequest>) -> Self {
+    pub const fn new(tx: mpsc::UnboundedSender<SvmRequest>) -> Self {
         Self { tx }
     }
 
@@ -87,12 +88,12 @@ impl SvmClient {
         args: Q,
     ) -> SvcResult<A> {
         let (rpc, rx) = RpcRequest::new(args);
-        self.send(func(rpc)).await?;
+        self.send(func(rpc))?;
         Ok(rx.await?)
     }
 
-    async fn send(&self, value: SvmRequest) -> SvcResult<()> {
-        Ok(self.tx.send(value).await?)
+    fn send(&self, value: SvmRequest) -> SvcResult<()> {
+        Ok(self.tx.send(value)?)
     }
 
     pub async fn register_service<S>(&mut self, name: impl AsRef<str>, svc: S) -> SvcResult<Uuid>
@@ -139,8 +140,12 @@ impl SvmClient {
         self.rpc(SvmRequest::Resolve, id.service_id()).await?
     }
 
-    pub async fn subscribe(&mut self) -> SvcResult<(Uuid, mpsc::Receiver<ServiceEvent>)> {
-        let (tx, rx) = mpsc::channel(10);
+    pub async fn lookup_name(&mut self, id: impl IntoServiceId) -> SvcResult<String> {
+        self.rpc(SvmRequest::LookupName, id.service_id()).await?
+    }
+
+    pub async fn subscribe(&mut self) -> SvcResult<(Uuid, mpsc::UnboundedReceiver<ServiceEvent>)> {
+        let (tx, rx) = mpsc::unbounded_channel();
 
         let uuid = self.rpc(SvmRequest::Subscribe, tx).await??;
 
@@ -210,6 +215,7 @@ impl Debug for SvmRequest {
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Register(_arg0) => f.debug_tuple("Register").field(&"<service>").finish(),
             Self::Resolve(arg0) => f.debug_tuple("Resolve").field(arg0).finish(),
+            Self::LookupName(arg0) => f.debug_tuple("ResolveName").field(arg0).finish(),
             Self::Subscribe(_arg0) => f.debug_tuple("Subscribe").finish(),
             Self::Shutdown(_arg0) => f.debug_tuple("Shutdown").finish(),
         }
@@ -217,11 +223,11 @@ impl Debug for SvmRequest {
 }
 
 pub struct ServiceManager {
-    control_rx: mpsc::Receiver<SvmRequest>,
-    control_tx: mpsc::Sender<SvmRequest>,
-    service_rx: mpsc::Receiver<ServiceEvent>,
-    service_tx: mpsc::Sender<ServiceEvent>,
-    subscribers: BTreeMap<Uuid, mpsc::Sender<ServiceEvent>>,
+    control_rx: mpsc::UnboundedReceiver<SvmRequest>,
+    control_tx: mpsc::UnboundedSender<SvmRequest>,
+    service_rx: mpsc::UnboundedReceiver<ServiceEvent>,
+    service_tx: mpsc::UnboundedSender<ServiceEvent>,
+    subscribers: BTreeMap<Uuid, mpsc::UnboundedSender<ServiceEvent>>,
     svcs: BTreeMap<Uuid, ServiceInstance>,
     names: BTreeMap<String, Uuid>,
     tasks: JoinSet<Result<(), RunSvcError>>,
@@ -237,8 +243,8 @@ impl Default for ServiceManager {
 impl ServiceManager {
     #[must_use]
     pub fn new() -> Self {
-        let (control_tx, control_rx) = mpsc::channel(32);
-        let (service_tx, service_rx) = mpsc::channel(32);
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        let (service_tx, service_rx) = mpsc::unbounded_channel();
         Self {
             control_tx,
             control_rx,
@@ -274,7 +280,7 @@ impl ServiceManager {
         SvmClient::new(self.handle())
     }
 
-    fn handle(&self) -> mpsc::Sender<SvmRequest> {
+    fn handle(&self) -> mpsc::UnboundedSender<SvmRequest> {
         self.control_tx.clone()
     }
 
@@ -364,11 +370,11 @@ impl ServiceManager {
             .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
     }
 
-    async fn notify_subscribers(&mut self, event: ServiceEvent) {
+    fn notify_subscribers(&mut self, event: ServiceEvent) {
         let mut failed = vec![];
         for (key, sub) in &self.subscribers {
             log::trace!("UPDATE: [sub-{key}] {} -> {:?}", &event.id, &event.state);
-            if sub.send(event).await.is_err() {
+            if sub.send(event).is_err() {
                 failed.push(*key);
             }
         }
@@ -380,17 +386,18 @@ impl ServiceManager {
     async fn next_event(&mut self) -> SvcResult<()> {
         tokio::select! {
             event = self.control_rx.recv() => self.handle_svm_request(event.ok_or(SvcError::Shutdown)?).await,
-            event = self.service_rx.recv() => self.handle_service_event(event.ok_or(SvcError::Shutdown)?).await,
+            event = self.service_rx.recv() => {
+                self.handle_service_event(event.ok_or(SvcError::Shutdown)?);
+                Ok(())
+            },
         }
     }
 
-    async fn handle_service_event(&mut self, event: ServiceEvent) -> SvcResult<()> {
-        self.notify_subscribers(event).await;
+    fn handle_service_event(&mut self, event: ServiceEvent) {
+        self.notify_subscribers(event);
         let name = &self.svcs[&event.id].name;
         log::trace!("[{name}] [{}] Service is now {:?}", event.id, event.state);
         self.svcs.get_mut(&event.id).unwrap().state = event.state;
-
-        Ok(())
     }
 
     async fn handle_svm_request(&mut self, upd: SvmRequest) -> SvcResult<()> {
@@ -414,9 +421,11 @@ impl ServiceManager {
 
             SvmRequest::Resolve(rpc) => rpc.respond(|id| self.resolve(&id)),
 
+            SvmRequest::LookupName(rpc) => rpc.respond(|id| Ok(self.get(&id)?.name.clone())),
+
             SvmRequest::Subscribe(rpc) => {
                 for (id, svc) in &self.svcs {
-                    rpc.data().send(ServiceEvent::new(*id, svc.state)).await?;
+                    rpc.data().send(ServiceEvent::new(*id, svc.state))?;
                 }
 
                 rpc.respond(|tx| {

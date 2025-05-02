@@ -8,7 +8,6 @@ pub mod date_format;
 pub mod devicedb;
 pub mod diff;
 pub mod error;
-pub mod event;
 pub mod flags;
 pub mod gamma;
 pub mod hs;
@@ -20,6 +19,10 @@ pub mod version;
 pub mod xy;
 pub mod zigbee;
 
+#[cfg(feature = "event")]
+pub mod event;
+
+#[cfg(feature = "mac")]
 use mac_address::MacAddress;
 
 pub const WIDE_GAMUT_MAX_X: f64 = 0.7347;
@@ -34,12 +37,14 @@ pub fn best_guess_timezone() -> String {
     iana_time_zone::get_timezone().unwrap_or_else(|_| "none".to_string())
 }
 
+#[cfg(feature = "mac")]
 #[must_use]
 pub fn bridge_id_raw(mac: MacAddress) -> [u8; 8] {
     let b = mac.bytes();
     [b[0], b[1], b[2], 0xFF, 0xFE, b[3], b[4], b[5]]
 }
 
+#[cfg(feature = "mac")]
 #[must_use]
 pub fn bridge_id(mac: MacAddress) -> String {
     hex::encode(bridge_id_raw(mac))

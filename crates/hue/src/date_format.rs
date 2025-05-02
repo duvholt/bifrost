@@ -35,7 +35,7 @@ macro_rules! date_deserializer_utc {
         where
             D: serde::Deserializer<'de>,
         {
-            use serde::{self, de::Error, Deserialize};
+            use serde::{self, Deserialize, de::Error};
             let s = String::deserialize(deserializer)?;
             let dt = chrono::NaiveDateTime::parse_from_str(&s, $fmt).map_err(Error::custom)?;
             Ok(<$type>::from_naive_utc_and_offset(dt, Utc))
@@ -49,7 +49,7 @@ macro_rules! date_deserializer_local {
         where
             D: serde::Deserializer<'de>,
         {
-            use serde::{self, de::Error, Deserialize};
+            use serde::{self, Deserialize, de::Error};
             let s = String::deserialize(deserializer)?;
             let dt = chrono::NaiveDateTime::parse_from_str(&s, $fmt).map_err(Error::custom)?;
             Ok(dt)
@@ -63,7 +63,7 @@ macro_rules! date_deserializer_local_opt {
         where
             D: serde::Deserializer<'de>,
         {
-            use serde::{self, de::Error, Deserialize};
+            use serde::{self, Deserialize, de::Error};
             let Some(s) = Option::<String>::deserialize(deserializer)? else {
                 return Ok(None);
             };
@@ -85,7 +85,7 @@ macro_rules! date_deserializer_utc_opt {
         where
             D: serde::Deserializer<'de>,
         {
-            use serde::{self, de::Error, Deserialize};
+            use serde::{self, Deserialize, de::Error};
             let Some(s) = Option::<String>::deserialize(deserializer)? else {
                 return Ok(None);
             };
@@ -104,7 +104,7 @@ pub mod utc_ms {
 
 pub mod update_utc {
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use serde::{self, de::Error, Deserialize, Deserializer};
+    use serde::{self, Deserialize, Deserializer, de::Error};
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     where

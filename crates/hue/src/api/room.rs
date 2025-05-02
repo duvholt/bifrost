@@ -60,6 +60,14 @@ impl RoomUpdate {
             ..self
         }
     }
+
+    #[must_use]
+    pub fn with_children(self, children: BTreeSet<ResourceLink>) -> Self {
+        Self {
+            children: Some(children),
+            ..self
+        }
+    }
 }
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -72,39 +80,47 @@ pub enum RoomArchetype {
     KidsBedroom,
     Bathroom,
     Nursery,
-    Recreation,
     Office,
-    Gym,
-    Hallway,
+    GuestRoom,
+
     Toilet,
-    FrontDoor,
+    Staircase,
+    Hallway,
+    LaundryRoom,
+    Storage,
+    Closet,
     Garage,
-    Terrace,
+    Other,
+
+    Gym,
+    Lounge,
+    Tv,
+    Computer,
+    Recreation,
+    /// Gaming Room
+    ManCave,
+    Music,
+    /// Library
+    Reading,
+    Studio,
+
+    /// Backyard
     Garden,
+    /// Patio
+    Terrace,
+    Balcony,
     Driveway,
     Carport,
-    Home,
+    FrontDoor,
+    Porch,
+    Barbecue,
+    Pool,
+
     Downstairs,
     Upstairs,
     TopFloor,
     Attic,
-    GuestRoom,
-    Staircase,
-    Lounge,
-    ManCave,
-    Computer,
-    Studio,
-    Music,
-    Tv,
-    Reading,
-    Closet,
-    Storage,
-    LaundryRoom,
-    Balcony,
-    Porch,
-    Barbecue,
-    Pool,
-    Other,
+    Home,
 }
 
 impl RoomMetadata {
@@ -113,6 +129,17 @@ impl RoomMetadata {
         Self {
             archetype,
             name: name.to_string(),
+        }
+    }
+}
+
+impl AddAssign<RoomUpdate> for Room {
+    fn add_assign(&mut self, rhs: RoomUpdate) {
+        if let Some(md) = rhs.metadata {
+            self.metadata += md;
+        }
+        if let Some(children) = rhs.children {
+            self.children = children;
         }
     }
 }

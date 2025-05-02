@@ -4,7 +4,7 @@ use clap::Parser;
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::io::{stdin, AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader, stdin};
 use tokio::select;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 

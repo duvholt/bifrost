@@ -1,8 +1,8 @@
 use chrono::{DateTime, Duration, Utc};
 
-use hue::update::{update_url_for_bridge, UpdateEntries, UpdateEntry};
-use hue::version::SwVersion;
 use hue::HUE_BRIDGE_V2_MODEL_ID;
+use hue::update::{UpdateEntries, UpdateEntry, update_url_for_bridge};
+use hue::version::SwVersion;
 
 use crate::error::{ApiError, ApiResult};
 
