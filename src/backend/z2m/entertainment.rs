@@ -10,6 +10,9 @@ use hue::zigbee::{
 use z2m::request::Z2mRequest;
 use zcl::attr::ZclDataType;
 
+use crate::backend::z2m::websocket::Z2mWebSocket;
+use crate::error::ApiResult;
+
 pub struct EntStream {
     pub stream: EntertainmentZigbeeStream,
     pub target: String,
@@ -94,5 +97,29 @@ impl EntStream {
         }
 
         blks
+    }
+
+    pub async fn start_stream(&mut self, z2mws: &mut Z2mWebSocket) -> ApiResult<()> {
+        log::debug!("Entertainment addrs: {:#?}", &self.addrs);
+        log::debug!("Entertainment modes: {:#?}", &self.modes);
+        for (dev, segments) in &self.addrs {
+            let z2mreq = Self::z2m_set_entertainment_brightness(0xFE);
+            z2mws.send(dev, &z2mreq).await?;
+
+            if segments.len() <= 1 {
+                continue;
+            }
+
+            let mapping = self.stream.segment_mapping(segments)?;
+            z2mws.send_zigbee_message(dev, &mapping).await?;
+        }
+
+        let stop = self.stream.reset()?;
+        for topic in self.addrs.keys() {
+            log::debug!("Sending stop to {topic}");
+            z2mws.send_zigbee_message(topic, &stop).await?;
+        }
+
+        Ok(())
     }
 }

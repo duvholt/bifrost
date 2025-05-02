@@ -937,26 +937,7 @@ impl Z2mBackend {
                 if let Some(target) = targets.first() {
                     let mut es = EntStream::new(self.counter, target, addrs);
 
-                    log::debug!("Entertainment addrs: {:#?}", &es.addrs);
-                    log::debug!("Entertainment modes: {:#?}", &es.modes);
-                    for (dev, segments) in &es.addrs {
-                        let z2mreq = EntStream::z2m_set_entertainment_brightness(0xFE);
-                        z2mws.send(dev, &z2mreq).await?;
-
-                        if segments.len() <= 1 {
-                            continue;
-                        }
-
-                        z2mws
-                            .send_zigbee_message(dev, &es.stream.segment_mapping(segments)?)
-                            .await?;
-                    }
-
-                    let message = es.stream.reset()?;
-                    for topic in es.addrs.keys() {
-                        log::debug!("Sending stop to {topic}");
-                        z2mws.send_zigbee_message(topic, &message).await?;
-                    }
+                    es.start_stream(z2mws).await?;
 
                     self.entstream = Some(es);
                 }
