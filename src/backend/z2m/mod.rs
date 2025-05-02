@@ -39,7 +39,7 @@ use hue::scene_icons;
 use hue::stream::HueStreamLights;
 use hue::zigbee::{
     EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
-    HueZigbeeUpdate, LightRecordMode, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
+    HueZigbeeUpdate, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
 };
 use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
 use z2m::convert::{
@@ -1027,20 +1027,7 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(target) = targets.first() {
-                    let mut modes = vec![];
-
-                    for segments in addrs.values() {
-                        let mode = if segments.len() <= 1 {
-                            LightRecordMode::Device
-                        } else {
-                            LightRecordMode::Segment
-                        };
-
-                        for seg in segments {
-                            modes.push((*seg, mode));
-                        }
-                    }
-
+                    let modes = EntStream::addrs_to_light_modes(&addrs);
                     let mut es = EntStream {
                         stream: EntertainmentZigbeeStream::new(self.counter),
                         target: Z2mTarget::new(target),
