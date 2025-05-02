@@ -746,9 +746,7 @@ impl Z2mBackend {
                         payload = payload.with_gradient(upd.gradient.clone());
                     }
 
-                    let z2mreq = Z2mRequest::Update(&payload);
-
-                    z2mws.send(topic, &z2mreq).await?;
+                    z2mws.send_update(topic, &payload).await?;
 
                     /* step 2: if supported (and needed) send hue-specific effects update */
 
