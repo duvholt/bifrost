@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::api::{RType, ResourceLink};
+use crate::api::RType;
 
 #[derive(Error, Debug)]
 pub enum HueError {
@@ -43,9 +43,6 @@ pub enum HueError {
 
     #[error("Resource {0} not found")]
     V1NotFound(u32),
-
-    #[error("Missing auxiliary data resource {0:?}")]
-    AuxNotFound(ResourceLink),
 
     #[error("Cannot allocate any more {0:?}")]
     Full(RType),

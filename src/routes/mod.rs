@@ -41,12 +41,13 @@ impl IntoResponse for ApiError {
                 | HueError::UuidError(_)
                 | HueError::HueEntertainmentBadHeader
                 | HueError::HueZigbeeUnknownFlags(_) => StatusCode::BAD_REQUEST,
+
                 HueError::UpdateUnsupported(_) | HueError::WrongType(_, _) => {
                     StatusCode::NOT_ACCEPTABLE
                 }
-                HueError::NotFound(_) | HueError::V1NotFound(_) | HueError::AuxNotFound(_) => {
-                    StatusCode::NOT_FOUND
-                }
+
+                HueError::NotFound(_) | HueError::V1NotFound(_) => StatusCode::NOT_FOUND,
+
                 HueError::Full(_) => StatusCode::INSUFFICIENT_STORAGE,
 
                 HueError::IOError(_) | HueError::HueZigbeeDecodeError | HueError::Undiffable => {
@@ -54,10 +55,13 @@ impl IntoResponse for ApiError {
                 }
             },
 
-            Self::CreateNotAllowed(_)
-            | Self::UpdateNotAllowed(_)
-            | Self::DeleteNotAllowed(_)
-            | Self::CreateNotYetSupported(_)
+            Self::AuxNotFound(_) => StatusCode::NOT_FOUND,
+
+            Self::CreateNotAllowed(_) | Self::UpdateNotAllowed(_) | Self::DeleteNotAllowed(_) => {
+                StatusCode::METHOD_NOT_ALLOWED
+            }
+
+            Self::CreateNotYetSupported(_)
             | Self::UpdateNotYetSupported(_)
             | Self::DeleteNotYetSupported(_) => StatusCode::FORBIDDEN,
 

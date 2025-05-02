@@ -1,3 +1,4 @@
+pub mod learn;
 pub mod stream;
 pub mod zclcommand;
 
@@ -5,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use maplit::btreeset;
 use native_tls::TlsConnector;
@@ -22,13 +23,13 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use hue::api::{
-    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, ColorTemperatureUpdate,
-    ColorUpdate, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
-    EntertainmentConfiguration, EntertainmentSegment, EntertainmentSegments, GroupedLight, Light,
-    LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
-    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
-    RoomMetadata, Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall,
-    SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
+    DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
+    EntertainmentSegment, EntertainmentSegments, GroupedLight, Light, LightEffect, LightEffects,
+    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata,
+    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
+    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -45,21 +46,15 @@ use z2m::convert::{
 };
 use z2m::hexcolor::HexColor;
 use z2m::request::Z2mRequest;
-use z2m::update::{DeviceColor, DeviceUpdate};
+use z2m::update::DeviceUpdate;
 
+use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::stream::Z2mTarget;
 use crate::backend::{Backend, BackendRequest};
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
 use crate::resource::Resources;
-
-#[derive(Debug)]
-struct LearnScene {
-    pub expire: DateTime<Utc>,
-    pub missing: HashSet<Uuid>,
-    pub known: HashMap<Uuid, SceneAction>,
-}
 
 struct EntStream {
     stream: EntertainmentZigbeeStream,
@@ -73,9 +68,9 @@ pub struct Z2mBackend {
     server: Z2mServer,
     config: Arc<AppConfig>,
     state: Arc<Mutex<Resources>>,
-    map: HashMap<String, Uuid>,
-    rmap: HashMap<Uuid, String>,
-    learn: HashMap<Uuid, LearnScene>,
+    map: HashMap<String, ResourceLink>,
+    rmap: HashMap<ResourceLink, String>,
+    learner: SceneLearn,
     ignore: HashSet<String>,
     network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
@@ -104,7 +99,7 @@ impl Z2mBackend {
     ) -> ApiResult<Self> {
         let map = HashMap::new();
         let rmap = HashMap::new();
-        let learn = HashMap::new();
+        let learn = SceneLearn::new(name.clone());
         let ignore = HashSet::new();
         let network = HashMap::new();
         let entstream = None;
@@ -115,7 +110,7 @@ impl Z2mBackend {
             state,
             map,
             rmap,
-            learn,
+            learner: learn,
             ignore,
             network,
             entstream,
@@ -151,8 +146,8 @@ impl Z2mBackend {
             usertest: None,
         };
 
-        self.map.insert(name.to_string(), link_light.rid);
-        self.rmap.insert(link_light.rid, name.to_string());
+        self.map.insert(name.to_string(), link_light);
+        self.rmap.insert(link_light, name.to_string());
 
         let mut light = Light::new(link_device, metadata);
 
@@ -260,8 +255,8 @@ impl Z2mBackend {
             usertest: None,
         };
 
-        self.map.insert(name.to_string(), link_button.rid);
-        self.rmap.insert(link_button.rid, name.to_string());
+        self.map.insert(name.to_string(), link_button);
+        self.rmap.insert(link_button, name.to_string());
 
         let mut res = self.state.lock().await;
         let button = Button {
@@ -415,9 +410,9 @@ impl Z2mBackend {
             services: btreeset![link_glight],
         };
 
-        self.map.insert(topic.clone(), link_glight.rid);
-        self.rmap.insert(link_glight.rid, topic.clone());
-        self.rmap.insert(link_room.rid, topic.clone());
+        self.map.insert(topic.clone(), link_glight);
+        self.rmap.insert(link_glight, topic.clone());
+        self.rmap.insert(link_room, topic.clone());
 
         for id in &res.get_resource_ids_by_type(RType::BridgeHome) {
             res.update(id, |bh: &mut BridgeHome| {
@@ -474,50 +469,8 @@ impl Z2mBackend {
             *light += upd;
         })?;
 
-        for learn in self.learn.values_mut() {
-            if learn.missing.remove(uuid) {
-                let upd = devupd;
-                let rlink = RType::Light.link_to(*uuid);
-                let light = res.get::<Light>(&rlink)?;
-                let mut color_temperature = None;
-                let mut color = None;
-                if let Some(DeviceColor { xy: Some(xy), .. }) = upd.color {
-                    color = Some(ColorUpdate { xy });
-                } else if let Some(mirek) = upd.color_temp {
-                    color_temperature = Some(ColorTemperatureUpdate { mirek });
-                }
-
-                learn.known.insert(
-                    *uuid,
-                    SceneAction {
-                        color,
-                        color_temperature,
-                        dimming: light.as_dimming_opt(),
-                        on: Some(light.on),
-                        gradient: None,
-                        effects: json!({}),
-                    },
-                );
-            }
-            log::info!("[{}] Learn: {learn:?}", self.name);
-        }
-
-        let keys: Vec<Uuid> = self.learn.keys().copied().collect();
-        for uuid in &keys {
-            if self.learn[uuid].missing.is_empty() {
-                let lscene = self.learn.remove(uuid).unwrap();
-                log::info!("[{}] Learned all lights {uuid}", self.name);
-                let actions: Vec<SceneActionElement> = lscene
-                    .known
-                    .into_iter()
-                    .map(|(uuid, action)| SceneActionElement {
-                        action,
-                        target: RType::Light.link_to(uuid),
-                    })
-                    .collect();
-                res.update::<Scene>(uuid, |scene| scene.actions = actions)?;
-            }
-        }
+        self.learner.learn(uuid, &res, devupd)?;
+        self.learner.collect(&mut res)?;
         drop(res);
 
         Ok(())
@@ -540,16 +493,16 @@ impl Z2mBackend {
 
     async fn handle_bridge_message(&mut self, msg: Message) -> ApiResult<()> {
         #[allow(unused_variables)]
-        match msg {
-            Message::BridgeInfo(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeLogging(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeExtensions(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeEvent(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeDefinitions(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeState(ref obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeConverters(ref obj) => { /* println!("{obj:#?}"); */ }
+        match &msg {
+            Message::BridgeInfo(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeLogging(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeExtensions(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeEvent(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeDefinitions(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeState(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeConverters(obj) => { /* println!("{obj:#?}"); */ }
 
-            Message::BridgeDevices(ref obj) => {
+            Message::BridgeDevices(obj) => {
                 for dev in obj {
                     self.network.insert(dev.friendly_name.clone(), dev.clone());
                     if let Some(exp) = dev.expose_light() {
@@ -584,7 +537,7 @@ impl Z2mBackend {
                 }
             }
 
-            Message::BridgeGroups(ref obj) => {
+            Message::BridgeGroups(obj) => {
                 /* println!("{obj:#?}"); */
                 for grp in obj {
                     self.add_group(grp).await?;
@@ -612,7 +565,7 @@ impl Z2mBackend {
             return Ok(());
         };
 
-        let res = self.handle_update(val, &msg.payload).await;
+        let res = self.handle_update(&val.rid, &msg.payload).await;
         if let Err(ref err) = res {
             log::error!(
                 "Cannot parse update: {err}\n{}",
@@ -622,6 +575,63 @@ impl Z2mBackend {
 
         /* return Ok here, since we do not want to break the event loop */
         Ok(())
+    }
+
+    #[allow(clippy::match_same_arms)]
+    fn make_hue_specific_update(upd: &LightUpdate) -> ApiResult<HueZigbeeUpdate> {
+        let mut hz = HueZigbeeUpdate::new();
+
+        if let Some(grad) = &upd.gradient {
+            hz = hz.with_gradient_colors(
+                match grad.mode {
+                    Some(LightGradientMode::InterpolatedPalette) => GradientStyle::Linear,
+                    Some(LightGradientMode::InterpolatedPaletteMirrored) => GradientStyle::Mirrored,
+                    Some(LightGradientMode::RandomPixelated) => GradientStyle::Scattered,
+                    None => GradientStyle::Linear,
+                },
+                grad.points.iter().map(|c| c.color.xy).collect(),
+            )?;
+
+            hz = hz.with_gradient_params(GradientParams {
+                scale: match grad.mode {
+                    Some(LightGradientMode::InterpolatedPalette) => 0x28,
+                    Some(LightGradientMode::InterpolatedPaletteMirrored) => 0x18,
+                    Some(LightGradientMode::RandomPixelated) => 0x38,
+                    None => 0x18,
+                },
+                offset: 0x00,
+            });
+        }
+
+        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
+            if let Some(fx) = &act.effect {
+                let et = match fx {
+                    LightEffect::NoEffect => EffectType::NoEffect,
+                    LightEffect::Prism => EffectType::Prism,
+                    LightEffect::Opal => EffectType::Opal,
+                    LightEffect::Glisten => EffectType::Glisten,
+                    LightEffect::Sparkle => EffectType::Sparkle,
+                    LightEffect::Fire => EffectType::Fireplace,
+                    LightEffect::Candle => EffectType::Candle,
+                    LightEffect::Underwater => EffectType::Underwater,
+                    LightEffect::Cosmos => EffectType::Cosmos,
+                    LightEffect::Sunbeam => EffectType::Sunbeam,
+                    LightEffect::Enchant => EffectType::Enchant,
+                };
+                hz = hz.with_effect_type(et);
+            }
+            if let Some(speed) = &act.parameters.speed {
+                hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
+            }
+            if let Some(ct) = &act.parameters.color_temperature {
+                hz = hz.with_color_mirek(ct.mirek);
+            }
+            if let Some(color) = &act.parameters.color {
+                hz = hz.with_color_xy(color.xy);
+            }
+        }
+
+        Ok(hz)
     }
 
     async fn websocket_read(&mut self, pkt: tungstenite::Message) -> ApiResult<()> {
@@ -676,57 +686,13 @@ impl Z2mBackend {
         }
     }
 
-    fn learn_cleanup(&mut self) {
-        let now = Utc::now();
-        self.learn.retain(|uuid, lscene| {
-            let res = lscene.expire < now;
-            if !res {
-                log::warn!(
-                    "[{}] Failed to learn scene {uuid} before deadline",
-                    self.name
-                );
-            }
-            res
-        });
-    }
-
-    async fn learn_scene_recall(&mut self, lscene: &ResourceLink) -> ApiResult<()> {
-        log::info!("[{}] Recall scene: {lscene:?}", self.name);
-        let lock = self.state.lock().await;
-        let scene: &Scene = lock.get(lscene)?;
-
-        if scene.actions.is_empty() {
-            let room: &Room = lock.get(&scene.group)?;
-
-            let lights: Vec<Uuid> = room
-                .children
-                .iter()
-                .filter_map(|rl| lock.get(rl).ok())
-                .filter_map(hue::api::Device::light_service)
-                .map(|rl| rl.rid)
-                .collect();
-
-            drop(lock);
-
-            let learn = LearnScene {
-                expire: Utc::now() + Duration::seconds(5),
-                missing: HashSet::from_iter(lights),
-                known: HashMap::new(),
-            };
-
-            self.learn.insert(lscene.rid, learn);
-        }
-
-        Ok(())
-    }
-
     async fn websocket_send(
         &self,
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
         topic: &str,
         payload: Z2mRequest<'_>,
     ) -> ApiResult<()> {
-        let Some(uuid) = self.map.get(topic) else {
+        let Some(link) = self.map.get(topic) else {
             log::trace!(
                 "[{}] Topic [{topic}] unknown on this z2m connection",
                 self.name
@@ -735,7 +701,7 @@ impl Z2mBackend {
         };
 
         log::trace!(
-            "[{}] Topic [{topic}] known as {uuid} on this z2m connection, sending event..",
+            "[{}] Topic [{topic}] known as {link:?} on this z2m connection, sending event..",
             self.name
         );
 
@@ -768,13 +734,13 @@ impl Z2mBackend {
         socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
         req: Arc<BackendRequest>,
     ) -> ApiResult<()> {
-        self.learn_cleanup();
+        self.learner.cleanup();
 
         let mut lock = self.state.lock().await;
 
         match (*req).clone() {
             BackendRequest::LightUpdate(link, upd) => {
-                if let Some(topic) = self.rmap.get(&link.rid) {
+                if let Some(topic) = self.rmap.get(&link) {
                     // We cannot recover .mode from backend updates, since these only contain
                     // the gradient colors. So we have no choice, but to update the mode
                     // here. Otherwise, the information would be lost.
@@ -788,116 +754,57 @@ impl Z2mBackend {
                     let hue_effects = lock.get::<Light>(&link)?.effects.is_some();
                     drop(lock);
 
+                    /* step 1: send generic light update */
+                    let mut payload = DeviceUpdate::default()
+                        .with_state(upd.on.map(|on| on.on))
+                        .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+                        .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
+                        .with_color_xy(upd.color.map(|col| col.xy));
+
+                    // We don't want to send gradient updates twice, but if hue
+                    // effects are not supported for this light, this is the best
+                    // (and only) way to do it
+                    if !hue_effects {
+                        payload = payload.with_gradient(upd.gradient.clone());
+                    }
+
+                    let z2mreq = Z2mRequest::Update(&payload);
+
+                    self.websocket_send(socket, topic, z2mreq).await?;
+
+                    /* step 2: if supported (and needed) send hue-specific effects update */
+
                     if hue_effects {
-                        let mut hz = HueZigbeeUpdate::new();
+                        let mut hz = Self::make_hue_specific_update(&upd)?;
 
-                        if let Some(on) = &upd.on {
-                            hz = hz.with_on_off(on.on);
-                        }
+                        if !hz.is_empty() {
+                            hz = hz.with_fade_speed(0x0001);
 
-                        if let Some(grad) = &upd.gradient {
-                            hz = hz.with_gradient_colors(
-                                match grad.mode {
-                                    Some(LightGradientMode::InterpolatedPalette) => {
-                                        GradientStyle::Linear
+                            let data = hz.to_vec()?;
+                            log::debug!("Sending hue-specific frame: {}", hex::encode(&data));
+
+                            let upd = json!({
+                                "command": {
+                                    "cluster": 0xFC03,
+                                    "command": 0,
+                                    "payload": {
+                                        "data": data
                                     }
-                                    Some(LightGradientMode::InterpolatedPaletteMirrored) => {
-                                        GradientStyle::Mirrored
-                                    }
-                                    Some(LightGradientMode::RandomPixelated) => {
-                                        GradientStyle::Scattered
-                                    }
-                                    None => GradientStyle::Linear,
-                                },
-                                grad.points.iter().map(|c| c.color.xy).collect(),
-                            )?;
-
-                            hz = hz.with_gradient_params(GradientParams {
-                                scale: 0x38,
-                                offset: 0x00,
-                            });
-                        }
-
-                        if let Some(br) = &upd.dimming {
-                            hz = hz.with_brightness(
-                                (br.brightness / 100.0).unit_to_u8_clamped_light(),
+                                }}
                             );
+                            let z2mreq = Z2mRequest::Untyped {
+                                endpoint: 11,
+                                value: &upd,
+                            };
+
+                            self.websocket_send(socket, topic, z2mreq).await?;
                         }
-
-                        if let Some(temp) = &upd.color_temperature {
-                            hz = hz.with_color_mirek(temp.mirek);
-                        }
-
-                        if let Some(xy) = &upd.color {
-                            hz = hz.with_color_xy(xy.xy);
-                        }
-
-                        if let Some(LightEffectsV2Update { action: Some(act) }) = &upd.effects_v2 {
-                            if let Some(fx) = &act.effect {
-                                let et = match fx {
-                                    LightEffect::NoEffect => EffectType::NoEffect,
-                                    LightEffect::Prism => EffectType::Prism,
-                                    LightEffect::Opal => EffectType::Opal,
-                                    LightEffect::Glisten => EffectType::Glisten,
-                                    LightEffect::Sparkle => EffectType::Sparkle,
-                                    LightEffect::Fire => EffectType::Fireplace,
-                                    LightEffect::Candle => EffectType::Candle,
-                                    LightEffect::Underwater => EffectType::Underwater,
-                                    LightEffect::Cosmos => EffectType::Cosmos,
-                                    LightEffect::Sunbeam => EffectType::Sunbeam,
-                                    LightEffect::Enchant => EffectType::Enchant,
-                                };
-                                hz = hz.with_effect_type(et);
-                            }
-                            if let Some(speed) = &act.parameters.speed {
-                                hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
-                            }
-                            if let Some(ct) = &act.parameters.color_temperature {
-                                hz = hz.with_color_mirek(ct.mirek);
-                            }
-                            if let Some(color) = &act.parameters.color {
-                                hz = hz.with_color_xy(color.xy);
-                            }
-                        }
-
-                        hz = hz.with_fade_speed(0x0001);
-
-                        let data = hz.to_vec()?;
-
-                        println!("{}", hex::encode(&data));
-
-                        let upd = json!({
-                            "command": {
-                                "cluster": 0xFC03,
-                                "command": 0,
-                                "payload": {
-                                    "data": data
-                                }
-                            }}
-                        );
-
-                        let z2mreq = Z2mRequest::Untyped {
-                            endpoint: 11,
-                            value: &upd,
-                        };
-
-                        self.websocket_send(socket, topic, z2mreq).await?;
-                    } else {
-                        let payload = DeviceUpdate::default()
-                            .with_state(upd.on.map(|on| on.on))
-                            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                            .with_color_temp(upd.color_temperature.map(|ct| ct.mirek))
-                            .with_color_xy(upd.color.map(|col| col.xy))
-                            .with_gradient(upd.gradient);
-
-                        let z2mreq = Z2mRequest::Update(&payload);
-
-                        self.websocket_send(socket, topic, z2mreq).await?;
                     }
                 }
             }
+
             BackendRequest::SceneCreate(link_scene, sid, scene) => {
-                if let Some(topic) = self.rmap.get(&scene.group.rid) {
+                if let Some(topic) = self.rmap.get(&scene.group) {
                     log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
 
                     lock.aux_set(
@@ -917,6 +824,7 @@ impl Z2mBackend {
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
+
             BackendRequest::SceneUpdate(link, upd) => {
                 if let Some(recall) = upd.recall {
                     let scene = lock.get::<Scene>(&link)?;
@@ -940,11 +848,15 @@ impl Z2mBackend {
                             })?;
                         }
 
-                        let room = lock.get::<Scene>(&link)?.group.rid;
+                        let room = lock.get::<Scene>(&link)?.group;
                         drop(lock);
 
                         if let Some(topic) = self.rmap.get(&room).cloned() {
-                            self.learn_scene_recall(&link).await?;
+                            log::info!("[{}] Recall scene: {link:?}", self.name);
+
+                            let mut lock = self.state.lock().await;
+                            self.learner.learn_scene_recall(&link, &mut lock)?;
+
                             let z2mreq = Z2mRequest::SceneRecall(index);
                             self.websocket_send(socket, &topic, z2mreq).await?;
                         }
@@ -953,8 +865,9 @@ impl Z2mBackend {
                     }
                 }
             }
+
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                let room = lock.get::<GroupedLight>(&link)?.owner.rid;
+                let room = lock.get::<GroupedLight>(&link)?.owner;
                 drop(lock);
 
                 let payload = DeviceUpdate::default()
@@ -968,12 +881,13 @@ impl Z2mBackend {
                     self.websocket_send(socket, topic, z2mreq).await?;
                 }
             }
+
             BackendRequest::Delete(link) => {
                 if link.rtype != RType::Scene {
                     return Ok(());
                 }
 
-                let room = lock.get::<Scene>(&link)?.group.rid;
+                let room = lock.get::<Scene>(&link)?.group;
                 let index = lock
                     .aux_get(&link)?
                     .index
@@ -1003,7 +917,7 @@ impl Z2mBackend {
                             .ok_or(HueError::NotFound(member.service.rid))?;
                         let topic = self
                             .rmap
-                            .get(&light_id.rid)
+                            .get(&light_id)
                             .ok_or(HueError::NotFound(member.service.rid))?;
                         let dev = self
                             .network
@@ -1095,6 +1009,7 @@ impl Z2mBackend {
                     self.websocket_send(socket, &device, z2mreq).await?;
                 }
             }
+
             BackendRequest::EntertainmentStop() => {
                 log::debug!("Stopping entertainment mode..");
                 if let Some(es) = &mut self.entstream.take() {

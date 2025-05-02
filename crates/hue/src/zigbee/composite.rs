@@ -122,6 +122,19 @@ impl HueZigbeeUpdate {
     }
 
     #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.onoff.is_none()
+            && self.brightness.is_none()
+            && self.color_mirek.is_none()
+            && self.color_xy.is_none()
+            && self.fade_speed.is_none()
+            && self.gradient_colors.is_none()
+            && self.gradient_params.is_none()
+            && self.effect_type.is_none()
+            && self.effect_speed.is_none()
+    }
+
+    #[must_use]
     pub const fn with_on_off(mut self, on_off: bool) -> Self {
         self.onoff = Some(if on_off { 1 } else { 0 });
         self

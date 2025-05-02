@@ -24,7 +24,6 @@ pub fn hue_zclcommand(cluster: &str, msg: &ZigbeeMessage) -> Value {
                 "manufacturerCode": msg.mfc,
                 "disableDefaultResponse": msg.ddr,
                 "direction": 0,
-                "srcEndpoint": 64,
                 "timeout": 100.0,
             },
         }

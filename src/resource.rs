@@ -99,12 +99,12 @@ impl Resources {
         self.add_bridge(bridge_id.to_owned())
     }
 
-    pub fn aux_get(&self, link: &ResourceLink) -> HueResult<&AuxData> {
-        self.state.aux_get(link)
+    pub fn aux_get(&self, link: &ResourceLink) -> ApiResult<&AuxData> {
+        self.state.aux_get(&link.rid)
     }
 
     pub fn aux_set(&mut self, link: &ResourceLink, aux: AuxData) {
-        self.state.aux_set(link, aux);
+        self.state.aux_set(link.rid, aux);
     }
 
     pub fn try_update<T: Serialize>(
@@ -319,9 +319,9 @@ impl Resources {
             };
 
             if &scn.group == room {
-                let Some(AuxData {
+                let Ok(AuxData {
                     index: Some(index), ..
-                }) = self.state.try_aux_get(&scene.id)
+                }) = self.state.aux_get(&scene.id)
                 else {
                     continue;
                 };
