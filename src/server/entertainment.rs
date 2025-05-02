@@ -23,7 +23,6 @@ use hue::stream::{HueStreamPacket, HueStreamPacketHeader};
 use svc::traits::Service;
 
 use crate::error::{ApiError, ApiResult};
-use crate::model::throttle::{Throttle, ThrottleQueue};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
 
@@ -90,8 +89,6 @@ impl EntertainmentService {
 
         let mut fps = 0;
         let mut period = Utc::now().timestamp();
-        let throttle = Throttle::from_fps(30);
-        let mut queue = ThrottleQueue::new(throttle, 2);
 
         loop {
             let n = Self::read_frame(&mut sess, &mut buf).await?;
@@ -114,8 +111,6 @@ impl EntertainmentService {
                 return Err(ApiError::EntStreamDesync);
             }
 
-            queue.push(BackendRequest::EntertainmentFrame(pkt.lights));
-
             let ts = Utc::now().timestamp();
             if period != ts {
                 log::info!("Entertainment fps: {fps}");
@@ -123,10 +118,9 @@ impl EntertainmentService {
                 fps = 0;
             }
 
-            if let Some(req) = queue.pop() {
-                fps += 1;
-                self.res.lock().await.backend_request(req)?;
-            }
+            fps += 1;
+            let req = BackendRequest::EntertainmentFrame(pkt.lights);
+            self.res.lock().await.backend_request(req)?;
         }
 
         Ok(())
