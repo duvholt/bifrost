@@ -155,7 +155,16 @@ impl Service for EntertainmentService {
     }
 
     async fn start(&mut self) -> Result<(), Self::Error> {
-        self.udp = Some(Arc::new(UdpListener::bind(self.addr).await?));
+        let socket = UdpSocket::bind(self.addr).await?;
+        // We need a very small receive buffer, since we deliberately want to
+        // drop packets if we can't keep up with the sync mode packets
+        socket::setsockopt(&socket.as_fd(), RcvBuf, &512)?;
+
+        let listener = UdpListenBuilder::new(socket)
+            .with_buffer_size(512)
+            .listen()
+            .await?;
+        self.udp = Some(Arc::new(listener));
         Ok(())
     }
 
