@@ -11,10 +11,10 @@ use serde_json::{Value, json};
 ///
 /// Older versions WILL NOT WORK.
 #[must_use]
-pub fn hue_zclcommand(cluster: &str, msg: &ZigbeeMessage) -> Value {
+pub fn hue_zclcommand(msg: &ZigbeeMessage) -> Value {
     json!({
         "zclcommand": {
-            "cluster": cluster,
+            "cluster": msg.cluster,
             "command": msg.command,
             "payload": {
                 "data": msg.data,

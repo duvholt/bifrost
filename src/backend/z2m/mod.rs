@@ -1,6 +1,5 @@
 pub mod entertainment;
 pub mod learn;
-pub mod stream;
 pub mod websocket;
 pub mod zclcommand;
 
@@ -34,7 +33,7 @@ use hue::api::{
 use hue::clamp::Clamp;
 use hue::error::HueError;
 use hue::scene_icons;
-use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate, ZigbeeTarget};
+use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
 use z2m::api::{ExposeLight, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
@@ -948,14 +947,15 @@ impl Z2mBackend {
                             continue;
                         }
 
-                        let z2mreq = es.target.send(es.stream.segment_mapping(segments)?)?;
-                        z2mws.send(dev, &z2mreq).await?;
+                        z2mws
+                            .send_zigbee_message(dev, &es.stream.segment_mapping(segments)?)
+                            .await?;
                     }
 
-                    let z2mreq = es.target.send(es.stream.reset()?)?;
+                    let message = es.stream.reset()?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        z2mws.send(topic, &z2mreq).await?;
+                        z2mws.send_zigbee_message(topic, &message).await?;
                     }
 
                     self.entstream = Some(es);
@@ -966,19 +966,18 @@ impl Z2mBackend {
                 if let Some(es) = &mut self.entstream {
                     let blks = es.generate_frame(frame);
 
-                    let z2mreq = es.target.send(es.stream.frame(blks)?)?;
-                    let device = es.target.device.clone();
-                    z2mws.send(&device, &z2mreq).await?;
+                    let message = es.stream.frame(blks)?;
+                    z2mws.send_zigbee_message(&es.target, &message).await?;
                 }
             }
 
             BackendRequest::EntertainmentStop() => {
                 log::debug!("Stopping entertainment mode..");
                 if let Some(es) = &mut self.entstream.take() {
-                    let z2mreq = es.target.send(es.stream.reset()?)?;
+                    let message = es.stream.reset()?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        z2mws.send(topic, &z2mreq).await?;
+                        z2mws.send_zigbee_message(topic, &message).await?;
                     }
                     self.counter = es.stream.counter();
 

@@ -10,11 +10,9 @@ use hue::zigbee::{
 use z2m::request::Z2mRequest;
 use zcl::attr::ZclDataType;
 
-use crate::backend::z2m::stream::Z2mTarget;
-
 pub struct EntStream {
     pub stream: EntertainmentZigbeeStream,
-    pub target: Z2mTarget,
+    pub target: String,
     pub addrs: BTreeMap<String, Vec<u16>>,
     pub modes: Vec<(u16, LightRecordMode)>,
 }
@@ -25,7 +23,7 @@ impl EntStream {
         let modes = Self::addrs_to_light_modes(&addrs);
         Self {
             stream: EntertainmentZigbeeStream::new(counter),
-            target: Z2mTarget::new(target),
+            target: target.to_string(),
             addrs,
             modes,
         }
