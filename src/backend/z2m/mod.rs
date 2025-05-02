@@ -1,6 +1,7 @@
 pub mod entertainment;
 pub mod learn;
 pub mod stream;
+pub mod websocket;
 pub mod zclcommand;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -9,19 +10,16 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::Utc;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use maplit::btreeset;
 use native_tls::TlsConnector;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::Mutex;
 use tokio::sync::broadcast::Receiver;
 use tokio::time::sleep;
-use tokio_tungstenite::{
-    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config, tungstenite,
-};
+use tokio_tungstenite::{Connector, connect_async_tls_with_config, tungstenite};
 use uuid::Uuid;
 
 use hue::api::{
@@ -48,6 +46,7 @@ use z2m::update::{DeviceColorMode, DeviceUpdate};
 use crate::backend::Backend;
 use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
+use crate::backend::z2m::websocket::Z2mWebSocket;
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
@@ -707,58 +706,10 @@ impl Z2mBackend {
         }
     }
 
-    async fn websocket_send(
-        &self,
-        socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-        topic: &str,
-        payload: &Z2mRequest<'_>,
-    ) -> ApiResult<()> {
-        let Some(link) = self.map.get(topic) else {
-            log::trace!(
-                "[{}] Topic [{topic}] unknown on this z2m connection",
-                self.name
-            );
-            return Ok(());
-        };
-
-        log::trace!(
-            "[{}] Topic [{topic}] known as {link:?} on this z2m connection, sending event..",
-            self.name
-        );
-
-        let api_req = match &payload {
-            Z2mRequest::Untyped { endpoint, value } => RawMessage {
-                topic: format!("{topic}/{endpoint}/set"),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::RawWrite(value) => RawMessage {
-                topic: format!("{topic}/set/write"),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::GroupMemberAdd(value) => RawMessage {
-                topic: "bridge/request/group/members/add".into(),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::GroupMemberRemove(value) => RawMessage {
-                topic: "bridge/request/group/members/remove".into(),
-                payload: serde_json::to_value(value)?,
-            },
-            _ => RawMessage {
-                topic: format!("{topic}/set"),
-                payload: serde_json::to_value(payload)?,
-            },
-        };
-
-        let json = serde_json::to_string(&api_req)?;
-        log::debug!("[{}] Sending {json}", self.name);
-        let msg = tungstenite::Message::text(json);
-        Ok(socket.send(msg).await?)
-    }
-
     #[allow(clippy::too_many_lines)]
     async fn websocket_write(
         &mut self,
-        socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+        z2mws: &mut Z2mWebSocket,
         req: Arc<BackendRequest>,
     ) -> ApiResult<()> {
         self.learner.cleanup();
@@ -797,7 +748,7 @@ impl Z2mBackend {
 
                     let z2mreq = Z2mRequest::Update(&payload);
 
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send(topic, &z2mreq).await?;
 
                     /* step 2: if supported (and needed) send hue-specific effects update */
 
@@ -824,7 +775,7 @@ impl Z2mBackend {
                                 value: &upd,
                             };
 
-                            self.websocket_send(socket, topic, &z2mreq).await?;
+                            z2mws.send(topic, &z2mreq).await?;
                         }
                     }
                 }
@@ -848,7 +799,7 @@ impl Z2mBackend {
                     lock.add(link_scene, Resource::Scene(scene.clone()))?;
                     drop(lock);
 
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send(topic, &z2mreq).await?;
                 }
             }
 
@@ -885,7 +836,7 @@ impl Z2mBackend {
                             self.learner.learn_scene_recall(link, &mut lock)?;
 
                             let z2mreq = Z2mRequest::SceneRecall(index);
-                            self.websocket_send(socket, &topic, &z2mreq).await?;
+                            z2mws.send(&topic, &z2mreq).await?;
                         }
                     } else {
                         log::error!("Scene recall type not supported: {recall:?}");
@@ -905,7 +856,7 @@ impl Z2mBackend {
 
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::Update(&payload);
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send(topic, &z2mreq).await?;
                 }
             }
 
@@ -935,7 +886,7 @@ impl Z2mBackend {
                                 skip_disable_reporting: None,
                             };
                             let z2mreq = Z2mRequest::GroupMemberAdd(change);
-                            self.websocket_send(socket, topic, &z2mreq).await?;
+                            z2mws.send(topic, &z2mreq).await?;
                         }
 
                         for remove in known_existing.difference(&known_new) {
@@ -947,7 +898,7 @@ impl Z2mBackend {
                                 skip_disable_reporting: None,
                             };
                             let z2mreq = Z2mRequest::GroupMemberRemove(change);
-                            self.websocket_send(socket, topic, &z2mreq).await?;
+                            z2mws.send(topic, &z2mreq).await?;
                         }
                     }
                 }
@@ -967,7 +918,7 @@ impl Z2mBackend {
 
                 if let Some(topic) = self.rmap.get(&room) {
                     let z2mreq = Z2mRequest::SceneRemove(index);
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send(topic, &z2mreq).await?;
                 }
             }
 
@@ -1015,20 +966,20 @@ impl Z2mBackend {
                     log::debug!("Entertainment modes: {:#?}", &es.modes);
                     for (dev, segments) in &es.addrs {
                         let z2mreq = EntStream::z2m_set_entertainment_brightness(0xFE);
-                        self.websocket_send(socket, dev, &z2mreq).await?;
+                        z2mws.send(dev, &z2mreq).await?;
 
                         if segments.len() <= 1 {
                             continue;
                         }
 
                         let z2mreq = es.target.send(es.stream.segment_mapping(segments)?)?;
-                        self.websocket_send(socket, dev, &z2mreq).await?;
+                        z2mws.send(dev, &z2mreq).await?;
                     }
 
                     let z2mreq = es.target.send(es.stream.reset()?)?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, &z2mreq).await?;
+                        z2mws.send(topic, &z2mreq).await?;
                     }
 
                     self.entstream = Some(es);
@@ -1041,7 +992,7 @@ impl Z2mBackend {
 
                     let z2mreq = es.target.send(es.stream.frame(blks)?)?;
                     let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, &z2mreq).await?;
+                    z2mws.send(&device, &z2mreq).await?;
                 }
             }
 
@@ -1051,7 +1002,7 @@ impl Z2mBackend {
                     let z2mreq = es.target.send(es.stream.reset()?)?;
                     for topic in es.addrs.keys() {
                         log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, &z2mreq).await?;
+                        z2mws.send(topic, &z2mreq).await?;
                     }
                     self.counter = es.stream.counter();
 
@@ -1079,7 +1030,7 @@ impl Z2mBackend {
     pub async fn event_loop(
         &mut self,
         chan: &mut Receiver<Arc<BackendRequest>>,
-        mut socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+        mut socket: Z2mWebSocket,
     ) -> ApiResult<()> {
         loop {
             select! {
@@ -1138,7 +1089,8 @@ impl Backend for Z2mBackend {
             match connect_async_tls_with_config(url.as_str(), None, false, connector.clone()).await
             {
                 Ok((socket, _)) => {
-                    let res = self.event_loop(&mut chan, socket).await;
+                    let z2m_socket = Z2mWebSocket::new(self.name.clone(), socket);
+                    let res = self.event_loop(&mut chan, z2m_socket).await;
                     if let Err(err) = res {
                         log::error!("[{}] Event loop broke: {err}", self.name);
                     }
