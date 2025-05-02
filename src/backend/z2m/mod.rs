@@ -1082,20 +1082,35 @@ impl Z2mBackend {
                 if let Some(es) = &mut self.entstream {
                     let mut blks = vec![];
 
-                    if let HueStreamLights::Rgb(rgb) = frame {
-                        for light in rgb {
-                            let (xy, bright) = light.to_xy();
+                    match frame {
+                        HueStreamLights::Rgb(rgb) => {
+                            for light in rgb {
+                                let (xy, bright) = light.to_xy();
 
-                            let brightness = (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
-                            let (chan, mode) = es.modes[light.channel as usize % es.modes.len()];
-                            let raw = xy.to_quant();
-                            let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
+                                let brightness =
+                                    (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
+                                let (chan, mode) =
+                                    es.modes[light.channel as usize % es.modes.len()];
+                                let raw = xy.to_quant();
+                                let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
 
-                            blks.push(lrec);
+                                blks.push(lrec);
+                            }
                         }
-                    } else {
-                        // FIXME
-                        unimplemented!();
+                        HueStreamLights::Xy(xy) => {
+                            for light in xy {
+                                let (xy, bright) = light.to_xy();
+
+                                let brightness =
+                                    (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
+                                let (chan, mode) =
+                                    es.modes[light.channel as usize % es.modes.len()];
+                                let raw = xy.to_quant();
+                                let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
+
+                                blks.push(lrec);
+                            }
+                        }
                     }
 
                     let z2mreq = es.target.send(es.stream.frame(blks)?)?;
