@@ -36,14 +36,6 @@ impl Z2mWebSocket {
         /* ); */
 
         let api_req = match &payload {
-            Z2mRequest::Untyped { endpoint, value } => RawMessage {
-                topic: format!("{topic}/{endpoint}/set"),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::RawWrite(value) => RawMessage {
-                topic: format!("{topic}/set/write"),
-                payload: serde_json::to_value(value)?,
-            },
             Z2mRequest::GroupMemberAdd(value) => RawMessage {
                 topic: "bridge/request/group/members/add".into(),
                 payload: serde_json::to_value(value)?,

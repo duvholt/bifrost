@@ -766,12 +766,9 @@ impl Z2mBackend {
                                     "payload": {
                                         "data": data
                                     }
-                                }}
-                            );
-                            let z2mreq = Z2mRequest::Untyped {
-                                endpoint: 11,
-                                value: &upd,
-                            };
+                                }
+                            });
+                            let z2mreq = Z2mRequest::Raw(upd);
 
                             z2mws.send(topic, &z2mreq).await?;
                         }

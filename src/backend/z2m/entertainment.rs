@@ -51,13 +51,15 @@ impl EntStream {
 
     #[must_use]
     pub fn z2m_set_entertainment_brightness(brightness: u8) -> Z2mRequest<'static> {
-        Z2mRequest::RawWrite(json!({
-            "cluster": EntertainmentZigbeeStream::CLUSTER,
-            "payload": {
-                "5": {
-                    "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
-                    "type": 32,
-                    "value": brightness,
+        Z2mRequest::Raw(json!({
+            "write": {
+                "cluster": EntertainmentZigbeeStream::CLUSTER,
+                "payload": {
+                    "5": {
+                        "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
+                        "type": 32,
+                        "value": brightness,
+                    }
                 }
             }
         }))
