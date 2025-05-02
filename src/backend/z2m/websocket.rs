@@ -5,6 +5,7 @@ use futures::{SinkExt, Stream};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use z2m::update::DeviceUpdate;
 use z2m::{api::RawMessage, request::Z2mRequest};
 
 use crate::error::ApiResult;
@@ -64,6 +65,12 @@ impl Z2mWebSocket {
 
     pub async fn send_scene_store(&mut self, topic: &str, name: &str, id: u32) -> ApiResult<()> {
         let z2mreq = Z2mRequest::SceneStore { name, id };
+
+        self.send(topic, &z2mreq).await
+    }
+
+    pub async fn send_update(&mut self, topic: &str, payload: &DeviceUpdate) -> ApiResult<()> {
+        let z2mreq = Z2mRequest::Update(payload);
 
         self.send(topic, &z2mreq).await
     }

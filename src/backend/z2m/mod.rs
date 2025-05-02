@@ -853,8 +853,7 @@ impl Z2mBackend {
                     .with_color_xy(upd.color.map(|col| col.xy));
 
                 if let Some(topic) = self.rmap.get(&room) {
-                    let z2mreq = Z2mRequest::Update(&payload);
-                    z2mws.send(topic, &z2mreq).await?;
+                    z2mws.send_update(topic, &payload).await?;
                 }
             }
 
