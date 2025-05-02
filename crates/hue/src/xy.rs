@@ -19,6 +19,11 @@ impl XY {
         Self { x, y }
     }
 
+    pub const D50_WHITE_POINT: Self = Self {
+        x: 0.34567,
+        y: 0.35850,
+    };
+
     pub const D65_WHITE_POINT: Self = Self {
         x: 0.31271,
         y: 0.32902,
