@@ -17,6 +17,11 @@ pub enum Z2mRequest<'a> {
 
     SceneRemove(u32),
 
+    Write {
+        cluster: u16,
+        payload: Value,
+    },
+
     #[serde(untagged)]
     GroupMemberAdd(GroupMemberChange),
 
