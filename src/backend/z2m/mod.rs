@@ -1128,6 +1128,21 @@ impl Z2mBackend {
                         self.websocket_send(socket, topic, &z2mreq).await?;
                     }
                     self.counter = es.stream.counter();
+
+                    for id in lock.get_resource_ids_by_type(RType::Light) {
+                        let light: &Light = lock.get_id(id)?;
+                        if light.is_streaming() {
+                            lock.update(&id, Light::stop_streaming)?;
+                        }
+                    }
+
+                    for id in lock.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+                        let ec: &EntertainmentConfiguration = lock.get_id(id)?;
+                        if ec.is_streaming() {
+                            lock.update(&id, EntertainmentConfiguration::stop_streaming)?;
+                        }
+                    }
+                    drop(lock);
                 }
             }
         }
