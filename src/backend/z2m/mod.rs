@@ -36,11 +36,7 @@ use hue::api::{
 use hue::clamp::Clamp;
 use hue::error::HueError;
 use hue::scene_icons;
-use hue::stream::HueStreamLights;
-use hue::zigbee::{
-    EffectType, GradientParams, GradientStyle, HueEntFrameLightRecord, HueZigbeeUpdate,
-    ZigbeeTarget,
-};
+use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate, ZigbeeTarget};
 use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
@@ -1039,41 +1035,9 @@ impl Z2mBackend {
                 }
             }
 
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             BackendRequest::EntertainmentFrame(frame) => {
                 if let Some(es) = &mut self.entstream {
-                    let mut blks = vec![];
-
-                    match frame {
-                        HueStreamLights::Rgb(rgb) => {
-                            for light in rgb {
-                                let (xy, bright) = light.to_xy();
-
-                                let brightness =
-                                    (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
-                                let (chan, mode) =
-                                    es.modes[light.channel as usize % es.modes.len()];
-                                let raw = xy.to_quant();
-                                let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
-
-                                blks.push(lrec);
-                            }
-                        }
-                        HueStreamLights::Xy(xy) => {
-                            for light in xy {
-                                let (xy, bright) = light.to_xy();
-
-                                let brightness =
-                                    (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
-                                let (chan, mode) =
-                                    es.modes[light.channel as usize % es.modes.len()];
-                                let raw = xy.to_quant();
-                                let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
-
-                                blks.push(lrec);
-                            }
-                        }
-                    }
+                    let blks = es.generate_frame(frame);
 
                     let z2mreq = es.target.send(es.stream.frame(blks)?)?;
                     let device = es.target.device.clone();
