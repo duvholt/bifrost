@@ -5,6 +5,11 @@ use crate::api::GroupMemberChange;
 use crate::update::DeviceUpdate;
 
 #[derive(Clone, Debug, Serialize)]
+pub struct Z2mPayload {
+    pub data: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Z2mRequest<'a> {
     SceneStore {
@@ -20,6 +25,12 @@ pub enum Z2mRequest<'a> {
     Write {
         cluster: u16,
         payload: Value,
+    },
+
+    Command {
+        cluster: u16,
+        command: u16,
+        payload: Z2mPayload,
     },
 
     #[serde(untagged)]
