@@ -1,17 +1,21 @@
 use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddr};
+use std::os::fd::AsFd;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
+use nix::sys::socket;
+use nix::sys::socket::sockopt::RcvBuf;
 use openssl::ssl::{Ssl, SslContext, SslMethod};
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
+use tokio::io::AsyncReadExt;
+use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tokio_openssl::SslStream;
-use udp_stream::{UdpListener, UdpStream};
+use udp_stream::{UdpListenBuilder, UdpListener, UdpStream};
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::EntertainmentConfiguration;
@@ -28,17 +32,6 @@ pub struct EntertainmentService {
     udp: Option<Arc<UdpListener>>,
     ctx: Option<SslContext>,
     res: Arc<Mutex<Resources>>,
-}
-
-async fn fill_buffer_to<T>(rdr: &mut BufReader<T>, size: usize) -> ApiResult<()>
-where
-    T: AsyncRead + Unpin,
-{
-    while rdr.buffer().len() < size {
-        rdr.fill_buf().await?;
-    }
-
-    Ok(())
 }
 
 impl EntertainmentService {
@@ -76,28 +69,24 @@ impl EntertainmentService {
         }
     }
 
-    pub async fn run_loop(&self, sess: SslStream<UdpStream>) -> ApiResult<()> {
-        const TIMEOUT: Duration = Duration::from_millis(1000);
+    pub async fn run_loop(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
+        let mut buf = [0u8; 1024];
 
-        let mut rdr = BufReader::new(sess);
+        // read the first frame, and use it to look up area, color mode, etc.
+        // this means we discard the first frame, but since we expect at least
+        // 10 frames *per second*, this is acceptable.
+        let sz = Self::read_frame(&mut sess, &mut buf).await?;
+        let header = HueStreamPacketHeader::parse(&buf[..sz])?;
 
-        let len = HueStreamPacket::HEADER_SIZE;
-
-        match timeout(TIMEOUT, fill_buffer_to(&mut rdr, len)).await {
-            Ok(Err(_)) | Err(_) => return Err(ApiError::EntStreamInitError),
-            Ok(Ok(())) => {}
-        }
-
-        let header = HueStreamPacketHeader::parse(rdr.buffer())?;
-
-        // look up entertainment area
         let lock = self.res.lock().await;
-        let ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
-        let nlights = ent.channels.len();
-        lock.backend_request(BackendRequest::EntertainmentStart(header.area))?;
-        drop(lock);
 
-        let mut buf = vec![0u8; HueStreamPacket::size_with_lights(nlights)];
+        // look up entertainment area, to make sure it exists
+        let _ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
+
+        // request entertainment mode start
+        lock.backend_request(BackendRequest::EntertainmentStart(header.area))?;
+
+        drop(lock);
 
         let mut fps = 0;
         let mut period = Utc::now().timestamp();
@@ -105,25 +94,15 @@ impl EntertainmentService {
         let mut queue = ThrottleQueue::new(throttle, 2);
 
         loop {
-            match timeout(Duration::from_millis(1000), rdr.read_exact(&mut buf)).await {
-                Ok(Err(err)) if err.kind() == ErrorKind::UnexpectedEof => {
-                    log::debug!("Sync stream stopped by sender");
-                    break;
-                }
-                Ok(Err(err)) => {
-                    log::error!("Error while trying to read sync data: {err:?}");
-                    return Err(ApiError::EntStreamDesync);
-                }
-                Err(_) => {
-                    log::warn!("Timeout while waiting for sync data");
-                    return Err(ApiError::EntStreamTimeout);
-                }
-                Ok(Ok(n)) => {
-                    log::trace!("Read {n} bytes of sync data");
-                }
+            let n = Self::read_frame(&mut sess, &mut buf).await?;
+            if n == 0 {
+                break;
             }
 
-            let pkt = HueStreamPacket::parse(&buf)?;
+            let view = &buf[..n];
+            log::trace!("Packet buffer: {}", view.escape_ascii());
+
+            let pkt = HueStreamPacket::parse(view)?;
 
             if pkt.color_mode != header.color_mode {
                 log::error!("Entertainment Mode color_mode changed mid-stream.");
