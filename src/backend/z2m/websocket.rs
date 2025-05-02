@@ -70,6 +70,12 @@ impl Z2mWebSocket {
         self.send(topic, &z2mreq).await
     }
 
+    pub async fn send_scene_recall(&mut self, topic: &str, index: u32) -> ApiResult<()> {
+        let z2mreq = Z2mRequest::SceneRecall(index);
+
+        self.send(topic, &z2mreq).await
+    }
+
     pub async fn send_update(&mut self, topic: &str, payload: &DeviceUpdate) -> ApiResult<()> {
         let z2mreq = Z2mRequest::Update(payload);
 

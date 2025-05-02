@@ -833,8 +833,7 @@ impl Z2mBackend {
                             let mut lock = self.state.lock().await;
                             self.learner.learn_scene_recall(link, &mut lock)?;
 
-                            let z2mreq = Z2mRequest::SceneRecall(index);
-                            z2mws.send(&topic, &z2mreq).await?;
+                            z2mws.send_scene_recall(&topic, index).await?;
                         }
                     } else {
                         log::error!("Scene recall type not supported: {recall:?}");
