@@ -91,6 +91,22 @@ impl Z2mWebSocket {
 
         self.send(topic, &z2mreq).await
     }
+
+    pub async fn send_group_member_remove(
+        &mut self,
+        topic: &str,
+        friendly_name: &str,
+    ) -> ApiResult<()> {
+        let change = GroupMemberChange {
+            device: friendly_name.to_string(),
+            group: topic.to_string(),
+            endpoint: None,
+            skip_disable_reporting: None,
+        };
+        let z2mreq = Z2mRequest::GroupMemberRemove(change);
+
+        self.send(topic, &z2mreq).await
+    }
 }
 
 impl Stream for Z2mWebSocket

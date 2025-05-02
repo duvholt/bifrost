@@ -35,7 +35,7 @@ use hue::clamp::Clamp;
 use hue::error::HueError;
 use hue::scene_icons;
 use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate, ZigbeeTarget};
-use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
+use z2m::api::{ExposeLight, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
@@ -881,14 +881,7 @@ impl Z2mBackend {
 
                         for remove in known_existing.difference(&known_new) {
                             let friendly_name = &self.rmap[remove];
-                            let change = GroupMemberChange {
-                                device: friendly_name.to_string(),
-                                group: topic.to_string(),
-                                endpoint: None,
-                                skip_disable_reporting: None,
-                            };
-                            let z2mreq = Z2mRequest::GroupMemberRemove(change);
-                            z2mws.send(topic, &z2mreq).await?;
+                            z2mws.send_group_member_remove(topic, friendly_name).await?;
                         }
                     }
                 }
