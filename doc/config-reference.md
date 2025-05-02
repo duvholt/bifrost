@@ -112,6 +112,20 @@ z2m:
     #   be hidden instead.
     #
     group_prefix: bifrost_
+
+    # Streaming mode ("Entertainment mode" / "Hue Sync") maximum frames per second
+    #
+    # This is the maximum number of light updates attempted per second.
+    #
+    # The incoming data stream (from a Sync Box, Hue Sync for Windows/Mac,
+    # or some other client) determines the maximum possible fps.
+    #
+    # For example, if Bifrost only receives light updates at 10 fps, setting
+    # this limit to 20 will have no effect.
+    #
+    # On the other hand, if the streaming client sends faster than this limit,
+    # frames will be dropped to avoid going over it.
+    streaming_fps: 30
   ...
 
 # Rooms section [optional!]
