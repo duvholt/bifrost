@@ -99,8 +99,8 @@ impl Z2mBackend {
     ) -> ApiResult<Self> {
         let map = HashMap::new();
         let rmap = HashMap::new();
-        let learn = SceneLearn::new(name.clone());
         let ignore = HashSet::new();
+        let learner = SceneLearn::new(name.clone());
         let network = HashMap::new();
         let entstream = None;
         Ok(Self {
@@ -110,7 +110,7 @@ impl Z2mBackend {
             state,
             map,
             rmap,
-            learner: learn,
+            learner,
             ignore,
             network,
             entstream,
