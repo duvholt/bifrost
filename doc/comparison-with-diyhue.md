@@ -41,9 +41,9 @@ In any case, feedback always welcome.
 | Language                             | Python                                  | Rust                                      |
 | Project scope                        | Broad (supports countless integrations) | Narrow (specifically targets zigbee2mqtt) |
 | Use Hue Bridge as backend            | ✅                                      | ❌                                        |
-| Usable from Homeassistant            | ✅ (as a Hue Bridge)                    | ✅ (more testing needed)                  |
+| Usable from Homeassistant            | ✅ (as a Hue Bridge)                    | ✅ (as a Hue Bridge)                      |
 | Control individual lights            | ✅                                      | ✅                                        |
-| Good performance for groups of light | ❌                                      | ✅                                        |
+| Good performance for groups of light | ❌ (sends a message per light)          | ✅ (uses zigbee groups)                   |
 | Connect to zigbee2mqtt               | (✅) (but only one server)              | ✅ (multiple servers supported)           |
 | Auto-detection of color features     | ❌ (needs manual configuration)         | ✅                                        |
 | Create zigbee2mqtt scenes            | ❌                                      | ✅                                        |
@@ -51,11 +51,14 @@ In any case, feedback always welcome.
 | Learn zigbee2mqtt scenes             | ❌                                      | ✅                                        |
 | Delete zigbee2mqtt scenes            | ❌                                      | ✅                                        |
 | Join new zigbee lights               | ✅                                      | ❌                                        |
+| Add/remove lights to rooms           | ❌                                      | ✅                                        |
 | Live state of lights in Hue app      | ❌ [^1]                                 | ✅                                        |
 | Multiple type of backends            | ✅                                      | ❌ (only zigbee2mqtt)                     |
-| Entertainment zones                  | ✅                                      | ❌ (planned)                              |
+| Entertainment zones                  | ✅                                      | ✅                                        |
+| Native entertainment zone support    | ❌                                      | ✅                                        |
+| Hue effects (fireplace, candle, etc) | (✅) (partial)                          | ✅                                        |
 | Routines / Wake up / Go to sleep     | ✅                                      | ❌ (planned)                              |
-| Remote services                      | ✅ (only with Hue essentials)           | ❌                                        |
+| Remote services                      | (✅) (only with Hue essentials)         | ❌                                        |
 | Add custom lights and switches       | ✅                                      | ❌                                        |
 
 [^1]: Light state synchronization (i.e. consistency between hue emulator, hue
