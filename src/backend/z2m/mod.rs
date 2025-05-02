@@ -897,8 +897,7 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&room) {
-                    let z2mreq = Z2mRequest::SceneRemove(index);
-                    z2mws.send(topic, &z2mreq).await?;
+                    z2mws.send_scene_remove(topic, index).await?;
                 }
             }
 
