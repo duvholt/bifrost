@@ -61,6 +61,12 @@ impl Z2mWebSocket {
         let msg = Message::text(json);
         Ok(self.socket.send(msg).await?)
     }
+
+    pub async fn send_scene_store(&mut self, topic: &str, name: &str, id: u32) -> ApiResult<()> {
+        let z2mreq = Z2mRequest::SceneStore { name, id };
+
+        self.send(topic, &z2mreq).await
+    }
 }
 
 impl Stream for Z2mWebSocket

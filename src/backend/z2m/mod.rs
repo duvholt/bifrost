@@ -791,15 +791,13 @@ impl Z2mBackend {
                             .with_topic(&scene.metadata.name)
                             .with_index(*sid),
                     );
-                    let z2mreq = Z2mRequest::SceneStore {
-                        name: &scene.metadata.name,
-                        id: *sid,
-                    };
+
+                    z2mws
+                        .send_scene_store(topic, &scene.metadata.name, *sid)
+                        .await?;
 
                     lock.add(link_scene, Resource::Scene(scene.clone()))?;
                     drop(lock);
-
-                    z2mws.send(topic, &z2mreq).await?;
                 }
             }
 
