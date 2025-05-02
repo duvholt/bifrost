@@ -64,9 +64,10 @@ impl Default for EntertainmentZigbeeStream {
 impl EntertainmentZigbeeStream {
     pub const DEFAULT_SMOOTHING: u16 = 0x0400;
     pub const CLUSTER: u16 = 0xFC01;
-    pub const CMD_SEGMENT_MAP: u8 = 7;
-    pub const CMD_RESET: u8 = 3;
     pub const CMD_FRAME: u8 = 1;
+    pub const CMD_RESET: u8 = 3;
+    pub const CMD_LIGHT_BALANCE: u8 = 5;
+    pub const CMD_SEGMENT_MAP: u8 = 7;
 
     #[must_use]
     pub const fn new(counter: u32) -> Self {
