@@ -955,11 +955,8 @@ impl Z2mBackend {
             BackendRequest::EntertainmentStop() => {
                 log::debug!("Stopping entertainment mode..");
                 if let Some(es) = &mut self.entstream.take() {
-                    let message = es.stream.reset()?;
-                    for topic in es.addrs.keys() {
-                        log::debug!("Sending stop to {topic}");
-                        z2mws.send_zigbee_message(topic, &message).await?;
-                    }
+                    es.stop_stream(z2mws).await?;
+
                     self.counter = es.stream.counter();
 
                     for id in lock.get_resource_ids_by_type(RType::Light) {

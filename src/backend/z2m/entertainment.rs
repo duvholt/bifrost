@@ -122,4 +122,14 @@ impl EntStream {
 
         Ok(())
     }
+
+    pub async fn stop_stream(&mut self, z2mws: &mut Z2mWebSocket) -> ApiResult<()> {
+        let message = self.stream.reset()?;
+        for topic in self.addrs.keys() {
+            log::debug!("Sending stop to {topic}");
+            z2mws.send_zigbee_message(topic, &message).await?;
+        }
+
+        Ok(())
+    }
 }
