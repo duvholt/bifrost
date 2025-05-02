@@ -53,7 +53,7 @@ impl EntStream {
         Z2mRequest::Write {
             cluster: EntertainmentZigbeeStream::CLUSTER,
             payload: json!({
-                "5": {
+                EntertainmentZigbeeStream::CMD_LIGHT_BALANCE.to_string(): {
                     "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
                     "type": ZclDataType::ZclU8 as u8,
                     "value": brightness,
