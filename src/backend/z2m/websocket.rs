@@ -2,11 +2,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::{SinkExt, Stream};
-use hue::zigbee::ZigbeeMessage;
+use hue::zigbee::{HueZigbeeUpdate, ZigbeeMessage};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use z2m::api::GroupMemberChange;
+use z2m::request::Z2mPayload;
 use z2m::update::DeviceUpdate;
 use z2m::{api::RawMessage, request::Z2mRequest};
 
@@ -116,6 +117,19 @@ impl Z2mWebSocket {
 
     pub async fn send_zigbee_message(&mut self, topic: &str, msg: &ZigbeeMessage) -> ApiResult<()> {
         let z2mreq = Z2mRequest::Raw(hue_zclcommand(msg));
+        self.send(topic, &z2mreq).await
+    }
+
+    pub async fn send_hue_effects(&mut self, topic: &str, hz: HueZigbeeUpdate) -> ApiResult<()> {
+        let data = hz.to_vec()?;
+        log::debug!("Sending hue-specific frame: {}", hex::encode(&data));
+
+        let z2mreq = Z2mRequest::Command {
+            cluster: 0xFC03,
+            command: 0,
+            payload: Z2mPayload { data },
+        };
+
         self.send(topic, &z2mreq).await
     }
 }
