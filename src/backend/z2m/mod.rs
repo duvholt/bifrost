@@ -1,3 +1,4 @@
+pub mod entertainment;
 pub mod learn;
 pub mod stream;
 pub mod zclcommand;
@@ -49,19 +50,13 @@ use z2m::request::Z2mRequest;
 use z2m::update::{DeviceColorMode, DeviceUpdate};
 
 use crate::backend::Backend;
+use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::stream::Z2mTarget;
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
 use crate::resource::Resources;
-
-struct EntStream {
-    stream: EntertainmentZigbeeStream,
-    target: Z2mTarget,
-    addrs: BTreeMap<String, Vec<u16>>,
-    modes: Vec<(u16, LightRecordMode)>,
-}
 
 pub struct Z2mBackend {
     name: String,
