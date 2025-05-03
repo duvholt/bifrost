@@ -2469,7 +2469,7 @@ dependencies = [
 [[package]]
 name = "tokio-ssdp"
 version = "0.2.0"
-source = "git+https://github.com/chrivers/tokio-ssdp.git?rev=f53ea121#f53ea1213966a3dc47c8e0dfc44ca1b15fd112a9"
+source = "git+https://github.com/chrivers/tokio-ssdp.git?rev=00fc29c3#00fc29c348165e183081c7abcb7e927dcead6f81"
 dependencies = [
  "httparse",
  "httpdate",
