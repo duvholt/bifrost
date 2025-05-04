@@ -43,7 +43,7 @@ impl Service for MdnsService {
         let mdns = ServiceDaemon::new()?;
         mdns.enable_interface(IpAddr::from(self.ip))?;
         let service_type = "_hue._tcp.local.";
-        let instance_name = format!("bifrost-{}", hex::encode(self.mac.bytes()));
+        let instance_name = format!("bifrost-{}", hex::encode(&self.mac.bytes()[3..]));
         let service_hostname = format!("{instance_name}.local.");
         let service_addr = self.ip.to_string();
         let service_port = 443;
