@@ -74,7 +74,7 @@ impl EntertainmentService {
         // read the first frame, and use it to look up area, color mode, etc.
         // this means we discard the first frame, but since we expect at least
         // 10 frames *per second*, this is acceptable.
-        let sz = Self::read_frame(&mut sess, &mut buf).await?;
+        let mut sz = Self::read_frame(&mut sess, &mut buf).await?;
         let header = HueStreamPacketHeader::parse(&buf[..sz])?;
 
         let lock = self.res.lock().await;
@@ -91,12 +91,7 @@ impl EntertainmentService {
         let mut period = Utc::now().timestamp();
 
         loop {
-            let n = Self::read_frame(&mut sess, &mut buf).await?;
-            if n == 0 {
-                break;
-            }
-
-            let view = &buf[..n];
+            let view = &buf[..sz];
             log::trace!("Packet buffer: {}", view.escape_ascii());
 
             let pkt = HueStreamPacket::parse(view)?;
@@ -121,6 +116,11 @@ impl EntertainmentService {
             fps += 1;
             let req = BackendRequest::EntertainmentFrame(pkt.lights);
             self.res.lock().await.backend_request(req)?;
+
+            sz = Self::read_frame(&mut sess, &mut buf).await?;
+            if sz == 0 {
+                break;
+            }
         }
 
         Ok(())
