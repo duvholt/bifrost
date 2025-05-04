@@ -54,7 +54,12 @@ impl Z2mWebSocket {
         };
 
         let json = serde_json::to_string(&api_req)?;
-        log::debug!("[{}] Sending {json}", self.name);
+        if matches!(payload, Z2mRequest::EntertainmentFrame(_)) {
+            log::trace!("[{}] Entertainment: {json}", self.name);
+        } else {
+            log::debug!("[{}] Sending {json}", self.name);
+        }
+
         let msg = Message::text(json);
         Ok(self.socket.send(msg).await?)
     }
@@ -117,6 +122,15 @@ impl Z2mWebSocket {
 
     pub async fn send_zigbee_message(&mut self, topic: &str, msg: &ZigbeeMessage) -> ApiResult<()> {
         let z2mreq = Z2mRequest::Raw(hue_zclcommand(msg));
+        self.send(topic, &z2mreq).await
+    }
+
+    pub async fn send_entertainment_frame(
+        &mut self,
+        topic: &str,
+        msg: &ZigbeeMessage,
+    ) -> ApiResult<()> {
+        let z2mreq = Z2mRequest::EntertainmentFrame(hue_zclcommand(msg));
         self.send(topic, &z2mreq).await
     }
 

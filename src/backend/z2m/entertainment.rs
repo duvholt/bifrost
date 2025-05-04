@@ -137,6 +137,6 @@ impl EntStream {
         let blks = self.generate_frame(frame);
 
         let message = self.stream.frame(blks)?;
-        z2mws.send_zigbee_message(&self.target, &message).await
+        z2mws.send_entertainment_frame(&self.target, &message).await
     }
 }
