@@ -1,6 +1,7 @@
+use chrono::Duration;
 use packed_struct::prelude::*;
 
-use crate::error::HueResult;
+use crate::error::{HueError, HueResult};
 use crate::zigbee::{HueEntFrame, HueEntFrameLightRecord, HueEntSegmentConfig, HueEntStop};
 
 pub struct EntertainmentZigbeeStream {
@@ -69,6 +70,10 @@ impl EntertainmentZigbeeStream {
     pub const CMD_LIGHT_BALANCE: u8 = 5;
     pub const CMD_SEGMENT_MAP: u8 = 7;
 
+    /// The maximum fade time (0xFFFF) seems to correspond to 2.56 seconds.
+    /// (determined experimentally)
+    pub const SMOOTHING_MAX_MICROS: i64 = 2_560_000;
+
     #[must_use]
     pub const fn new(counter: u32) -> Self {
         Self {
@@ -89,6 +94,25 @@ impl EntertainmentZigbeeStream {
 
     pub const fn set_smoothing(&mut self, smoothing: u16) {
         self.smoothing = smoothing;
+    }
+
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    pub fn duration_to_smoothing(duration: Duration) -> HueResult<u16> {
+        // Get number of microseconds, if positive and less than maximum
+        let us = duration
+            .num_microseconds()
+            .filter(|us| (0..Self::SMOOTHING_MAX_MICROS).contains(us))
+            .ok_or(HueError::HueZigbeeEncodeError)?;
+
+        // Scale to target range
+        let smoothing = (us * 0x10000 / Self::SMOOTHING_MAX_MICROS) as u16;
+
+        Ok(smoothing)
+    }
+
+    pub fn set_smoothing_duration(&mut self, duration: Duration) -> HueResult<()> {
+        self.set_smoothing(Self::duration_to_smoothing(duration)?);
+        Ok(())
     }
 
     pub fn segment_mapping(&mut self, map: &[u16]) -> HueResult<ZigbeeMessage> {
