@@ -48,6 +48,7 @@ use crate::backend::z2m::websocket::Z2mWebSocket;
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
+use crate::model::throttle::Throttle;
 use crate::resource::Resources;
 
 pub struct Z2mBackend {
@@ -62,21 +63,27 @@ pub struct Z2mBackend {
     network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
     counter: u32,
+    fps: u32,
+    throttle: Throttle,
 }
 
 impl Z2mBackend {
+    const DEFAULT_FPS: u32 = 30;
+
     pub fn new(
         name: String,
         server: Z2mServer,
         config: Arc<AppConfig>,
         state: Arc<Mutex<Resources>>,
     ) -> ApiResult<Self> {
+        let fps = server.streaming_fps.map_or(Self::DEFAULT_FPS, u32::from);
         let map = HashMap::new();
         let rmap = HashMap::new();
         let ignore = HashSet::new();
         let learner = SceneLearn::new(name.clone());
         let network = HashMap::new();
         let entstream = None;
+        let throttle = Throttle::from_fps(fps);
         Ok(Self {
             name,
             server,
@@ -88,6 +95,8 @@ impl Z2mBackend {
             ignore,
             network,
             entstream,
+            throttle,
+            fps,
             counter: 0,
         })
     }
@@ -922,6 +931,8 @@ impl Z2mBackend {
                 if let Some(target) = targets.first() {
                     let mut es = EntStream::new(self.counter, target, addrs);
 
+                    log::info!("Starting entertainment mode stream at {} fps", self.fps);
+
                     es.start_stream(z2mws).await?;
 
                     self.entstream = Some(es);
@@ -930,7 +941,9 @@ impl Z2mBackend {
 
             BackendRequest::EntertainmentFrame(frame) => {
                 if let Some(es) = &mut self.entstream {
-                    es.frame(z2mws, frame).await?;
+                    if self.throttle.tick() {
+                        es.frame(z2mws, frame).await?;
+                    }
                 }
             }
 
