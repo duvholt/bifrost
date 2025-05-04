@@ -931,6 +931,13 @@ impl Z2mBackend {
                 if let Some(target) = targets.first() {
                     let mut es = EntStream::new(self.counter, target, addrs);
 
+                    // Not even a real Philips Hue bridge uses this trick!
+                    //
+                    // We set the entertainment mode fade speed ("smoothing")
+                    // to fit the target frame rate, to ensure perfectly smooth
+                    // transitionss, even at low frame rates!
+                    es.stream.set_smoothing_duration(self.throttle.interval())?;
+
                     log::info!("Starting entertainment mode stream at {} fps", self.fps);
 
                     es.start_stream(z2mws).await?;
