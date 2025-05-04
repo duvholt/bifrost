@@ -81,4 +81,8 @@ impl<T> ThrottleQueue<T> {
     pub fn pop(&mut self) -> Option<T> {
         self.queue.pop_back()
     }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
 }
