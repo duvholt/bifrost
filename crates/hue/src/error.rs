@@ -32,6 +32,9 @@ pub enum HueError {
     #[error("Failed to decode Hue Zigbee Update")]
     HueZigbeeDecodeError,
 
+    #[error("Failed to encode Hue Zigbee Update")]
+    HueZigbeeEncodeError,
+
     #[error("Failed to decode Hue Zigbee Update: Unknown flags {0:04x}")]
     HueZigbeeUnknownFlags(u16),
 
