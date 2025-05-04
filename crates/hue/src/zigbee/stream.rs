@@ -155,3 +155,46 @@ impl EntertainmentZigbeeStream {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use chrono::Duration;
+
+    use crate::zigbee::EntertainmentZigbeeStream as EZS;
+
+    #[test]
+    fn test_duration_zero() {
+        let zero_dur = Duration::seconds(0);
+        let smo = EZS::duration_to_smoothing(zero_dur).unwrap();
+        assert_eq!(smo, 0);
+    }
+
+    #[test]
+    fn test_duration_half() {
+        let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS / 2);
+        let smo = EZS::duration_to_smoothing(max_dur).unwrap();
+        assert_eq!(smo, 0x8000);
+    }
+
+    #[test]
+    fn test_duration_max() {
+        let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS - 1);
+        let smo = EZS::duration_to_smoothing(max_dur).unwrap();
+        assert_eq!(smo, 0xFFFF);
+    }
+
+    #[test]
+    fn test_duration_negative() {
+        let max_dur = Duration::microseconds(-1);
+        let smo = EZS::duration_to_smoothing(max_dur);
+        assert!(smo.is_err());
+    }
+
+    #[test]
+    fn test_duration_over_limit() {
+        let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS);
+        let smo = EZS::duration_to_smoothing(max_dur);
+        assert!(smo.is_err());
+    }
+}
