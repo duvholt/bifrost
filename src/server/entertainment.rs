@@ -108,7 +108,7 @@ impl EntertainmentService {
 
             let ts = Utc::now().timestamp();
             if period != ts {
-                log::info!("Entertainment fps: {fps}");
+                log::info!("Incoming entertainment fps: {fps}");
                 period = ts;
                 fps = 0;
             }
