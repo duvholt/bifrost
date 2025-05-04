@@ -46,7 +46,7 @@ impl EntertainmentService {
     }
 
     async fn read_frame(sess: &mut SslStream<UdpStream>, buf: &mut [u8]) -> ApiResult<usize> {
-        const TIMEOUT: Duration = Duration::from_millis(1000);
+        const TIMEOUT: Duration = Duration::from_secs(10);
 
         match timeout(TIMEOUT, sess.read(buf)).await {
             Ok(Err(err)) if err.kind() == ErrorKind::UnexpectedEof => {
@@ -70,6 +70,10 @@ impl EntertainmentService {
 
     pub async fn run_loop(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
         let mut buf = [0u8; 1024];
+
+        timeout(Duration::from_secs(2), Pin::new(&mut sess).accept())
+            .await
+            .map_err(|_| ApiError::EntStreamTimeout)??;
 
         // read the first frame, and use it to look up area, color mode, etc.
         // this means we discard the first frame, but since we expect at least
@@ -174,9 +178,8 @@ impl Service for EntertainmentService {
         loop {
             let (socket, _addr) = udp.accept().await?;
             let ssl = Ssl::new(ctx)?;
+            let stream = SslStream::new(ssl, socket)?;
 
-            let mut stream = SslStream::new(ssl, socket)?;
-            Pin::new(&mut stream).accept().await?;
             match self.run_loop(stream).await {
                 Ok(()) => log::info!("Entertainment stream finished"),
                 Err(err) => log::error!("Entertainment stream error: {err}"),
