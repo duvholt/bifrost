@@ -42,6 +42,10 @@ pub enum Z2mRequest<'a> {
     #[serde(untagged)]
     Update(&'a DeviceUpdate),
 
+    // same as Z2mRequest::Raw, but allows us to suppress logging for these
+    #[serde(untagged)]
+    EntertainmentFrame(Value),
+
     #[serde(untagged)]
     Raw(Value),
 }
