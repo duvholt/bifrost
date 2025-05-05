@@ -103,7 +103,8 @@ pub enum HueApiV1Error {
 }
 
 impl HueApiV1Error {
-    pub fn error_code(&self) -> u32 {
+    #[must_use]
+    pub const fn error_code(&self) -> u32 {
         match self {
             Self::UnauthorizedUser => 1,
             Self::BodyContainsInvalidJson => 2,
