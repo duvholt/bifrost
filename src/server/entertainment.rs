@@ -79,6 +79,7 @@ impl EntertainmentService {
         // this means we discard the first frame, but since we expect at least
         // 10 frames *per second*, this is acceptable.
         let mut sz = Self::read_frame(&mut sess, &mut buf).await?;
+        log::trace!("First entertainment frame: {}", hex::encode(&buf[..sz]));
         let header = HueStreamPacketHeader::parse(&buf[..sz])?;
 
         let lock = self.res.lock().await;
