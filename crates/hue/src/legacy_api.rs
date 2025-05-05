@@ -301,15 +301,16 @@ pub struct ApiGroupAction {
     pub colormode: Option<LightColorMode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum ApiGroupType {
     Entertainment,
+    #[default]
     LightGroup,
     Room,
     Zone,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum ApiGroupClass {
     #[serde(rename = "Living room")]
     LivingRoom,
@@ -332,6 +333,7 @@ pub enum ApiGroupClass {
     Garden,
     Driveway,
     Carport,
+    #[default]
     Other,
 
     Home,
