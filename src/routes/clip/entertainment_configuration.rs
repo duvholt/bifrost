@@ -19,11 +19,6 @@ use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
 pub async fn post_resource(state: &AppState, req: Value) -> ApiV2Result {
-    log::info!(
-        "POST: entertainment_configuration {}",
-        serde_json::to_string(&req)?
-    );
-
     let new: EntertainmentConfigurationNew = serde_json::from_value(req)?;
 
     let mut lock = state.res.lock().await;
