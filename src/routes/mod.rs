@@ -150,7 +150,6 @@ impl IntoResponse for ApiError {
             | Self::UpdateNotYetSupported(_)
             | Self::DeleteNotYetSupported(_) => StatusCode::FORBIDDEN,
 
-            Self::V1CreateUnsupported(_) => StatusCode::NOT_IMPLEMENTED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
