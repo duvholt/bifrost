@@ -54,4 +54,70 @@ pub enum HueError {
     Undiffable,
 }
 
+/// Error types for Hue Bridge v1 API
+#[derive(Error, Debug)]
+pub enum HueApiV1Error {
+    /// Type 1
+    #[error("Unauthorized")]
+    UnauthorizedUser,
+
+    /// Type 2
+    #[error("Body contains invalid JSON")]
+    BodyContainsInvalidJson,
+
+    /// Type 3
+    #[error("Resource not found")]
+    ResourceNotfound,
+
+    /// Type 4
+    #[error("Method not available for resource")]
+    MethodNotAvailableForResource,
+
+    /// Type 5
+    #[error("Missing parameters in body")]
+    MissingParametersInBody,
+
+    /// Type 6
+    #[error("Parameter not available")]
+    ParameterNotAvailable,
+
+    /// Type 7
+    #[error("Invalid value for parameter")]
+    InvalidValueForParameter,
+
+    /// Type 8
+    #[error("Parameter not modifiable")]
+    ParameterNotModifiable,
+
+    /// Type 11
+    #[error("Too many items in list")]
+    TooManyItemsInList,
+
+    /// Type 12
+    #[error("Portal connection is required")]
+    PortalConnectionIsRequired,
+
+    /// Type 901
+    #[error("Internal bridge error")]
+    BridgeInternalError,
+}
+
+impl HueApiV1Error {
+    pub fn error_code(&self) -> u32 {
+        match self {
+            Self::UnauthorizedUser => 1,
+            Self::BodyContainsInvalidJson => 2,
+            Self::ResourceNotfound => 3,
+            Self::MethodNotAvailableForResource => 4,
+            Self::MissingParametersInBody => 5,
+            Self::ParameterNotAvailable => 6,
+            Self::InvalidValueForParameter => 7,
+            Self::ParameterNotModifiable => 8,
+            Self::TooManyItemsInList => 11,
+            Self::PortalConnectionIsRequired => 12,
+            Self::BridgeInternalError => 901,
+        }
+    }
+}
+
 pub type HueResult<T> = Result<T, HueError>;
