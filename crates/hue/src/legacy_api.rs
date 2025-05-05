@@ -117,6 +117,7 @@ pub struct NewUser {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUserReply {
     pub username: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub clientkey: Option<String>,
 }
 
