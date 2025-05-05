@@ -2,6 +2,7 @@ use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::response::{IntoResponse, Response};
 use hue::error::{HueApiV1Error, HueError};
+use hue::legacy_api::ApiResourceType;
 use hyper::StatusCode;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -34,6 +35,9 @@ pub enum ApiV1Error {
 
     #[error(transparent)]
     HueApiV1(#[from] HueApiV1Error),
+
+    #[error("Cannot create resources of type: {0:?}")]
+    V1CreateUnsupported(ApiResourceType),
 }
 
 impl ApiV1Error {
@@ -44,6 +48,7 @@ impl ApiV1Error {
             Self::ApiError(_)
             | Self::HueError(_)
             | Self::SerdeJsonError(_)
+            | Self::V1CreateUnsupported(_)
             | Self::HueApiV1(
                 HueApiV1Error::UnauthorizedUser
                 | HueApiV1Error::BodyContainsInvalidJson
@@ -69,6 +74,9 @@ impl ApiV1Error {
             Self::HueApiV1(err) => err.error_code(),
             Self::ApiError(_) | Self::HueError(_) | Self::SerdeJsonError(_) => {
                 HueApiV1Error::BridgeInternalError.error_code()
+            }
+            Self::V1CreateUnsupported(_) => {
+                HueApiV1Error::MethodNotAvailableForResource.error_code()
             }
         }
     }
