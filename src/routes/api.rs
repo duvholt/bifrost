@@ -13,11 +13,11 @@ use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationMetadata,
-    EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
-    EntertainmentConfigurationStatus, EntertainmentConfigurationType, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, Position, RType, Resource, ResourceLink, Room, Scene,
-    SceneActive, SceneStatus, SceneUpdate, V1Reply,
+    Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
+    EntertainmentConfigurationMetadata, EntertainmentConfigurationNew,
+    EntertainmentConfigurationServiceLocationsNew, EntertainmentConfigurationType,
+    EntertainmentConfigurationUpdate, GroupedLight, GroupedLightUpdate, Light, LightUpdate,
+    Position, RType, ResourceLink, Room, Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
@@ -417,24 +417,40 @@ async fn put_api_user_resource_id(
     match artype {
         ApiResourceType::Groups => {
             let upd: ApiGroupUpdate2 = serde_json::from_value(req)?;
-            let mut lock = state.res.lock().await;
 
-            let uuid = lock.from_id_v1(id)?;
+            let uuid = state.res.lock().await.from_id_v1(id)?;
 
-            match lock.get_resource_by_id(&uuid)?.obj {
-                Resource::EntertainmentConfiguration(_ec) => {
-                    lock.update(&uuid, |ec: &mut EntertainmentConfiguration| {
-                        ec.status = if upd.stream.active {
-                            EntertainmentConfigurationStatus::Active
-                        } else {
-                            EntertainmentConfigurationStatus::Inactive
-                        };
-                    })?;
-                }
-                _ => {}
+            let action = if upd.stream.active {
+                EntertainmentConfigurationAction::Start
+            } else {
+                EntertainmentConfigurationAction::Stop
+            };
+
+            let ecupd = EntertainmentConfigurationUpdate {
+                configuration_type: None,
+                metadata: None,
+                action: Some(action),
+                stream_proxy: None,
+                locations: None,
+            };
+
+            let rlink = RType::EntertainmentConfiguration.link_to(uuid);
+
+            let resp = entertainment_configuration::put_resource_id(
+                &state,
+                rlink,
+                serde_json::to_value(&ecupd)?,
+            )
+            .await?;
+
+            if resp.0.errors.is_empty() {
+                let v1res = V1Reply::for_group(id)
+                    .add("stream/active", upd.stream.active)?
+                    .json();
+                Ok(Json(v1res))
+            } else {
+                Err(HueApiV1Error::BridgeInternalError)?
             }
-
-            Ok(Json(V1Reply::for_group(id).json()))
         }
         ApiResourceType::Config
         | ApiResourceType::Lights
