@@ -71,7 +71,7 @@ impl EntertainmentService {
     pub async fn run_loop(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
         let mut buf = [0u8; 1024];
 
-        timeout(Duration::from_secs(2), Pin::new(&mut sess).accept())
+        timeout(Duration::from_secs(5), Pin::new(&mut sess).accept())
             .await
             .map_err(|_| ApiError::EntStreamTimeout)??;
 
