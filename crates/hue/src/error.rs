@@ -38,9 +38,6 @@ pub enum HueError {
     #[error("Failed to decode Hue Zigbee Update: Unknown flags {0:04x}")]
     HueZigbeeUnknownFlags(u16),
 
-    #[error("State changes not supported for: {0:?}")]
-    UpdateUnsupported(RType),
-
     #[error("Resource {0} not found")]
     NotFound(uuid::Uuid),
 

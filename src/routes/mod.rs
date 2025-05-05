@@ -43,8 +43,6 @@ impl IntoResponse for ApiError {
                 | HueError::HueEntertainmentBadHeader
                 | HueError::HueZigbeeUnknownFlags(_) => StatusCode::BAD_REQUEST,
 
-                HueError::UpdateUnsupported(_) => StatusCode::NOT_ACCEPTABLE,
-
                 HueError::NotFound(_) | HueError::V1NotFound(_) | HueError::WrongType(_, _) => {
                     StatusCode::NOT_FOUND
                 }
