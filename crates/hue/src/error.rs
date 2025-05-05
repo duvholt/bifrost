@@ -55,69 +55,57 @@ pub enum HueError {
 }
 
 /// Error types for Hue Bridge v1 API
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy)]
 pub enum HueApiV1Error {
     /// Type 1
     #[error("Unauthorized")]
-    UnauthorizedUser,
+    UnauthorizedUser = 1,
 
     /// Type 2
     #[error("Body contains invalid JSON")]
-    BodyContainsInvalidJson,
+    BodyContainsInvalidJson = 2,
 
     /// Type 3
     #[error("Resource not found")]
-    ResourceNotfound,
+    ResourceNotfound = 3,
 
     /// Type 4
     #[error("Method not available for resource")]
-    MethodNotAvailableForResource,
+    MethodNotAvailableForResource = 4,
 
     /// Type 5
     #[error("Missing parameters in body")]
-    MissingParametersInBody,
+    MissingParametersInBody = 5,
 
     /// Type 6
     #[error("Parameter not available")]
-    ParameterNotAvailable,
+    ParameterNotAvailable = 6,
 
     /// Type 7
     #[error("Invalid value for parameter")]
-    InvalidValueForParameter,
+    InvalidValueForParameter = 7,
 
     /// Type 8
     #[error("Parameter not modifiable")]
-    ParameterNotModifiable,
+    ParameterNotModifiable = 8,
 
     /// Type 11
     #[error("Too many items in list")]
-    TooManyItemsInList,
+    TooManyItemsInList = 11,
 
     /// Type 12
     #[error("Portal connection is required")]
-    PortalConnectionIsRequired,
+    PortalConnectionIsRequired = 12,
 
     /// Type 901
     #[error("Internal bridge error")]
-    BridgeInternalError,
+    BridgeInternalError = 901,
 }
 
 impl HueApiV1Error {
     #[must_use]
     pub const fn error_code(&self) -> u32 {
-        match self {
-            Self::UnauthorizedUser => 1,
-            Self::BodyContainsInvalidJson => 2,
-            Self::ResourceNotfound => 3,
-            Self::MethodNotAvailableForResource => 4,
-            Self::MissingParametersInBody => 5,
-            Self::ParameterNotAvailable => 6,
-            Self::InvalidValueForParameter => 7,
-            Self::ParameterNotModifiable => 8,
-            Self::TooManyItemsInList => 11,
-            Self::PortalConnectionIsRequired => 12,
-            Self::BridgeInternalError => 901,
-        }
+        *self as u32
     }
 }
 
