@@ -141,8 +141,8 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
                 sensors: vec![],
                 state: ApiGroupState::default(),
                 stream: json!({
-                    "active": false,
-                    "owner": Value::Null,
+                    "active": entconf.active_streamer.is_some(),
+                    "owner": entconf.active_streamer,
                     "proxymode": "auto",
                     "proxynode": "/bridge"
                 }),
