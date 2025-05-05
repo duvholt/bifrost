@@ -382,6 +382,16 @@ pub struct ApiGroup {
     pub locations: Value,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiGroupNew {
+    pub name: Option<String>,
+    #[serde(default, rename = "type")]
+    pub group_type: ApiGroupType,
+    #[serde(default)]
+    pub class: ApiGroupClass,
+    pub lights: Vec<String>,
+}
+
 impl ApiGroup {
     #[must_use]
     pub fn make_group_0() -> Self {
