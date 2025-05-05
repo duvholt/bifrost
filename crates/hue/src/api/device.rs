@@ -31,8 +31,18 @@ pub struct DeviceUpdate {
 
 impl Device {
     #[must_use]
+    pub fn service(&self, rtype: RType) -> Option<&ResourceLink> {
+        self.services.iter().find(|rl| rl.rtype == rtype)
+    }
+
+    #[must_use]
     pub fn light_service(&self) -> Option<&ResourceLink> {
-        self.services.iter().find(|rl| rl.rtype == RType::Light)
+        self.service(RType::Light)
+    }
+
+    #[must_use]
+    pub fn entertainment_service(&self) -> Option<&ResourceLink> {
+        self.service(RType::Entertainment)
     }
 }
 
