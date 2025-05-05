@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use axum::Router;
 use axum::extract::{Path, State};
@@ -13,15 +13,18 @@ use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
+    Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationMetadata,
+    EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
+    EntertainmentConfigurationStatus, EntertainmentConfigurationType, GroupedLight,
+    GroupedLightUpdate, Light, LightUpdate, Position, RType, Resource, ResourceLink, Room, Scene,
     SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
-    ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
-    ApiResourceType, ApiScene, ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor,
-    ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
+    ApiGroup, ApiGroupAction, ApiGroupActionUpdate, ApiGroupClass, ApiGroupNew, ApiGroupState,
+    ApiGroupType, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
+    ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor, ApiUserConfig, Capabilities,
+    HueApiResult, NewUser, NewUserReply,
 };
 
 use crate::error::{ApiError, ApiResult};
@@ -96,10 +99,53 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
     }
 
     for rr in res.get_resources_by_type(RType::EntertainmentConfiguration) {
-        let ent: EntertainmentConfiguration = rr.obj.try_into()?;
+        let entconf: EntertainmentConfiguration = rr.obj.try_into()?;
+
+        let mut locations = BTreeMap::<String, Vec<f64>>::new();
+
+        for sl in &entconf.locations.service_locations {
+            let ent = res.get::<Entertainment>(&sl.service)?;
+            let dev = res.get::<Device>(&ent.owner)?;
+            let light_link = dev
+                .light_service()
+                .ok_or(HueError::NotFound(ent.owner.rid))?;
+
+            let idx = res.get_id_v1_index(light_link.rid)?;
+            locations.insert(
+                idx.to_string(),
+                vec![sl.position.x, sl.position.y, sl.position.z],
+            );
+        }
+
+        let class = match entconf.configuration_type {
+            EntertainmentConfigurationType::Screen => ApiGroupClass::TV,
+            EntertainmentConfigurationType::Monitor => ApiGroupClass::Computer,
+            EntertainmentConfigurationType::Music => ApiGroupClass::Music,
+            // FIXME: what does Space3D map to?
+            EntertainmentConfigurationType::Space3D | EntertainmentConfigurationType::Other => {
+                ApiGroupClass::Other
+            }
+        };
+
         rooms.insert(
             res.get_id_v1(rr.id)?,
-            ApiGroup::from_entertainment_configuration(&ent),
+            ApiGroup {
+                name: entconf.metadata.name.clone(),
+                lights: locations.keys().cloned().collect(),
+                locations: json!(locations),
+                action: ApiGroupAction::default(),
+                class,
+                group_type: ApiGroupType::Entertainment,
+                recycle: false,
+                sensors: vec![],
+                state: ApiGroupState::default(),
+                stream: json!({
+                    "active": false,
+                    "owner": Value::Null,
+                    "proxymode": "auto",
+                    "proxynode": "/bridge"
+                }),
+            },
         );
     }
 
