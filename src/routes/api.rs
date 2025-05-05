@@ -30,6 +30,7 @@ use hue::legacy_api::{
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
+use crate::routes::clip::entertainment_configuration;
 use crate::routes::extractor::Json;
 use crate::routes::{ApiV1Error, ApiV1Result};
 use crate::server::appstate::AppState;
@@ -246,12 +247,115 @@ async fn get_api_user_resource(
 }
 
 async fn post_api_user_resource(
+    state: State<AppState>,
     Path((_username, resource)): Path<(String, ApiResourceType)>,
     Json(req): Json<Value>,
 ) -> ApiV1Result<Json<Value>> {
-    warn!("POST v1 user resource unsupported");
-    warn!("Request: {req:?}");
-    Err(ApiV1Error::V1CreateUnsupported(resource))
+    // FIXME: these are copied from entertainment_configuration
+    const POSITIONS: &[Position] = &[
+        Position {
+            x: -0.4,
+            y: 0.8,
+            z: -0.4,
+        },
+        Position {
+            x: -0.4,
+            y: 0.8,
+            z: 0.4,
+        },
+        Position {
+            x: -0.22,
+            y: 0.8,
+            z: 0.4,
+        },
+        Position {
+            x: 0.0,
+            y: 0.8,
+            z: 0.4,
+        },
+        Position {
+            x: 0.22,
+            y: 0.8,
+            z: 0.4,
+        },
+        Position {
+            x: 0.4,
+            y: 0.8,
+            z: 0.4,
+        },
+        Position {
+            x: 0.4,
+            y: 0.8,
+            z: -0.4,
+        },
+    ];
+
+    // We only know how to create entertainment groups
+    let ApiResourceType::Groups = resource else {
+        warn!("POST v1 user resource unsupported");
+        warn!("Request: {req:?}");
+        return Err(ApiV1Error::V1CreateUnsupported(resource));
+    };
+
+    let group_create: ApiGroupNew = serde_json::from_value(req)?;
+    info!("Create group request: {group_create:?}");
+
+    if group_create.group_type != ApiGroupType::Entertainment {
+        return Err(ApiV1Error::V1CreateUnsupported(resource));
+    }
+
+    let lock = state.res.lock().await;
+
+    let mut service_locations = vec![];
+
+    let mut positions = POSITIONS.iter().cycle();
+
+    for id in group_create.lights {
+        let light_uuid = lock.from_id_v1(id.parse().map_err(ApiError::ParseIntError)?)?;
+        let light = lock.get_id::<Light>(light_uuid)?;
+        let device = lock.get::<Device>(&light.owner)?;
+
+        // FIXME: not the best error mapping
+        let ent_svc = device
+            .entertainment_service()
+            .ok_or(HueError::NotFound(light_uuid))?;
+
+        service_locations.push(EntertainmentConfigurationServiceLocationsNew {
+            positions: vec![positions.next().unwrap().clone()],
+            service: *ent_svc,
+        });
+    }
+
+    let ecnew = EntertainmentConfigurationNew {
+        configuration_type: EntertainmentConfigurationType::Screen,
+        metadata: EntertainmentConfigurationMetadata {
+            name: group_create
+                .name
+                .unwrap_or_else(|| String::from("Entertainment area")),
+        },
+        stream_proxy: None,
+        locations: hue::api::EntertainmentConfigurationLocationsNew { service_locations },
+    };
+
+    log::debug!("Converted to V2 create request: {ecnew:?}");
+    drop(lock);
+
+    let mut resp =
+        entertainment_configuration::post_resource(&state, serde_json::to_value(ecnew)?).await?;
+
+    // FIXME: ugly unpacking/repacking of post_resource result
+    if let Some(data) = resp.0.data.pop() {
+        let rlink: ResourceLink = serde_json::from_value(data)?;
+
+        let id = state.res.lock().await.get_id_v1_index(rlink.rid)?;
+
+        let response = json!([{"success": {"id": id}}]);
+
+        log::info!("Success: created {id} ({})", rlink.rid);
+        Ok(Json(response))
+    } else {
+        Err(ApiV1Error::V1CreateUnsupported(resource))
+    }
 }
 
 async fn put_api_user_resource(
