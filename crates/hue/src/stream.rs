@@ -70,6 +70,14 @@ impl HueStreamPacketV1 {
             HueStreamLightsV1::Xy(_) => HueStreamColorMode::Xy,
         }
     }
+
+    #[must_use]
+    pub fn light_ids(&self) -> Vec<u32> {
+        match &self.lights {
+            HueStreamLightsV1::Rgb(rgb) => rgb.iter().map(|light| light.light_id).collect(),
+            HueStreamLightsV1::Xy(xy) => xy.iter().map(|light| light.light_id).collect(),
+        }
+    }
 }
 
 impl HueStreamPacketV2 {
