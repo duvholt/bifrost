@@ -122,17 +122,12 @@ pub struct NewUserReply {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ConnectionState {
     Connected,
+    #[default]
     Disconnected,
-}
-
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
