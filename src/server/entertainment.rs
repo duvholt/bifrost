@@ -19,7 +19,7 @@ use udp_stream::{UdpListenBuilder, UdpListener, UdpStream};
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::EntertainmentConfiguration;
-use hue::stream::{HueStreamPacket, HueStreamPacketHeader};
+use hue::stream::{HueStreamPacket, HueStreamPacketV2};
 use svc::traits::Service;
 
 use crate::error::{ApiError, ApiResult};
@@ -68,6 +68,20 @@ impl EntertainmentService {
         }
     }
 
+    #[allow(clippy::unused_async)]
+    pub async fn translate_frame(
+        _res: &Resources,
+        pkt: HueStreamPacket,
+    ) -> ApiResult<HueStreamPacketV2> {
+        match pkt {
+            HueStreamPacket::V1(_v1) => {
+                log::error!("Entertainment stream version 1 not supported yet");
+                Err(ApiError::EntStreamInitError)
+            }
+            HueStreamPacket::V2(v2) => Ok(v2),
+        }
+    }
+
     pub async fn run_loop(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
         let mut buf = [0u8; 1024];
 
@@ -80,9 +94,11 @@ impl EntertainmentService {
         // 10 frames *per second*, this is acceptable.
         let mut sz = Self::read_frame(&mut sess, &mut buf).await?;
         log::trace!("First entertainment frame: {}", hex::encode(&buf[..sz]));
-        let header = HueStreamPacketHeader::parse(&buf[..sz])?;
+        let raw = HueStreamPacket::parse(&buf[..sz])?;
 
         let lock = self.res.lock().await;
+
+        let header = Self::translate_frame(&lock, raw).await?;
 
         // look up entertainment area, to make sure it exists
         let _ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
@@ -99,9 +115,10 @@ impl EntertainmentService {
             let view = &buf[..sz];
             log::trace!("Packet buffer: {}", view.escape_ascii());
 
-            let pkt = HueStreamPacket::parse(view)?;
+            let raw = HueStreamPacket::parse(view)?;
+            let pkt = Self::translate_frame(&*self.res.lock().await, raw).await?;
 
-            if pkt.color_mode != header.color_mode {
+            if pkt.color_mode() != header.color_mode() {
                 log::error!("Entertainment Mode color_mode changed mid-stream.");
                 return Err(ApiError::EntStreamDesync);
             }

@@ -1,4 +1,5 @@
 use packed_struct::prelude::*;
+use packed_struct::types::bits::ByteArray;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,107 +12,188 @@ pub enum HueStreamColorMode {
     Xy = 0x01,
 }
 
+#[derive(PrimitiveEnum_u8, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum HueStreamVersion {
+    V1 = 0x01,
+    V2 = 0x02,
+}
+
 #[derive(PackedStruct, Clone, Debug)]
-#[packed_struct(size = "52", endian = "msb")]
+#[packed_struct(size = "16", endian = "msb")]
 pub struct HueStreamHeader {
     magic: [u8; 9],
-    version: u16,
+    #[packed_field(ty = "enum", size_bytes = "1")]
+    version: HueStreamVersion,
+    x0: u8,
     seqnr: u8,
-    x0: u16,
+    x1: u16,
     #[packed_field(size_bytes = "1", ty = "enum")]
     color_mode: HueStreamColorMode,
-    x1: u8,
-    dest: [u8; 36],
+    x2: u8,
 }
 
-#[derive(Clone, Debug)]
-pub struct HueStreamPacketHeader {
-    pub color_mode: HueStreamColorMode,
-    pub area: Uuid,
-}
-
-impl HueStreamPacketHeader {
+impl HueStreamHeader {
     pub const MAGIC: &[u8] = b"HueStream";
-    pub const SIZE: usize = size_of::<<HueStreamHeader as PackedStruct>::ByteArray>();
+    pub const SIZE: usize = size_of::<<Self as PackedStruct>::ByteArray>();
 
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        let len = Self::SIZE;
-        if data.len() < len {
+        if data.len() < Self::SIZE {
             return Err(HueError::HueEntertainmentBadHeader);
         }
 
-        let hdr = HueStreamHeader::unpack_from_slice(&data[..len])?;
+        let hdr = Self::unpack_from_slice(&data[..Self::SIZE])?;
 
         if hdr.magic != Self::MAGIC {
             return Err(HueError::HueEntertainmentBadHeader);
         }
 
-        let dest = Uuid::try_parse_ascii(&hdr.dest)?;
-
-        Ok(Self {
-            color_mode: hdr.color_mode,
-            area: dest,
-        })
+        Ok(hdr)
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct HueStreamPacket {
-    pub color_mode: HueStreamColorMode,
+pub enum HueStreamPacket {
+    V1(HueStreamPacketV1),
+    V2(HueStreamPacketV2),
+}
+
+#[derive(Clone, Debug)]
+pub struct HueStreamPacketV1 {
+    pub lights: HueStreamLightsV1,
+}
+
+impl HueStreamPacketV1 {
+    #[must_use]
+    pub const fn color_mode(&self) -> HueStreamColorMode {
+        match self.lights {
+            HueStreamLightsV1::Rgb(_) => HueStreamColorMode::Rgb,
+            HueStreamLightsV1::Xy(_) => HueStreamColorMode::Xy,
+        }
+    }
+}
+
+impl HueStreamPacketV2 {
+    #[must_use]
+    pub const fn color_mode(&self) -> HueStreamColorMode {
+        match self.lights {
+            HueStreamLightsV2::Rgb(_) => HueStreamColorMode::Rgb,
+            HueStreamLightsV2::Xy(_) => HueStreamColorMode::Xy,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct HueStreamPacketV2 {
     pub area: Uuid,
-    pub lights: HueStreamLights,
+    pub lights: HueStreamLightsV2,
 }
 
 impl HueStreamPacket {
-    pub const HEADER_SIZE: usize = HueStreamPacketHeader::SIZE;
-
-    #[must_use]
-    pub const fn size_with_lights(nlights: usize) -> usize {
-        Self::HEADER_SIZE + nlights * 7
-    }
+    /// Size of uuid in printed ("dashed") form
+    const ASCII_UUID_SIZE: usize = 36;
 
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        let (header, body) = data.split_at(Self::HEADER_SIZE);
-        let hdr = HueStreamPacketHeader::parse(header)?;
-        let lights = HueStreamLights::parse(hdr.color_mode, body)?;
-
-        Ok(Self {
-            color_mode: hdr.color_mode,
-            area: hdr.area,
-            lights,
-        })
+        let (header, body) = data.split_at(HueStreamHeader::SIZE);
+        let hdr = HueStreamHeader::parse(header)?;
+        match hdr.version {
+            HueStreamVersion::V1 => {
+                let lights = HueStreamLightsV1::parse(hdr.color_mode, body)?;
+                Ok(Self::V1(HueStreamPacketV1 { lights }))
+            }
+            HueStreamVersion::V2 => {
+                let (area_bytes, body) = body.split_at(Self::ASCII_UUID_SIZE);
+                let area = Uuid::try_parse_ascii(area_bytes)?;
+                let lights = HueStreamLightsV2::parse(hdr.color_mode, body)?;
+                Ok(Self::V2(HueStreamPacketV2 { area, lights }))
+            }
+        }
     }
-}
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum HueStreamLights {
-    Rgb(Vec<Rgb16>),
-    Xy(Vec<Xy16>),
-}
-
-impl HueStreamLights {
-    pub fn parse(color_mode: HueStreamColorMode, data: &[u8]) -> HueResult<Self> {
-        let res = match color_mode {
-            HueStreamColorMode::Rgb => Self::Rgb(
-                data.chunks_exact(7)
-                    .map(Rgb16::unpack_from_slice)
-                    .collect::<Result<_, _>>()?,
-            ),
-            HueStreamColorMode::Xy => Self::Xy(
-                data.chunks_exact(7)
-                    .map(Xy16::unpack_from_slice)
-                    .collect::<Result<_, _>>()?,
-            ),
-        };
-
-        Ok(res)
+    #[must_use]
+    pub const fn color_mode(&self) -> HueStreamColorMode {
+        match self {
+            Self::V1(v1) => v1.color_mode(),
+            Self::V2(v2) => v2.color_mode(),
+        }
     }
 }
 
 #[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
+#[packed_struct(size = "9", endian = "msb")]
+pub struct Rgb16V1 {
+    #[packed_field(size_bytes = "3")]
+    pub light_id: u32,
+    #[packed_field(size_bytes = "6")]
+    pub rgb: Rgb16,
+}
+
+#[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
+#[packed_struct(size = "9", endian = "msb")]
+pub struct Xy16V1 {
+    #[packed_field(size_bytes = "3")]
+    pub light_id: u32,
+    #[packed_field(size_bytes = "6")]
+    pub xy: Xy16,
+}
+
+#[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
 #[packed_struct(size = "7", endian = "msb")]
-pub struct Rgb16 {
+pub struct Rgb16V2 {
     pub channel: u8,
+    #[packed_field(size_bytes = "6")]
+    pub rgb: Rgb16,
+}
+
+#[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
+#[packed_struct(size = "7", endian = "msb")]
+pub struct Xy16V2 {
+    pub channel: u8,
+    #[packed_field(size_bytes = "6")]
+    pub xy: Xy16,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum HueStreamLightsV1 {
+    Rgb(Vec<Rgb16V1>),
+    Xy(Vec<Xy16V1>),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum HueStreamLightsV2 {
+    Rgb(Vec<Rgb16V2>),
+    Xy(Vec<Xy16V2>),
+}
+
+fn parse_list<T: PackedStruct>(data: &[u8]) -> HueResult<Vec<T>> {
+    let res = data
+        .chunks_exact(T::ByteArray::len())
+        .map(T::unpack_from_slice)
+        .collect::<Result<_, _>>()?;
+
+    Ok(res)
+}
+
+impl HueStreamLightsV1 {
+    pub fn parse(color_mode: HueStreamColorMode, data: &[u8]) -> HueResult<Self> {
+        match color_mode {
+            HueStreamColorMode::Rgb => Ok(Self::Rgb(parse_list(data)?)),
+            HueStreamColorMode::Xy => Ok(Self::Xy(parse_list(data)?)),
+        }
+    }
+}
+
+impl HueStreamLightsV2 {
+    pub fn parse(color_mode: HueStreamColorMode, data: &[u8]) -> HueResult<Self> {
+        match color_mode {
+            HueStreamColorMode::Rgb => Ok(Self::Rgb(parse_list(data)?)),
+            HueStreamColorMode::Xy => Ok(Self::Xy(parse_list(data)?)),
+        }
+    }
+}
+
+#[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
+#[packed_struct(size = "6", endian = "msb")]
+pub struct Rgb16 {
     pub r: u16,
     pub g: u16,
     pub b: u16,
@@ -129,9 +211,8 @@ impl Rgb16 {
 }
 
 #[derive(PackedStruct, Clone, Debug, Copy, Serialize, Deserialize)]
-#[packed_struct(size = "7", endian = "msb")]
+#[packed_struct(size = "6", endian = "msb")]
 pub struct Xy16 {
-    pub channel: u8,
     pub x: u16,
     pub y: u16,
     pub b: u16,
@@ -175,7 +256,6 @@ mod tests {
     #[test]
     fn rgb16_to_xy() {
         let rgb16 = Rgb16 {
-            channel: 1,
             r: 0xFFFF,
             g: 0xFFFF,
             b: 0xFFFF,
@@ -191,7 +271,6 @@ mod tests {
     #[test]
     fn xy16_to_xy() {
         let xy16 = Xy16 {
-            channel: 1,
             x: 0x8000,
             y: 0xFFFF,
             b: 0xFFFF,

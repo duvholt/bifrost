@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use hue::api::{GroupedLightUpdate, LightUpdate, ResourceLink, RoomUpdate, Scene, SceneUpdate};
-use hue::stream::HueStreamLights;
+use hue::stream::HueStreamLightsV2;
 
 use crate::Client;
 use crate::config::Z2mServer;
@@ -23,7 +23,7 @@ pub enum BackendRequest {
     Delete(ResourceLink),
 
     EntertainmentStart(Uuid),
-    EntertainmentFrame(HueStreamLights),
+    EntertainmentFrame(HueStreamLightsV2),
     EntertainmentStop(),
 }
 
