@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::os::fd::AsFd;
@@ -16,10 +17,15 @@ use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tokio_openssl::SslStream;
 use udp_stream::{UdpListenBuilder, UdpListener, UdpStream};
+use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
-use hue::api::EntertainmentConfiguration;
-use hue::stream::{HueStreamPacket, HueStreamPacketV2};
+use hue::api::{Device, EntertainmentConfiguration, Light, RType};
+use hue::error::HueError;
+use hue::stream::{
+    HueStreamLightsV1, HueStreamLightsV2, HueStreamPacket, HueStreamPacketV1, HueStreamPacketV2,
+    Rgb16V2, Xy16V2,
+};
 use svc::traits::Service;
 
 use crate::error::{ApiError, ApiResult};
@@ -68,16 +74,119 @@ impl EntertainmentService {
         }
     }
 
-    #[allow(clippy::unused_async)]
-    pub async fn translate_frame(
-        _res: &Resources,
-        pkt: HueStreamPacket,
+    #[allow(clippy::unused_async, unreachable_code, unused_variables)]
+    pub fn translate_v1_frame(
+        res: &Resources,
+        v1: HueStreamPacketV1,
     ) -> ApiResult<HueStreamPacketV2> {
-        match pkt {
-            HueStreamPacket::V1(_v1) => {
-                log::error!("Entertainment stream version 1 not supported yet");
-                Err(ApiError::EntStreamInitError)
+        let mut lights = BTreeMap::new();
+        for id_v1 in v1.light_ids() {
+            let uuid = res.from_id_v1(id_v1)?;
+            lights.insert(id_v1, uuid);
+        }
+        let light_ids: BTreeSet<_> = lights.values().copied().collect();
+
+        let mut best_included = 0;
+        let mut best_excluded = 0;
+        let mut best_area = None;
+
+        for uuid in res.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+            let entconf = res.get_id::<EntertainmentConfiguration>(uuid)?;
+
+            let ent_light_ids: BTreeSet<Uuid> =
+                entconf.light_services.iter().map(|ls| ls.rid).collect();
+
+            let included = light_ids.intersection(&ent_light_ids).count();
+            let excluded = light_ids.difference(&ent_light_ids).count();
+
+            if (included > best_included)
+                || ((included == best_included) && (excluded < best_excluded))
+            {
+                log::trace!("Found candidate entertainment_configuration: {uuid}");
+                log::trace!("  lights included: {included}");
+                log::trace!("  lights excluded: {excluded}");
+                best_included = included;
+                best_excluded = excluded;
+                best_area = Some(uuid);
             }
+        }
+
+        if let Some(area) = best_area {
+            let mut mapping = BTreeMap::new();
+            for (id_v1, id) in &lights {
+                let light: &Light = res.get_id(*id)?;
+                let dev: &Device = res.get(&light.owner)?;
+                let ent_svc = dev.entertainment_service().ok_or(HueError::NotFound(*id))?;
+
+                mapping.insert(*id_v1, ent_svc.rid);
+            }
+
+            let entconf = res.get_id::<EntertainmentConfiguration>(area)?;
+
+            let lights = match v1.lights {
+                HueStreamLightsV1::Rgb(rgb16_v1s) => {
+                    let mut v2 = vec![];
+
+                    for rgb in rgb16_v1s {
+                        let ent = mapping[&rgb.light_id];
+                        for chan in &entconf.channels {
+                            for member in &chan.members {
+                                if member.service.rid != ent {
+                                    continue;
+                                }
+
+                                v2.push(Rgb16V2 {
+                                    channel: u8::try_from(chan.channel_id)?,
+                                    rgb: rgb.rgb,
+                                });
+
+                                // there's almost always just a single
+                                // member for each channel, but we don't
+                                // want to add the light multiple times
+                                break;
+                            }
+                        }
+                    }
+
+                    HueStreamLightsV2::Rgb(v2)
+                }
+                HueStreamLightsV1::Xy(xy16_v1s) => {
+                    let mut v2 = vec![];
+
+                    for xy in xy16_v1s {
+                        let ent = mapping[&xy.light_id];
+                        for chan in &entconf.channels {
+                            for member in &chan.members {
+                                if member.service.rid != ent {
+                                    continue;
+                                }
+
+                                v2.push(Xy16V2 {
+                                    channel: u8::try_from(chan.channel_id)?,
+                                    xy: xy.xy,
+                                });
+
+                                // there's almost always just a single
+                                // member for each channel, but we don't
+                                // want to add the light multiple times
+                                break;
+                            }
+                        }
+                    }
+
+                    HueStreamLightsV2::Xy(v2)
+                }
+            };
+
+            Ok(HueStreamPacketV2 { area, lights })
+        } else {
+            Err(ApiError::EntStreamInitError)
+        }
+    }
+
+    pub fn translate_frame(res: &Resources, pkt: HueStreamPacket) -> ApiResult<HueStreamPacketV2> {
+        match pkt {
+            HueStreamPacket::V1(v1) => Self::translate_v1_frame(res, v1),
             HueStreamPacket::V2(v2) => Ok(v2),
         }
     }
@@ -98,7 +207,7 @@ impl EntertainmentService {
 
         let lock = self.res.lock().await;
 
-        let header = Self::translate_frame(&lock, raw).await?;
+        let header = Self::translate_frame(&lock, raw)?;
 
         // look up entertainment area, to make sure it exists
         let _ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
@@ -116,7 +225,7 @@ impl EntertainmentService {
             log::trace!("Packet buffer: {}", view.escape_ascii());
 
             let raw = HueStreamPacket::parse(view)?;
-            let pkt = Self::translate_frame(&*self.res.lock().await, raw).await?;
+            let pkt = Self::translate_frame(&*self.res.lock().await, raw)?;
 
             if pkt.color_mode() != header.color_mode() {
                 log::error!("Entertainment Mode color_mode changed mid-stream.");
