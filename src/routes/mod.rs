@@ -41,6 +41,7 @@ impl IntoResponse for ApiError {
                 | HueError::PackedStructError(_)
                 | HueError::UuidError(_)
                 | HueError::HueEntertainmentBadHeader
+                | HueError::EffectDurationOutOfRange(_)
                 | HueError::HueZigbeeUnknownFlags(_) => StatusCode::BAD_REQUEST,
 
                 HueError::UpdateUnsupported(_) | HueError::WrongType(_, _) => {

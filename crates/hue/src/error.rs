@@ -52,6 +52,9 @@ pub enum HueError {
 
     #[error("Cannot generate json difference between non-map objects")]
     Undiffable,
+
+    #[error("Effect duration out of range: {0}")]
+    EffectDurationOutOfRange(u32)
 }
 
 pub type HueResult<T> = Result<T, HueError>;

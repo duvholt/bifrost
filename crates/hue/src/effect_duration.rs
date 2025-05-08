@@ -1,3 +1,5 @@
+use crate::{error::HueResult};
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct EffectDuration(pub u8);
 
@@ -20,9 +22,8 @@ const RESOLUTION_01M_LIMIT: u32 = 60 * 60; // 60min.
 const RESOLUTION_05M_LIMIT: u32 = 6 * 60 * 60; // 06hrs.
 
 impl EffectDuration {
-    #[must_use]
     #[allow(clippy::cast_possible_truncation)]
-    pub const fn from_seconds(seconds: u32) -> Self {
+    pub const fn from_seconds(seconds: u32) -> HueResult<Self> {
         let (base, resolution) = if seconds < RESOLUTION_01S_LIMIT {
             (RESOLUTION_01S_BASE, RESOLUTION_01S)
         } else if seconds < RESOLUTION_05S_LIMIT {
@@ -34,9 +35,9 @@ impl EffectDuration {
         } else if seconds < RESOLUTION_05M_LIMIT {
             (RESOLUTION_05M_BASE, RESOLUTION_05M)
         } else {
-            return Self(0);
+            return Err(crate::error::HueError::EffectDurationOutOfRange(seconds));
         };
-        Self(base - ((seconds / resolution) as u8))
+        Ok(Self(base - ((seconds / resolution) as u8)))
     }
 }
 
@@ -63,9 +64,15 @@ mod tests {
         ];
         for (input, output) in values {
             assert_eq!(
-                EffectDuration::from_seconds(input * 60),
+                EffectDuration::from_seconds(input * 60).unwrap(),
                 EffectDuration(output)
             );
         }
+    }
+
+    #[test]
+    pub fn out_of_range() {
+        let seconds = 10 * 60 * 60; // 10h
+        assert!(EffectDuration::from_seconds(seconds).is_err());
     }
 }
