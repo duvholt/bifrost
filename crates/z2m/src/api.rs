@@ -43,11 +43,35 @@ pub enum Message {
     #[serde(rename = "bridge/converters")]
     BridgeConverters(Value),
 
+    #[serde(rename = "bridge/response/options")]
+    BridgeOptions(Value),
+
+    #[serde(rename = "bridge/response/touchlink/scan")]
+    BridgeTouchlinkScan(Value),
+
+    #[serde(rename = "bridge/response/permit_join")]
+    BridgePermitJoin(Value),
+
+    #[serde(rename = "bridge/response/networkmap")]
+    BridgeNetworkmap(Value),
+
+    #[serde(rename = "bridge/response/device/remove")]
+    BridgeDeviceRemove(Value),
+
     #[serde(rename = "bridge/response/group/members/add")]
     BridgeGroupMembersAdd(GroupMemberChangeResponse),
 
     #[serde(rename = "bridge/response/group/members/remove")]
     BridgeGroupMembersRemove(GroupMemberChangeResponse),
+
+    #[serde(rename = "bridge/response/device/options")]
+    BridgeDeviceOptions(Value),
+
+    #[serde(rename = "bridge/response/device/configure_reporting")]
+    BridgeDeviceConfigureReporting(Value),
+
+    #[serde(rename = "bridge/response/device/ota_update/check")]
+    BridgeDeviceOtaUpdateCheck(Value),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

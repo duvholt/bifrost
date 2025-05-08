@@ -491,6 +491,14 @@ impl Z2mBackend {
             Message::BridgeDefinitions(obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeState(obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeConverters(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgeOptions(obj) => { /* println!("{obj:#?}"); */ }
+            Message::BridgePermitJoin(obj) => {}
+            Message::BridgeDeviceRemove(obj) => {}
+            Message::BridgeTouchlinkScan(obj) => {}
+            Message::BridgeDeviceOptions(obj) => {}
+            Message::BridgeNetworkmap(obj) => {}
+            Message::BridgeDeviceOtaUpdateCheck(obj) => {}
+            Message::BridgeDeviceConfigureReporting(obj) => {}
 
             Message::BridgeDevices(obj) => {
                 for dev in obj {
