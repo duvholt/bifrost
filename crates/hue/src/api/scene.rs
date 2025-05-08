@@ -4,7 +4,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink};
+use crate::api::{
+    ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, LightGradientUpdate, On, ResourceLink,
+};
 use crate::date_format;
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -88,7 +90,7 @@ pub struct SceneAction {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on: Option<On>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gradient: Option<Value>,
+    pub gradient: Option<LightGradientUpdate>,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub effects: Value,
 }
