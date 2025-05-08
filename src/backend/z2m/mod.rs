@@ -987,6 +987,10 @@ impl Z2mBackend {
                     drop(lock);
                 }
             }
+
+            BackendRequest::ZigbeeDeviceDiscovery(_rlink, _zbd) => {
+                z2mws.send_permit_join(60 * 4, None).await?;
+            }
         }
 
         Ok(())

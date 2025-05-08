@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use hue::api::{GroupedLightUpdate, LightUpdate, ResourceLink, RoomUpdate, Scene, SceneUpdate};
+use hue::api::{
+    GroupedLightUpdate, LightUpdate, ResourceLink, RoomUpdate, Scene, SceneUpdate,
+    ZigbeeDeviceDiscoveryUpdate,
+};
 use hue::stream::HueStreamLightsV2;
 
 use crate::Client;
@@ -25,6 +28,8 @@ pub enum BackendRequest {
     EntertainmentStart(Uuid),
     EntertainmentFrame(HueStreamLightsV2),
     EntertainmentStop(),
+
+    ZigbeeDeviceDiscovery(ResourceLink, ZigbeeDeviceDiscoveryUpdate),
 }
 
 impl Client {

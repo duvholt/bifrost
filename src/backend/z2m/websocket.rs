@@ -6,7 +6,7 @@ use hue::zigbee::{HueZigbeeUpdate, ZigbeeMessage};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-use z2m::api::GroupMemberChange;
+use z2m::api::{GroupMemberChange, PermitJoin};
 use z2m::request::Z2mPayload;
 use z2m::update::DeviceUpdate;
 use z2m::{api::RawMessage, request::Z2mRequest};
@@ -45,6 +45,10 @@ impl Z2mWebSocket {
             },
             Z2mRequest::GroupMemberRemove(value) => RawMessage {
                 topic: "bridge/request/group/members/remove".into(),
+                payload: serde_json::to_value(value)?,
+            },
+            Z2mRequest::PermitJoin(value) => RawMessage {
+                topic: "bridge/request/permit_join".into(),
                 payload: serde_json::to_value(value)?,
             },
             _ => RawMessage {
@@ -145,6 +149,12 @@ impl Z2mWebSocket {
         };
 
         self.send(topic, &z2mreq).await
+    }
+
+    pub async fn send_permit_join(&mut self, time: u32, device: Option<String>) -> ApiResult<()> {
+        let z2mreq = Z2mRequest::PermitJoin(PermitJoin { time, device });
+
+        self.send("", &z2mreq).await
     }
 }
 
