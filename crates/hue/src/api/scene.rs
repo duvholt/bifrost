@@ -151,6 +151,26 @@ impl SceneUpdate {
     }
 }
 
+impl AddAssign<SceneUpdate> for Scene {
+    fn add_assign(&mut self, upd: SceneUpdate) {
+        if let Some(actions) = upd.actions {
+            self.actions = actions;
+        }
+        if let Some(md) = upd.metadata {
+            self.metadata += md;
+        }
+        if let Some(palette) = upd.palette {
+            self.palette = palette;
+        }
+        if let Some(speed) = upd.speed {
+            self.speed = speed;
+        }
+        if let Some(auto_dynamic) = upd.auto_dynamic {
+            self.auto_dynamic = auto_dynamic;
+        }
+    }
+}
+
 impl AddAssign<SceneMetadataUpdate> for SceneMetadata {
     fn add_assign(&mut self, upd: SceneMetadataUpdate) {
         if let Some(appdata) = upd.appdata {
