@@ -76,11 +76,10 @@ pub struct BehaviorInstance {
     pub state: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub migrated_from: Option<Value>,
-    pub configuration: BehaviorInstanceConfiguration,
+    pub configuration: Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(untagged)]
 pub enum BehaviorInstanceConfiguration {
     Wakeup(WakeupConfiguration),
 }
@@ -211,7 +210,14 @@ impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
         }
 
         if let Some(configuration) = upd.configuration {
-            self.configuration = configuration;
+            match serde_json::to_value(configuration) {
+                Ok(value) => {
+                    self.configuration = value;
+                },
+                Err(err) => {
+                    // todo: what do we do here?
+                },
+            }
         }
     }
 }
