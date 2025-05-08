@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use maplit::btreeset;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::sync::Notify;
 use tokio::sync::broadcast::{Receiver, Sender};
 use uuid::Uuid;
@@ -14,7 +14,7 @@ use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink,
     ResourceRecord, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
-    ZigbeeDeviceDiscovery,
+    ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus,
 };
 use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
@@ -262,8 +262,11 @@ impl Resources {
 
         let zbdd = ZigbeeDeviceDiscovery {
             owner: link_bridge_dev,
-            status: String::from("ready"),
-            action: Value::Null,
+            status: ZigbeeDeviceDiscoveryStatus::Ready,
+            action: ZigbeeDeviceDiscoveryAction {
+                action_type_values: vec![],
+                search_codes: vec![],
+            },
         };
 
         let zbc = ZigbeeConnectivity {

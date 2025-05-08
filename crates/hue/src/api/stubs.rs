@@ -240,15 +240,6 @@ pub struct ZigbeeConnectivity {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ZigbeeDeviceDiscovery {
-    pub owner: ResourceLink,
-    pub status: String,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Value::is_null")]
-    pub action: Value,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Zone {
     pub metadata: Metadata,
     pub children: BTreeSet<ResourceLink>,
