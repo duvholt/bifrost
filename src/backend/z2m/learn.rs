@@ -5,9 +5,10 @@ use serde_json::json;
 use uuid::Uuid;
 
 use hue::api::{
-    ColorTemperatureUpdate, ColorUpdate, Light, RType, ResourceLink, Room, Scene, SceneAction,
-    SceneActionElement,
+    ColorTemperatureUpdate, ColorUpdate, Light, LightGradientPoint, LightGradientUpdate, RType,
+    ResourceLink, Room, Scene, SceneAction, SceneActionElement,
 };
+use z2m::hexcolor::HexColor;
 use z2m::update::{DeviceColor, DeviceUpdate};
 
 use crate::error::ApiResult;
@@ -80,6 +81,7 @@ impl SceneLearn {
         Ok(())
     }
 
+    #[allow(clippy::option_if_let_else, clippy::manual_map)]
     pub fn learn(&mut self, uuid: &Uuid, res: &Resources, upd: &DeviceUpdate) -> ApiResult<()> {
         for learn in self.scenes.values_mut() {
             if !learn.missing.remove(uuid) {
@@ -96,6 +98,22 @@ impl SceneLearn {
                 color_temperature = Some(ColorTemperatureUpdate::new(mirek));
             }
 
+            let gradient = if let Some(grad) = &upd.gradient {
+                Some(LightGradientUpdate {
+                    mode: None,
+                    points: grad
+                        .iter()
+                        .map(|p| LightGradientPoint {
+                            color: ColorUpdate {
+                                xy: HexColor::to_xy_color(p),
+                            },
+                        })
+                        .collect(),
+                })
+            } else {
+                None
+            };
+
             learn.known.insert(
                 *uuid,
                 SceneAction {
@@ -103,7 +121,7 @@ impl SceneLearn {
                     color_temperature,
                     dimming: light.as_dimming_opt(),
                     on: Some(light.on),
-                    gradient: None,
+                    gradient,
                     effects: json!({}),
                 },
             );
