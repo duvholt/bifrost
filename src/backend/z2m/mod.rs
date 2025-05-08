@@ -500,7 +500,6 @@ impl Z2mBackend {
             Message::BridgeConverters(obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgeOptions(obj) => { /* println!("{obj:#?}"); */ }
             Message::BridgePermitJoin(obj) => {}
-            Message::BridgeDeviceRemove(obj) => {}
             Message::BridgeTouchlinkScan(obj) => {}
             Message::BridgeDeviceOptions(obj) => {}
             Message::BridgeNetworkmap(obj) => {}
@@ -580,6 +579,18 @@ impl Z2mBackend {
                             _ => unreachable!(),
                         }
                     }
+                }
+            }
+
+            Message::BridgeDeviceRemove(obj) => {
+                if let Some(rlink) = self.map.get(&obj.data.id) {
+                    self.state.lock().await.delete(rlink)?;
+
+                    log::warn!("Device removed: {rlink:?}");
+                }
+
+                if let Some(rlink) = self.map.remove(&obj.data.id) {
+                    self.rmap.retain(|_, v| *v != obj.data.id);
                 }
             }
         }
