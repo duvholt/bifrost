@@ -5,6 +5,7 @@ pub mod zclcommand;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
@@ -15,8 +16,8 @@ use native_tls::TlsConnector;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::select;
-use tokio::sync::Mutex;
 use tokio::sync::broadcast::Receiver;
+use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
 use tokio_tungstenite::{Connector, connect_async_tls_with_config, tungstenite};
 use uuid::Uuid;
@@ -39,7 +40,7 @@ use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
-use z2m::update::{DeviceColorMode, DeviceUpdate};
+use z2m::update::{DeviceColorMode, DeviceEffect, DeviceUpdate};
 
 use crate::backend::Backend;
 use crate::backend::z2m::entertainment::EntStream;
@@ -65,10 +66,15 @@ pub struct Z2mBackend {
     counter: u32,
     fps: u32,
     throttle: Throttle,
+
+    // for sending delayed messages over the websocket
+    message_rx: mpsc::UnboundedReceiver<(String, DeviceUpdate)>,
+    message_tx: mpsc::UnboundedSender<(String, DeviceUpdate)>,
 }
 
 impl Z2mBackend {
     const DEFAULT_FPS: u32 = 20;
+    const LIGHT_BREATHE_DURATION: Duration = Duration::from_secs(2);
 
     pub fn new(
         name: String,
@@ -84,6 +90,7 @@ impl Z2mBackend {
         let network = HashMap::new();
         let entstream = None;
         let throttle = Throttle::from_fps(fps);
+        let (message_tx, message_rx) = mpsc::unbounded_channel();
         Ok(Self {
             name,
             server,
@@ -97,6 +104,8 @@ impl Z2mBackend {
             entstream,
             throttle,
             fps,
+            message_rx,
+            message_tx,
             counter: 0,
         })
     }
@@ -781,6 +790,23 @@ impl Z2mBackend {
                         payload = payload.with_gradient(upd.gradient.clone());
                     }
 
+                    // handle "identify" request (light breathing)
+                    if upd.identify.is_some() {
+                        // update immediate payload with breathe effect
+                        payload = payload.with_effect(DeviceEffect::Breathe);
+
+                        let tx = self.message_tx.clone();
+                        let topic = topic.clone();
+
+                        // spawn task to stop effect after a few seconds
+                        let _job = tokio::spawn(async move {
+                            sleep(Self::LIGHT_BREATHE_DURATION).await;
+
+                            let upd = DeviceUpdate::new().with_effect(DeviceEffect::FinishEffect);
+                            tx.send((topic, upd))
+                        });
+                    }
+
                     z2mws.send_update(topic, &payload).await?;
 
                     /* step 2: if supported (and needed) send hue-specific effects update */
@@ -1051,6 +1077,9 @@ impl Z2mBackend {
                 pkt = socket.next() => {
                     self.websocket_read(pkt.ok_or(ApiError::UnexpectedZ2mEof)??).await?;
                 },
+                Some((topic, upd)) = self.message_rx.recv() => {
+                    socket.send_update(&topic, &upd).await?;
+                }
             };
         }
     }
@@ -1107,7 +1136,7 @@ impl Backend for Z2mBackend {
                     log::error!("[{}] Connect failed: {err:?}", self.name);
                 }
             }
-            sleep(std::time::Duration::from_millis(2000)).await;
+            sleep(Duration::from_millis(2000)).await;
         }
     }
 }
