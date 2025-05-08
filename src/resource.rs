@@ -188,6 +188,40 @@ impl Resources {
 
     pub fn delete(&mut self, link: &ResourceLink) -> ApiResult<()> {
         log::info!("Deleting {link:?}..");
+
+        // Delete references to this object from other objects
+        for obj in self.state.res.values_mut() {
+            match obj {
+                Resource::BridgeHome(bridge_home) => {
+                    bridge_home.children.remove(link);
+                    bridge_home.services.remove(link);
+                }
+                Resource::Device(device) => {
+                    device.services.remove(link);
+                }
+                Resource::Room(room) => {
+                    room.children.remove(link);
+                    room.services.remove(link);
+                }
+                Resource::Zone(zone) => {
+                    zone.children.remove(link);
+                    zone.services.remove(link);
+                }
+
+                Resource::ServiceGroup(_value) => { /* FIXME: not modelled */ }
+
+                _ => {}
+            }
+        }
+
+        // When deleting lights, remove owning device as well
+        if let Some(owner) = self.get_resource(link)?.obj.owner() {
+            if link.rtype == RType::Light && owner.rtype == RType::Device {
+                self.delete(&owner)?;
+            }
+        }
+
+        // Remove object from state database
         self.state.remove(&link.rid)?;
 
         self.state_updates.notify_one();
