@@ -805,14 +805,15 @@ impl Z2mBackend {
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
-                if let Some(recall) = &upd.recall {
-                    let scene = lock.get::<Scene>(link)?;
-                    if recall.action == Some(SceneStatusEnum::Active) {
-                        let index = lock
-                            .aux_get(link)?
-                            .index
-                            .ok_or(HueError::NotFound(link.rid))?;
+                let scene = lock.get::<Scene>(link)?;
 
+                let index = lock
+                    .aux_get(link)?
+                    .index
+                    .ok_or(HueError::NotFound(link.rid))?;
+
+                if let Some(recall) = &upd.recall {
+                    if recall.action == Some(SceneStatusEnum::Active) {
                         let scenes = lock.get_scenes_for_room(&scene.group.rid);
                         for rid in scenes {
                             lock.update::<Scene>(&rid, |scn| {
@@ -840,6 +841,24 @@ impl Z2mBackend {
                         }
                     } else {
                         log::error!("Scene recall type not supported: {recall:?}");
+                    }
+                } else {
+                    // We're not recalling the scene, so we are updating the scene
+                    let room = lock.get::<Scene>(link)?.group;
+
+                    if let Some(topic) = self.rmap.get(&room).cloned() {
+                        log::info!("[{}] Store scene: {link:?}", self.name);
+
+                        let scene = lock.get::<Scene>(link)?;
+                        z2mws
+                            .send_scene_store(&topic, &scene.metadata.name, index)
+                            .await?;
+
+                        // We have requested z2m to update the scene, so update
+                        // the state database accordingly
+                        lock.update::<Scene>(&link.rid, |scene| {
+                            *scene += upd.clone();
+                        })?;
                     }
                 }
             }
