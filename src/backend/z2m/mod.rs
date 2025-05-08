@@ -415,6 +415,13 @@ impl Z2mBackend {
     }
 
     pub async fn handle_update(&mut self, rid: &Uuid, payload: &Value) -> ApiResult<()> {
+        if let Value::String(string) = payload {
+            if string.is_empty() {
+                log::debug!("Ignoring empty payload for {rid}");
+                return Ok(());
+            }
+        }
+
         let upd = DeviceUpdate::deserialize(payload)?;
 
         let obj = self.state.lock().await.get_resource_by_id(rid)?.obj;
