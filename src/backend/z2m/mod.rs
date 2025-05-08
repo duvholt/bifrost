@@ -684,6 +684,8 @@ impl Z2mBackend {
 
         let raw_msg = serde_json::from_str::<RawMessage>(&txt);
 
+        log::trace!("[{}] Incoming z2m message: {txt}", self.name);
+
         let msg = raw_msg.map_err(|err| {
             log::error!(
                 "[{}] Invalid websocket message: {:#?} [{}..]",
