@@ -1,7 +1,8 @@
 #![allow(clippy::struct_excessive_bools)]
 
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -56,7 +57,7 @@ pub enum Message {
     BridgeNetworkmap(Value),
 
     #[serde(rename = "bridge/response/device/remove")]
-    BridgeDeviceRemove(Value),
+    BridgeDeviceRemove(BridgeDeviceRemoveResponse),
 
     #[serde(rename = "bridge/response/group/members/add")]
     BridgeGroupMembersAdd(GroupMemberChangeResponse),
@@ -85,10 +86,15 @@ pub enum Endpoint {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GroupMemberChangeResponse {
-    pub data: GroupMemberChange,
+pub struct BridgeResponse<T> {
+    pub data: T,
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction: Option<String>,
 }
+
+pub type BridgeDeviceRemoveResponse = BridgeResponse<DeviceRemoveResponse>;
+pub type GroupMemberChangeResponse = BridgeResponse<GroupMemberChange>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GroupMemberChange {
@@ -104,6 +110,13 @@ pub struct GroupMemberChange {
 pub struct PermitJoin {
     pub time: u32,
     pub device: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceRemoveResponse {
+    pub id: String,
+    pub block: bool,
+    pub force: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]
