@@ -14,8 +14,15 @@ pub enum ZigbeeDeviceDiscoveryStatus {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ZigbeeDeviceDiscoveryAction {
     pub action_type_values: Vec<Value>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub search_codes: Vec<String>,
+}
+
+impl ZigbeeDeviceDiscoveryAction {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.action_type_values.is_empty()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -23,8 +30,7 @@ pub struct ZigbeeDeviceDiscovery {
     pub owner: ResourceLink,
     pub status: ZigbeeDeviceDiscoveryStatus,
 
-    /* FIXME: Needed to import previous state files which lack this field */
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "ZigbeeDeviceDiscoveryAction::is_empty")]
     pub action: ZigbeeDeviceDiscoveryAction,
 }
 
