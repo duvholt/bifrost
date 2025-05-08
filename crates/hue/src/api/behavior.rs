@@ -2,9 +2,9 @@ use std::ops::AddAssign;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use uuid::{uuid, Uuid};
+use uuid::{Uuid, uuid};
 
-use super::DollarRef;
+use super::{DollarRef, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BehaviorScript {
@@ -59,10 +59,10 @@ where
     Ok(Some(Value::deserialize(deserializer)?))
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct BehaviorInstance {
     #[serde(default)]
-    pub dependees: Vec<Value>,
+    pub dependees: Vec<BehaviorInstanceDependee>,
     pub enabled: bool,
     pub last_error: Option<String>,
     pub metadata: BehaviorInstanceMetadata,
@@ -157,6 +157,21 @@ pub mod configuration {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct BehaviorInstanceDependee {
+    #[serde(rename = "type")]
+    pub type_field: Option<String>,
+    pub target: ResourceLink,
+    pub level: BehaviorInstanceDependeeLevel,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BehaviorInstanceDependeeLevel {
+    Critical,
+    NonCritical,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct BehaviorInstanceMetadata {
     pub name: String,
 }
@@ -213,10 +228,10 @@ impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
             match serde_json::to_value(configuration) {
                 Ok(value) => {
                     self.configuration = value;
-                },
+                }
                 Err(err) => {
                     // todo: what do we do here?
-                },
+                }
             }
         }
     }
