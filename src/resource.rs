@@ -519,7 +519,7 @@ impl Resources {
 
     pub fn backend_request(&self, req: BackendRequest) -> ApiResult<()> {
         if !matches!(req, BackendRequest::EntertainmentFrame(_)) {
-            log::debug!("z2m request: {req:#?}");
+            log::debug!("Backend request: {req:#?}");
         }
 
         self.backend_updates.send(Arc::new(req))?;
