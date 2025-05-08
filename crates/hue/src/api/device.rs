@@ -27,6 +27,8 @@ pub struct DeviceUpdate {
     pub services: Option<Vec<ResourceLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub product_data: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identify: Option<DeviceIdentifyUpdate>,
 }
 
 impl Device {
@@ -44,6 +46,17 @@ impl Device {
     pub fn entertainment_service(&self) -> Option<&ResourceLink> {
         self.service(RType::Entertainment)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceIdentify {
+    Identify,
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+pub struct DeviceIdentifyUpdate {
+    pub action: DeviceIdentify,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]

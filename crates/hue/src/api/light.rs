@@ -4,6 +4,7 @@ use std::ops::{AddAssign, Sub};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::api::device::DeviceIdentifyUpdate;
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::hs::HS;
 use crate::legacy_api::ApiLightStateUpdate;
@@ -627,6 +628,8 @@ pub struct LightUpdate {
     pub powerup: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamics: Option<LightDynamicsUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identify: Option<DeviceIdentifyUpdate>,
 }
 
 impl LightUpdate {
@@ -673,6 +676,11 @@ impl LightUpdate {
             color: hs.into().map(|hs| XY::from_hs(hs).0).map(ColorUpdate::new),
             ..self
         }
+    }
+
+    #[must_use]
+    pub fn with_identify(self, identify: Option<DeviceIdentifyUpdate>) -> Self {
+        Self { identify, ..self }
     }
 
     #[must_use]
