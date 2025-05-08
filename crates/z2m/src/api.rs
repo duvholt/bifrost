@@ -76,6 +76,12 @@ pub struct GroupMemberChange {
     pub skip_disable_reporting: Option<bool>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PermitJoin {
+    pub time: u32,
+    pub device: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Availability {
