@@ -203,6 +203,18 @@ impl From<EntertainmentConfigurationServiceLocationsNew>
     }
 }
 
+impl From<EntertainmentConfigurationLocationsNew> for EntertainmentConfigurationLocationsUpdate {
+    fn from(value: EntertainmentConfigurationLocationsNew) -> Self {
+        Self {
+            service_locations: value
+                .service_locations
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EntertainmentConfigurationServiceLocationsUpdate {
     pub equalization_factor: Option<f64>,
