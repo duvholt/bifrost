@@ -971,10 +971,9 @@ impl Z2mBackend {
     }
 
     async fn backend_delete(&self, z2mws: &mut Z2mWebSocket, link: &ResourceLink) -> ApiResult<()> {
-        let lock = self.state.lock().await;
-
         match link.rtype {
             RType::Scene => {
+                let lock = self.state.lock().await;
                 let room = lock.get::<Scene>(link)?.group;
                 let index = lock
                     .aux_get(link)?
