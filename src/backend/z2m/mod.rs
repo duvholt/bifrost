@@ -747,65 +747,67 @@ impl Z2mBackend {
         link: &ResourceLink,
         upd: &LightUpdate,
     ) -> ApiResult<()> {
-        if let Some(topic) = self.rmap.get(link) {
-            let mut lock = self.state.lock().await;
+        let Some(topic) = self.rmap.get(link) else {
+            return Ok(());
+        };
 
-            // We cannot recover .mode from backend updates, since these only contain
-            // the gradient colors. So we have no choice, but to update the mode
-            // here. Otherwise, the information would be lost.
-            if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
-                lock.update::<Light>(&link.rid, |light| {
-                    if let Some(gr) = &mut light.gradient {
-                        gr.mode = mode;
-                    }
-                })?;
-            }
-            let hue_effects = lock.get::<Light>(link)?.effects.is_some();
-            drop(lock);
+        let mut lock = self.state.lock().await;
 
-            /* step 1: send generic light update */
-            let mut payload = DeviceUpdate::default()
-                .with_state(upd.on.map(|on| on.on))
-                .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
-                .with_color_xy(upd.color.map(|col| col.xy));
-
-            // We don't want to send gradient updates twice, but if hue
-            // effects are not supported for this light, this is the best
-            // (and only) way to do it
-            if !hue_effects {
-                payload = payload.with_gradient(upd.gradient.clone());
-            }
-
-            // handle "identify" request (light breathing)
-            if upd.identify.is_some() {
-                // update immediate payload with breathe effect
-                payload = payload.with_effect(DeviceEffect::Breathe);
-
-                let tx = self.message_tx.clone();
-                let topic = topic.clone();
-
-                // spawn task to stop effect after a few seconds
-                let _job = tokio::spawn(async move {
-                    sleep(Self::LIGHT_BREATHE_DURATION).await;
-
-                    let upd = DeviceUpdate::new().with_effect(DeviceEffect::FinishEffect);
-                    tx.send((topic, upd))
-                });
-            }
-
-            z2mws.send_update(topic, &payload).await?;
-
-            /* step 2: if supported (and needed) send hue-specific effects update */
-
-            if hue_effects {
-                let mut hz = Self::make_hue_specific_update(upd)?;
-
-                if !hz.is_empty() {
-                    hz = hz.with_fade_speed(0x0001);
-
-                    z2mws.send_hue_effects(topic, hz).await?;
+        // We cannot recover .mode from backend updates, since these only contain
+        // the gradient colors. So we have no choice, but to update the mode
+        // here. Otherwise, the information would be lost.
+        if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
+            lock.update::<Light>(&link.rid, |light| {
+                if let Some(gr) = &mut light.gradient {
+                    gr.mode = mode;
                 }
+            })?;
+        }
+        let hue_effects = lock.get::<Light>(link)?.effects.is_some();
+        drop(lock);
+
+        /* step 1: send generic light update */
+        let mut payload = DeviceUpdate::default()
+            .with_state(upd.on.map(|on| on.on))
+            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+            .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
+            .with_color_xy(upd.color.map(|col| col.xy));
+
+        // We don't want to send gradient updates twice, but if hue
+        // effects are not supported for this light, this is the best
+        // (and only) way to do it
+        if !hue_effects {
+            payload = payload.with_gradient(upd.gradient.clone());
+        }
+
+        // handle "identify" request (light breathing)
+        if upd.identify.is_some() {
+            // update immediate payload with breathe effect
+            payload = payload.with_effect(DeviceEffect::Breathe);
+
+            let tx = self.message_tx.clone();
+            let topic = topic.clone();
+
+            // spawn task to stop effect after a few seconds
+            let _job = tokio::spawn(async move {
+                sleep(Self::LIGHT_BREATHE_DURATION).await;
+
+                let upd = DeviceUpdate::new().with_effect(DeviceEffect::FinishEffect);
+                tx.send((topic, upd))
+            });
+        }
+
+        z2mws.send_update(topic, &payload).await?;
+
+        /* step 2: if supported (and needed) send hue-specific effects update */
+
+        if hue_effects {
+            let mut hz = Self::make_hue_specific_update(upd)?;
+
+            if !hz.is_empty() {
+                hz = hz.with_fade_speed(0x0001);
+
+                z2mws.send_hue_effects(topic, hz).await?;
             }
         }
 
