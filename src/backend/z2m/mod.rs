@@ -1134,52 +1134,41 @@ impl Z2mBackend {
     ) -> ApiResult<()> {
         self.learner.cleanup();
 
-        let mut lock = self.state.lock().await;
-
         match &*req {
             BackendRequest::LightUpdate(link, upd) => {
-                drop(lock);
                 self.backend_light_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::SceneCreate(link_scene, sid, scene) => {
-                drop(lock);
                 self.backend_scene_create(z2mws, link_scene, *sid, scene)
                     .await?;
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
-                drop(lock);
                 self.backend_scene_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                drop(lock);
                 self.backend_grouped_light_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
-                drop(lock);
                 self.backend_room_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::Delete(link) => {
-                drop(lock);
                 self.backend_delete(z2mws, link).await?;
             }
 
             BackendRequest::EntertainmentStart(ent_id) => {
-                drop(lock);
                 self.backend_entertainment_start(z2mws, ent_id).await?;
             }
 
             BackendRequest::EntertainmentFrame(frame) => {
-                drop(lock);
                 self.backend_entertainment_frame(z2mws, frame).await?;
             }
 
             BackendRequest::EntertainmentStop() => {
-                drop(lock);
                 self.backend_entertainment_stop(z2mws).await?;
             }
 
