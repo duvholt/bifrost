@@ -13,10 +13,11 @@ use tokio::sync::MutexGuard;
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
-    EntertainmentConfigurationMetadata, EntertainmentConfigurationNew,
-    EntertainmentConfigurationServiceLocationsNew, EntertainmentConfigurationType,
-    EntertainmentConfigurationUpdate, GroupedLight, GroupedLightUpdate, Light, LightUpdate,
-    Position, RType, ResourceLink, Room, Scene, SceneActive, SceneStatus, SceneUpdate, V1Reply,
+    EntertainmentConfigurationLocationsNew, EntertainmentConfigurationMetadata,
+    EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, GroupedLight,
+    GroupedLightUpdate, Light, LightUpdate, RType, ResourceLink, Room, Scene, SceneActive,
+    SceneStatus, SceneUpdate, V1Reply,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
@@ -29,7 +30,7 @@ use hue::legacy_api::{
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::{STANDARD_APPLICATION_ID, STANDARD_CLIENT_KEY};
-use crate::routes::clip::entertainment_configuration;
+use crate::routes::clip::entertainment_configuration::{self, POSITIONS};
 use crate::routes::extractor::Json;
 use crate::routes::{ApiV1Error, ApiV1Result};
 use crate::server::appstate::AppState;
@@ -245,49 +246,39 @@ async fn get_api_user_resource(
     }
 }
 
+fn lights_v1_to_ec_locations(
+    lights: &[String],
+    res: &Resources,
+) -> ApiResult<EntertainmentConfigurationLocationsNew> {
+    let mut service_locations = vec![];
+
+    let mut positions = POSITIONS.iter().cycle();
+
+    for id in lights {
+        let light_uuid = res.from_id_v1(id.parse().map_err(ApiError::ParseIntError)?)?;
+        let light = res.get_id::<Light>(light_uuid)?;
+        let device = res.get::<Device>(&light.owner)?;
+
+        // FIXME: not the best error mapping
+        let ent_svc = device
+            .entertainment_service()
+            .ok_or(HueError::NotFound(light_uuid))?;
+
+        service_locations.push(EntertainmentConfigurationServiceLocationsNew {
+            positions: vec![positions.next().unwrap().clone()],
+            service: *ent_svc,
+        });
+    }
+
+    Ok(EntertainmentConfigurationLocationsNew { service_locations })
+}
+
 async fn post_api_user_resource(
     state: State<AppState>,
     Path((_username, resource)): Path<(String, ApiResourceType)>,
     Json(req): Json<Value>,
 ) -> ApiV1Result<Json<Value>> {
     // FIXME: these are copied from entertainment_configuration
-    const POSITIONS: &[Position] = &[
-        Position {
-            x: -0.4,
-            y: 0.8,
-            z: -0.4,
-        },
-        Position {
-            x: -0.4,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: -0.22,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.0,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.22,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.4,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.4,
-            y: 0.8,
-            z: -0.4,
-        },
-    ];
 
     // We only know how to create entertainment groups
     let ApiResourceType::Groups = resource else {
@@ -305,25 +296,7 @@ async fn post_api_user_resource(
 
     let lock = state.res.lock().await;
 
-    let mut service_locations = vec![];
-
-    let mut positions = POSITIONS.iter().cycle();
-
-    for id in group_create.lights {
-        let light_uuid = lock.from_id_v1(id.parse().map_err(ApiError::ParseIntError)?)?;
-        let light = lock.get_id::<Light>(light_uuid)?;
-        let device = lock.get::<Device>(&light.owner)?;
-
-        // FIXME: not the best error mapping
-        let ent_svc = device
-            .entertainment_service()
-            .ok_or(HueError::NotFound(light_uuid))?;
-
-        service_locations.push(EntertainmentConfigurationServiceLocationsNew {
-            positions: vec![positions.next().unwrap().clone()],
-            service: *ent_svc,
-        });
-    }
+    let locations = lights_v1_to_ec_locations(&group_create.lights, &lock)?;
 
     let ecnew = EntertainmentConfigurationNew {
         configuration_type: EntertainmentConfigurationType::Screen,
@@ -333,7 +306,7 @@ async fn post_api_user_resource(
                 .unwrap_or_else(|| String::from("Entertainment area")),
         },
         stream_proxy: None,
-        locations: hue::api::EntertainmentConfigurationLocationsNew { service_locations },
+        locations,
     };
 
     log::debug!("Converted to V2 create request: {ecnew:?}");
