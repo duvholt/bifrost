@@ -390,21 +390,27 @@ async fn put_api_user_resource_id(
         ApiResourceType::Groups => {
             let upd: ApiGroupUpdate2 = serde_json::from_value(req)?;
 
-            let uuid = state.res.lock().await.from_id_v1(id)?;
+            let mut v1res = V1Reply::for_group(id);
 
-            let action = if upd.stream.active {
-                EntertainmentConfigurationAction::Start
-            } else {
-                EntertainmentConfigurationAction::Stop
-            };
+            let mut ecupd = EntertainmentConfigurationUpdate::new();
 
-            let ecupd = EntertainmentConfigurationUpdate {
-                configuration_type: None,
-                metadata: None,
-                action: Some(action),
-                stream_proxy: None,
-                locations: None,
-            };
+            let lock = state.res.lock().await;
+
+            let uuid = lock.from_id_v1(id)?;
+
+            ecupd.action = upd.stream.map(|stream| {
+                if stream.active {
+                    EntertainmentConfigurationAction::Start
+                } else {
+                    EntertainmentConfigurationAction::Stop
+                }
+            });
+
+            if let Some(lights) = &upd.lights {
+                ecupd.locations = Some(lights_v1_to_ec_locations(lights, &lock)?.into());
+            }
+
+            drop(lock);
 
             let rlink = RType::EntertainmentConfiguration.link_to(uuid);
 
@@ -415,14 +421,15 @@ async fn put_api_user_resource_id(
             )
             .await?;
 
-            if resp.0.errors.is_empty() {
-                let v1res = V1Reply::for_group(id)
-                    .add("stream/active", upd.stream.active)?
-                    .json();
-                Ok(Json(v1res))
-            } else {
-                Err(HueApiV1Error::BridgeInternalError)?
+            if !resp.0.errors.is_empty() {
+                Err(HueApiV1Error::BridgeInternalError)?;
             }
+
+            if let Some(stream) = &upd.stream {
+                v1res = v1res.add("stream/active", stream.active)?;
+            }
+
+            Ok(Json(v1res.json()))
         }
         ApiResourceType::Config
         | ApiResourceType::Lights

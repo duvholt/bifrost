@@ -491,14 +491,16 @@ pub struct ApiGroupUpdate {
     pub scene: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Active {
     pub active: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupUpdate2 {
-    pub stream: Active,
+    pub lights: Option<Vec<String>>,
+    pub name: Option<String>,
+    pub stream: Option<Active>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
