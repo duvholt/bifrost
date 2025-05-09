@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
-use hue::stream::HueStreamLights;
+use hue::stream::HueStreamLightsV2;
 use hue::zigbee::{
     EntertainmentZigbeeStream, HueEntFrameLightRecord, LightRecordMode,
     PHILIPS_HUE_ZIGBEE_VENDOR_ID,
@@ -67,12 +67,12 @@ impl EntStream {
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
-    pub fn generate_frame(&self, frame: &HueStreamLights) -> Vec<HueEntFrameLightRecord> {
+    pub fn generate_frame(&self, frame: &HueStreamLightsV2) -> Vec<HueEntFrameLightRecord> {
         let mut blks = vec![];
         match frame {
-            HueStreamLights::Rgb(rgb) => {
+            HueStreamLightsV2::Rgb(rgb) => {
                 for light in rgb {
-                    let (xy, bright) = light.to_xy();
+                    let (xy, bright) = light.rgb.to_xy();
 
                     let brightness = (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
                     let (chan, mode) = self.modes[light.channel as usize % self.modes.len()];
@@ -82,9 +82,9 @@ impl EntStream {
                     blks.push(lrec);
                 }
             }
-            HueStreamLights::Xy(xy) => {
+            HueStreamLightsV2::Xy(xy) => {
                 for light in xy {
-                    let (xy, bright) = light.to_xy();
+                    let (xy, bright) = light.xy.to_xy();
 
                     let brightness = (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
                     let (chan, mode) = self.modes[light.channel as usize % self.modes.len()];
@@ -132,7 +132,7 @@ impl EntStream {
     pub async fn frame(
         &mut self,
         z2mws: &mut Z2mWebSocket,
-        frame: &HueStreamLights,
+        frame: &HueStreamLightsV2,
     ) -> ApiResult<()> {
         let blks = self.generate_frame(frame);
 

@@ -892,6 +892,7 @@ impl Z2mBackend {
             }
 
             BackendRequest::EntertainmentStart(ent_id) => {
+                log::trace!("[{}] Entertainment start", self.name);
                 let ent: &EntertainmentConfiguration = lock.get_id(*ent_id)?;
 
                 let mut chans = ent.channels.clone();
@@ -900,6 +901,7 @@ impl Z2mBackend {
                 let mut targets = vec![];
                 chans.sort_by_key(|c| c.channel_id);
 
+                log::trace!("[{}] Resolving entertainment channels", self.name);
                 for chan in chans {
                     for member in &chan.members {
                         let ent: &Entertainment = lock.get(&member.service)?;
@@ -909,7 +911,7 @@ impl Z2mBackend {
                         let topic = self
                             .rmap
                             .get(&light_id)
-                            .ok_or(HueError::NotFound(member.service.rid))?;
+                            .ok_or(HueError::NotFound(light_id.rid))?;
                         let dev = self
                             .network
                             .get(topic)

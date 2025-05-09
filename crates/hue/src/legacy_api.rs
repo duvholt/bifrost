@@ -122,17 +122,12 @@ pub struct NewUserReply {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ConnectionState {
     Connected,
+    #[default]
     Disconnected,
-}
-
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -301,15 +296,16 @@ pub struct ApiGroupAction {
     pub colormode: Option<LightColorMode>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum ApiGroupType {
     Entertainment,
+    #[default]
     LightGroup,
     Room,
     Zone,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum ApiGroupClass {
     #[serde(rename = "Living room")]
     LivingRoom,
@@ -332,6 +328,7 @@ pub enum ApiGroupClass {
     Garden,
     Driveway,
     Carport,
+    #[default]
     Other,
 
     Home,
@@ -380,6 +377,16 @@ pub struct ApiGroup {
     pub locations: Value,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiGroupNew {
+    pub name: Option<String>,
+    #[serde(default, rename = "type")]
+    pub group_type: ApiGroupType,
+    #[serde(default)]
+    pub class: ApiGroupClass,
+    pub lights: Vec<String>,
+}
+
 impl ApiGroup {
     #[must_use]
     pub fn make_group_0() -> Self {
@@ -388,7 +395,7 @@ impl ApiGroup {
             lights: vec![],
             action: ApiGroupAction::default(),
             group_type: ApiGroupType::LightGroup,
-            class: ApiGroupClass::Other,
+            class: ApiGroupClass::default(),
             recycle: false,
             sensors: vec![],
             state: ApiGroupState::default(),
@@ -418,38 +425,13 @@ impl ApiGroup {
                 alert: ApiAlert::None,
                 colormode: None,
             },
-            class: ApiGroupClass::Other,
+            class: ApiGroupClass::default(),
             group_type: ApiGroupType::Room,
             recycle: false,
             sensors: vec![],
             state: ApiGroupState::default(),
             stream: Value::Null,
             locations: Value::Null,
-        }
-    }
-
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    #[must_use]
-    pub fn from_entertainment_configuration(ent: &api::EntertainmentConfiguration) -> Self {
-        Self {
-            name: ent.metadata.name.clone(),
-            // FIXME: obviously don't hard-code light numbers here
-            lights: vec!["9".into()],
-            locations: json!({
-                "9": [0, 0.8, 0],
-            }),
-            action: ApiGroupAction::default(),
-            class: ApiGroupClass::Other,
-            group_type: ApiGroupType::Entertainment,
-            recycle: false,
-            sensors: vec![],
-            state: ApiGroupState::default(),
-            stream: json!({
-                "active": false,
-                "owner": Value::Null,
-                "proxymode": "auto",
-                "proxynode": "/bridge"
-            }),
         }
     }
 }
@@ -509,14 +491,16 @@ pub struct ApiGroupUpdate {
     pub scene: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Active {
     pub active: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiGroupUpdate2 {
-    pub stream: Active,
+    pub lights: Option<Vec<String>>,
+    pub name: Option<String>,
+    pub stream: Option<Active>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

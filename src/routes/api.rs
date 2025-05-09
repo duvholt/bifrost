@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use axum::Router;
 use axum::extract::{Path, State};
@@ -9,24 +9,28 @@ use log::{info, warn};
 use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::sync::MutexGuard;
-use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    Device, EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
-    SceneActive, SceneStatus, SceneUpdate, V1Reply,
+    Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
+    EntertainmentConfigurationLocationsNew, EntertainmentConfigurationMetadata,
+    EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, GroupedLight,
+    GroupedLightUpdate, Light, LightUpdate, RType, ResourceLink, Room, Scene, SceneActive,
+    SceneStatus, SceneUpdate, V1Reply,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
-    ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
-    ApiResourceType, ApiScene, ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor,
-    ApiUserConfig, Capabilities, HueApiResult, NewUser, NewUserReply,
+    ApiGroup, ApiGroupAction, ApiGroupActionUpdate, ApiGroupClass, ApiGroupNew, ApiGroupState,
+    ApiGroupType, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate, ApiResourceType, ApiScene,
+    ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor, ApiUserConfig, Capabilities,
+    HueApiResult, NewUser, NewUserReply,
 };
 
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
-use crate::routes::auth::STANDARD_CLIENT_KEY;
+use crate::routes::auth::{STANDARD_APPLICATION_ID, STANDARD_CLIENT_KEY};
+use crate::routes::clip::entertainment_configuration::{self, POSITIONS};
 use crate::routes::extractor::Json;
 use crate::routes::{ApiV1Error, ApiV1Result};
 use crate::server::appstate::AppState;
@@ -41,11 +45,11 @@ async fn post_api(bytes: Bytes) -> ApiV1Result<Json<impl Serialize>> {
 
     let res = NewUserReply {
         clientkey: if json.generateclientkey {
-            Some(STANDARD_CLIENT_KEY.to_hex())
+            Some(hex::encode_upper(STANDARD_CLIENT_KEY))
         } else {
             None
         },
-        username: Uuid::new_v4().as_simple().to_string(),
+        username: STANDARD_APPLICATION_ID.to_string(),
     };
     Ok(Json(vec![HueApiResult::Success(res)]))
 }
@@ -96,10 +100,53 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
     }
 
     for rr in res.get_resources_by_type(RType::EntertainmentConfiguration) {
-        let ent: EntertainmentConfiguration = rr.obj.try_into()?;
+        let entconf: EntertainmentConfiguration = rr.obj.try_into()?;
+
+        let mut locations = BTreeMap::<String, Vec<f64>>::new();
+
+        for sl in &entconf.locations.service_locations {
+            let ent = res.get::<Entertainment>(&sl.service)?;
+            let dev = res.get::<Device>(&ent.owner)?;
+            let light_link = dev
+                .light_service()
+                .ok_or(HueError::NotFound(ent.owner.rid))?;
+
+            let idx = res.get_id_v1_index(light_link.rid)?;
+            locations.insert(
+                idx.to_string(),
+                vec![sl.position.x, sl.position.y, sl.position.z],
+            );
+        }
+
+        let class = match entconf.configuration_type {
+            EntertainmentConfigurationType::Screen => ApiGroupClass::TV,
+            EntertainmentConfigurationType::Monitor => ApiGroupClass::Computer,
+            EntertainmentConfigurationType::Music => ApiGroupClass::Music,
+            // FIXME: what does Space3D map to?
+            EntertainmentConfigurationType::Space3D | EntertainmentConfigurationType::Other => {
+                ApiGroupClass::Other
+            }
+        };
+
         rooms.insert(
             res.get_id_v1(rr.id)?,
-            ApiGroup::from_entertainment_configuration(&ent),
+            ApiGroup {
+                name: entconf.metadata.name.clone(),
+                lights: locations.keys().cloned().collect(),
+                locations: json!(locations),
+                action: ApiGroupAction::default(),
+                class,
+                group_type: ApiGroupType::Entertainment,
+                recycle: false,
+                sensors: vec![],
+                state: ApiGroupState::default(),
+                stream: json!({
+                    "active": entconf.active_streamer.is_some(),
+                    "owner": entconf.active_streamer.map(|_st| STANDARD_APPLICATION_ID.to_string()),
+                    "proxymode": "auto",
+                    "proxynode": "/bridge"
+                }),
+            },
         );
     }
 
@@ -199,13 +246,88 @@ async fn get_api_user_resource(
     }
 }
 
+fn lights_v1_to_ec_locations(
+    lights: &[String],
+    res: &Resources,
+) -> ApiResult<EntertainmentConfigurationLocationsNew> {
+    let mut service_locations = vec![];
+
+    let mut positions = POSITIONS.iter().cycle();
+
+    for id in lights {
+        let light_uuid = res.from_id_v1(id.parse().map_err(ApiError::ParseIntError)?)?;
+        let light = res.get_id::<Light>(light_uuid)?;
+        let device = res.get::<Device>(&light.owner)?;
+
+        // FIXME: not the best error mapping
+        let ent_svc = device
+            .entertainment_service()
+            .ok_or(HueError::NotFound(light_uuid))?;
+
+        service_locations.push(EntertainmentConfigurationServiceLocationsNew {
+            positions: vec![positions.next().unwrap().clone()],
+            service: *ent_svc,
+        });
+    }
+
+    Ok(EntertainmentConfigurationLocationsNew { service_locations })
+}
+
 async fn post_api_user_resource(
+    state: State<AppState>,
     Path((_username, resource)): Path<(String, ApiResourceType)>,
     Json(req): Json<Value>,
 ) -> ApiV1Result<Json<Value>> {
-    warn!("POST v1 user resource unsupported");
-    warn!("Request: {req:?}");
-    Err(ApiV1Error::V1CreateUnsupported(resource))
+    // FIXME: these are copied from entertainment_configuration
+
+    // We only know how to create entertainment groups
+    let ApiResourceType::Groups = resource else {
+        warn!("POST v1 user resource unsupported");
+        warn!("Request: {req:?}");
+        return Err(ApiV1Error::V1CreateUnsupported(resource));
+    };
+
+    let group_create: ApiGroupNew = serde_json::from_value(req)?;
+    info!("Create group request: {group_create:?}");
+
+    if group_create.group_type != ApiGroupType::Entertainment {
+        return Err(ApiV1Error::V1CreateUnsupported(resource));
+    }
+
+    let lock = state.res.lock().await;
+
+    let locations = lights_v1_to_ec_locations(&group_create.lights, &lock)?;
+
+    let ecnew = EntertainmentConfigurationNew {
+        configuration_type: EntertainmentConfigurationType::Screen,
+        metadata: EntertainmentConfigurationMetadata {
+            name: group_create
+                .name
+                .unwrap_or_else(|| String::from("Entertainment area")),
+        },
+        stream_proxy: None,
+        locations,
+    };
+
+    log::debug!("Converted to V2 create request: {ecnew:?}");
+    drop(lock);
+
+    let mut resp =
+        entertainment_configuration::post_resource(&state, serde_json::to_value(ecnew)?).await?;
+
+    // FIXME: ugly unpacking/repacking of post_resource result
+    if let Some(data) = resp.0.data.pop() {
+        let rlink: ResourceLink = serde_json::from_value(data)?;
+
+        let id = state.res.lock().await.get_id_v1_index(rlink.rid)?;
+
+        let response = json!([{"success": {"id": id}}]);
+
+        log::info!("Success: created {id} ({})", rlink.rid);
+        Ok(Json(response))
+    } else {
+        Err(ApiV1Error::V1CreateUnsupported(resource))
+    }
 }
 
 async fn put_api_user_resource(
@@ -267,24 +389,47 @@ async fn put_api_user_resource_id(
     match artype {
         ApiResourceType::Groups => {
             let upd: ApiGroupUpdate2 = serde_json::from_value(req)?;
-            let mut lock = state.res.lock().await;
+
+            let mut v1res = V1Reply::for_group(id);
+
+            let mut ecupd = EntertainmentConfigurationUpdate::new();
+
+            let lock = state.res.lock().await;
 
             let uuid = lock.from_id_v1(id)?;
 
-            match lock.get_resource_by_id(&uuid)?.obj {
-                Resource::EntertainmentConfiguration(_ec) => {
-                    lock.update(&uuid, |ec: &mut EntertainmentConfiguration| {
-                        ec.status = if upd.stream.active {
-                            EntertainmentConfigurationStatus::Active
-                        } else {
-                            EntertainmentConfigurationStatus::Inactive
-                        };
-                    })?;
+            ecupd.action = upd.stream.map(|stream| {
+                if stream.active {
+                    EntertainmentConfigurationAction::Start
+                } else {
+                    EntertainmentConfigurationAction::Stop
                 }
-                _ => {}
+            });
+
+            if let Some(lights) = &upd.lights {
+                ecupd.locations = Some(lights_v1_to_ec_locations(lights, &lock)?.into());
             }
 
-            Ok(Json(V1Reply::for_group(id).json()))
+            drop(lock);
+
+            let rlink = RType::EntertainmentConfiguration.link_to(uuid);
+
+            let resp = entertainment_configuration::put_resource_id(
+                &state,
+                rlink,
+                serde_json::to_value(&ecupd)?,
+            )
+            .await?;
+
+            if !resp.0.errors.is_empty() {
+                Err(HueApiV1Error::BridgeInternalError)?;
+            }
+
+            if let Some(stream) = &upd.stream {
+                v1res = v1res.add("stream/active", stream.active)?;
+            }
+
+            Ok(Json(v1res.json()))
         }
         ApiResourceType::Config
         | ApiResourceType::Lights
