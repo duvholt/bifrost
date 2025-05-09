@@ -31,6 +31,7 @@ use hue::api::{
     LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
     RoomMetadata, RoomUpdate, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusEnum, SceneUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscoveryUpdate,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -1121,6 +1122,15 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_zigbee_device_discovery(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        _rlink: &ResourceLink,
+        _zbd: &ZigbeeDeviceDiscoveryUpdate,
+    ) -> ApiResult<()> {
+        z2mws.send_permit_join(60 * 4, None).await
+    }
+
     async fn handle_backend_event(
         &mut self,
         z2mws: &mut Z2mWebSocket,
@@ -1161,8 +1171,9 @@ impl Z2mBackend {
 
             BackendRequest::EntertainmentStop() => self.backend_entertainment_stop(z2mws).await,
 
-            BackendRequest::ZigbeeDeviceDiscovery(_rlink, _zbd) => {
-                z2mws.send_permit_join(60 * 4, None).await
+            BackendRequest::ZigbeeDeviceDiscovery(rlink, zbd) => {
+                self.backend_zigbee_device_discovery(z2mws, rlink, zbd)
+                    .await
             }
         }
     }
