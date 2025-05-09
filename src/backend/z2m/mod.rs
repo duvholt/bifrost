@@ -819,25 +819,26 @@ impl Z2mBackend {
         sid: u32,
         scene: &Scene,
     ) -> ApiResult<()> {
-        if let Some(topic) = self.rmap.get(&scene.group) {
-            let mut lock = self.state.lock().await;
+        let Some(topic) = self.rmap.get(&scene.group) else {
+            return Ok(());
+        };
 
-            log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
+        log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
 
-            lock.aux_set(
-                link_scene,
-                AuxData::new()
-                    .with_topic(&scene.metadata.name)
-                    .with_index(sid),
-            );
+        let mut lock = self.state.lock().await;
 
-            z2mws
-                .send_scene_store(topic, &scene.metadata.name, sid)
-                .await?;
+        let auxdata = AuxData::new()
+            .with_topic(&scene.metadata.name)
+            .with_index(sid);
 
-            lock.add(link_scene, Resource::Scene(scene.clone()))?;
-            drop(lock);
-        }
+        lock.aux_set(link_scene, auxdata);
+
+        z2mws
+            .send_scene_store(topic, &scene.metadata.name, sid)
+            .await?;
+
+        lock.add(link_scene, Resource::Scene(scene.clone()))?;
+        drop(lock);
 
         Ok(())
     }
