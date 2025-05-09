@@ -1098,6 +1098,34 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_entertainment_stop(&mut self, z2mws: &mut Z2mWebSocket) -> ApiResult<()> {
+        log::debug!("Stopping entertainment mode..");
+        if let Some(es) = &mut self.entstream.take() {
+            let mut lock = self.state.lock().await;
+
+            es.stop_stream(z2mws).await?;
+
+            self.counter = es.stream.counter();
+
+            for id in lock.get_resource_ids_by_type(RType::Light) {
+                let light: &Light = lock.get_id(id)?;
+                if light.is_streaming() {
+                    lock.update(&id, Light::stop_streaming)?;
+                }
+            }
+
+            for id in lock.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+                let ec: &EntertainmentConfiguration = lock.get_id(id)?;
+                if ec.is_streaming() {
+                    lock.update(&id, EntertainmentConfiguration::stop_streaming)?;
+                }
+            }
+            drop(lock);
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -1151,27 +1179,8 @@ impl Z2mBackend {
             }
 
             BackendRequest::EntertainmentStop() => {
-                log::debug!("Stopping entertainment mode..");
-                if let Some(es) = &mut self.entstream.take() {
-                    es.stop_stream(z2mws).await?;
-
-                    self.counter = es.stream.counter();
-
-                    for id in lock.get_resource_ids_by_type(RType::Light) {
-                        let light: &Light = lock.get_id(id)?;
-                        if light.is_streaming() {
-                            lock.update(&id, Light::stop_streaming)?;
-                        }
-                    }
-
-                    for id in lock.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
-                        let ec: &EntertainmentConfiguration = lock.get_id(id)?;
-                        if ec.is_streaming() {
-                            lock.update(&id, EntertainmentConfiguration::stop_streaming)?;
-                        }
-                    }
-                    drop(lock);
-                }
+                drop(lock);
+                self.backend_entertainment_stop(z2mws).await?;
             }
 
             BackendRequest::ZigbeeDeviceDiscovery(_rlink, _zbd) => {
