@@ -36,6 +36,10 @@ impl HueStreamPacketHeader {
 
     pub fn parse(data: &[u8]) -> HueResult<Self> {
         let len = Self::SIZE;
+        if data.len() < len {
+            return Err(HueError::HueEntertainmentBadHeader);
+        }
+
         let hdr = HueStreamHeader::unpack_from_slice(&data[..len])?;
 
         if hdr.magic != Self::MAGIC {
@@ -133,4 +137,70 @@ pub struct Xy16 {
     pub b: u16,
 }
 
-impl Xy16 {}
+impl Xy16 {
+    #[must_use]
+    pub fn to_xy(&self) -> (XY, f64) {
+        (
+            XY::new(
+                f64::from(self.x) / f64::from(0xFFFF),
+                f64::from(self.y) / f64::from(0xFFFF),
+            ),
+            f64::from(self.b) / f64::from(0x101),
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        stream::{Rgb16, Xy16},
+        xy::XY,
+    };
+
+    macro_rules! compare_float {
+        ($expr:expr, $value:expr, $diff:expr) => {
+            let a = $expr;
+            let b = $value;
+            eprintln!("{a} vs {b:.4}");
+            assert!((a - b).abs() < $diff);
+        };
+    }
+
+    macro_rules! compare {
+        ($expr:expr, $value:expr) => {
+            compare_float!($expr, $value, 1e-5)
+        };
+    }
+
+    #[test]
+    fn rgb16_to_xy() {
+        let rgb16 = Rgb16 {
+            channel: 1,
+            r: 0xFFFF,
+            g: 0xFFFF,
+            b: 0xFFFF,
+        };
+
+        let (xy, b) = rgb16.to_xy();
+
+        compare!(xy.x, XY::D50_WHITE_POINT.x);
+        compare!(xy.y, XY::D50_WHITE_POINT.y);
+        compare_float!(b, 255.0, 1e-2);
+    }
+
+    #[test]
+    fn xy16_to_xy() {
+        let xy16 = Xy16 {
+            channel: 1,
+            x: 0x8000,
+            y: 0xFFFF,
+            b: 0xFFFF,
+        };
+
+        let (xy, b) = xy16.to_xy();
+
+        compare!(xy.x, 0.5);
+        compare!(xy.y, 1.0);
+        compare!(b, 255.0);
+    }
+}

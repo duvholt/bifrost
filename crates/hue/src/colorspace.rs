@@ -86,7 +86,7 @@ impl Matrix3 {
 
     #[allow(clippy::suboptimal_flops)]
     #[must_use]
-    fn mult(&self, d: [f64; 3]) -> [f64; 3] {
+    pub fn mult(&self, d: [f64; 3]) -> [f64; 3] {
         let m = self.0;
         let cx = d[0] * m[0] + d[1] * m[1] + d[2] * m[2];
         let cy = d[0] * m[3] + d[1] * m[4] + d[2] * m[5];
@@ -110,9 +110,9 @@ impl IndexMut<[usize; 2]> for Matrix3 {
 }
 
 pub struct ColorSpace {
-    rgb: Matrix3,
-    xyz: Matrix3,
-    gamma: GammaCorrection,
+    pub rgb: Matrix3,
+    pub xyz: Matrix3,
+    pub gamma: GammaCorrection,
 }
 
 impl ColorSpace {

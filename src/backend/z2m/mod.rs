@@ -1,5 +1,6 @@
+pub mod entertainment;
 pub mod learn;
-pub mod stream;
+pub mod websocket;
 pub mod zclcommand;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -8,19 +9,16 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::Utc;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use maplit::btreeset;
 use native_tls::TlsConnector;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::Mutex;
 use tokio::sync::broadcast::Receiver;
 use tokio::time::sleep;
-use tokio_tungstenite::{
-    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config, tungstenite,
-};
+use tokio_tungstenite::{Connector, connect_async_tls_with_config, tungstenite};
 use uuid::Uuid;
 
 use hue::api::{
@@ -35,33 +33,23 @@ use hue::api::{
 use hue::clamp::Clamp;
 use hue::error::HueError;
 use hue::scene_icons;
-use hue::stream::HueStreamLights;
-use hue::zigbee::{
-    EffectType, EntertainmentZigbeeStream, GradientParams, GradientStyle, HueEntFrameLightRecord,
-    HueZigbeeUpdate, LightRecordMode, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeTarget,
-};
-use z2m::api::{ExposeLight, GroupMemberChange, Message, RawMessage};
+use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
+use z2m::api::{ExposeLight, Message, RawMessage};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
-use z2m::request::Z2mRequest;
 use z2m::update::{DeviceColorMode, DeviceUpdate};
 
 use crate::backend::Backend;
+use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
-use crate::backend::z2m::stream::Z2mTarget;
+use crate::backend::z2m::websocket::Z2mWebSocket;
 use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
+use crate::model::throttle::Throttle;
 use crate::resource::Resources;
-
-struct EntStream {
-    stream: EntertainmentZigbeeStream,
-    target: Z2mTarget,
-    addrs: BTreeMap<String, Vec<u16>>,
-    modes: Vec<(u16, LightRecordMode)>,
-}
 
 pub struct Z2mBackend {
     name: String,
@@ -75,34 +63,27 @@ pub struct Z2mBackend {
     network: HashMap<String, z2m::api::Device>,
     entstream: Option<EntStream>,
     counter: u32,
-}
-
-fn z2m_set_entertainment_brightness(brightness: u8) -> Z2mRequest<'static> {
-    Z2mRequest::RawWrite(json!({
-        "cluster": EntertainmentZigbeeStream::CLUSTER,
-        "payload": {
-            "5": {
-                "manufacturerCode": PHILIPS_HUE_ZIGBEE_VENDOR_ID,
-                "type": 32,
-                "value": brightness,
-            }
-        }
-    }))
+    fps: u32,
+    throttle: Throttle,
 }
 
 impl Z2mBackend {
+    const DEFAULT_FPS: u32 = 20;
+
     pub fn new(
         name: String,
         server: Z2mServer,
         config: Arc<AppConfig>,
         state: Arc<Mutex<Resources>>,
     ) -> ApiResult<Self> {
+        let fps = server.streaming_fps.map_or(Self::DEFAULT_FPS, u32::from);
         let map = HashMap::new();
         let rmap = HashMap::new();
-        let learn = SceneLearn::new(name.clone());
         let ignore = HashSet::new();
+        let learner = SceneLearn::new(name.clone());
         let network = HashMap::new();
         let entstream = None;
+        let throttle = Throttle::from_fps(fps);
         Ok(Self {
             name,
             server,
@@ -110,10 +91,12 @@ impl Z2mBackend {
             state,
             map,
             rmap,
-            learner: learn,
+            learner,
             ignore,
             network,
             entstream,
+            throttle,
+            fps,
             counter: 0,
         })
     }
@@ -684,7 +667,7 @@ impl Z2mBackend {
             return Err(ApiError::UnexpectedZ2mReply(pkt));
         };
 
-        let raw_msg: Result<RawMessage, _> = serde_json::from_str(&txt);
+        let raw_msg = serde_json::from_str::<RawMessage>(&txt);
 
         let msg = raw_msg.map_err(|err| {
             log::error!(
@@ -730,58 +713,10 @@ impl Z2mBackend {
         }
     }
 
-    async fn websocket_send(
-        &self,
-        socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-        topic: &str,
-        payload: &Z2mRequest<'_>,
-    ) -> ApiResult<()> {
-        let Some(link) = self.map.get(topic) else {
-            log::trace!(
-                "[{}] Topic [{topic}] unknown on this z2m connection",
-                self.name
-            );
-            return Ok(());
-        };
-
-        log::trace!(
-            "[{}] Topic [{topic}] known as {link:?} on this z2m connection, sending event..",
-            self.name
-        );
-
-        let api_req = match &payload {
-            Z2mRequest::Untyped { endpoint, value } => RawMessage {
-                topic: format!("{topic}/{endpoint}/set"),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::RawWrite(value) => RawMessage {
-                topic: format!("{topic}/set/write"),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::GroupMemberAdd(value) => RawMessage {
-                topic: "bridge/request/group/members/add".into(),
-                payload: serde_json::to_value(value)?,
-            },
-            Z2mRequest::GroupMemberRemove(value) => RawMessage {
-                topic: "bridge/request/group/members/remove".into(),
-                payload: serde_json::to_value(value)?,
-            },
-            _ => RawMessage {
-                topic: format!("{topic}/set"),
-                payload: serde_json::to_value(payload)?,
-            },
-        };
-
-        let json = serde_json::to_string(&api_req)?;
-        log::debug!("[{}] Sending {json}", self.name);
-        let msg = tungstenite::Message::text(json);
-        Ok(socket.send(msg).await?)
-    }
-
     #[allow(clippy::too_many_lines)]
     async fn websocket_write(
         &mut self,
-        socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+        z2mws: &mut Z2mWebSocket,
         req: Arc<BackendRequest>,
     ) -> ApiResult<()> {
         self.learner.cleanup();
@@ -818,9 +753,7 @@ impl Z2mBackend {
                         payload = payload.with_gradient(upd.gradient.clone());
                     }
 
-                    let z2mreq = Z2mRequest::Update(&payload);
-
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send_update(topic, &payload).await?;
 
                     /* step 2: if supported (and needed) send hue-specific effects update */
 
@@ -830,24 +763,7 @@ impl Z2mBackend {
                         if !hz.is_empty() {
                             hz = hz.with_fade_speed(0x0001);
 
-                            let data = hz.to_vec()?;
-                            log::debug!("Sending hue-specific frame: {}", hex::encode(&data));
-
-                            let upd = json!({
-                                "command": {
-                                    "cluster": 0xFC03,
-                                    "command": 0,
-                                    "payload": {
-                                        "data": data
-                                    }
-                                }}
-                            );
-                            let z2mreq = Z2mRequest::Untyped {
-                                endpoint: 11,
-                                value: &upd,
-                            };
-
-                            self.websocket_send(socket, topic, &z2mreq).await?;
+                            z2mws.send_hue_effects(topic, hz).await?;
                         }
                     }
                 }
@@ -863,15 +779,13 @@ impl Z2mBackend {
                             .with_topic(&scene.metadata.name)
                             .with_index(*sid),
                     );
-                    let z2mreq = Z2mRequest::SceneStore {
-                        name: &scene.metadata.name,
-                        id: *sid,
-                    };
+
+                    z2mws
+                        .send_scene_store(topic, &scene.metadata.name, *sid)
+                        .await?;
 
                     lock.add(link_scene, Resource::Scene(scene.clone()))?;
                     drop(lock);
-
-                    self.websocket_send(socket, topic, &z2mreq).await?;
                 }
             }
 
@@ -907,8 +821,7 @@ impl Z2mBackend {
                             let mut lock = self.state.lock().await;
                             self.learner.learn_scene_recall(link, &mut lock)?;
 
-                            let z2mreq = Z2mRequest::SceneRecall(index);
-                            self.websocket_send(socket, &topic, &z2mreq).await?;
+                            z2mws.send_scene_recall(&topic, index).await?;
                         }
                     } else {
                         log::error!("Scene recall type not supported: {recall:?}");
@@ -927,8 +840,7 @@ impl Z2mBackend {
                     .with_color_xy(upd.color.map(|col| col.xy));
 
                 if let Some(topic) = self.rmap.get(&room) {
-                    let z2mreq = Z2mRequest::Update(&payload);
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send_update(topic, &payload).await?;
                 }
             }
 
@@ -951,26 +863,12 @@ impl Z2mBackend {
 
                         for add in known_new.difference(&known_existing) {
                             let friendly_name = &self.rmap[add];
-                            let change = GroupMemberChange {
-                                device: friendly_name.to_string(),
-                                group: topic.to_string(),
-                                endpoint: None,
-                                skip_disable_reporting: None,
-                            };
-                            let z2mreq = Z2mRequest::GroupMemberAdd(change);
-                            self.websocket_send(socket, topic, &z2mreq).await?;
+                            z2mws.send_group_member_add(topic, friendly_name).await?;
                         }
 
                         for remove in known_existing.difference(&known_new) {
                             let friendly_name = &self.rmap[remove];
-                            let change = GroupMemberChange {
-                                device: friendly_name.to_string(),
-                                group: topic.to_string(),
-                                endpoint: None,
-                                skip_disable_reporting: None,
-                            };
-                            let z2mreq = Z2mRequest::GroupMemberRemove(change);
-                            self.websocket_send(socket, topic, &z2mreq).await?;
+                            z2mws.send_group_member_remove(topic, friendly_name).await?;
                         }
                     }
                 }
@@ -989,8 +887,7 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&room) {
-                    let z2mreq = Z2mRequest::SceneRemove(index);
-                    self.websocket_send(socket, topic, &z2mreq).await?;
+                    z2mws.send_scene_remove(topic, index).await?;
                 }
             }
 
@@ -1032,87 +929,52 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(target) = targets.first() {
-                    let mut modes = vec![];
+                    let mut es = EntStream::new(self.counter, target, addrs);
 
-                    for segments in addrs.values() {
-                        let mode = if segments.len() <= 1 {
-                            LightRecordMode::Device
-                        } else {
-                            LightRecordMode::Segment
-                        };
+                    // Not even a real Philips Hue bridge uses this trick!
+                    //
+                    // We set the entertainment mode fade speed ("smoothing")
+                    // to fit the target frame rate, to ensure perfectly smooth
+                    // transitionss, even at low frame rates!
+                    es.stream.set_smoothing_duration(self.throttle.interval())?;
 
-                        for seg in segments {
-                            modes.push((*seg, mode));
-                        }
-                    }
+                    log::info!("Starting entertainment mode stream at {} fps", self.fps);
 
-                    let mut es = EntStream {
-                        stream: EntertainmentZigbeeStream::new(self.counter),
-                        target: Z2mTarget::new(target),
-                        addrs,
-                        modes,
-                    };
-
-                    log::debug!("Entertainment addrs: {:#?}", &es.addrs);
-                    log::debug!("Entertainment modes: {:#?}", &es.modes);
-                    for (dev, segments) in &es.addrs {
-                        let z2mreq = z2m_set_entertainment_brightness(0xFE);
-                        self.websocket_send(socket, dev, &z2mreq).await?;
-
-                        if segments.len() <= 1 {
-                            continue;
-                        }
-
-                        let z2mreq = es.target.send(es.stream.segment_mapping(segments)?)?;
-                        self.websocket_send(socket, dev, &z2mreq).await?;
-                    }
-
-                    let z2mreq = es.target.send(es.stream.reset()?)?;
-                    for topic in es.addrs.keys() {
-                        log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, &z2mreq).await?;
-                    }
+                    es.start_stream(z2mws).await?;
 
                     self.entstream = Some(es);
                 }
             }
 
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             BackendRequest::EntertainmentFrame(frame) => {
                 if let Some(es) = &mut self.entstream {
-                    let mut blks = vec![];
-
-                    if let HueStreamLights::Rgb(rgb) = frame {
-                        for light in rgb {
-                            let (xy, bright) = light.to_xy();
-
-                            let brightness = (bright / 255.0 * 2047.0).clamp(1.0, 2047.0) as u16;
-                            let (chan, mode) = es.modes[light.channel as usize % es.modes.len()];
-                            let raw = xy.to_quant();
-                            let lrec = HueEntFrameLightRecord::new(chan, brightness, mode, raw);
-
-                            blks.push(lrec);
-                        }
-                    } else {
-                        // FIXME
-                        unimplemented!();
+                    if self.throttle.tick() {
+                        es.frame(z2mws, frame).await?;
                     }
-
-                    let z2mreq = es.target.send(es.stream.frame(blks)?)?;
-                    let device = es.target.device.clone();
-                    self.websocket_send(socket, &device, &z2mreq).await?;
                 }
             }
 
             BackendRequest::EntertainmentStop() => {
                 log::debug!("Stopping entertainment mode..");
                 if let Some(es) = &mut self.entstream.take() {
-                    let z2mreq = es.target.send(es.stream.reset()?)?;
-                    for topic in es.addrs.keys() {
-                        log::debug!("Sending stop to {topic}");
-                        self.websocket_send(socket, topic, &z2mreq).await?;
-                    }
+                    es.stop_stream(z2mws).await?;
+
                     self.counter = es.stream.counter();
+
+                    for id in lock.get_resource_ids_by_type(RType::Light) {
+                        let light: &Light = lock.get_id(id)?;
+                        if light.is_streaming() {
+                            lock.update(&id, Light::stop_streaming)?;
+                        }
+                    }
+
+                    for id in lock.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+                        let ec: &EntertainmentConfiguration = lock.get_id(id)?;
+                        if ec.is_streaming() {
+                            lock.update(&id, EntertainmentConfiguration::stop_streaming)?;
+                        }
+                    }
+                    drop(lock);
                 }
             }
         }
@@ -1123,7 +985,7 @@ impl Z2mBackend {
     pub async fn event_loop(
         &mut self,
         chan: &mut Receiver<Arc<BackendRequest>>,
-        mut socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+        mut socket: Z2mWebSocket,
     ) -> ApiResult<()> {
         loop {
             select! {
@@ -1182,7 +1044,8 @@ impl Backend for Z2mBackend {
             match connect_async_tls_with_config(url.as_str(), None, false, connector.clone()).await
             {
                 Ok((socket, _)) => {
-                    let res = self.event_loop(&mut chan, socket).await;
+                    let z2m_socket = Z2mWebSocket::new(self.name.clone(), socket);
+                    let res = self.event_loop(&mut chan, z2m_socket).await;
                     if let Err(err) = res {
                         log::error!("[{}] Event loop broke: {err}", self.name);
                     }

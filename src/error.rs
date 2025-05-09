@@ -51,6 +51,9 @@ pub enum ApiError {
     QuickXmlSeError(#[from] quick_xml::se::SeError),
 
     #[error(transparent)]
+    NixError(#[from] nix::Error),
+
+    #[error(transparent)]
     SendErrorHue(#[from] tokio::sync::broadcast::error::SendError<EventBlock>),
 
     #[error(transparent)]
@@ -165,6 +168,9 @@ pub enum ApiError {
 
     #[error("Entertainment Stream init error")]
     EntStreamInitError,
+
+    #[error("Entertainment Stream timeout")]
+    EntStreamTimeout,
 
     #[error("Entertainment Stream desynchronized")]
     EntStreamDesync,

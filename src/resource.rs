@@ -12,9 +12,9 @@ use uuid::Uuid;
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
-    EntertainmentConfiguration, EntertainmentConfigurationStatus, GroupedLight, Light, LightMode,
-    Metadata, On, RType, Resource, ResourceLink, ResourceRecord, Stub, TimeZone,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery,
+    EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink,
+    ResourceRecord, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscovery,
 };
 use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
@@ -58,24 +58,17 @@ impl Resources {
     pub fn reset_all_streaming(&mut self) -> ApiResult<()> {
         for id in self.get_resource_ids_by_type(RType::Light) {
             let light: &Light = self.get_id(id)?;
-            if light.mode != LightMode::Normal {
+            if light.is_streaming() {
                 log::warn!("Clearing streaming state of Light {}", id);
-                self.update::<Light>(&id, |light| {
-                    light.mode = LightMode::Normal;
-                })?;
+                self.update(&id, Light::stop_streaming)?;
             }
         }
 
         for id in self.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
             let ec: &EntertainmentConfiguration = self.get_id(id)?;
-            if ec.active_streamer.is_some()
-                || ec.status != EntertainmentConfigurationStatus::Inactive
-            {
+            if ec.is_streaming() {
                 log::warn!("Clearing streaming state of EntertainmentConfiguration {id}");
-                self.update::<EntertainmentConfiguration>(&id, |ec| {
-                    ec.active_streamer = None;
-                    ec.status = EntertainmentConfigurationStatus::Inactive;
-                })?;
+                self.update(&id, EntertainmentConfiguration::stop_streaming)?;
             }
         }
 

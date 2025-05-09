@@ -39,8 +39,9 @@
 | Groups          | ✅          | Automatically mapped to rooms                                                                            |
 | Scenes          | ✅          | Scenes can be created, recalled, deleted. Scenes found in zigbee2mqtt will be imported, and auto-learned |
 
-| Feature | GET | POST | PUT          | DELETE |
-|---------|-----|------|--------------|--------|
-| Lights  | ✅  | -    | ✅ (partial) | -      |
-| Groups  | ✅  | ❌   | ✅ (partial) | ❌     |
-| Scenes  | ✅  | ✅   | ✅ (partial) | ✅     |
+| Feature             | GET | POST | PUT          | DELETE |
+|---------------------|-----|------|--------------|--------|
+| Lights              | ✅  | -    | ✅ (partial) | -      |
+| Groups              | ✅  | ❌   | ✅ (partial) | ❌     |
+| Scenes              | ✅  | ✅   | ✅ (partial) | ✅     |
+| Entertainment Zones | ✅  | ✅   | ✅           | ❌     |

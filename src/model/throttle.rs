@@ -28,6 +28,11 @@ impl Throttle {
     }
 
     #[must_use]
+    pub const fn interval(&self) -> Duration {
+        self.interval
+    }
+
+    #[must_use]
     pub fn elapsed_since(&self, now: DateTime<Utc>) -> Duration {
         now - self.last_update
     }
@@ -75,5 +80,9 @@ impl<T> ThrottleQueue<T> {
 
     pub fn pop(&mut self) -> Option<T> {
         self.queue.pop_back()
+    }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
     }
 }

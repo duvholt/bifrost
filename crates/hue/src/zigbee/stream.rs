@@ -1,6 +1,7 @@
+use chrono::Duration;
 use packed_struct::prelude::*;
 
-use crate::error::HueResult;
+use crate::error::{HueError, HueResult};
 use crate::zigbee::{HueEntFrame, HueEntFrameLightRecord, HueEntSegmentConfig, HueEntStop};
 
 pub struct EntertainmentZigbeeStream {
@@ -64,9 +65,14 @@ impl Default for EntertainmentZigbeeStream {
 impl EntertainmentZigbeeStream {
     pub const DEFAULT_SMOOTHING: u16 = 0x0400;
     pub const CLUSTER: u16 = 0xFC01;
-    pub const CMD_SEGMENT_MAP: u8 = 7;
-    pub const CMD_RESET: u8 = 3;
     pub const CMD_FRAME: u8 = 1;
+    pub const CMD_RESET: u8 = 3;
+    pub const CMD_LIGHT_BALANCE: u8 = 5;
+    pub const CMD_SEGMENT_MAP: u8 = 7;
+
+    /// The maximum fade time (0xFFFF) seems to correspond to 2.56 seconds.
+    /// (determined experimentally)
+    pub const SMOOTHING_MAX_MICROS: i64 = 2_560_000;
 
     #[must_use]
     pub const fn new(counter: u32) -> Self {
@@ -88,6 +94,25 @@ impl EntertainmentZigbeeStream {
 
     pub const fn set_smoothing(&mut self, smoothing: u16) {
         self.smoothing = smoothing;
+    }
+
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    pub fn duration_to_smoothing(duration: Duration) -> HueResult<u16> {
+        // Get number of microseconds, if positive and less than maximum
+        let us = duration
+            .num_microseconds()
+            .filter(|us| (0..Self::SMOOTHING_MAX_MICROS).contains(us))
+            .ok_or(HueError::HueZigbeeEncodeError)?;
+
+        // Scale to target range
+        let smoothing = (us * 0x10000 / Self::SMOOTHING_MAX_MICROS) as u16;
+
+        Ok(smoothing)
+    }
+
+    pub fn set_smoothing_duration(&mut self, duration: Duration) -> HueResult<()> {
+        self.set_smoothing(Self::duration_to_smoothing(duration)?);
+        Ok(())
     }
 
     pub fn segment_mapping(&mut self, map: &[u16]) -> HueResult<ZigbeeMessage> {
@@ -128,5 +153,48 @@ impl EntertainmentZigbeeStream {
             Self::CMD_FRAME,
             ent.pack()?,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use chrono::Duration;
+
+    use crate::zigbee::EntertainmentZigbeeStream as EZS;
+
+    #[test]
+    fn test_duration_zero() {
+        let zero_dur = Duration::seconds(0);
+        let smo = EZS::duration_to_smoothing(zero_dur).unwrap();
+        assert_eq!(smo, 0);
+    }
+
+    #[test]
+    fn test_duration_half() {
+        let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS / 2);
+        let smo = EZS::duration_to_smoothing(max_dur).unwrap();
+        assert_eq!(smo, 0x8000);
+    }
+
+    #[test]
+    fn test_duration_max() {
+        let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS - 1);
+        let smo = EZS::duration_to_smoothing(max_dur).unwrap();
+        assert_eq!(smo, 0xFFFF);
+    }
+
+    #[test]
+    fn test_duration_negative() {
+        let max_dur = Duration::microseconds(-1);
+        let smo = EZS::duration_to_smoothing(max_dur);
+        assert!(smo.is_err());
+    }
+
+    #[test]
+    fn test_duration_over_limit() {
+        let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS);
+        let smo = EZS::duration_to_smoothing(max_dur);
+        assert!(smo.is_err());
     }
 }

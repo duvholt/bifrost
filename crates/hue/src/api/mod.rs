@@ -303,17 +303,23 @@ macro_rules! resource_conversion_impl {
     };
 }
 
+// AuthV1 is not a real resource (only used in links)
+// resource_conversion_impl!(AuthV1);
 resource_conversion_impl!(BehaviorInstance);
 resource_conversion_impl!(BehaviorScript);
 resource_conversion_impl!(Bridge);
 resource_conversion_impl!(BridgeHome);
 resource_conversion_impl!(Button);
 resource_conversion_impl!(Device);
+resource_conversion_impl!(DevicePower);
+resource_conversion_impl!(DeviceSoftwareUpdate);
 resource_conversion_impl!(Entertainment);
 resource_conversion_impl!(EntertainmentConfiguration);
 resource_conversion_impl!(GeofenceClient);
 resource_conversion_impl!(Geolocation);
 resource_conversion_impl!(GroupedLight);
+resource_conversion_impl!(GroupedLightLevel);
+resource_conversion_impl!(GroupedMotion);
 resource_conversion_impl!(Homekit);
 resource_conversion_impl!(Light);
 resource_conversion_impl!(LightLevel);

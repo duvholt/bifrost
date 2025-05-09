@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
+use std::{collections::BTreeMap, num::NonZeroU32};
 
 use camino::Utf8PathBuf;
 use hue::api::RoomArchetype;
@@ -43,6 +43,7 @@ pub struct Z2mServer {
     pub url: Url,
     pub group_prefix: Option<String>,
     pub disable_tls_verify: Option<bool>,
+    pub streaming_fps: Option<NonZeroU32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
