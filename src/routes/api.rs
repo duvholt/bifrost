@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use axum::Router;
 use axum::extract::{Path, State};
-use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
 use bytes::Bytes;
 use chrono::Utc;
 use log::{info, warn};
+use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::sync::MutexGuard;
 use uuid::Uuid;
@@ -17,7 +17,7 @@ use hue::api::{
     GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
     SceneActive, SceneStatus, SceneUpdate, V1Reply,
 };
-use hue::error::{HueError, HueResult};
+use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
     ApiGroup, ApiGroupActionUpdate, ApiGroupUpdate2, ApiLight, ApiLightStateUpdate,
     ApiResourceType, ApiScene, ApiSceneAppData, ApiSceneType, ApiSceneVersion, ApiSensor,
@@ -28,13 +28,14 @@ use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
 use crate::routes::extractor::Json;
+use crate::routes::{ApiV1Error, ApiV1Result};
 use crate::server::appstate::AppState;
 
-async fn get_api_config(State(state): State<AppState>) -> impl IntoResponse {
+async fn get_api_config(State(state): State<AppState>) -> Json<impl Serialize> {
     Json(state.api_short_config().await)
 }
 
-async fn post_api(bytes: Bytes) -> ApiResult<impl IntoResponse> {
+async fn post_api(bytes: Bytes) -> ApiV1Result<Json<impl Serialize>> {
     info!("post: {bytes:?}");
     let json: NewUser = serde_json::from_slice(&bytes)?;
 
@@ -105,7 +106,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
     Ok(rooms)
 }
 
-pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiResult<ApiScene> {
+pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiV1Result<ApiScene> {
     let lights = scene
         .actions
         .iter()
@@ -121,7 +122,7 @@ pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiResult<Api
                 ApiLightStateUpdate::from(sae.action.clone()),
             ))
         })
-        .collect::<ApiResult<_>>()?;
+        .collect::<ApiV1Result<_>>()?;
 
     let room_id = res.get_id_v1_index(scene.group.rid)?;
 
@@ -146,7 +147,7 @@ pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiResult<Api
     })
 }
 
-fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiScene>> {
+fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiV1Result<HashMap<String, ApiScene>> {
     let mut scenes = HashMap::new();
 
     for rr in res.get_resources_by_type(RType::Scene) {
@@ -165,7 +166,7 @@ fn get_scenes(owner: &str, res: &MutexGuard<Resources>) -> ApiResult<HashMap<Str
 async fn get_api_user(
     state: State<AppState>,
     Path(username): Path<String>,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiV1Result<Json<impl Serialize>> {
     let lock = state.res.lock().await;
 
     Ok(Json(ApiUserConfig {
@@ -183,7 +184,7 @@ async fn get_api_user(
 async fn get_api_user_resource(
     State(state): State<AppState>,
     Path((username, artype)): Path<(String, ApiResourceType)>,
-) -> ApiResult<Json<Value>> {
+) -> ApiV1Result<Json<Value>> {
     let lock = &state.res.lock().await;
     match artype {
         ApiResourceType::Config => Ok(Json(json!(state.api_config(username).await?))),
@@ -201,26 +202,26 @@ async fn get_api_user_resource(
 async fn post_api_user_resource(
     Path((_username, resource)): Path<(String, ApiResourceType)>,
     Json(req): Json<Value>,
-) -> ApiResult<Json<Value>> {
+) -> ApiV1Result<Json<Value>> {
     warn!("POST v1 user resource unsupported");
     warn!("Request: {req:?}");
-    Err(ApiError::V1CreateUnsupported(resource))
+    Err(ApiV1Error::V1CreateUnsupported(resource))
 }
 
 async fn put_api_user_resource(
     Path((_username, _resource)): Path<(String, String)>,
     Json(req): Json<Value>,
-) -> impl IntoResponse {
+) -> ApiV1Result<Json<impl Serialize>> {
     warn!("PUT v1 user resource {req:?}");
     //Json(format!("user {username} resource {resource}"))
-    Json(vec![HueApiResult::Success(req)])
+    Ok(Json(vec![HueApiResult::Success(req)]))
 }
 
 #[allow(clippy::significant_drop_tightening)]
 async fn get_api_user_resource_id(
     State(state): State<AppState>,
     Path((username, resource, id)): Path<(String, ApiResourceType, u32)>,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiV1Result<Json<impl Serialize>> {
     log::debug!("GET v1 username={username} resource={resource:?} id={id}");
     let result = match resource {
         ApiResourceType::Lights => {
@@ -260,7 +261,7 @@ async fn put_api_user_resource_id(
     State(state): State<AppState>,
     Path((username, artype, id)): Path<(String, ApiResourceType, u32)>,
     Json(req): Json<Value>,
-) -> ApiResult<impl IntoResponse> {
+) -> ApiV1Result<Json<Value>> {
     log::debug!("PUT v1 username={username} resource={artype:?} id={id}");
     log::debug!("JSON: {req:?}");
     match artype {
@@ -292,7 +293,7 @@ async fn put_api_user_resource_id(
         | ApiResourceType::Scenes
         | ApiResourceType::Schedules
         | ApiResourceType::Sensors
-        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(artype)),
+        | ApiResourceType::Capabilities => Err(ApiV1Error::V1CreateUnsupported(artype)),
     }
 }
 
@@ -300,7 +301,7 @@ async fn put_api_user_resource_id_path(
     State(state): State<AppState>,
     Path((_username, artype, id, path)): Path<(String, ApiResourceType, u32, String)>,
     Json(req): Json<Value>,
-) -> ApiResult<Json<Value>> {
+) -> ApiV1Result<Json<Value>> {
     match artype {
         ApiResourceType::Lights => {
             log::debug!("req: {}", serde_json::to_string_pretty(&req)?);
@@ -349,7 +350,7 @@ async fn put_api_user_resource_id_path(
                     V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?
                 }
                 ApiGroupActionUpdate::GroupUpdate(upd) => {
-                    let scene_id = upd.scene.parse()?;
+                    let scene_id = upd.scene.parse().map_err(ApiError::ParseIntError)?;
                     let scene_uuid = lock.from_id_v1(scene_id)?;
                     let rlink = RType::Scene.link_to(scene_uuid);
                     let updv2 = SceneUpdate::new().with_recall_action(Some(SceneStatus {
@@ -404,7 +405,7 @@ async fn put_api_user_resource_id_path(
         | ApiResourceType::Scenes
         | ApiResourceType::Schedules
         | ApiResourceType::Sensors
-        | ApiResourceType::Capabilities => Err(ApiError::V1CreateUnsupported(artype)),
+        | ApiResourceType::Capabilities => Err(ApiV1Error::V1CreateUnsupported(artype)),
     }
 }
 
@@ -414,8 +415,8 @@ async fn put_api_user_resource_id_path(
 /// even though this does not seem to ever have been a valid hue endpoint.
 ///
 /// 2025-01-24: This response has been confirmed to work by Alexa and Peter Miller on discord.
-pub async fn workaround_iconnect_hue() -> impl IntoResponse {
-    Json(json!([{"error":{"type":1,"address":"/","description":"unauthorized user"}}]))
+pub async fn workaround_iconnect_hue() -> ApiV1Result<()> {
+    Err(HueApiV1Error::UnauthorizedUser)?
 }
 
 pub fn router() -> Router<AppState> {

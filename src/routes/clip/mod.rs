@@ -9,7 +9,6 @@ use entertainment_configuration as ent_conf;
 
 use axum::Router;
 use axum::extract::{Path, State};
-use axum::response::IntoResponse;
 use axum::routing::{delete, get, post, put};
 use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
@@ -51,7 +50,7 @@ impl<T: Serialize> V2Reply<T> {
     }
 }
 
-async fn get_all_resources(State(state): State<AppState>) -> impl IntoResponse {
+async fn get_all_resources(State(state): State<AppState>) -> ApiV2Result {
     let lock = state.res.lock().await;
     let res = lock.get_resources();
     drop(lock);
@@ -69,7 +68,7 @@ async fn post_resource(
     State(state): State<AppState>,
     Path(rtype): Path<RType>,
     Json(req): Json<Value>,
-) -> impl IntoResponse {
+) -> ApiV2Result {
     log::info!("POST {rtype:?}");
     log::debug!("Json data:\n{}", serde_json::to_string_pretty(&req)?);
 

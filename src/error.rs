@@ -8,7 +8,6 @@ use tokio::task::JoinError;
 
 use bifrost_api::backend::BackendRequest;
 use hue::event::EventBlock;
-use hue::legacy_api::ApiResourceType;
 use svc::error::SvcError;
 
 #[derive(Error, Debug)]
@@ -119,10 +118,6 @@ pub enum ApiError {
 
     #[error("Unexpected z2m message: {0:?}")]
     UnexpectedZ2mReply(tokio_tungstenite::tungstenite::Message),
-
-    /* hue api v1 errors */
-    #[error("Cannot create resources of type: {0:?}")]
-    V1CreateUnsupported(ApiResourceType),
 
     /* hue api v2 errors */
     #[error("Failed to get firmware version reply from update server")]
