@@ -113,6 +113,11 @@ pub struct PermitJoin {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceRemove {
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeviceRemoveResponse {
     pub id: String,
     pub block: bool,
