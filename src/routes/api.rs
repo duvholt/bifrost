@@ -9,7 +9,6 @@ use log::{info, warn};
 use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::sync::MutexGuard;
-use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
@@ -29,7 +28,7 @@ use hue::legacy_api::{
 
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
-use crate::routes::auth::STANDARD_CLIENT_KEY;
+use crate::routes::auth::{STANDARD_APPLICATION_ID, STANDARD_CLIENT_KEY};
 use crate::routes::clip::entertainment_configuration;
 use crate::routes::extractor::Json;
 use crate::routes::{ApiV1Error, ApiV1Result};
@@ -49,7 +48,7 @@ async fn post_api(bytes: Bytes) -> ApiV1Result<Json<impl Serialize>> {
         } else {
             None
         },
-        username: Uuid::new_v4().as_simple().to_string(),
+        username: STANDARD_APPLICATION_ID.to_string(),
     };
     Ok(Json(vec![HueApiResult::Success(res)]))
 }
