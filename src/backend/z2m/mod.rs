@@ -28,8 +28,8 @@ use hue::api::{
     EntertainmentSegment, EntertainmentSegments, GroupedLight, GroupedLightUpdate, Light,
     LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
     LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
-    RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum,
-    SceneUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    RoomMetadata, RoomUpdate, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
+    SceneStatusEnum, SceneUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -934,6 +934,45 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_room_update(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        upd: &RoomUpdate,
+    ) -> ApiResult<()> {
+        let lock = self.state.lock().await;
+
+        if let Some(children) = &upd.children {
+            if let Some(topic) = self.rmap.get(link) {
+                let room = lock.get::<Room>(link)?.clone();
+                drop(lock);
+
+                let known_existing: BTreeSet<_> = room
+                    .children
+                    .iter()
+                    .filter(|device| self.rmap.contains_key(device))
+                    .collect();
+
+                let known_new: BTreeSet<_> = children
+                    .iter()
+                    .filter(|device| self.rmap.contains_key(device))
+                    .collect();
+
+                for add in known_new.difference(&known_existing) {
+                    let friendly_name = &self.rmap[add];
+                    z2mws.send_group_member_add(topic, friendly_name).await?;
+                }
+
+                for remove in known_existing.difference(&known_new) {
+                    let friendly_name = &self.rmap[remove];
+                    z2mws.send_group_member_remove(topic, friendly_name).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -967,33 +1006,8 @@ impl Z2mBackend {
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
-                if let Some(children) = &upd.children {
-                    if let Some(topic) = self.rmap.get(link) {
-                        let room = lock.get::<Room>(link)?.clone();
-                        drop(lock);
-
-                        let known_existing: BTreeSet<_> = room
-                            .children
-                            .iter()
-                            .filter(|device| self.rmap.contains_key(device))
-                            .collect();
-
-                        let known_new: BTreeSet<_> = children
-                            .iter()
-                            .filter(|device| self.rmap.contains_key(device))
-                            .collect();
-
-                        for add in known_new.difference(&known_existing) {
-                            let friendly_name = &self.rmap[add];
-                            z2mws.send_group_member_add(topic, friendly_name).await?;
-                        }
-
-                        for remove in known_existing.difference(&known_new) {
-                            let friendly_name = &self.rmap[remove];
-                            z2mws.send_group_member_remove(topic, friendly_name).await?;
-                        }
-                    }
-                }
+                drop(lock);
+                self.backend_room_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::Delete(link) => match link.rtype {
