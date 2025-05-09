@@ -38,15 +38,3 @@ pub async fn put_scene(state: &AppState, rlink: ResourceLink, put: Value) -> Api
 
     V2Reply::ok(rlink)
 }
-
-pub async fn delete_scene(state: &AppState, rlink: ResourceLink) -> ApiV2Result {
-    let lock = state.res.lock().await;
-
-    let _scene: &Scene = lock.get(&rlink)?;
-
-    lock.backend_request(BackendRequest::Delete(rlink))?;
-
-    drop(lock);
-
-    V2Reply::ok(rlink)
-}

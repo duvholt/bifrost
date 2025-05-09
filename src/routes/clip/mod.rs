@@ -6,6 +6,7 @@ pub mod room;
 pub mod scene;
 pub mod zigbee_device_discovery;
 
+use bifrost_api::backend::BackendRequest;
 use entertainment_configuration as ent_conf;
 
 use axum::Router;
@@ -209,24 +210,28 @@ async fn delete_resource_id(
     log::info!("DELETE {rlink:?}");
 
     match rlink.rtype {
-        RType::Scene => scene::delete_scene(&state, rlink).await,
-
-        /* Allowed, but support is missing in Bifrost */
+        /* Allowed (send request to backend) */
         RType::BehaviorInstance
         | RType::Device
         | RType::EntertainmentConfiguration
         | RType::GeofenceClient
         | RType::MatterFabric
         | RType::Room
+        | RType::Scene
         | RType::ServiceGroup
         | RType::SmartScene
         | RType::Zone => {
-            /* check that the resource exists, otherwise we should return 404 */
-            state.res.lock().await.get_resource(&rlink)?;
+            let lock = state.res.lock().await;
 
-            let err = ApiError::DeleteNotYetSupported(rlink.rtype);
-            log::error!("err");
-            Err(err)
+            /* check that the resource exists, otherwise we should return 404 */
+            lock.get_resource(&rlink)?;
+
+            /* request deletion from backend */
+            lock.backend_request(BackendRequest::Delete(rlink))?;
+
+            drop(lock);
+
+            V2Reply::ok(rlink)
         }
 
         /* Not allowed by protocol */
