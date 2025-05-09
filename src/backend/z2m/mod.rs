@@ -1018,6 +1018,71 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_entertainment_start(
+        &mut self,
+        z2mws: &mut Z2mWebSocket,
+        ent_id: &Uuid,
+    ) -> ApiResult<()> {
+        log::trace!("[{}] Entertainment start", self.name);
+        let lock = self.state.lock().await;
+
+        let ent: &EntertainmentConfiguration = lock.get_id(*ent_id)?;
+
+        let mut chans = ent.channels.clone();
+
+        let mut addrs: BTreeMap<String, Vec<u16>> = BTreeMap::new();
+        let mut targets = vec![];
+        chans.sort_by_key(|c| c.channel_id);
+
+        log::trace!("[{}] Resolving entertainment channels", self.name);
+        for chan in chans {
+            for member in &chan.members {
+                let ent: &Entertainment = lock.get(&member.service)?;
+                let light_id = ent
+                    .renderer_reference
+                    .ok_or(HueError::NotFound(member.service.rid))?;
+                let topic = self
+                    .rmap
+                    .get(&light_id)
+                    .ok_or(HueError::NotFound(light_id.rid))?;
+                let dev = self
+                    .network
+                    .get(topic)
+                    .ok_or(HueError::NotFound(member.service.rid))?;
+
+                let segment_addr = dev.network_address + member.index;
+
+                addrs
+                    .entry(dev.friendly_name.clone())
+                    .or_default()
+                    .push(segment_addr);
+
+                targets.push(topic);
+            }
+        }
+        log::debug!("Entertainment addresses: {addrs:04x?}");
+        drop(lock);
+
+        if let Some(target) = targets.first() {
+            let mut es = EntStream::new(self.counter, target, addrs);
+
+            // Not even a real Philips Hue bridge uses this trick!
+            //
+            // We set the entertainment mode fade speed ("smoothing")
+            // to fit the target frame rate, to ensure perfectly smooth
+            // transitionss, even at low frame rates!
+            es.stream.set_smoothing_duration(self.throttle.interval())?;
+
+            log::info!("Starting entertainment mode stream at {} fps", self.fps);
+
+            es.start_stream(z2mws).await?;
+
+            self.entstream = Some(es);
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -1061,60 +1126,8 @@ impl Z2mBackend {
             }
 
             BackendRequest::EntertainmentStart(ent_id) => {
-                log::trace!("[{}] Entertainment start", self.name);
-                let ent: &EntertainmentConfiguration = lock.get_id(*ent_id)?;
-
-                let mut chans = ent.channels.clone();
-
-                let mut addrs: BTreeMap<String, Vec<u16>> = BTreeMap::new();
-                let mut targets = vec![];
-                chans.sort_by_key(|c| c.channel_id);
-
-                log::trace!("[{}] Resolving entertainment channels", self.name);
-                for chan in chans {
-                    for member in &chan.members {
-                        let ent: &Entertainment = lock.get(&member.service)?;
-                        let light_id = ent
-                            .renderer_reference
-                            .ok_or(HueError::NotFound(member.service.rid))?;
-                        let topic = self
-                            .rmap
-                            .get(&light_id)
-                            .ok_or(HueError::NotFound(light_id.rid))?;
-                        let dev = self
-                            .network
-                            .get(topic)
-                            .ok_or(HueError::NotFound(member.service.rid))?;
-
-                        let segment_addr = dev.network_address + member.index;
-
-                        addrs
-                            .entry(dev.friendly_name.clone())
-                            .or_default()
-                            .push(segment_addr);
-
-                        targets.push(topic);
-                    }
-                }
-                log::debug!("Entertainment addresses: {addrs:04x?}");
                 drop(lock);
-
-                if let Some(target) = targets.first() {
-                    let mut es = EntStream::new(self.counter, target, addrs);
-
-                    // Not even a real Philips Hue bridge uses this trick!
-                    //
-                    // We set the entertainment mode fade speed ("smoothing")
-                    // to fit the target frame rate, to ensure perfectly smooth
-                    // transitionss, even at low frame rates!
-                    es.stream.set_smoothing_duration(self.throttle.interval())?;
-
-                    log::info!("Starting entertainment mode stream at {} fps", self.fps);
-
-                    es.start_stream(z2mws).await?;
-
-                    self.entstream = Some(es);
-                }
+                self.backend_entertainment_start(z2mws, ent_id).await?;
             }
 
             BackendRequest::EntertainmentFrame(frame) => {
