@@ -593,9 +593,17 @@ impl Z2mBackend {
 
             Message::BridgeDeviceRemove(obj) => {
                 if let Some(rlink) = self.map.get(&obj.data.id) {
-                    self.state.lock().await.delete(rlink)?;
-
-                    log::warn!("Device removed: {rlink:?}");
+                    match rlink.rtype {
+                        RType::Light => {
+                            let mut lock = self.state.lock().await;
+                            let owner = lock.get::<Light>(rlink)?.owner;
+                            log::info!("Removing device: {owner:?}");
+                            lock.delete(&owner)?;
+                        }
+                        rtype => {
+                            log::warn!("Cannot handle removing resource of type {rtype:?}");
+                        }
+                    }
                 }
 
                 if let Some(rlink) = self.map.remove(&obj.data.id) {
