@@ -973,6 +973,51 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_delete(&self, z2mws: &mut Z2mWebSocket, link: &ResourceLink) -> ApiResult<()> {
+        let lock = self.state.lock().await;
+
+        match link.rtype {
+            RType::Scene => {
+                let room = lock.get::<Scene>(link)?.group;
+                let index = lock
+                    .aux_get(link)?
+                    .index
+                    .ok_or(HueError::NotFound(link.rid))?;
+                drop(lock);
+
+                if let Some(topic) = self.rmap.get(&room) {
+                    z2mws.send_scene_remove(topic, index).await?;
+                }
+            }
+
+            RType::Device => {
+                if let Some(dev) = self
+                    .rmap
+                    .get(link)
+                    .and_then(|topic| self.network.get(topic))
+                {
+                    let addr = dev.ieee_address.to_string();
+                    log::info!(
+                        "[{}] Requesting z2m removal of {} ({})",
+                        self.name,
+                        &addr,
+                        dev.friendly_name
+                    );
+
+                    z2mws.send_device_remove(addr).await?;
+                }
+            }
+
+            rtype => {
+                log::warn!(
+                    "[{}] Deleting objects of type {rtype:?} is not supported",
+                    self.name
+                );
+            }
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -1010,45 +1055,10 @@ impl Z2mBackend {
                 self.backend_room_update(z2mws, link, upd).await?;
             }
 
-            BackendRequest::Delete(link) => match link.rtype {
-                RType::Scene => {
-                    let room = lock.get::<Scene>(link)?.group;
-                    let index = lock
-                        .aux_get(link)?
-                        .index
-                        .ok_or(HueError::NotFound(link.rid))?;
-                    drop(lock);
-
-                    if let Some(topic) = self.rmap.get(&room) {
-                        z2mws.send_scene_remove(topic, index).await?;
-                    }
-                }
-
-                RType::Device => {
-                    if let Some(dev) = self
-                        .rmap
-                        .get(link)
-                        .and_then(|topic| self.network.get(topic))
-                    {
-                        let addr = dev.ieee_address.to_string();
-                        log::info!(
-                            "[{}] Requesting z2m removal of {} ({})",
-                            self.name,
-                            &addr,
-                            dev.friendly_name
-                        );
-
-                        z2mws.send_device_remove(addr).await?;
-                    }
-                }
-
-                rtype => {
-                    log::warn!(
-                        "[{}] Deleting objects of type {rtype:?} is not supported",
-                        self.name
-                    );
-                }
-            },
+            BackendRequest::Delete(link) => {
+                drop(lock);
+                self.backend_delete(z2mws, link).await?;
+            }
 
             BackendRequest::EntertainmentStart(ent_id) => {
                 log::trace!("[{}] Entertainment start", self.name);
