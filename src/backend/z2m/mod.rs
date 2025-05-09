@@ -923,14 +923,8 @@ impl Z2mBackend {
     ) -> ApiResult<()> {
         let room = self.state.lock().await.get::<GroupedLight>(link)?.owner;
 
-        let payload = DeviceUpdate::default()
-            .with_state(upd.on.map(|on| on.on))
-            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-            .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
-            .with_color_xy(upd.color.map(|col| col.xy));
-
         if let Some(topic) = self.rmap.get(&room) {
-            z2mws.send_update(topic, &payload).await?;
+            z2mws.send_update(topic, &upd.into()).await?;
         }
 
         Ok(())
