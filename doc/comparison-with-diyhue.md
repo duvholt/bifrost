@@ -55,7 +55,7 @@ In any case, feedback always welcome.
 | Live state of lights in Hue app      | ❌ [^1]                                 | ✅                                        |
 | Multiple type of backends            | ✅                                      | ❌ (only Zigbee2MQTT)                     |
 | Entertainment zones                  | ✅                                      | ✅                                        |
-| Native entertainment zone support    | ❌                                      | ✅                                        |
+| Zigbee Entertainment mode support    | ❌                                      | ✅                                        |
 | Hue effects (fireplace, candle, etc) | (✅) (partial)                          | ✅                                        |
 | Routines / Wake up / Go to sleep     | ✅                                      | ❌ (planned)                              |
 | Remote services                      | (✅) (only with Hue essentials)         | ❌                                        |
