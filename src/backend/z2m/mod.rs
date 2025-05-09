@@ -28,8 +28,8 @@ use hue::api::{
     EntertainmentSegment, EntertainmentSegments, GroupedLight, Light, LightEffect, LightEffects,
     LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata,
     RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, Stub, Taurus, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
+    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, SceneUpdate, Stub, Taurus,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -841,6 +841,76 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_scene_update(
+        &mut self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        upd: &SceneUpdate,
+    ) -> ApiResult<()> {
+        let mut lock = self.state.lock().await;
+
+        let scene = lock.get::<Scene>(link)?;
+
+        let index = lock
+            .aux_get(link)?
+            .index
+            .ok_or(HueError::NotFound(link.rid))?;
+
+        if let Some(recall) = &upd.recall {
+            if recall.action == Some(SceneStatusEnum::Active) {
+                let scenes = lock.get_scenes_for_room(&scene.group.rid);
+                for rid in scenes {
+                    lock.update::<Scene>(&rid, |scn| {
+                        scn.status = Some(SceneStatus {
+                            active: if rid == link.rid {
+                                SceneActive::Static
+                            } else {
+                                SceneActive::Inactive
+                            },
+                            last_recall: None,
+                        });
+                    })?;
+                }
+
+                let room = lock.get::<Scene>(link)?.group;
+                drop(lock);
+
+                if let Some(topic) = self.rmap.get(&room).cloned() {
+                    log::info!("[{}] Recall scene: {link:?}", self.name);
+
+                    let mut lock = self.state.lock().await;
+                    self.learner.learn_scene_recall(link, &mut lock)?;
+
+                    z2mws.send_scene_recall(&topic, index).await?;
+                }
+            } else {
+                log::error!("Scene recall type not supported: {recall:?}");
+            }
+        } else {
+            // We're not recalling the scene, so we are updating the scene
+            let room = lock.get::<Scene>(link)?.group;
+
+            if let Some(topic) = self.rmap.get(&room).cloned() {
+                log::info!("[{}] Store scene: {link:?}", self.name);
+
+                let scene = lock.get::<Scene>(link)?;
+                z2mws
+                    .send_scene_store(&topic, &scene.metadata.name, index)
+                    .await?;
+
+                // We have requested z2m to update the scene, so update
+                // the state database accordingly
+                lock.update::<Scene>(&link.rid, |scene| {
+                    *scene += upd.clone();
+                })?;
+
+                drop(lock);
+            }
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -864,62 +934,8 @@ impl Z2mBackend {
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
-                let scene = lock.get::<Scene>(link)?;
-
-                let index = lock
-                    .aux_get(link)?
-                    .index
-                    .ok_or(HueError::NotFound(link.rid))?;
-
-                if let Some(recall) = &upd.recall {
-                    if recall.action == Some(SceneStatusEnum::Active) {
-                        let scenes = lock.get_scenes_for_room(&scene.group.rid);
-                        for rid in scenes {
-                            lock.update::<Scene>(&rid, |scn| {
-                                scn.status = Some(SceneStatus {
-                                    active: if rid == link.rid {
-                                        SceneActive::Static
-                                    } else {
-                                        SceneActive::Inactive
-                                    },
-                                    last_recall: None,
-                                });
-                            })?;
-                        }
-
-                        let room = lock.get::<Scene>(link)?.group;
-                        drop(lock);
-
-                        if let Some(topic) = self.rmap.get(&room).cloned() {
-                            log::info!("[{}] Recall scene: {link:?}", self.name);
-
-                            let mut lock = self.state.lock().await;
-                            self.learner.learn_scene_recall(link, &mut lock)?;
-
-                            z2mws.send_scene_recall(&topic, index).await?;
-                        }
-                    } else {
-                        log::error!("Scene recall type not supported: {recall:?}");
-                    }
-                } else {
-                    // We're not recalling the scene, so we are updating the scene
-                    let room = lock.get::<Scene>(link)?.group;
-
-                    if let Some(topic) = self.rmap.get(&room).cloned() {
-                        log::info!("[{}] Store scene: {link:?}", self.name);
-
-                        let scene = lock.get::<Scene>(link)?;
-                        z2mws
-                            .send_scene_store(&topic, &scene.metadata.name, index)
-                            .await?;
-
-                        // We have requested z2m to update the scene, so update
-                        // the state database accordingly
-                        lock.update::<Scene>(&link.rid, |scene| {
-                            *scene += upd.clone();
-                        })?;
-                    }
-                }
+                drop(lock);
+                self.backend_scene_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
