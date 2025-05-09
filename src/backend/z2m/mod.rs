@@ -452,32 +452,30 @@ impl Z2mBackend {
     }
 
     async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
-        let mut res = self.state.lock().await;
-        res.update::<Light>(uuid, |light| {
-            let mut upd = LightUpdate::new()
-                .with_on(devupd.state.map(Into::into))
-                .with_brightness(devupd.brightness.map(|b| b / 254.0 * 100.0))
-                .with_color_temperature(devupd.color_temp)
-                .with_gradient(devupd.gradient.as_ref().map(|s| {
-                    LightGradientUpdate {
-                        mode: None,
-                        points: s
-                            .iter()
-                            .map(|hc| LightGradientPoint::xy(hc.to_xy_color()))
-                            .collect(),
-                    }
-                }));
+        let mut upd = LightUpdate::new()
+            .with_on(devupd.state.map(Into::into))
+            .with_brightness(devupd.brightness.map(|b| b / 254.0 * 100.0))
+            .with_color_temperature(devupd.color_temp)
+            .with_gradient(devupd.gradient.as_ref().map(|s| {
+                LightGradientUpdate {
+                    mode: None,
+                    points: s
+                        .iter()
+                        .map(|hc| LightGradientPoint::xy(hc.to_xy_color()))
+                        .collect(),
+                }
+            }));
 
-            if devupd.color_mode != Some(DeviceColorMode::ColorTemp) {
-                upd = upd.with_color_xy(devupd.color.and_then(|col| col.xy));
-            }
+        if devupd.color_mode != Some(DeviceColorMode::ColorTemp) {
+            upd = upd.with_color_xy(devupd.color.and_then(|col| col.xy));
+        }
 
-            *light += upd;
-        })?;
+        let mut lock = self.state.lock().await;
+        lock.update::<Light>(uuid, |light| *light += upd)?;
 
-        self.learner.learn(uuid, &res, devupd)?;
-        self.learner.collect(&mut res)?;
-        drop(res);
+        self.learner.learn(uuid, &lock, devupd)?;
+        self.learner.collect(&mut lock)?;
+        drop(lock);
 
         Ok(())
     }
