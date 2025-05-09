@@ -741,7 +741,7 @@ impl Z2mBackend {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn websocket_write(
+    async fn handle_backend_event(
         &mut self,
         z2mws: &mut Z2mWebSocket,
         req: Arc<BackendRequest>,
@@ -1083,7 +1083,7 @@ impl Z2mBackend {
             select! {
                 pkt = chan.recv() => {
                     let api_req = pkt?;
-                    self.websocket_write(&mut socket, api_req).await?;
+                    self.handle_backend_event(&mut socket, api_req).await?;
                     // FIXME: this used to be our "throttle" feature, but it breaks entertainment mode
                     /* tokio::time::sleep(std::time::Duration::from_millis(100)).await; */
                 },
