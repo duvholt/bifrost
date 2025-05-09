@@ -44,7 +44,7 @@ async fn post_api(bytes: Bytes) -> ApiV1Result<Json<impl Serialize>> {
 
     let res = NewUserReply {
         clientkey: if json.generateclientkey {
-            Some(STANDARD_CLIENT_KEY.to_hex())
+            Some(hex::encode_upper(STANDARD_CLIENT_KEY))
         } else {
             None
         },
