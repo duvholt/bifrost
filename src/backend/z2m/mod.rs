@@ -1126,7 +1126,6 @@ impl Z2mBackend {
         Ok(())
     }
 
-    #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
         z2mws: &mut Z2mWebSocket,
@@ -1136,48 +1135,41 @@ impl Z2mBackend {
 
         match &*req {
             BackendRequest::LightUpdate(link, upd) => {
-                self.backend_light_update(z2mws, link, upd).await?;
+                self.backend_light_update(z2mws, link, upd).await
             }
 
-            BackendRequest::SceneCreate(link_scene, sid, scene) => {
-                self.backend_scene_create(z2mws, link_scene, *sid, scene)
-                    .await?;
+            BackendRequest::SceneCreate(link, sid, scene) => {
+                self.backend_scene_create(z2mws, link, *sid, scene).await
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
-                self.backend_scene_update(z2mws, link, upd).await?;
+                self.backend_scene_update(z2mws, link, upd).await
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                self.backend_grouped_light_update(z2mws, link, upd).await?;
+                self.backend_grouped_light_update(z2mws, link, upd).await
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
-                self.backend_room_update(z2mws, link, upd).await?;
+                self.backend_room_update(z2mws, link, upd).await
             }
 
-            BackendRequest::Delete(link) => {
-                self.backend_delete(z2mws, link).await?;
-            }
+            BackendRequest::Delete(link) => self.backend_delete(z2mws, link).await,
 
             BackendRequest::EntertainmentStart(ent_id) => {
-                self.backend_entertainment_start(z2mws, ent_id).await?;
+                self.backend_entertainment_start(z2mws, ent_id).await
             }
 
             BackendRequest::EntertainmentFrame(frame) => {
-                self.backend_entertainment_frame(z2mws, frame).await?;
+                self.backend_entertainment_frame(z2mws, frame).await
             }
 
-            BackendRequest::EntertainmentStop() => {
-                self.backend_entertainment_stop(z2mws).await?;
-            }
+            BackendRequest::EntertainmentStop() => self.backend_entertainment_stop(z2mws).await,
 
             BackendRequest::ZigbeeDeviceDiscovery(_rlink, _zbd) => {
-                z2mws.send_permit_join(60 * 4, None).await?;
+                z2mws.send_permit_join(60 * 4, None).await
             }
         }
-
-        Ok(())
     }
 
     pub async fn event_loop(
