@@ -114,6 +114,7 @@ z2m:
     group_prefix: bifrost_
 
     # Streaming mode ("Entertainment mode" / "Hue Sync") maximum frames per second
+    # [optional!]
     #
     # This is the maximum number of light updates attempted per second.
     #
@@ -121,11 +122,28 @@ z2m:
     # or some other client) determines the maximum possible fps.
     #
     # For example, if Bifrost only receives light updates at 10 fps, setting
-    # this limit to 20 will have no effect.
+    # this limit to 20 will still only cause the lights to update at 10 fps.
     #
     # On the other hand, if the streaming client sends faster than this limit,
     # frames will be dropped to avoid going over it.
-    streaming_fps: 30
+    #
+    # If not specified, uses a default of 20, which is an attempt to balance
+    # responsiveness against load on the Zigbee mesh.
+    #
+    # Because of the smoothing algorithm Bifrost uses, the results will look
+    # *better* if this is not set higher than needed.
+    #
+    # For example, 30 fps content will look good at 10, 20 or 30 streaming_fps,
+    # but worse at streaming_fps: 60, because the frame-to-frame transition
+    # time will be wrong for the content.
+    #
+    # Rules of thumb(s), for best results:
+    # - Higher numbers mean greater load on your Zigbee mesh.
+    # - If your mesh starts lagging or becoming unresponsive, try a lower number.
+    # - Even values as low as 5 fps looks pretty good.
+    # - There usually no reason to go above 60.
+    # - Have fun experimenting :-)
+    streaming_fps: 20
   ...
 
 # Rooms section [optional!]

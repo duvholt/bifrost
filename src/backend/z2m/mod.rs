@@ -68,7 +68,7 @@ pub struct Z2mBackend {
 }
 
 impl Z2mBackend {
-    const DEFAULT_FPS: u32 = 30;
+    const DEFAULT_FPS: u32 = 20;
 
     pub fn new(
         name: String,
