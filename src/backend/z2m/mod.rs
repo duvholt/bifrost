@@ -921,9 +921,7 @@ impl Z2mBackend {
         link: &ResourceLink,
         upd: &GroupedLightUpdate,
     ) -> ApiResult<()> {
-        let lock = self.state.lock().await;
-        let room = lock.get::<GroupedLight>(link)?.owner;
-        drop(lock);
+        let room = self.state.lock().await.get::<GroupedLight>(link)?.owner;
 
         let payload = DeviceUpdate::default()
             .with_state(upd.on.map(|on| on.on))
