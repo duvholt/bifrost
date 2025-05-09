@@ -25,11 +25,11 @@ use uuid::Uuid;
 use hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
     DeviceProductData, DimmingUpdate, Entertainment, EntertainmentConfiguration,
-    EntertainmentSegment, EntertainmentSegments, GroupedLight, Light, LightEffect, LightEffects,
-    LightEffectsV2, LightEffectsV2Update, LightGradientMode, LightMetadata, LightUpdate, Metadata,
-    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum, SceneUpdate, Stub, Taurus,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    EntertainmentSegment, EntertainmentSegments, GroupedLight, GroupedLightUpdate, Light,
+    LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
+    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
+    RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, SceneStatusEnum,
+    SceneUpdate, Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::error::HueError;
@@ -911,6 +911,29 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_grouped_light_update(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        upd: &GroupedLightUpdate,
+    ) -> ApiResult<()> {
+        let lock = self.state.lock().await;
+        let room = lock.get::<GroupedLight>(link)?.owner;
+        drop(lock);
+
+        let payload = DeviceUpdate::default()
+            .with_state(upd.on.map(|on| on.on))
+            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+            .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
+            .with_color_xy(upd.color.map(|col| col.xy));
+
+        if let Some(topic) = self.rmap.get(&room) {
+            z2mws.send_update(topic, &payload).await?;
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -939,18 +962,8 @@ impl Z2mBackend {
             }
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
-                let room = lock.get::<GroupedLight>(link)?.owner;
                 drop(lock);
-
-                let payload = DeviceUpdate::default()
-                    .with_state(upd.on.map(|on| on.on))
-                    .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
-                    .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
-                    .with_color_xy(upd.color.map(|col| col.xy));
-
-                if let Some(topic) = self.rmap.get(&room) {
-                    z2mws.send_update(topic, &payload).await?;
-                }
+                self.backend_grouped_light_update(z2mws, link, upd).await?;
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
