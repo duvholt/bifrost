@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use itertools::Itertools;
 use maplit::btreeset;
 use serde::Serialize;
 use serde_json::json;
@@ -142,6 +143,24 @@ impl Resources {
             func(obj);
             Ok(())
         })
+    }
+
+    pub fn update_by_type<T: Serialize>(&mut self, func: impl Fn(&mut T)) -> ApiResult<()>
+    where
+        for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = HueError>,
+    {
+        let ids = self.state.res.keys().copied().collect_vec();
+        for id in &ids {
+            let obj = self.state.get_mut(id)?;
+            let x: Result<&mut T, _> = obj.try_into();
+            if x.is_ok() {
+                self.try_update(id, |obj: &mut T| {
+                    func(obj);
+                    Ok(())
+                })?;
+            }
+        }
+        Ok(())
     }
 
     #[must_use]
