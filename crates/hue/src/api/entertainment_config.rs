@@ -104,13 +104,20 @@ pub enum EntertainmentConfigurationType {
     Other,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct EntertainmentConfigurationUpdate {
     pub configuration_type: Option<EntertainmentConfigurationType>,
     pub metadata: Option<EntertainmentConfigurationMetadata>,
     pub action: Option<EntertainmentConfigurationAction>,
     pub stream_proxy: Option<EntertainmentConfigurationStreamProxyUpdate>,
     pub locations: Option<EntertainmentConfigurationLocationsUpdate>,
+}
+
+impl EntertainmentConfigurationUpdate {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
