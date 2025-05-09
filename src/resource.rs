@@ -14,8 +14,8 @@ use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink,
-    ResourceRecord, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
-    ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus,
+    ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus, Zone,
 };
 use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
@@ -209,39 +209,55 @@ impl Resources {
         log::info!("Deleting {link:?}..");
 
         // Delete references to this object from other objects
-        for obj in self.state.res.values_mut() {
-            match obj {
-                Resource::BridgeHome(bridge_home) => {
-                    bridge_home.children.remove(link);
-                    bridge_home.services.remove(link);
-                }
-                Resource::Device(device) => {
-                    device.services.remove(link);
-                }
-                Resource::Room(room) => {
-                    room.children.remove(link);
-                    room.services.remove(link);
-                }
-                Resource::Zone(zone) => {
-                    zone.children.remove(link);
-                    zone.services.remove(link);
-                }
+        self.update_by_type(|bridge_home: &mut BridgeHome| {
+            bridge_home.children.remove(link);
+            bridge_home.services.remove(link);
+        })?;
 
-                Resource::ServiceGroup(_value) => { /* FIXME: not modelled */ }
+        self.update_by_type(|device: &mut Device| {
+            device.services.remove(link);
+        })?;
 
-                _ => {}
-            }
-        }
+        self.update_by_type(|ec: &mut EntertainmentConfiguration| {
+            ec.locations
+                .service_locations
+                .retain(|sl| sl.service != *link);
+            ec.channels
+                .retain(|chan| !chan.members.iter().any(|c| c.service == *link));
+            ec.light_services.retain(|ls| ls != link);
+        })?;
 
-        // When deleting lights, remove owning device as well
-        if let Some(owner) = self.get_resource(link)?.obj.owner() {
-            if link.rtype == RType::Light && owner.rtype == RType::Device {
-                self.delete(&owner)?;
-            }
-        }
+        self.update_by_type(|room: &mut Room| {
+            room.children.remove(link);
+            room.services.remove(link);
+        })?;
 
-        // Remove object from state database
+        self.update_by_type(|zone: &mut Zone| {
+            zone.children.remove(link);
+            zone.services.remove(link);
+        })?;
+
+        // Remove resource from state database
         self.state.remove(&link.rid)?;
+
+        // Find ids of all resources owned by the deleted node
+        let owned_by = self
+            .state
+            .res
+            .iter()
+            .filter_map(|(rid, res)| {
+                if res.owner() == Some(*link) {
+                    Some(ResourceLink::new(*rid, res.rtype()))
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+
+        // Delete all resources owned by the deleted node
+        for owned in owned_by {
+            self.delete(&owned)?;
+        }
 
         self.state_updates.notify_one();
 
