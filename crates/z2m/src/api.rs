@@ -138,7 +138,7 @@ impl Debug for IeeeAddress {
 
 impl Display for IeeeAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:08X}", self.0)
+        write!(f, "0x{:016x}", self.0)
     }
 }
 
