@@ -811,6 +811,36 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_scene_create(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link_scene: &ResourceLink,
+        sid: u32,
+        scene: &Scene,
+    ) -> ApiResult<()> {
+        if let Some(topic) = self.rmap.get(&scene.group) {
+            let mut lock = self.state.lock().await;
+
+            log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
+
+            lock.aux_set(
+                link_scene,
+                AuxData::new()
+                    .with_topic(&scene.metadata.name)
+                    .with_index(sid),
+            );
+
+            z2mws
+                .send_scene_store(topic, &scene.metadata.name, sid)
+                .await?;
+
+            lock.add(link_scene, Resource::Scene(scene.clone()))?;
+            drop(lock);
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -828,23 +858,9 @@ impl Z2mBackend {
             }
 
             BackendRequest::SceneCreate(link_scene, sid, scene) => {
-                if let Some(topic) = self.rmap.get(&scene.group) {
-                    log::info!("New scene: {link_scene:?} ({})", scene.metadata.name);
-
-                    lock.aux_set(
-                        link_scene,
-                        AuxData::new()
-                            .with_topic(&scene.metadata.name)
-                            .with_index(*sid),
-                    );
-
-                    z2mws
-                        .send_scene_store(topic, &scene.metadata.name, *sid)
-                        .await?;
-
-                    lock.add(link_scene, Resource::Scene(scene.clone()))?;
-                    drop(lock);
-                }
+                drop(lock);
+                self.backend_scene_create(z2mws, link_scene, *sid, scene)
+                    .await?;
             }
 
             BackendRequest::SceneUpdate(link, upd) => {
