@@ -955,22 +955,45 @@ impl Z2mBackend {
                 }
             }
 
-            BackendRequest::Delete(link) => {
-                if link.rtype != RType::Scene {
-                    return Ok(());
+            BackendRequest::Delete(link) => match link.rtype {
+                RType::Scene => {
+                    let room = lock.get::<Scene>(link)?.group;
+                    let index = lock
+                        .aux_get(link)?
+                        .index
+                        .ok_or(HueError::NotFound(link.rid))?;
+                    drop(lock);
+
+                    if let Some(topic) = self.rmap.get(&room) {
+                        z2mws.send_scene_remove(topic, index).await?;
+                    }
                 }
 
-                let room = lock.get::<Scene>(link)?.group;
-                let index = lock
-                    .aux_get(link)?
-                    .index
-                    .ok_or(HueError::NotFound(link.rid))?;
-                drop(lock);
+                RType::Device => {
+                    if let Some(dev) = self
+                        .rmap
+                        .get(link)
+                        .and_then(|topic| self.network.get(topic))
+                    {
+                        let addr = dev.ieee_address.to_string();
+                        log::info!(
+                            "[{}] Requesting z2m removal of {} ({})",
+                            self.name,
+                            &addr,
+                            dev.friendly_name
+                        );
 
-                if let Some(topic) = self.rmap.get(&room) {
-                    z2mws.send_scene_remove(topic, index).await?;
+                        z2mws.send_device_remove(addr).await?;
+                    }
                 }
-            }
+
+                rtype => {
+                    log::warn!(
+                        "[{}] Deleting objects of type {rtype:?} is not supported",
+                        self.name
+                    );
+                }
+            },
 
             BackendRequest::EntertainmentStart(ent_id) => {
                 log::trace!("[{}] Entertainment start", self.name);
