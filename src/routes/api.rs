@@ -141,7 +141,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
                 state: ApiGroupState::default(),
                 stream: json!({
                     "active": entconf.active_streamer.is_some(),
-                    "owner": entconf.active_streamer,
+                    "owner": entconf.active_streamer.map(|_st| STANDARD_APPLICATION_ID.to_string()),
                     "proxymode": "auto",
                     "proxynode": "/bridge"
                 }),
