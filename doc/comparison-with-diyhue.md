@@ -1,31 +1,31 @@
-## Comparison with DiyHue
+## Comparison with diyHue
 
-You might already be familiar with [DiyHue](https://github.com/diyhue/diyHue),
+You might already be familiar with [diyHue](https://github.com/diyhue/diyHue),
 an existing project that aims to emulate a Philips Hue Bridge.
 
-DiyHue is a well-established project, that integrates with countless
+diyHue is a well-established project, that integrates with countless
 servers/services/light systems, and emulates many Hue Bridge features.
 
-However, I have been frustrated with DiyHue's MQTT integration, and its fairly
+However, I have been frustrated with diyHue's MQTT integration, and its fairly
 poor performance when operating more than a handful of lights at a time. Since
-DiyHue always sends individual messages to each light in a group, large rooms
+diyHue always sends individual messages to each light in a group, large rooms
 can get quite slow (multiple seconds for every adjustment, no matter how minor).
 
-As far as I know, DiyHue does not support Zigbee groups (or MQTT groups) at all,
+Currently, diyHue does not support Zigbee groups (or MQTT groups) at all,
 whereas Bifrost is written specifically to present zigbee2mqtt groups as Hue
 Bridge "rooms". For zigbee/mqtt use cases, this massively increases performance
 and reliability.
 
-Another thing about DiyHue that frustrates me to no end, is the lack of
+Another thing about diyHue that frustrates me to no end, is the lack of
 (working) support for push notifications. If you use the Hue App to control a
-DiyHue bridge, you will notice that it does not react to any changes from other
+diyHue bridge, you will notice that it does not react to any changes from other
 phones, home automation, etc. Also, the reported light states (on/off, color,
 temperature, etc) are sometimes just wrong.
 
-Overall, DiyHue can do an impressive number of things, but it seems to have some
+Overall, diyHue can do an impressive number of things, but it seems to have some
 pretty rough edges.
 
-Just to clarify, I've enjoyed using DiyHue, and I wish them all the best. It's
+Just to clarify, I've enjoyed using diyHue, and I wish them all the best. It's
 also very useful, both as a home automation service, and a reverse engineering
 resource.
 
@@ -36,7 +36,7 @@ case.
 In any case, feedback always welcome.
 
 
-| Feature                              | DiyHue                                  | Bifrost                                   |
+| Feature                              | diyHue                                  | Bifrost                                   |
 |--------------------------------------|-----------------------------------------|-------------------------------------------|
 | Language                             | Python                                  | Rust                                      |
 | Project scope                        | Broad (supports countless integrations) | Narrow (specifically targets zigbee2mqtt) |
@@ -62,7 +62,7 @@ In any case, feedback always welcome.
 | Add custom lights and switches       | ✅                                      | ❌                                        |
 
 [^1]: Light state synchronization (i.e. consistency between hue emulator, hue
-    app and reality) seems to be, unfortunately, somewhat brittle in DiyHue. See
+    app and reality) seems to be, unfortunately, somewhat brittle in diyHue. See
     for example:
     * https://github.com/diyhue/diyHue/issues/883
     * https://github.com/diyhue/diyHue/issues/835
