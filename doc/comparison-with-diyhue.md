@@ -12,7 +12,7 @@ diyHue always sends individual messages to each light in a group, large rooms
 can get quite slow (multiple seconds for every adjustment, no matter how minor).
 
 Currently, diyHue does not support Zigbee groups (or MQTT groups) at all,
-whereas Bifrost is written specifically to present zigbee2mqtt groups as Hue
+whereas Bifrost is written specifically to present Zigbee2MQTT groups as Hue
 Bridge "rooms". For zigbee/mqtt use cases, this massively increases performance
 and reliability.
 
@@ -29,7 +29,7 @@ Just to clarify, I've enjoyed using diyHue, and I wish them all the best. It's
 also very useful, both as a home automation service, and a reverse engineering
 resource.
 
-However, if you're also using one or more zigbee2mqtt servers to control Zigbee
+However, if you're also using one or more Zigbee2MQTT servers to control Zigbee
 devices, feel free to give Bifrost a try. It might be a better fit for your use
 case.
 
@@ -39,21 +39,21 @@ In any case, feedback always welcome.
 | Feature                              | diyHue                                  | Bifrost                                   |
 |--------------------------------------|-----------------------------------------|-------------------------------------------|
 | Language                             | Python                                  | Rust                                      |
-| Project scope                        | Broad (supports countless integrations) | Narrow (specifically targets zigbee2mqtt) |
+| Project scope                        | Broad (supports countless integrations) | Narrow (specifically targets Zigbee2MQTT) |
 | Use Hue Bridge as backend            | ✅                                      | ❌                                        |
 | Usable from Homeassistant            | ✅ (as a Hue Bridge)                    | ✅ (as a Hue Bridge)                      |
 | Control individual lights            | ✅                                      | ✅                                        |
 | Good performance for groups of light | ❌ (sends a message per light)          | ✅ (uses zigbee groups)                   |
-| Connect to zigbee2mqtt               | (✅) (but only one server)              | ✅ (multiple servers supported)           |
+| Connect to Zigbee2MQTT               | (✅) (but only one server)              | ✅ (multiple servers supported)           |
 | Auto-detection of color features     | ❌ (needs manual configuration)         | ✅                                        |
-| Create zigbee2mqtt scenes            | ❌                                      | ✅                                        |
-| Recall zigbee2mqtt scenes            | ❌                                      | ✅                                        |
-| Learn zigbee2mqtt scenes             | ❌                                      | ✅                                        |
-| Delete zigbee2mqtt scenes            | ❌                                      | ✅                                        |
+| Create Zigbee2MQTT scenes            | ❌                                      | ✅                                        |
+| Recall Zigbee2MQTT scenes            | ❌                                      | ✅                                        |
+| Learn Zigbee2MQTT scenes             | ❌                                      | ✅                                        |
+| Delete Zigbee2MQTT scenes            | ❌                                      | ✅                                        |
 | Join new zigbee lights               | ✅                                      | ❌                                        |
 | Add/remove lights to rooms           | ❌                                      | ✅                                        |
 | Live state of lights in Hue app      | ❌ [^1]                                 | ✅                                        |
-| Multiple type of backends            | ✅                                      | ❌ (only zigbee2mqtt)                     |
+| Multiple type of backends            | ✅                                      | ❌ (only Zigbee2MQTT)                     |
 | Entertainment zones                  | ✅                                      | ✅                                        |
 | Native entertainment zone support    | ❌                                      | ✅                                        |
 | Hue effects (fireplace, candle, etc) | (✅) (partial)                          | ✅                                        |
