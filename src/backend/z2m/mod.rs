@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::Utc;
 use futures::StreamExt;
+use hue::stream::HueStreamLightsV2;
 use maplit::btreeset;
 use native_tls::TlsConnector;
 use serde::Deserialize;
@@ -1083,6 +1084,20 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_entertainment_frame(
+        &mut self,
+        z2mws: &mut Z2mWebSocket,
+        frame: &HueStreamLightsV2,
+    ) -> ApiResult<()> {
+        if let Some(es) = &mut self.entstream {
+            if self.throttle.tick() {
+                es.frame(z2mws, frame).await?;
+            }
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     async fn handle_backend_event(
         &mut self,
@@ -1131,11 +1146,8 @@ impl Z2mBackend {
             }
 
             BackendRequest::EntertainmentFrame(frame) => {
-                if let Some(es) = &mut self.entstream {
-                    if self.throttle.tick() {
-                        es.frame(z2mws, frame).await?;
-                    }
-                }
+                drop(lock);
+                self.backend_entertainment_frame(z2mws, frame).await?;
             }
 
             BackendRequest::EntertainmentStop() => {
