@@ -18,6 +18,45 @@ use crate::routes::auth::STANDARD_APPLICATION_ID;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
+// FIXME: These are hard-coded values fitting for an LCX005 gradient light chain
+pub const POSITIONS: &[Position] = &[
+    Position {
+        x: -0.4,
+        y: 0.8,
+        z: -0.4,
+    },
+    Position {
+        x: -0.4,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: -0.22,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.0,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.22,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.4,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.4,
+        y: 0.8,
+        z: -0.4,
+    },
+];
+
 pub async fn post_resource(state: &AppState, req: Value) -> ApiV2Result {
     let new: EntertainmentConfigurationNew = serde_json::from_value(req)?;
 
@@ -79,45 +118,6 @@ fn make_channels(
     lock: &Resources,
     locations: &[EntertainmentConfigurationServiceLocations],
 ) -> ApiResult<Vec<EntertainmentConfigurationChannels>> {
-    // FIXME: These are hard-coded values fitting for an LCX005 gradient light chain
-    const POSITIONS: &[Position] = &[
-        Position {
-            x: -0.4,
-            y: 0.8,
-            z: -0.4,
-        },
-        Position {
-            x: -0.4,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: -0.22,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.0,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.22,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.4,
-            y: 0.8,
-            z: 0.4,
-        },
-        Position {
-            x: 0.4,
-            y: 0.8,
-            z: -0.4,
-        },
-    ];
-
     let mut channels: Vec<EntertainmentConfigurationChannels> = vec![];
 
     let mut channel_id = 0;
