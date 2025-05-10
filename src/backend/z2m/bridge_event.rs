@@ -4,7 +4,7 @@ use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
 use hue::api::{DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, Room};
-use z2m::api::{Message, RawMessage, Response};
+use z2m::api::{DeviceRemoveResponse, Message, RawMessage, Response};
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
@@ -97,7 +97,28 @@ impl Z2mBackend {
         Ok(())
     }
 
-    #[allow(clippy::too_many_lines)]
+    async fn bridge_device_remove(&mut self, data: &DeviceRemoveResponse) -> ApiResult<()> {
+        if let Some(rlink) = self.map.get(&data.id) {
+            match rlink.rtype {
+                RType::Light => {
+                    let mut lock = self.state.lock().await;
+                    let owner = lock.get::<Light>(rlink)?.owner;
+                    log::info!("Removing device: {owner:?}");
+                    lock.delete(&owner)?;
+                }
+                rtype => {
+                    log::warn!("Cannot handle removing resource of type {rtype:?}");
+                }
+            }
+        }
+
+        if let Some(_rlink) = self.map.remove(&data.id) {
+            self.rmap.retain(|_, v| *v != data.id);
+        }
+
+        Ok(())
+    }
+
     async fn handle_bridge_message(&mut self, msg: Message) -> ApiResult<()> {
         #[allow(unused_variables)]
         match &msg {
@@ -208,23 +229,7 @@ impl Z2mBackend {
                     return Ok(());
                 };
 
-                if let Some(rlink) = self.map.get(&data.id) {
-                    match rlink.rtype {
-                        RType::Light => {
-                            let mut lock = self.state.lock().await;
-                            let owner = lock.get::<Light>(rlink)?.owner;
-                            log::info!("Removing device: {owner:?}");
-                            lock.delete(&owner)?;
-                        }
-                        rtype => {
-                            log::warn!("Cannot handle removing resource of type {rtype:?}");
-                        }
-                    }
-                }
-
-                if let Some(rlink) = self.map.remove(&data.id) {
-                    self.rmap.retain(|_, v| *v != data.id);
-                }
+                self.bridge_device_remove(data).await?;
             }
         }
         Ok(())
