@@ -95,6 +95,21 @@ async fn main() -> ApiResult<()> {
                 Message::BridgeDeviceOtaUpdateCheck(obj) => {
                     println!("{obj:#?}");
                 }
+                Message::BridgeConfig(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupAdd(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupRemove(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupRename(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupOptions(obj) => {
+                    println!("{obj:#?}");
+                }
             }
 
             continue;

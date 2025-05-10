@@ -37,7 +37,7 @@ use hue::clamp::Clamp;
 use hue::error::HueError;
 use hue::scene_icons;
 use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
-use z2m::api::{ExposeLight, Message, RawMessage};
+use z2m::api::{ExposeLight, Message, RawMessage, Response};
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
@@ -481,6 +481,7 @@ impl Z2mBackend {
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn handle_bridge_message(&mut self, msg: Message) -> ApiResult<()> {
         #[allow(unused_variables)]
         match &msg {
@@ -498,6 +499,11 @@ impl Z2mBackend {
             Message::BridgeNetworkmap(obj) => {}
             Message::BridgeDeviceOtaUpdateCheck(obj) => {}
             Message::BridgeDeviceConfigureReporting(obj) => {}
+            Message::BridgeConfig(obj) => {}
+            Message::BridgeResponseGroupAdd(obj) => {}
+            Message::BridgeResponseGroupRemove(obj) => {}
+            Message::BridgeResponseGroupRename(obj) => {}
+            Message::BridgeResponseGroupOptions(obj) => {}
 
             Message::BridgeDevices(obj) => {
                 for dev in obj {
@@ -542,12 +548,17 @@ impl Z2mBackend {
             }
 
             Message::BridgeGroupMembersAdd(change) | Message::BridgeGroupMembersRemove(change) => {
-                if let Some(light) = self.map.get(&change.data.device) {
+                let Response::Ok { data: change, .. } = change else {
+                    log::warn!("[{}] Error reported from z2m: {change:?}", self.name);
+                    return Ok(());
+                };
+
+                if let Some(light) = self.map.get(&change.device) {
                     let mut lock = self.state.lock().await;
                     let device = lock.get::<Light>(light)?.clone();
 
                     let device_link = device.owner;
-                    if let Some(room) = self.map.get(&change.data.group) {
+                    if let Some(room) = self.map.get(&change.group) {
                         let room_link = lock.get::<GroupedLight>(room)?.owner;
                         let exists = lock
                             .get::<Room>(&room_link)?
@@ -576,7 +587,12 @@ impl Z2mBackend {
             }
 
             Message::BridgeDeviceRemove(obj) => {
-                if let Some(rlink) = self.map.get(&obj.data.id) {
+                let Response::Ok { data, .. } = obj else {
+                    log::warn!("[{}] Error reported from z2m: {obj:?}", self.name);
+                    return Ok(());
+                };
+
+                if let Some(rlink) = self.map.get(&data.id) {
                     match rlink.rtype {
                         RType::Light => {
                             let mut lock = self.state.lock().await;
@@ -590,8 +606,8 @@ impl Z2mBackend {
                     }
                 }
 
-                if let Some(rlink) = self.map.remove(&obj.data.id) {
-                    self.rmap.retain(|_, v| *v != obj.data.id);
+                if let Some(rlink) = self.map.remove(&data.id) {
+                    self.rmap.retain(|_, v| *v != data.id);
                 }
             }
         }

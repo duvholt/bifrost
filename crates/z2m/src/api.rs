@@ -56,14 +56,29 @@ pub enum Message {
     #[serde(rename = "bridge/response/networkmap")]
     BridgeNetworkmap(Value),
 
-    #[serde(rename = "bridge/response/device/remove")]
-    BridgeDeviceRemove(BridgeDeviceRemoveResponse),
+    #[serde(rename = "bridge/config")]
+    BridgeConfig(Value),
+
+    #[serde(rename = "bridge/response/group/add")]
+    BridgeResponseGroupAdd(Response<GroupAdd>),
+
+    #[serde(rename = "bridge/response/group/remove")]
+    BridgeResponseGroupRemove(Response<GroupRemove>),
+
+    #[serde(rename = "bridge/response/group/rename")]
+    BridgeResponseGroupRename(Response<GroupRename>),
+
+    #[serde(rename = "bridge/response/group/options")]
+    BridgeResponseGroupOptions(Response<GroupOptions>),
 
     #[serde(rename = "bridge/response/group/members/add")]
-    BridgeGroupMembersAdd(GroupMemberChangeResponse),
+    BridgeGroupMembersAdd(Response<GroupMemberChange>),
 
     #[serde(rename = "bridge/response/group/members/remove")]
-    BridgeGroupMembersRemove(GroupMemberChangeResponse),
+    BridgeGroupMembersRemove(Response<GroupMemberChange>),
+
+    #[serde(rename = "bridge/response/device/remove")]
+    BridgeDeviceRemove(Response<DeviceRemoveResponse>),
 
     #[serde(rename = "bridge/response/device/options")]
     BridgeDeviceOptions(Value),
@@ -84,17 +99,6 @@ pub enum Endpoint {
     #[serde(untagged)]
     Number(u32),
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BridgeResponse<T> {
-    pub data: T,
-    pub status: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub transaction: Option<String>,
-}
-
-pub type BridgeDeviceRemoveResponse = BridgeResponse<DeviceRemoveResponse>;
-pub type GroupMemberChangeResponse = BridgeResponse<GroupMemberChange>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GroupMemberChange {
