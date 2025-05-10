@@ -1,4 +1,5 @@
 mod backend_event;
+mod bridge_event;
 pub mod entertainment;
 pub mod learn;
 pub mod websocket;
@@ -13,28 +14,27 @@ use chrono::Utc;
 use futures::StreamExt;
 use maplit::btreeset;
 use native_tls::TlsConnector;
-use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::select;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
-use tokio_tungstenite::{Connector, connect_async_tls_with_config, tungstenite};
+use tokio_tungstenite::{Connector, connect_async_tls_with_config};
 use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
-    DeviceProductData, DimmingUpdate, Entertainment, EntertainmentSegment, EntertainmentSegments,
-    GroupedLight, Light, LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update,
-    LightGradientMode, LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room,
-    RoomArchetype, RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, Stub,
-    Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight,
+    Light, LightEffect, LightEffects, LightEffectsV2, LightEffectsV2Update, LightGradientMode,
+    LightMetadata, LightUpdate, Metadata, RType, Resource, ResourceLink, Room, RoomArchetype,
+    RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::clamp::Clamp;
 use hue::scene_icons;
 use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
-use z2m::api::{ExposeLight, Message, RawMessage, Response};
+use z2m::api::ExposeLight;
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
@@ -422,225 +422,6 @@ impl Z2mBackend {
         Ok(())
     }
 
-    pub async fn handle_update(&mut self, rid: &Uuid, payload: &Value) -> ApiResult<()> {
-        if let Value::String(string) = payload {
-            if string.is_empty() {
-                log::debug!("Ignoring empty payload for {rid}");
-                return Ok(());
-            }
-        }
-
-        let upd = DeviceUpdate::deserialize(payload)?;
-
-        let obj = self.state.lock().await.get_resource_by_id(rid)?.obj;
-        match obj {
-            Resource::Light(_) => {
-                if let Err(e) = self.handle_update_light(rid, &upd).await {
-                    log::error!("FAIL: {e:?} in {upd:?}");
-                }
-            }
-            Resource::GroupedLight(_) => {
-                if let Err(e) = self.handle_update_grouped_light(rid, &upd).await {
-                    log::error!("FAIL: {e:?} in {upd:?}");
-                }
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
-        let upd: LightUpdate = devupd.into();
-
-        let mut lock = self.state.lock().await;
-        lock.update::<Light>(uuid, |light| *light += &upd)?;
-
-        self.learner.learn(uuid, &lock, devupd)?;
-        self.learner.collect(&mut lock)?;
-        drop(lock);
-
-        Ok(())
-    }
-
-    async fn handle_update_grouped_light(&self, uuid: &Uuid, upd: &DeviceUpdate) -> ApiResult<()> {
-        let mut res = self.state.lock().await;
-        res.update::<GroupedLight>(uuid, |glight| {
-            if let Some(state) = &upd.state {
-                glight.on = Some((*state).into());
-            }
-
-            if let Some(b) = upd.brightness {
-                glight.dimming = Some(DimmingUpdate {
-                    brightness: b / 254.0 * 100.0,
-                });
-            }
-        })
-    }
-
-    #[allow(clippy::too_many_lines)]
-    async fn handle_bridge_message(&mut self, msg: Message) -> ApiResult<()> {
-        #[allow(unused_variables)]
-        match &msg {
-            Message::BridgeInfo(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeLogging(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeExtensions(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeEvent(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeDefinitions(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeState(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeConverters(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgeOptions(obj) => { /* println!("{obj:#?}"); */ }
-            Message::BridgePermitJoin(obj) => {}
-            Message::BridgeTouchlinkScan(obj) => {}
-            Message::BridgeDeviceOptions(obj) => {}
-            Message::BridgeNetworkmap(obj) => {}
-            Message::BridgeDeviceOtaUpdateCheck(obj) => {}
-            Message::BridgeDeviceConfigureReporting(obj) => {}
-            Message::BridgeConfig(obj) => {}
-            Message::BridgeResponseGroupAdd(obj) => {}
-            Message::BridgeResponseGroupRemove(obj) => {}
-            Message::BridgeResponseGroupRename(obj) => {}
-            Message::BridgeResponseGroupOptions(obj) => {}
-
-            Message::BridgeDevices(obj) => {
-                for dev in obj {
-                    self.network.insert(dev.friendly_name.clone(), dev.clone());
-                    if let Some(exp) = dev.expose_light() {
-                        log::info!(
-                            "[{}] Adding light {:?}: [{}] ({})",
-                            self.name,
-                            dev.ieee_address,
-                            dev.friendly_name,
-                            dev.model_id.as_deref().unwrap_or("<unknown model>")
-                        );
-                        self.add_light(dev, exp).await?;
-                    } else {
-                        log::debug!(
-                            "[{}] Ignoring unsupported device {}",
-                            self.name,
-                            dev.friendly_name
-                        );
-                        self.ignore.insert(dev.friendly_name.to_string());
-                    }
-                    /*
-                    if dev.expose_action() {
-                        log::info!(
-                            "[{}] Adding switch {:?}: [{}] ({})",
-                            self.name,
-                            dev.ieee_address,
-                            dev.friendly_name,
-                            dev.model_id.as_deref().unwrap_or("<unknown model>")
-                        );
-                        self.add_switch(dev).await?;
-                    }
-                    */
-                }
-            }
-
-            Message::BridgeGroups(obj) => {
-                /* println!("{obj:#?}"); */
-                for grp in obj {
-                    self.add_group(grp).await?;
-                }
-            }
-
-            Message::BridgeGroupMembersAdd(change) | Message::BridgeGroupMembersRemove(change) => {
-                let Response::Ok { data: change, .. } = change else {
-                    log::warn!("[{}] Error reported from z2m: {change:?}", self.name);
-                    return Ok(());
-                };
-
-                if let Some(light) = self.map.get(&change.device) {
-                    let mut lock = self.state.lock().await;
-                    let device = lock.get::<Light>(light)?.clone();
-
-                    let device_link = device.owner;
-                    if let Some(room) = self.map.get(&change.group) {
-                        let room_link = lock.get::<GroupedLight>(room)?.owner;
-                        let exists = lock
-                            .get::<Room>(&room_link)?
-                            .children
-                            .contains(&device_link);
-
-                        match msg {
-                            Message::BridgeGroupMembersAdd(_) => {
-                                if !exists {
-                                    lock.update(&room_link.rid, |room: &mut Room| {
-                                        room.children.insert(device_link);
-                                    })?;
-                                }
-                            }
-                            Message::BridgeGroupMembersRemove(_) => {
-                                if exists {
-                                    lock.update(&room_link.rid, |room: &mut Room| {
-                                        room.children.remove(&device_link);
-                                    })?;
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-            }
-
-            Message::BridgeDeviceRemove(obj) => {
-                let Response::Ok { data, .. } = obj else {
-                    log::warn!("[{}] Error reported from z2m: {obj:?}", self.name);
-                    return Ok(());
-                };
-
-                if let Some(rlink) = self.map.get(&data.id) {
-                    match rlink.rtype {
-                        RType::Light => {
-                            let mut lock = self.state.lock().await;
-                            let owner = lock.get::<Light>(rlink)?.owner;
-                            log::info!("Removing device: {owner:?}");
-                            lock.delete(&owner)?;
-                        }
-                        rtype => {
-                            log::warn!("Cannot handle removing resource of type {rtype:?}");
-                        }
-                    }
-                }
-
-                if let Some(rlink) = self.map.remove(&data.id) {
-                    self.rmap.retain(|_, v| *v != data.id);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn handle_device_message(&mut self, msg: RawMessage) -> ApiResult<()> {
-        if msg.topic.ends_with("/availability") || msg.topic.ends_with("/action") {
-            // availability: https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html#zigbee2mqtt-friendly-name-availability
-            // action: https://www.home-assistant.io/integrations/device_trigger.mqtt/
-            return Ok(());
-        }
-
-        let Some(ref val) = self.map.get(&msg.topic).copied() else {
-            if !self.ignore.contains(&msg.topic) {
-                log::warn!(
-                    "[{}] Notification on unknown topic {}",
-                    self.name,
-                    &msg.topic
-                );
-            }
-            return Ok(());
-        };
-
-        let res = self.handle_update(&val.rid, &msg.payload).await;
-        if let Err(ref err) = res {
-            log::error!(
-                "Cannot parse update: {err}\n{}",
-                serde_json::to_string_pretty(&msg.payload)?
-            );
-        }
-
-        /* return Ok here, since we do not want to break the event loop */
-        Ok(())
-    }
-
     #[allow(clippy::match_same_arms)]
     fn make_hue_specific_update(upd: &LightUpdate) -> ApiResult<HueZigbeeUpdate> {
         let mut hz = HueZigbeeUpdate::new();
@@ -701,60 +482,6 @@ impl Z2mBackend {
         Ok(hz)
     }
 
-    async fn websocket_read(&mut self, pkt: tungstenite::Message) -> ApiResult<()> {
-        let tungstenite::Message::Text(txt) = pkt else {
-            log::error!("[{}] Received non-text message on websocket :(", self.name);
-            return Err(ApiError::UnexpectedZ2mReply(pkt));
-        };
-
-        let raw_msg = serde_json::from_str::<RawMessage>(&txt);
-
-        log::trace!("[{}] Incoming z2m message: {txt}", self.name);
-
-        let msg = raw_msg.map_err(|err| {
-            log::error!(
-                "[{}] Invalid websocket message: {:#?} [{}..]",
-                self.name,
-                err,
-                &txt.chars().take(128).collect::<String>()
-            );
-            err
-        })?;
-
-        /* bridge messages are handled differently. everything else is a device message */
-        if !msg.topic.starts_with("bridge/") {
-            return self.handle_device_message(msg).await;
-        }
-
-        match serde_json::from_str(&txt) {
-            Ok(bridge_msg) => self.handle_bridge_message(bridge_msg).await,
-            Err(err) => {
-                match msg.topic.as_str() {
-                    topic @ ("bridge/devices" | "bridge/groups") => {
-                        log::error!(
-                            "[{}] Failed to parse critical z2m bridge message on [{}]:",
-                            self.name,
-                            topic,
-                        );
-                        log::error!("[{}] {}", self.name, serde_json::to_string(&msg.payload)?);
-                        Err(err)?
-                    }
-                    topic => {
-                        log::error!(
-                            "[{}] Failed to parse (non-critical) z2m bridge message on [{}]:",
-                            self.name,
-                            topic
-                        );
-                        log::error!("{}", serde_json::to_string(&msg.payload)?);
-
-                        /* Suppress this non-critical error, to avoid breaking the event loop */
-                        Ok(())
-                    }
-                }
-            }
-        }
-    }
-
     pub async fn event_loop(
         &mut self,
         chan: &mut Receiver<Arc<BackendRequest>>,
@@ -769,9 +496,12 @@ impl Z2mBackend {
                     // FIXME: this used to be our "throttle" feature, but it breaks entertainment mode
                     /* tokio::time::sleep(std::time::Duration::from_millis(100)).await; */
                 },
+
+                // all bridge event handling implemented in backend::z2m::bridge_event
                 pkt = socket.next() => {
                     self.websocket_read(pkt.ok_or(ApiError::UnexpectedZ2mEof)??).await?;
                 },
+
                 Some((topic, upd)) = self.message_rx.recv() => {
                     socket.send_update(&topic, &upd).await?;
                 }
