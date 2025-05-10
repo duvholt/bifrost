@@ -30,12 +30,7 @@ impl Z2mBackend {
 
         if let Some(grad) = &upd.gradient {
             hz = hz.with_gradient_colors(
-                match grad.mode {
-                    Some(LightGradientMode::InterpolatedPalette) => GradientStyle::Linear,
-                    Some(LightGradientMode::InterpolatedPaletteMirrored) => GradientStyle::Mirrored,
-                    Some(LightGradientMode::RandomPixelated) => GradientStyle::Scattered,
-                    None => GradientStyle::Linear,
-                },
+                grad.mode.map_or(GradientStyle::Linear, Into::into),
                 grad.points.iter().map(|c| c.color.xy).collect(),
             )?;
 
