@@ -20,9 +20,9 @@ use tokio::time::sleep;
 use tokio_tungstenite::{Connector, connect_async_tls_with_config};
 
 use bifrost_api::backend::BackendRequest;
-use hue::api::{LightEffect, LightEffectsV2Update, LightGradientMode, LightUpdate, ResourceLink};
+use hue::api::{LightEffectsV2Update, LightGradientMode, LightUpdate, ResourceLink};
 use hue::clamp::Clamp;
-use hue::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
+use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate};
 use z2m::update::DeviceUpdate;
 
 use crate::backend::Backend;
@@ -123,20 +123,7 @@ impl Z2mBackend {
         }) = &upd.effects_v2
         {
             if let Some(fx) = &act.effect {
-                let et = match fx {
-                    LightEffect::NoEffect => EffectType::NoEffect,
-                    LightEffect::Prism => EffectType::Prism,
-                    LightEffect::Opal => EffectType::Opal,
-                    LightEffect::Glisten => EffectType::Glisten,
-                    LightEffect::Sparkle => EffectType::Sparkle,
-                    LightEffect::Fire => EffectType::Fireplace,
-                    LightEffect::Candle => EffectType::Candle,
-                    LightEffect::Underwater => EffectType::Underwater,
-                    LightEffect::Cosmos => EffectType::Cosmos,
-                    LightEffect::Sunbeam => EffectType::Sunbeam,
-                    LightEffect::Enchant => EffectType::Enchant,
-                };
-                hz = hz.with_effect_type(et);
+                hz = hz.with_effect_type(fx.into());
             }
             if let Some(speed) = &act.parameters.speed {
                 hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
