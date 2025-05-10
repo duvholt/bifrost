@@ -243,7 +243,7 @@ impl Z2mBackend {
         Ok(())
     }
 
-    pub async fn websocket_read(&mut self, pkt: tungstenite::Message) -> ApiResult<()> {
+    pub async fn handle_bridge_event(&mut self, pkt: tungstenite::Message) -> ApiResult<()> {
         let tungstenite::Message::Text(txt) = pkt else {
             log::error!("[{}] Received non-text message on websocket :(", self.name);
             return Err(ApiError::UnexpectedZ2mReply(pkt));

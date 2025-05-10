@@ -156,7 +156,7 @@ impl Z2mBackend {
 
                 // all bridge event handling implemented in backend::z2m::bridge_event
                 pkt = socket.next() => {
-                    self.websocket_read(pkt.ok_or(ApiError::UnexpectedZ2mEof)??).await?;
+                    self.handle_bridge_event(pkt.ok_or(ApiError::UnexpectedZ2mEof)??).await?;
                 },
 
                 Some((topic, upd)) = self.message_rx.recv() => {
