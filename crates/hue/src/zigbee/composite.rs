@@ -26,8 +26,8 @@ pub enum EffectType {
     Enchant = 0x11,
 }
 
-impl From<&LightEffect> for EffectType {
-    fn from(value: &LightEffect) -> Self {
+impl From<LightEffect> for EffectType {
+    fn from(value: LightEffect) -> Self {
         match value {
             LightEffect::NoEffect => Self::NoEffect,
             LightEffect::Prism => Self::Prism,

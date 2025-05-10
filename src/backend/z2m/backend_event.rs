@@ -49,7 +49,7 @@ impl Z2mBackend {
             action: Some(act), ..
         }) = &upd.effects_v2
         {
-            if let Some(fx) = &act.effect {
+            if let Some(fx) = act.effect {
                 hz = hz.with_effect_type(fx.into());
             }
             if let Some(speed) = &act.parameters.speed {
