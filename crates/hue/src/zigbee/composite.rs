@@ -5,7 +5,7 @@ use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
-use crate::api::LightEffect;
+use crate::api::{LightEffect, LightGradientMode};
 use crate::error::{HueError, HueResult};
 use crate::flags::TakeFlag;
 use crate::xy::XY;
@@ -49,6 +49,16 @@ pub enum GradientStyle {
     Linear = 0x00,
     Scattered = 0x02,
     Mirrored = 0x04,
+}
+
+impl From<LightGradientMode> for GradientStyle {
+    fn from(value: LightGradientMode) -> Self {
+        match value {
+            LightGradientMode::InterpolatedPalette => Self::Linear,
+            LightGradientMode::InterpolatedPaletteMirrored => Self::Mirrored,
+            LightGradientMode::RandomPixelated => Self::Scattered,
+        }
+    }
 }
 
 bitflags! {
