@@ -4,7 +4,7 @@ use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
 use hue::api::{DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, Room};
-use z2m::api::{DeviceRemoveResponse, Message, RawMessage, Response};
+use z2m::api::{DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response};
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
@@ -119,6 +119,43 @@ impl Z2mBackend {
         Ok(())
     }
 
+    #[allow(clippy::collapsible_else_if)]
+    async fn bridge_group_member_change(
+        &self,
+        change: &GroupMemberChange,
+        added: bool,
+    ) -> ApiResult<()> {
+        if let Some(light) = self.map.get(&change.device) {
+            let mut lock = self.state.lock().await;
+            let device = lock.get::<Light>(light)?.clone();
+
+            let device_link = device.owner;
+            if let Some(room) = self.map.get(&change.group) {
+                let room_link = lock.get::<GroupedLight>(room)?.owner;
+                let exists = lock
+                    .get::<Room>(&room_link)?
+                    .children
+                    .contains(&device_link);
+
+                if added {
+                    if !exists {
+                        lock.update(&room_link.rid, |room: &mut Room| {
+                            room.children.insert(device_link);
+                        })?;
+                    }
+                } else {
+                    if exists {
+                        lock.update(&room_link.rid, |room: &mut Room| {
+                            room.children.remove(&device_link);
+                        })?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     async fn handle_bridge_message(&mut self, msg: Message) -> ApiResult<()> {
         #[allow(unused_variables)]
         match &msg {
@@ -190,37 +227,8 @@ impl Z2mBackend {
                     return Ok(());
                 };
 
-                if let Some(light) = self.map.get(&change.device) {
-                    let mut lock = self.state.lock().await;
-                    let device = lock.get::<Light>(light)?.clone();
-
-                    let device_link = device.owner;
-                    if let Some(room) = self.map.get(&change.group) {
-                        let room_link = lock.get::<GroupedLight>(room)?.owner;
-                        let exists = lock
-                            .get::<Room>(&room_link)?
-                            .children
-                            .contains(&device_link);
-
-                        match msg {
-                            Message::BridgeGroupMembersAdd(_) => {
-                                if !exists {
-                                    lock.update(&room_link.rid, |room: &mut Room| {
-                                        room.children.insert(device_link);
-                                    })?;
-                                }
-                            }
-                            Message::BridgeGroupMembersRemove(_) => {
-                                if exists {
-                                    lock.update(&room_link.rid, |room: &mut Room| {
-                                        room.children.remove(&device_link);
-                                    })?;
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                }
+                let added = matches!(msg, Message::BridgeGroupMembersAdd(_));
+                self.bridge_group_member_change(change, added).await?;
             }
 
             Message::BridgeDeviceRemove(obj) => {
