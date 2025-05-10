@@ -2,7 +2,6 @@ use std::io::Write;
 
 use svc::manager::ServiceManager;
 
-use bifrost::backend::Backend;
 use bifrost::backend::z2m::Z2mBackend;
 use bifrost::config;
 use bifrost::error::ApiResult;
@@ -115,17 +114,15 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
 
     // register all z2m backends as services
     for (name, server) in &appstate.config().z2m.servers {
-        let client = Z2mBackend::new(
+        let svc = Z2mBackend::new(
             name.clone(),
             server.clone(),
             appstate.config(),
             appstate.res.clone(),
         )?;
-        let stream = appstate.res.lock().await.backend_event_stream();
         let name = format!("z2m-{name}");
-        let svc = client.run_forever(stream);
 
-        mgr.register_function(name, svc).await?;
+        mgr.register_service(name, svc).await?;
     }
 
     // finally, iterate over all services and start them
