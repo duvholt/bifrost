@@ -4,7 +4,9 @@ use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
 use hue::api::{DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, Room};
-use z2m::api::{DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response};
+use z2m::api::{
+    BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
+};
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
@@ -97,6 +99,43 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn bridge_devices(&mut self, devices: &BridgeDevices) -> ApiResult<()> {
+        for dev in devices {
+            self.network.insert(dev.friendly_name.clone(), dev.clone());
+            if let Some(exp) = dev.expose_light() {
+                log::info!(
+                    "[{}] Adding light {:?}: [{}] ({})",
+                    self.name,
+                    dev.ieee_address,
+                    dev.friendly_name,
+                    dev.model_id.as_deref().unwrap_or("<unknown model>")
+                );
+                self.add_light(dev, exp).await?;
+            } else {
+                log::debug!(
+                    "[{}] Ignoring unsupported device {}",
+                    self.name,
+                    dev.friendly_name
+                );
+                self.ignore.insert(dev.friendly_name.to_string());
+            }
+            /*
+            if dev.expose_action() {
+                log::info!(
+                    "[{}] Adding switch {:?}: [{}] ({})",
+                    self.name,
+                    dev.ieee_address,
+                    dev.friendly_name,
+                    dev.model_id.as_deref().unwrap_or("<unknown model>")
+                );
+                self.add_switch(dev).await?;
+            }
+            */
+        }
+
+        Ok(())
+    }
+
     async fn bridge_device_remove(&mut self, data: &DeviceRemoveResponse) -> ApiResult<()> {
         if let Some(rlink) = self.map.get(&data.id) {
             match rlink.rtype {
@@ -180,38 +219,7 @@ impl Z2mBackend {
             Message::BridgeResponseGroupOptions(obj) => {}
 
             Message::BridgeDevices(obj) => {
-                for dev in obj {
-                    self.network.insert(dev.friendly_name.clone(), dev.clone());
-                    if let Some(exp) = dev.expose_light() {
-                        log::info!(
-                            "[{}] Adding light {:?}: [{}] ({})",
-                            self.name,
-                            dev.ieee_address,
-                            dev.friendly_name,
-                            dev.model_id.as_deref().unwrap_or("<unknown model>")
-                        );
-                        self.add_light(dev, exp).await?;
-                    } else {
-                        log::debug!(
-                            "[{}] Ignoring unsupported device {}",
-                            self.name,
-                            dev.friendly_name
-                        );
-                        self.ignore.insert(dev.friendly_name.to_string());
-                    }
-                    /*
-                    if dev.expose_action() {
-                        log::info!(
-                            "[{}] Adding switch {:?}: [{}] ({})",
-                            self.name,
-                            dev.ieee_address,
-                            dev.friendly_name,
-                            dev.model_id.as_deref().unwrap_or("<unknown model>")
-                        );
-                        self.add_switch(dev).await?;
-                    }
-                    */
-                }
+                self.bridge_devices(obj).await?;
             }
 
             Message::BridgeGroups(obj) => {
