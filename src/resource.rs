@@ -237,6 +237,9 @@ impl Resources {
             zone.services.remove(link);
         })?;
 
+        // Get id_v1 before deleting
+        let id_v1 = self.id_v1_scope(&link.rid, self.state.get(&link.rid)?);
+
         // Remove resource from state database
         self.state.remove(&link.rid)?;
 
@@ -261,7 +264,6 @@ impl Resources {
 
         self.state_updates.notify_one();
 
-        let id_v1 = self.state.id_v1(&link.rid);
         let evt = EventBlock::delete(*link, id_v1)?;
 
         self.hue_event_stream.hue_event(evt);
