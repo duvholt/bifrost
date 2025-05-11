@@ -71,8 +71,10 @@ pub fn event_update_apply<T: Serialize + DeserializeOwned>(ma: &T, mb: Value) ->
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
     use serde_json::json;
 
+    use crate::diff::event_update_apply as apply;
     use crate::diff::event_update_diff as diff;
 
     #[test]
@@ -168,5 +170,50 @@ mod tests {
         let c = json!({"owner": "foo"});
 
         assert_eq!(diff(a, b).unwrap(), Some(c));
+    }
+
+    #[test]
+    fn apply_empty() {
+        let a = json!({});
+        let b = json!({});
+        let c = json!({});
+
+        assert_eq!(apply(&a, b).unwrap(), c);
+    }
+
+    #[test]
+    fn apply_simply() {
+        let a = json!({});
+        let b = json!({"x": "y"});
+        let c = json!({"x": "y"});
+
+        assert_eq!(apply(&a, b).unwrap(), c);
+    }
+
+    #[test]
+    fn apply_overwrite() {
+        let a = json!({"x": "before"});
+        let b = json!({"x": "after"});
+        let c = json!({"x": "after"});
+
+        assert_eq!(apply(&a, b).unwrap(), c);
+    }
+
+    #[test]
+    fn apply_null() {
+        let a = json!({"x": "before"});
+        let b = json!({"x": Value::Null});
+        let c = json!({"x": Value::Null});
+
+        assert_eq!(apply(&a, b).unwrap(), c);
+    }
+
+    #[test]
+    fn apply_some() {
+        let a = json!({"x": "unchanged"});
+        let b = json!({"x": "unchanged", "y": "new"});
+        let c = json!({"x": "unchanged", "y": "new"});
+
+        assert_eq!(apply(&a, b).unwrap(), c);
     }
 }
