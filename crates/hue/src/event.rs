@@ -10,8 +10,6 @@ use crate::date_format;
 use crate::api::ResourceLink;
 #[cfg(feature = "rng")]
 use crate::error::HueResult;
-#[cfg(feature = "rng")]
-use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase", tag = "type")]
@@ -57,16 +55,16 @@ impl EventBlock {
         })
     }
 
-    pub fn delete(link: ResourceLink, id_v1: Option<u32>) -> HueResult<Self> {
+    pub fn delete(link: ResourceLink, id_v1: Option<String>) -> HueResult<Self> {
         Ok(Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),
             event: Event::Delete(Delete {
-                data: vec![json!({
-                    "id": link.rid,
-                    "id_v1": id_v1,
-                    "type": link.rtype,
-                })],
+                data: vec![ObjectDelete {
+                    id: link.rid,
+                    rtype: link.rtype,
+                    id_v1,
+                }],
             }),
         })
     }
@@ -94,8 +92,17 @@ pub struct Update {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ObjectDelete {
+    pub id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id_v1: Option<String>,
+    #[serde(rename = "type")]
+    pub rtype: RType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Delete {
-    pub data: Vec<Value>,
+    pub data: Vec<ObjectDelete>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
