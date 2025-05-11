@@ -61,7 +61,7 @@ mod tests {
     use crate::diff::event_update_diff as diff;
 
     #[test]
-    fn test_diff_empty() {
+    fn diff_empty() {
         let a = json!({});
         let b = json!({});
 
@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_value_unchanged() {
+    fn diff_value_unchanged() {
         let a = json!({"x": 42});
         let b = json!({"x": 42});
 
@@ -77,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_whitelist_unchanged() {
+    fn diff_whitelist_unchanged() {
         let a = json!({"owner": 42});
         let b = json!({"owner": 42});
 
@@ -85,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_value_removed() {
+    fn diff_value_removed() {
         let a = json!({"x": 42});
         let b = json!({});
 
@@ -93,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_value_added() {
+    fn diff_value_added() {
         let a = json!({});
         let b = json!({"x": 42});
         let c = json!({"x": 42});
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_value_changed() {
+    fn diff_value_changed() {
         let a = json!({"x": 17});
         let b = json!({"x": 42});
         let c = json!({"x": 42});
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_whitelist_removed() {
+    fn diff_whitelist_removed() {
         let a = json!({"owner": 17});
         let b = json!({});
         let c = json!({"owner": 17});
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_whitelist_added() {
+    fn diff_whitelist_added() {
         let a = json!({});
         let b = json!({"owner": 17});
         let c = json!({"owner": 17});
@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_whitelist_changed() {
+    fn diff_whitelist_changed() {
         let a = json!({"owner": 17});
         let b = json!({"owner": 42});
         let c = json!({"owner": 42});
@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_value_type_changed() {
+    fn diff_value_type_changed() {
         let a = json!({"x": 17});
         let b = json!({"x": "foo"});
         let c = json!({"x": "foo"});
@@ -147,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    fn test_diff_whitelist_type_changed() {
+    fn diff_whitelist_type_changed() {
         let a = json!({"owner": 17});
         let b = json!({"owner": "foo"});
         let c = json!({"owner": "foo"});
