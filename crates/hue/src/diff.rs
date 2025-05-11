@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 
 use crate::error::{HueError, HueResult};
@@ -52,6 +53,20 @@ pub fn event_update_diff(ma: Value, mb: Value) -> HueResult<Option<Value>> {
     }
 
     Ok(Some(Value::Object(diff)))
+}
+
+pub fn event_update_apply<T: Serialize + DeserializeOwned>(ma: &T, mb: Value) -> HueResult<T> {
+    let ma = serde_json::to_value(ma)?;
+
+    let (Value::Object(mut a), Value::Object(b)) = (ma, mb) else {
+        return Err(HueError::Undiffable);
+    };
+
+    for (key, value) in b {
+        a.insert(key, value);
+    }
+
+    Ok(serde_json::from_value(Value::Object(a))?)
 }
 
 #[cfg(test)]
