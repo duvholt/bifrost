@@ -59,7 +59,7 @@ pub fn event_update_apply<T: Serialize + DeserializeOwned>(ma: &T, mb: Value) ->
     let ma = serde_json::to_value(ma)?;
 
     let (Value::Object(mut a), Value::Object(b)) = (ma, mb) else {
-        return Err(HueError::Undiffable);
+        return Err(HueError::Unmergable);
     };
 
     for (key, value) in b {

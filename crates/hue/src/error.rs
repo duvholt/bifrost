@@ -52,6 +52,9 @@ pub enum HueError {
 
     #[error("Cannot generate json difference between non-map objects")]
     Undiffable,
+
+    #[error("Cannot merge json difference between non-map object")]
+    Unmergable,
 }
 
 /// Error types for Hue Bridge v1 API

@@ -137,7 +137,8 @@ impl IntoResponse for ApiError {
                 HueError::IOError(_)
                 | HueError::HueZigbeeDecodeError
                 | HueError::HueZigbeeEncodeError
-                | HueError::Undiffable => StatusCode::INTERNAL_SERVER_ERROR,
+                | HueError::Undiffable
+                | HueError::Unmergable => StatusCode::INTERNAL_SERVER_ERROR,
             },
 
             Self::AuxNotFound(_) => StatusCode::NOT_FOUND,
