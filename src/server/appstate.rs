@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::sync::Arc;
 
-use arc_swap::ArcSwap;
 use camino::Utf8Path;
 use chrono::Utc;
-use tokio::sync::Mutex;
+use tokio::sync::watch::Sender;
+use tokio::sync::{Mutex, watch};
 
 use hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use svc::manager::SvmClient;
@@ -19,7 +19,7 @@ use crate::server::updater::VersionUpdater;
 
 #[derive(Clone)]
 pub struct AppState {
-    conf: Arc<ArcSwap<AppConfig>>,
+    conf: Sender<AppConfig>,
     upd: Arc<Mutex<VersionUpdater>>,
     svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
@@ -66,8 +66,9 @@ impl AppState {
 
         res.reset_all_streaming()?;
 
-        let conf = Arc::new(ArcSwap::from_pointee(config));
         let res = Arc::new(Mutex::new(res));
+
+        let conf = Sender::new(config);
 
         Ok(Self {
             conf,
@@ -79,11 +80,17 @@ impl AppState {
 
     #[must_use]
     pub fn config(&self) -> Arc<AppConfig> {
-        self.conf.load_full()
+        Arc::new(self.conf.borrow().clone())
     }
 
-    pub fn replace_config(&self, config: AppConfig) {
-        self.conf.store(Arc::new(config));
+    #[must_use]
+    pub fn config_subscribe(&self) -> watch::Receiver<AppConfig> {
+        self.conf.subscribe()
+    }
+
+    #[allow(clippy::must_use_candidate)]
+    pub fn replace_config(&self, config: AppConfig) -> AppConfig {
+        self.conf.send_replace(config)
     }
 
     #[must_use]
@@ -98,12 +105,12 @@ impl AppState {
 
     #[must_use]
     pub async fn api_short_config(&self) -> ApiShortConfig {
-        let mac = self.conf.load().bridge.mac;
+        let mac = self.conf.borrow().bridge.mac;
         ApiShortConfig::from_mac_and_version(mac, self.upd.lock().await.get().await)
     }
 
     pub async fn api_config(&self, username: String) -> ApiResult<ApiConfig> {
-        let conf = self.conf.load();
+        let conf = self.config();
         let tz = tzfile::Tz::named(&conf.bridge.timezone)?;
         let localtime = Utc::now().with_timezone(&&tz).naive_local();
 
