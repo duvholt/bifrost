@@ -98,3 +98,35 @@ impl From<String> for ServiceId {
         Self::Name(value)
     }
 }
+
+impl From<String> for ServiceName {
+    fn from(value: String) -> Self {
+        if let Some((name, instance)) = value.split_once('@') {
+            Self {
+                name: name.to_string(),
+                instance: Some(instance.to_string()),
+            }
+        } else {
+            Self {
+                name: value,
+                instance: None,
+            }
+        }
+    }
+}
+
+impl From<&str> for ServiceName {
+    fn from(value: &str) -> Self {
+        if let Some((name, instance)) = value.split_once('@') {
+            Self {
+                name: name.to_string(),
+                instance: Some(instance.to_string()),
+            }
+        } else {
+            Self {
+                name: value.to_string(),
+                instance: None,
+            }
+        }
+    }
+}
