@@ -3,7 +3,7 @@ use std::error::Error;
 use thiserror::Error;
 
 use crate::manager::{ServiceEvent, SvmRequest};
-use crate::serviceid::ServiceId;
+use crate::serviceid::{ServiceId, ServiceName};
 use crate::traits::ServiceState;
 
 #[derive(Error, Debug)]
@@ -43,7 +43,7 @@ pub enum SvcError {
     ServiceNotFound(ServiceId),
 
     #[error("Service {0} already exists")]
-    ServiceAlreadyExists(String),
+    ServiceAlreadyExists(ServiceName),
 
     #[error("All services stopped")]
     Shutdown,

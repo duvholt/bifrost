@@ -40,7 +40,7 @@ impl Display for ServiceName {
 
 #[derive(Debug, Clone)]
 pub enum ServiceId {
-    Name(String),
+    Name(ServiceName),
     Id(Uuid),
 }
 
@@ -77,13 +77,13 @@ impl IntoServiceId for Uuid {
 
 impl IntoServiceId for String {
     fn service_id(self) -> ServiceId {
-        ServiceId::Name(self)
+        ServiceId::Name(ServiceName::from(self))
     }
 }
 
 impl IntoServiceId for &str {
     fn service_id(self) -> ServiceId {
-        ServiceId::Name(self.to_string())
+        ServiceId::Name(ServiceName::from(self))
     }
 }
 
@@ -95,7 +95,7 @@ impl From<Uuid> for ServiceId {
 
 impl From<String> for ServiceId {
     fn from(value: String) -> Self {
-        Self::Name(value)
+        value.service_id()
     }
 }
 
