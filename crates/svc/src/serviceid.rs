@@ -1,6 +1,42 @@
 use std::fmt::{Debug, Display};
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ServiceName {
+    name: String,
+    instance: Option<String>,
+}
+
+impl ServiceName {
+    // suppress clippy false-positive
+    #[allow(clippy::missing_const_for_fn)]
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[must_use]
+    pub fn instance(&self) -> Option<&str> {
+        self.instance.as_deref()
+    }
+}
+
+impl Display for ServiceName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self {
+                name,
+                instance: None,
+            } => write!(f, "{name}"),
+            Self {
+                name,
+                instance: Some(instance),
+            } => write!(f, "{name}@{instance}"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum ServiceId {
