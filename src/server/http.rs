@@ -14,7 +14,7 @@ use hyper::body::Incoming;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 
-use svc::traits::Service;
+use svc::traits::{Service, StopResult};
 
 use crate::error::{ApiError, ApiResult};
 
@@ -39,7 +39,6 @@ where
     A::Future: Send,
 {
     type Error = ApiError;
-    const SIGNAL_STOP: bool = true;
 
     async fn start(&mut self) -> Result<(), ApiError> {
         log::info!("Opening listen port on {}", self.addr);
@@ -66,9 +65,9 @@ where
         Ok(())
     }
 
-    async fn signal_stop(&mut self) -> Result<(), ApiError> {
+    async fn signal_stop(&mut self) -> Result<StopResult, ApiError> {
         self.handle.graceful_shutdown(Some(Duration::from_secs(1)));
-        Ok(())
+        Ok(StopResult::Delivered)
     }
 }
 
