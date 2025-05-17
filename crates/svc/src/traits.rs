@@ -116,19 +116,7 @@ where
 {
     type Error = E;
 
-    async fn configure(&mut self) -> Result<(), E> {
-        Ok(())
-    }
-
-    async fn start(&mut self) -> Result<(), E> {
-        Ok(())
-    }
-
     async fn run(&mut self) -> Result<(), E> {
         self.await
-    }
-
-    async fn stop(&mut self) -> Result<(), E> {
-        Ok(())
     }
 }
