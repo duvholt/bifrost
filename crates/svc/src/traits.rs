@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::RunSvcError;
 #[cfg(feature = "manager")]
 use crate::manager::ServiceEvent;
+use crate::template::ErrorAdapter;
 #[cfg(feature = "manager")]
 use std::future::Future;
 #[cfg(feature = "manager")]
@@ -95,6 +96,13 @@ pub trait Service: Send {
 
     async fn signal_stop(&mut self) -> Result<StopResult, Self::Error> {
         Ok(StopResult::NotSupported)
+    }
+
+    fn boxed(self) -> BoxDynService
+    where
+        Self: Sized + Unpin + 'static,
+    {
+        Box::new(ErrorAdapter::new(self)) as BoxDynService
     }
 }
 
