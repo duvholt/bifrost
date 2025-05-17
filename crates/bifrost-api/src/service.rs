@@ -26,12 +26,12 @@ impl Client {
         self.get("service").await
     }
 
-    pub async fn service_stop(&self, id: Uuid) -> BifrostResult<()> {
+    pub async fn service_stop(&self, id: Uuid) -> BifrostResult<Uuid> {
         self.put(&format!("service/{id}"), ServiceState::Stopped)
             .await
     }
 
-    pub async fn service_start(&self, id: Uuid) -> BifrostResult<()> {
+    pub async fn service_start(&self, id: Uuid) -> BifrostResult<Uuid> {
         self.put(&format!("service/{id}"), ServiceState::Running)
             .await
     }

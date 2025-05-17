@@ -34,20 +34,20 @@ async fn put_service(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(service_state): Json<ServiceState>,
-) -> BifrostApiResult<Json<()>> {
+) -> BifrostApiResult<Json<Uuid>> {
     let mut mgr = state.manager();
 
-    match service_state {
+    let uuid = match service_state {
         ServiceState::Registered
         | ServiceState::Configured
         | ServiceState::Starting
         | ServiceState::Stopping
-        | ServiceState::Failed => {}
+        | ServiceState::Failed => mgr.resolve(id).await?,
         ServiceState::Running => mgr.start(id).await?,
         ServiceState::Stopped => mgr.stop(id).await?,
-    }
+    };
 
-    Ok(Json(()))
+    Ok(Json(uuid))
 }
 
 pub fn router() -> Router<AppState> {

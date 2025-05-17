@@ -16,6 +16,7 @@ use crate::error::{RunSvcError, SvcError, SvcResult};
 use crate::rpc::RpcRequest;
 use crate::runservice::StandardService;
 use crate::serviceid::{IntoServiceId, ServiceId, ServiceName};
+use crate::template::ServiceTemplate;
 use crate::traits::{Service, ServiceRunner, ServiceState};
 
 #[derive(Debug)]
@@ -60,13 +61,14 @@ impl ServiceEvent {
 
 /// A request to a [`ServiceManager`]
 pub enum SvmRequest {
-    Stop(RpcRequest<ServiceId, SvcResult<()>>),
-    Start(RpcRequest<ServiceId, SvcResult<()>>),
+    Stop(RpcRequest<ServiceId, SvcResult<Uuid>>),
+    Start(RpcRequest<ServiceId, SvcResult<Uuid>>),
     Status(RpcRequest<ServiceId, SvcResult<ServiceState>>),
     List(RpcRequest<(), Vec<(Uuid, ServiceName)>>),
     Resolve(RpcRequest<ServiceId, SvcResult<Uuid>>),
     LookupName(RpcRequest<ServiceId, SvcResult<ServiceName>>),
     Register(RpcRequest<(String, ServiceFunc), SvcResult<Uuid>>),
+    RegisterTemplate(RpcRequest<(String, Box<dyn ServiceTemplate>), SvcResult<()>>),
     Subscribe(RpcRequest<mpsc::UnboundedSender<ServiceEvent>, SvcResult<Uuid>>),
     Shutdown(RpcRequest<(), ()>),
 }
@@ -128,11 +130,21 @@ impl SvmClient {
         .await?
     }
 
-    pub async fn start(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
+    pub async fn register_template(
+        &mut self,
+        name: impl AsRef<str>,
+        generator: impl ServiceTemplate + 'static,
+    ) -> SvcResult<()> {
+        let name = name.as_ref().to_string();
+        self.rpc(SvmRequest::RegisterTemplate, (name, Box::new(generator)))
+            .await?
+    }
+
+    pub async fn start(&mut self, id: impl IntoServiceId) -> SvcResult<Uuid> {
         self.rpc(SvmRequest::Start, id.service_id()).await?
     }
 
-    pub async fn stop(&mut self, id: impl IntoServiceId) -> SvcResult<()> {
+    pub async fn stop(&mut self, id: impl IntoServiceId) -> SvcResult<Uuid> {
         self.rpc(SvmRequest::Stop, id.service_id()).await?
     }
 
@@ -214,6 +226,10 @@ impl Debug for SvmRequest {
             Self::Status(arg0) => f.debug_tuple("Status").field(arg0).finish(),
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Register(_arg0) => f.debug_tuple("Register").field(&"<service>").finish(),
+            Self::RegisterTemplate(_arg0) => f
+                .debug_tuple("RegisterTemplate")
+                .field(&"<service>")
+                .finish(),
             Self::Resolve(arg0) => f.debug_tuple("Resolve").field(arg0).finish(),
             Self::LookupName(arg0) => f.debug_tuple("ResolveName").field(arg0).finish(),
             Self::Subscribe(_arg0) => f.debug_tuple("Subscribe").finish(),
@@ -231,6 +247,7 @@ pub struct ServiceManager {
     svcs: BTreeMap<Uuid, ServiceInstance>,
     names: BTreeMap<ServiceName, Uuid>,
     tasks: JoinSet<Result<(), RunSvcError>>,
+    templates: BTreeMap<String, Box<dyn ServiceTemplate>>,
     shutdown: bool,
 }
 
@@ -254,6 +271,7 @@ impl ServiceManager {
             svcs: BTreeMap::new(),
             names: BTreeMap::new(),
             tasks: JoinSet::new(),
+            templates: BTreeMap::new(),
             shutdown: false,
         }
     }
@@ -284,8 +302,7 @@ impl ServiceManager {
         self.control_tx.clone()
     }
 
-    fn register(&mut self, name: &str, svc: ServiceFunc) -> SvcResult<Uuid> {
-        let name = ServiceName::from(name);
+    fn register(&mut self, name: ServiceName, svc: ServiceFunc) -> SvcResult<Uuid> {
         if self.names.contains_key(&name) {
             return Err(SvcError::ServiceAlreadyExists(name));
         }
@@ -351,23 +368,49 @@ impl ServiceManager {
         Ok(&self.svcs[&id])
     }
 
-    fn start(&self, id: impl IntoServiceId) -> SvcResult<()> {
-        self.get(&id).and_then(|svc| {
+    fn start(&mut self, id: impl IntoServiceId) -> SvcResult<Uuid> {
+        let id = id.service_id();
+
+        // if the service is known, attempt to start it
+        if let Ok(svc) = self.get(&id) {
             log::debug!("Starting service: {id} {}", &svc.name);
-            Ok(svc.tx.send(ServiceState::Running)?)
-        })
+            svc.tx.send(ServiceState::Running)?;
+            return self.resolve(&id);
+        }
+
+        // ..else, check if it's a named instance
+        let ServiceId::Name(svc_name) = &id else {
+            return Err(SvcError::ServiceNotFound(id));
+        };
+
+        let Some(inst) = svc_name.instance() else {
+            return Err(SvcError::ServiceNotFound(id));
+        };
+
+        let Some(tmpl) = &self.templates.get(svc_name.name()) else {
+            return Err(SvcError::ServiceNotFound(id));
+        };
+
+        let inner = tmpl.generate(inst.to_string())?;
+        let svc = StandardService::new(svc_name.name(), inner);
+
+        let uuid = self.register(svc_name.clone(), svc.boxed())?;
+
+        Ok(uuid)
     }
 
-    fn stop(&self, id: impl IntoServiceId) -> SvcResult<()> {
+    fn stop(&self, id: impl IntoServiceId) -> SvcResult<Uuid> {
         let id = self.resolve(id)?;
 
         if self.svcs[&id].state == ServiceState::Stopped {
-            return Ok(());
+            return Ok(id);
         }
 
         log::debug!("Stopping service: {id} {}", self.svcs[&id].name);
         self.get(id)
-            .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))
+            .and_then(|svc| Ok(svc.tx.send(ServiceState::Stopped)?))?;
+
+        Ok(id)
     }
 
     fn notify_subscribers(&mut self, event: ServiceEvent) {
@@ -417,7 +460,14 @@ impl ServiceManager {
                 res
             }),
 
-            SvmRequest::Register(rpc) => rpc.respond(|(name, svc)| self.register(&name, svc)),
+            SvmRequest::Register(rpc) => {
+                rpc.respond(|(name, svc)| self.register(ServiceName::from(name), svc));
+            }
+
+            SvmRequest::RegisterTemplate(rpc) => rpc.respond(|(name, tmpl)| {
+                self.templates.insert(name, tmpl);
+                Ok(())
+            }),
 
             SvmRequest::Resolve(rpc) => rpc.respond(|id| self.resolve(&id)),
 
