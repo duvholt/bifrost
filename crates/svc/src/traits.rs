@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::RunSvcError;
 #[cfg(feature = "manager")]
 use crate::manager::ServiceEvent;
+#[cfg(feature = "manager")]
 use crate::template::ErrorAdapter;
 #[cfg(feature = "manager")]
 use std::future::Future;
@@ -98,6 +99,7 @@ pub trait Service: Send {
         Ok(StopResult::NotSupported)
     }
 
+    #[cfg(feature = "manager")]
     fn boxed(self) -> BoxDynService
     where
         Self: Sized + Unpin + 'static,
@@ -106,8 +108,10 @@ pub trait Service: Send {
     }
 }
 
+#[cfg(feature = "manager")]
 pub type BoxDynService = Box<dyn Service<Error = RunSvcError> + Unpin + 'static>;
 
+#[cfg(feature = "manager")]
 impl Service for BoxDynService {
     type Error = RunSvcError;
 
