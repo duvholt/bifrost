@@ -17,6 +17,11 @@ impl From<ServiceName> for String {
 }
 
 impl ServiceName {
+    #[must_use]
+    pub const fn new(name: String, instance: Option<String>) -> Self {
+        Self { name, instance }
+    }
+
     // suppress clippy false-positive
     #[allow(clippy::missing_const_for_fn)]
     #[must_use]
@@ -49,6 +54,15 @@ impl Display for ServiceName {
 pub enum ServiceId {
     Name(ServiceName),
     Id(Uuid),
+}
+
+impl ServiceId {
+    pub fn instance(name: impl Into<String>, instance: impl Into<String>) -> Self {
+        Self::Name(ServiceName {
+            name: name.into(),
+            instance: Some(instance.into()),
+        })
+    }
 }
 
 impl Display for ServiceId {
