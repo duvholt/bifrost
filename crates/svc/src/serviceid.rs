@@ -4,9 +4,16 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
 pub struct ServiceName {
     name: String,
     instance: Option<String>,
+}
+
+impl From<ServiceName> for String {
+    fn from(value: ServiceName) -> Self {
+        value.to_string()
+    }
 }
 
 impl ServiceName {
