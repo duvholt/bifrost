@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::error::RunSvcError;
-use crate::manager::ServiceEvent;
+use crate::manager::{ServiceEvent, ServiceFunc};
 use crate::policy::{Policy, Retry};
 use crate::traits::{Service, ServiceRunner, ServiceState, StopResult};
 
@@ -98,6 +98,12 @@ impl<S: Service> StandardService<S> {
     pub const fn with_stop_policy(mut self, policy: Policy) -> Self {
         self.stop_policy = policy;
         self
+    }
+}
+
+impl<S: Service + 'static> StandardService<S> {
+    pub fn boxed(self) -> ServiceFunc {
+        Box::new(|a, b, c| self.run(a, b, c))
     }
 }
 
