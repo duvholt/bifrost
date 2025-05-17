@@ -110,8 +110,9 @@ pub trait ServiceRunner {
 
 #[cfg(feature = "manager")]
 #[async_trait]
-impl<E: Error + Send + 'static, F> Service for F
+impl<E, F> Service for F
 where
+    E: Error + Send + 'static,
     F: Future<Output = Result<(), E>> + Send + Unpin,
 {
     type Error = E;
