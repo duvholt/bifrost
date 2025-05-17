@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use async_trait::async_trait;
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "manager")]
@@ -94,6 +95,32 @@ pub trait Service: Send {
 
     async fn signal_stop(&mut self) -> Result<StopResult, Self::Error> {
         Ok(StopResult::NotSupported)
+    }
+}
+
+pub type BoxDynService = Box<dyn Service<Error = RunSvcError> + Unpin + 'static>;
+
+impl Service for BoxDynService {
+    type Error = RunSvcError;
+
+    fn run<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).run()
+    }
+
+    fn configure<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).configure()
+    }
+
+    fn start<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).start()
+    }
+
+    fn stop<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).stop()
+    }
+
+    fn signal_stop<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<StopResult, Self::Error>> {
+        (**self).signal_stop()
     }
 }
 
