@@ -13,7 +13,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures::StreamExt;
 use native_tls::TlsConnector;
-use svc::traits::Service;
+use svc::error::SvcError;
+use svc::template::ServiceTemplate;
+use svc::traits::{BoxDynService, Service};
+use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::broadcast::Receiver;
@@ -33,6 +36,37 @@ use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::throttle::Throttle;
 use crate::resource::Resources;
+use crate::server::appstate::AppState;
+
+#[derive(Error, Debug)]
+pub enum TemplateError {
+    #[error("No config found for z2m server {0:?}")]
+    NotFound(String),
+}
+
+pub struct Z2mServiceTemplate {
+    state: AppState,
+}
+
+impl Z2mServiceTemplate {
+    #[must_use]
+    pub const fn new(state: AppState) -> Self {
+        Self { state }
+    }
+}
+
+impl ServiceTemplate for Z2mServiceTemplate {
+    fn generate(&self, name: String) -> Result<BoxDynService, SvcError> {
+        let config = self.state.config();
+        let Some(server) = config.z2m.servers.get(&name) else {
+            return Err(SvcError::generation(TemplateError::NotFound(name)));
+        };
+        let svc = Z2mBackend::new(name, server.clone(), config, self.state.res.clone())
+            .map_err(SvcError::generation)?;
+
+        Ok(svc.boxed())
+    }
+}
 
 pub struct Z2mBackend {
     name: String,
