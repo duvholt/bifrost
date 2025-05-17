@@ -1,14 +1,14 @@
 use std::io::Write;
 
-use svc::manager::ServiceManager;
-
-use bifrost::backend::z2m::Z2mBackend;
+use bifrost::backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
 use bifrost::server::appstate::AppState;
 use bifrost::server::http::HttpServer;
 use bifrost::server::mdns::MdnsService;
 use bifrost::server::{self, Protocol};
+use svc::manager::ServiceManager;
+use svc::serviceid::ServiceId;
 
 /*
  * Formatter function to output in syslog format. This makes sense when running
@@ -113,16 +113,12 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     mgr.register_service("entertainment", svc).await?;
 
     // register all z2m backends as services
-    for (name, server) in &appstate.config().z2m.servers {
-        let svc = Z2mBackend::new(
-            name.clone(),
-            server.clone(),
-            appstate.config(),
-            appstate.res.clone(),
-        )?;
-        let name = format!("z2m-{name}");
+    let template = backend::z2m::Z2mServiceTemplate::new(appstate.clone());
+    mgr.register_template("z2m", template).await?;
 
-        mgr.register_service(name, svc).await?;
+    // start named z2m instances, since templated services appear when started
+    for name in appstate.config().z2m.servers.keys() {
+        mgr.start(ServiceId::instance("z2m", name)).await?;
     }
 
     // finally, iterate over all services and start them
