@@ -50,6 +50,15 @@ pub enum SvcError {
 
     #[error("Service has failed")]
     ServiceFailed,
+
+    #[error("Templated service generation failed")]
+    ServiceGeneration(Box<dyn Error + Send>),
+}
+
+impl SvcError {
+    pub fn generation(err: impl Error + Send + 'static) -> Self {
+        Self::ServiceGeneration(Box::new(err))
+    }
 }
 
 #[derive(Error, Debug)]
