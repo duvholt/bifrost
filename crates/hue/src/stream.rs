@@ -255,8 +255,7 @@ mod tests {
 
         let (xy, b) = rgb16.to_xy();
 
-        compare!(xy.x, XY::D50_WHITE_POINT.x);
-        compare!(xy.y, XY::D50_WHITE_POINT.y);
+        compare_xy!(xy, XY::D50_WHITE_POINT);
         compare_float!(b, 255.0, 1e-2);
     }
 
