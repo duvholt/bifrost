@@ -51,24 +51,7 @@ pub fn cct_to_xy(cct: f64) -> XY {
 mod tests {
     use crate::colortemp::cct_to_xy;
     use crate::xy::XY;
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < 1e-4);
-        };
-    }
-
-    macro_rules! compare_xy {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            compare!(a.x, b.x);
-            compare!(a.y, b.y);
-        };
-    }
+    use crate::{compare, compare_float, compare_xy};
 
     // Regression tests, sanity checked against kelvin-to-blackbody raditation color
     // data found here:

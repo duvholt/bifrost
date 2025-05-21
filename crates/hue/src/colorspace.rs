@@ -216,15 +216,7 @@ mod tests {
     use std::iter::zip;
 
     use crate::colorspace::{ADOBE, ColorSpace, SRGB, WIDE};
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < 1e-4);
-        };
-    }
+    use crate::{compare, compare_float};
 
     fn verify_matrix(cs: &ColorSpace) {
         let xyz = &cs.xyz;

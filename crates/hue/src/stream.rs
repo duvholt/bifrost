@@ -241,25 +241,9 @@ impl Xy16 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        stream::{Rgb16, Xy16},
-        xy::XY,
-    };
-
-    macro_rules! compare_float {
-        ($expr:expr, $value:expr, $diff:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < $diff);
-        };
-    }
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            compare_float!($expr, $value, 1e-5)
-        };
-    }
+    use crate::stream::{Rgb16, Xy16};
+    use crate::xy::XY;
+    use crate::{compare, compare_float, compare_xy};
 
     #[test]
     fn rgb16_to_xy() {

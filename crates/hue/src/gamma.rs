@@ -63,12 +63,7 @@ impl GammaCorrection {
 #[cfg(test)]
 mod tests {
     use crate::gamma::GammaCorrection;
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            assert!(($expr - $value).abs() < 1e-5);
-        };
-    }
+    use crate::{compare, compare_float};
 
     #[test]
     fn gamma_none() {
