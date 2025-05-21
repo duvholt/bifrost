@@ -138,33 +138,10 @@ impl From<XY> for [f64; 2] {
 mod tests {
     use crate::hs::HS;
     use crate::xy::XY;
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < 1e-4);
-        };
-    }
-
-    macro_rules! compare_rgb {
-        ($a:expr, $b:expr) => {{
-            eprintln!("Comparing r");
-            compare!($a[0], $b[0]);
-            eprintln!("Comparing g");
-            compare!($a[1], $b[1]);
-            eprintln!("Comparing b");
-            compare!($a[2], $b[2]);
-        }};
-    }
-
-    macro_rules! compare_hsl_rgb {
-        ($h:expr, $s:expr, $rgb:expr) => {{
-            let sat = $s;
-            compare_rgb!(XY::rgb_from_hsl(HS { hue: $h, sat }, 0.5), $rgb);
-        }};
-    }
+    use crate::{
+        WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y, compare, compare_float, compare_hsl_rgb, compare_rgb,
+        compare_xy,
+    };
 
     #[test]
     fn rgb_from_hsl() {
