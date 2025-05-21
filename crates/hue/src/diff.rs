@@ -76,6 +76,7 @@ mod tests {
 
     use crate::diff::event_update_apply as apply;
     use crate::diff::event_update_diff as diff;
+    use crate::error::HueError;
 
     #[test]
     fn diff_empty() {
@@ -83,6 +84,14 @@ mod tests {
         let b = json!({});
 
         assert_eq!(diff(a, b).unwrap(), None);
+    }
+
+    #[test]
+    fn diff_invalid() {
+        let a = json!([]);
+        let b = json!({});
+
+        assert!(matches!(diff(a, b).unwrap_err(), HueError::Undiffable));
     }
 
     #[test]
@@ -179,6 +188,14 @@ mod tests {
         let c = json!({});
 
         assert_eq!(apply(&a, b).unwrap(), c);
+    }
+
+    #[test]
+    fn apply_invalid() {
+        let a = json!([]);
+        let b = json!({});
+
+        assert!(matches!(apply(&a, b).unwrap_err(), HueError::Unmergable));
     }
 
     #[test]
