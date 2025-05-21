@@ -55,6 +55,61 @@ mod tests {
     use crate::version::SwVersion;
     use crate::{HUE_BRIDGE_V2_DEFAULT_APIVERSION, HUE_BRIDGE_V2_DEFAULT_SWVERSION};
 
+    #[macro_export]
+    macro_rules! compare_float {
+        ($expr:expr, $value:expr, $diff:expr) => {
+            let a = $expr;
+            let b = $value;
+            eprintln!("{a} vs {b:.4}");
+            assert!((a - b).abs() < $diff);
+        };
+    }
+
+    #[macro_export]
+    macro_rules! compare {
+        ($expr:expr, $value:expr) => {
+            compare_float!($expr, $value, 1e-4)
+        };
+    }
+
+    #[macro_export]
+    macro_rules! compare_hs {
+        ($a:expr, $b:expr) => {{
+            compare!($a.hue, $b.hue);
+            compare!($a.sat, $b.sat);
+        }};
+    }
+
+    #[macro_export]
+    macro_rules! compare_xy {
+        ($expr:expr, $value:expr) => {
+            let a = $expr;
+            let b = $value;
+            compare!(a.x, b.x);
+            compare!(a.y, b.y);
+        };
+    }
+
+    #[macro_export]
+    macro_rules! compare_rgb {
+        ($a:expr, $b:expr) => {{
+            eprintln!("Comparing r");
+            compare!($a[0], $b[0]);
+            eprintln!("Comparing g");
+            compare!($a[1], $b[1]);
+            eprintln!("Comparing b");
+            compare!($a[2], $b[2]);
+        }};
+    }
+
+    #[macro_export]
+    macro_rules! compare_hsl_rgb {
+        ($h:expr, $s:expr, $rgb:expr) => {{
+            let sat = $s;
+            compare_rgb!(XY::rgb_from_hsl(HS { hue: $h, sat }, 0.5), $rgb);
+        }};
+    }
+
     /// verify that `HUE_BRIDGE_V2_DEFAULT_SWVERSION` and
     /// `HUE_BRIDGE_V2_DEFAULT_APIVERSION` are synchronized
     #[test]
