@@ -106,8 +106,8 @@ impl XY {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
     pub fn to_quant(&self) -> [u8; 3] {
-        let x = (self.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
-        let y = (self.y * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_Y) + (0.5 / 4095.))) as u16;
+        let x = ((self.x * f64::from(0xFFF)) / WIDE_GAMUT_MAX_X) as u16;
+        let y = ((self.y * f64::from(0xFFF)) / WIDE_GAMUT_MAX_Y) as u16;
         debug_assert!(x < 0x1000);
         debug_assert!(y < 0x1000);
 
