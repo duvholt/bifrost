@@ -79,7 +79,7 @@ impl XY {
         } else if h < 5.0 {
             [m + x, m, m + c]
         } else {
-            [m + c, m + 0.0, m + x]
+            [m + c, m, m + x]
         }
     }
 
