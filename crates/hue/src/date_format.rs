@@ -158,6 +158,7 @@ pub mod legacy_utc_opt {
     date_deserializer_utc_opt!(DateTime<Utc>, super::FORMAT_LOCAL);
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg(test)]
 mod tests {
     use std::fmt::Debug;
