@@ -377,3 +377,152 @@ impl HueZigbeeUpdate {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        xy::XY,
+        zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate},
+    };
+
+    #[test]
+    fn hzb_none() {
+        let hz = HueZigbeeUpdate::new();
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x00, 0x00]);
+    }
+
+    #[test]
+    fn hzb_onoff() {
+        let hz = HueZigbeeUpdate::new().with_on_off(true);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x01, 0x00, 0x01]);
+    }
+
+    #[test]
+    fn hzb_brightness() {
+        let hz = HueZigbeeUpdate::new().with_brightness(0x42);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x02, 0x00, 0x42]);
+    }
+
+    #[test]
+    fn hzb_mirek() {
+        let hz = HueZigbeeUpdate::new().with_color_mirek(0x1234);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x04, 0x00, 0x34, 0x12]);
+    }
+
+    #[test]
+    fn hzb_xy() {
+        let hz = HueZigbeeUpdate::new().with_color_xy(XY::new(0.5, 1.0));
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x08, 0x00, 0xFF, 0x7F, 0xFF, 0xFF]);
+    }
+
+    #[test]
+    fn hzb_fade_speed() {
+        let hz = HueZigbeeUpdate::new().with_fade_speed(0x1234);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x10, 0x00, 0x34, 0x12]);
+    }
+
+    #[test]
+    fn hzb_effect_type() {
+        let hz = HueZigbeeUpdate::new().with_effect_type(EffectType::Candle);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x20, 0x00, 0x01]);
+    }
+
+    #[test]
+    fn hzb_gradient_empty() {
+        let hz = HueZigbeeUpdate::new()
+            .with_gradient_colors(GradientStyle::Scattered, vec![])
+            .unwrap();
+        let bytes = hz.to_vec().unwrap();
+        assert_eq!(
+            bytes,
+            &[
+                0x00, 0x01, // flags
+                0x04, // data length
+                0x00, // number of lights (<< 4)
+                0x02, // style: scattered
+                0x00, 0x00 // padding
+            ]
+        );
+    }
+
+    #[test]
+    fn hzb_gradient_lights() {
+        let col1 = XY::new(0.5, 0.5);
+        let hz = HueZigbeeUpdate::new()
+            .with_gradient_colors(GradientStyle::Scattered, vec![col1])
+            .unwrap();
+        let bytes = hz.to_vec().unwrap();
+        let quant = col1.to_quant();
+        assert_eq!(
+            bytes,
+            &[
+                0x00, 0x01, // flags
+                0x07, // data length
+                0x10, // number of lights (<< 4)
+                0x02, // style: scattered
+                0x00, 0x00, // padding
+                quant[0], quant[1], quant[2],
+            ]
+        );
+    }
+
+    #[test]
+    fn hzb_effect_speed() {
+        let hz = HueZigbeeUpdate::new().with_effect_speed(0xAB);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x80, 0x00, 0xAB]);
+    }
+
+    #[test]
+    fn hzb_gradient_params() {
+        let hz = HueZigbeeUpdate::new().with_gradient_params(GradientParams {
+            scale: 0x12,
+            offset: 0x34,
+        });
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x40, 0x00, 0x12, 0x34]);
+    }
+
+    #[test]
+    fn hzb_is_empty() {
+        use HueZigbeeUpdate as HZU;
+        assert!(HZU::new().is_empty());
+        assert!(!HZU::new().with_on_off(false).is_empty());
+        assert!(!HZU::new().with_brightness(0x01).is_empty());
+        assert!(!HZU::new().with_color_mirek(0x01).is_empty());
+        assert!(!HZU::new().with_color_xy(XY::D50_WHITE_POINT).is_empty());
+        assert!(!HZU::new().with_color_xy(XY::D50_WHITE_POINT).is_empty());
+        assert!(!HZU::new().with_effect_type(EffectType::Cosmos).is_empty(),);
+        assert!(!HZU::new().with_fade_speed(0x01).is_empty());
+        assert!(
+            !HZU::new()
+                .with_gradient_colors(GradientStyle::Mirrored, vec![])
+                .unwrap()
+                .is_empty(),
+        );
+        assert!(
+            !HZU::new()
+                .with_gradient_params(GradientParams {
+                    scale: 0x01,
+                    offset: 0x02
+                })
+                .is_empty(),
+        );
+    }
+}
