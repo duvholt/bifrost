@@ -92,6 +92,16 @@ mod tests {
     }
 
     #[macro_export]
+    macro_rules! compare_xy_quant {
+        ($expr:expr, $value:expr) => {
+            let a = $expr;
+            let b = $value;
+            compare_float!(a.x, b.x, 1e-3);
+            compare_float!(a.y, b.y, 1e-3);
+        };
+    }
+
+    #[macro_export]
     macro_rules! compare_rgb {
         ($a:expr, $b:expr) => {{
             eprintln!("Comparing r");
@@ -101,6 +111,15 @@ mod tests {
             eprintln!("Comparing b");
             compare!($a[2], $b[2]);
         }};
+    }
+
+    #[macro_export]
+    macro_rules! compare_matrix {
+        ($a:expr, $b:expr) => {
+            zip($a, $b).for_each(|(a, b)| {
+                compare!(a, b);
+            });
+        };
     }
 
     #[macro_export]
