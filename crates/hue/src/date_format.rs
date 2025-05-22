@@ -304,4 +304,21 @@ mod tests {
         let (ds, d1) = date_utc();
         de(ds, &d1, |de| super::update_utc::deserialize(de))
     }
+
+    fn date_legacy_utc() -> (&'static str, DateTime<Utc>) {
+        let dt = Utc.with_ymd_and_hms(2014, 7, 8, 9, 10, 11).unwrap();
+        ("\"2014-07-08T09:10:11\"", dt)
+    }
+
+    #[test]
+    fn legacy_utc_de() -> HueResult<()> {
+        let (ds, d1) = date_legacy_utc();
+        de(ds, &d1, |de| super::legacy_utc::deserialize(de))
+    }
+
+    #[test]
+    fn legacy_utc_se() -> HueResult<()> {
+        let (s1, dt) = date_legacy_utc();
+        se(s1, |ser| super::legacy_utc::serialize(&dt, ser))
+    }
 }
