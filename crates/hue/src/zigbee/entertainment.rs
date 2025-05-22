@@ -177,9 +177,9 @@ impl HueEntSegmentLayout {
 
     pub fn pack(&self) -> HueResult<Vec<u8>> {
         let mut res = vec![];
-        let count = u16::try_from(self.members.len())?;
+        let count = u8::try_from(self.members.len())?;
         res.write_u16::<LE>(0)?;
-        res.write_u16::<LE>(count)?;
+        res.write_u8(count)?;
         for m in &self.members {
             res.write_all(&m.pack()?)?;
         }
