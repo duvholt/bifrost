@@ -52,7 +52,7 @@ impl Matrix3 {
             }
 
             // Divide the row by the diagonal term
-            let inv = 1.0 / d;
+            let inv = d.recip();
             for c in 0..3 {
                 current[[i, c]] *= inv;
                 inverse[[i, c]] *= inv;
