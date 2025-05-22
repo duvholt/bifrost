@@ -1,4 +1,5 @@
 #![doc = include_str!("../../../doc/hue-zigbee-format.md")]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod api;
 pub mod clamp;

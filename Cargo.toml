@@ -43,9 +43,13 @@ members = [
 ]
 
 [workspace.lints.rust]
+# NOTE: to use llvm-cov, comment out the "unstable_features" restriction:
 unstable_features = "forbid"
 unused_lifetimes = "warn"
 unused_qualifications = "warn"
+
+# Needed for llvm-cov
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }
 
 [workspace.lints.clippy]
 all         = { level = "warn", priority = -1 }
