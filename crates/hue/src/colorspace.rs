@@ -215,7 +215,7 @@ pub const ADOBE: ColorSpace = ColorSpace {
 mod tests {
     use std::iter::zip;
 
-    use crate::colorspace::{ADOBE, ColorSpace, SRGB, WIDE};
+    use crate::colorspace::{ADOBE, ColorSpace, Matrix3, SRGB, WIDE};
     use crate::{compare, compare_float, compare_matrix};
 
     fn verify_matrix(cs: &ColorSpace) {
@@ -242,5 +242,18 @@ mod tests {
     #[test]
     fn iverse_adobe() {
         verify_matrix(&ADOBE);
+    }
+
+    #[test]
+    fn invert_identity() {
+        let ident = Matrix3::identity();
+        let inv = ident.inverted().unwrap();
+        compare_matrix!(ident.0, inv.0);
+    }
+
+    #[test]
+    fn invert_zero() {
+        let zero = Matrix3([0.0; 9]);
+        assert!(zero.inverted().is_none());
     }
 }
