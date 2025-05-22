@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::sync::LazyLock;
+
 use crate::api::{DeviceArchetype, DeviceProductData};
 
 // This file contains discovered product data from multiple sources,
@@ -10,7 +13,7 @@ use crate::api::{DeviceArchetype, DeviceProductData};
 // provide more realistic API data, even when certain information is not
 // available from the backend (zigbee2mqtt).
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SimpleProductData<'a> {
     pub manufacturer_name: &'a str,
     pub product_name: &'a str,
@@ -35,15 +38,15 @@ impl<'a> SimpleProductData<'a> {
     }
 }
 
-// use shorter alias for better formatting
-#[allow(clippy::enum_glob_use)]
-use DeviceArchetype::*;
-use SimpleProductData as SPD;
+static PRODUCT_DATA: LazyLock<BTreeMap<&str, SimpleProductData>> = LazyLock::new(make_product_data);
 
-#[allow(clippy::match_same_arms)]
-#[must_use]
-pub fn product_data(model_id: &str) -> Option<SimpleProductData<'static>> {
-    let pd = match model_id {
+fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
+    // use shorter alias for better formatting
+    #[allow(clippy::enum_glob_use)]
+    use DeviceArchetype::*;
+    use SimpleProductData as SPD;
+
+    maplit::btreemap! {
         "915005987201" => SPD::signify("Signe gradient floor", HueSigne, "100b-118"),
         "929003053301_01" => SPD::signify("Hue Ensis up", PendantLong, "100b-11f"),
         "929003053301_02" => SPD::signify("Hue Ensis down", PendantLong, "100b-11f"),
@@ -77,9 +80,12 @@ pub fn product_data(model_id: &str) -> Option<SimpleProductData<'static>> {
             product_archetype: UnknownArchetype,
             hardware_platform_type: Some("1144-0"),
         },
-        _ => return None,
-    };
-    Some(pd)
+    }
+}
+
+#[must_use]
+pub fn product_data(model_id: &str) -> Option<SimpleProductData<'static>> {
+    PRODUCT_DATA.get(model_id).cloned()
 }
 
 #[must_use]
