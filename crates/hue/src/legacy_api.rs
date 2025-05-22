@@ -906,3 +906,22 @@ impl Capabilities {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "mac")]
+    #[test]
+    fn serialize_lower_case_mac() {
+        use mac_address::MacAddress;
+
+        use crate::legacy_api::serialize_lower_case_mac;
+
+        let mac = MacAddress::new([0x01, 0x02, 0x03, 0xAA, 0xBB, 0xCC]);
+        let mut res = vec![];
+        let mut ser = serde_json::Serializer::new(&mut res);
+
+        serialize_lower_case_mac(&mac, &mut ser).unwrap();
+
+        assert_eq!(res, b"\"01:02:03:aa:bb:cc\"");
+    }
+}
