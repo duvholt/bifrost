@@ -101,14 +101,17 @@ impl HueStreamPacket {
     const ASCII_UUID_SIZE: usize = 36;
 
     pub fn parse(data: &[u8]) -> HueResult<Self> {
-        let (header, body) = data.split_at(HueStreamHeader::SIZE);
-        let hdr = HueStreamHeader::parse(header)?;
+        let hdr = HueStreamHeader::parse(data)?;
+        let body = &data[HueStreamHeader::SIZE..];
         match hdr.version {
             HueStreamVersion::V1 => {
                 let lights = HueStreamLightsV1::parse(hdr.color_mode, body)?;
                 Ok(Self::V1(HueStreamPacketV1 { lights }))
             }
             HueStreamVersion::V2 => {
+                if body.len() < Self::ASCII_UUID_SIZE {
+                    return Err(HueError::HueEntertainmentBadHeader);
+                }
                 let (area_bytes, body) = body.split_at(Self::ASCII_UUID_SIZE);
                 let area = Uuid::try_parse_ascii(area_bytes)?;
                 let lights = HueStreamLightsV2::parse(hdr.color_mode, body)?;
