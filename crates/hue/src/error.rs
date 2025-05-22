@@ -106,6 +106,7 @@ pub enum HueApiV1Error {
 }
 
 impl HueApiV1Error {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     #[must_use]
     pub const fn error_code(&self) -> u32 {
         *self as u32
