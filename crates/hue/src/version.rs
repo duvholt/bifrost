@@ -76,3 +76,73 @@ impl SwVersion {
         format!("{}.{}.{}", &version[0..1], &version[2..4], version)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::version::SwVersion;
+    use crate::{HUE_BRIDGE_V2_DEFAULT_APIVERSION, HUE_BRIDGE_V2_DEFAULT_SWVERSION};
+
+    #[allow(clippy::nonminimal_bool)]
+    #[test]
+    fn partial_ord() {
+        let a = SwVersion {
+            version: 10,
+            name: String::new(),
+        };
+        let b = SwVersion {
+            version: 20,
+            name: String::new(),
+        };
+
+        assert!(a < b);
+        assert!(!(a >= b));
+    }
+
+    #[test]
+    fn default() {
+        let def = SwVersion::default();
+
+        assert_eq!(
+            def,
+            SwVersion {
+                version: HUE_BRIDGE_V2_DEFAULT_SWVERSION,
+                name: HUE_BRIDGE_V2_DEFAULT_APIVERSION.to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn debug() {
+        let version = SwVersion {
+            version: 1234,
+            name: "name".to_string(),
+        };
+        assert_eq!(format!("{version:?}"), "name (1234)");
+    }
+
+    #[test]
+    fn as_u64() {
+        assert_eq!(
+            SwVersion::default().as_u64(),
+            HUE_BRIDGE_V2_DEFAULT_SWVERSION
+        );
+    }
+
+    #[test]
+    fn get_legacy_swversion() {
+        let version = SwVersion::new(1234, String::new());
+        assert_eq!(version.get_legacy_swversion(), "1234");
+    }
+
+    #[test]
+    fn get_legacy_apiversion() {
+        let version = SwVersion::new(12345, String::new());
+        assert_eq!(version.get_legacy_apiversion(), "1.34.0");
+    }
+
+    #[test]
+    fn get_software_version() {
+        let version = SwVersion::new(123_456, String::new());
+        assert_eq!(version.get_software_version(), "1.34.123456");
+    }
+}
