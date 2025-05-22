@@ -84,6 +84,15 @@ impl HueEntFrameLightRecord {
     }
 
     #[must_use]
+    pub const fn mode(&self) -> Option<LightRecordMode> {
+        match self.brightness & 0x1F {
+            val if val == LightRecordMode::Device as u16 => Some(LightRecordMode::Device),
+            val if val == LightRecordMode::Segment as u16 => Some(LightRecordMode::Segment),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub const fn raw(&self) -> [u8; 3] {
         self.raw
     }
