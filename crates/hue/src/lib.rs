@@ -61,7 +61,7 @@ mod tests {
         ($expr:expr, $value:expr, $diff:expr) => {
             let a = $expr;
             let b = $value;
-            eprintln!("{a} vs {b:.4}");
+            eprintln!("{a} vs {b:.4} (diff {})", $diff);
             assert!((a - b).abs() < $diff);
         };
     }
