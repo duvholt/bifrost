@@ -45,7 +45,7 @@ impl From<LightEffect> for EffectType {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
+#[derive(PrimitiveEnum_u8, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GradientStyle {
     Linear = 0x00,
     Scattered = 0x02,
