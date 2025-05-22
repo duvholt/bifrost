@@ -242,9 +242,14 @@ impl Xy16 {
     }
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg(test)]
 mod tests {
-    use crate::stream::{Rgb16, Xy16};
+    use crate::error::HueError;
+    use crate::stream::{
+        HueStreamColorMode, HueStreamHeader, HueStreamLightsV1, HueStreamLightsV2, HueStreamPacket,
+        Rgb16, Xy16,
+    };
     use crate::xy::XY;
     use crate::{compare, compare_float, compare_xy};
 
@@ -275,5 +280,204 @@ mod tests {
         compare!(xy.x, 0.5);
         compare!(xy.y, 1.0);
         compare!(b, 255.0);
+    }
+
+    #[test]
+    fn parse_stream_lights_v1_rgb() {
+        let data = [0x11, 0x22, 0x33, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1];
+        let raw = HueStreamLightsV1::parse(HueStreamColorMode::Rgb, &data).unwrap();
+        let res = match raw {
+            HueStreamLightsV1::Rgb(rgb) => rgb,
+            HueStreamLightsV1::Xy(_) => panic!(),
+        };
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].light_id, 0x11_22_33);
+        assert_eq!(res[0].rgb.r, 0xA0A1);
+        assert_eq!(res[0].rgb.g, 0xB0B1);
+        assert_eq!(res[0].rgb.b, 0xC0C1);
+    }
+
+    #[test]
+    fn parse_stream_lights_v1_xy() {
+        let data = [0x11, 0x22, 0x33, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1];
+        let raw = HueStreamLightsV1::parse(HueStreamColorMode::Xy, &data).unwrap();
+        let res = match raw {
+            HueStreamLightsV1::Rgb(_) => panic!(),
+            HueStreamLightsV1::Xy(xy) => xy,
+        };
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].light_id, 0x11_22_33);
+        assert_eq!(res[0].xy.x, 0xA0A1);
+        assert_eq!(res[0].xy.y, 0xB0B1);
+        assert_eq!(res[0].xy.b, 0xC0C1);
+    }
+
+    #[test]
+    fn parse_stream_lights_v2_rgb() {
+        let data = [0x11, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1];
+        let raw = HueStreamLightsV2::parse(HueStreamColorMode::Rgb, &data).unwrap();
+        let res = match raw {
+            HueStreamLightsV2::Rgb(rgb) => rgb,
+            HueStreamLightsV2::Xy(_) => panic!(),
+        };
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].channel, 0x11);
+        assert_eq!(res[0].rgb.r, 0xA0A1);
+        assert_eq!(res[0].rgb.g, 0xB0B1);
+        assert_eq!(res[0].rgb.b, 0xC0C1);
+    }
+
+    #[test]
+    fn parse_stream_lights_v2_xy() {
+        let data = [0x11, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1];
+        let raw = HueStreamLightsV2::parse(HueStreamColorMode::Xy, &data).unwrap();
+        let res = match raw {
+            HueStreamLightsV2::Rgb(_) => panic!(),
+            HueStreamLightsV2::Xy(xy) => xy,
+        };
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].channel, 0x11);
+        assert_eq!(res[0].xy.x, 0xA0A1);
+        assert_eq!(res[0].xy.y, 0xB0B1);
+        assert_eq!(res[0].xy.b, 0xC0C1);
+    }
+
+    #[test]
+    fn parse_packet_bad_size() {
+        let data = vec![0x00, 0x01];
+
+        let err = HueStreamPacket::parse(&data).unwrap_err();
+        assert!(matches!(err, HueError::HueEntertainmentBadHeader));
+    }
+
+    #[test]
+    fn parse_packet_bad_header() {
+        let mut data = HueStreamHeader::MAGIC.to_vec();
+        data.extend_from_slice(&[
+            0x01, // version
+            0x00, // x0
+            0x00, // seqnr
+            0x00, 0x00, // x1
+            0x00, // color_mode: rgb
+            0x00, // x2,
+        ]);
+
+        // corrupt first byte
+        data[0] = b'X';
+
+        let err = HueStreamPacket::parse(&data).unwrap_err();
+        assert!(matches!(err, HueError::HueEntertainmentBadHeader));
+    }
+
+    #[test]
+    fn parse_packet_v1_rgb() {
+        let mut data = HueStreamHeader::MAGIC.to_vec();
+        data.extend_from_slice(&[
+            0x01, // version
+            0x00, // x0
+            0x00, // seqnr
+            0x00, 0x00, // x1
+            0x00, // color_mode: rgb
+            0x00, // x2,
+        ]);
+        data.extend_from_slice(&[0x11, 0x22, 0x33, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1]);
+
+        let res = HueStreamPacket::parse(&data).unwrap();
+
+        assert_eq!(res.color_mode(), HueStreamColorMode::Rgb);
+
+        match res {
+            HueStreamPacket::V1(v1) => {
+                assert_eq!(v1.light_ids(), [0x11_22_33]);
+            }
+            HueStreamPacket::V2(_) => panic!(),
+        }
+    }
+
+    #[test]
+    fn parse_packet_v1_xy() {
+        let mut data = HueStreamHeader::MAGIC.to_vec();
+        data.extend_from_slice(&[
+            0x01, // version
+            0x00, // x0
+            0x00, // seqnr
+            0x00, 0x00, // x1
+            0x01, // color_mode: xy
+            0x00, // x2,
+        ]);
+        data.extend_from_slice(&[0x11, 0x22, 0x33, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1]);
+
+        let res = HueStreamPacket::parse(&data).unwrap();
+
+        assert_eq!(res.color_mode(), HueStreamColorMode::Xy);
+
+        match res {
+            HueStreamPacket::V1(v1) => {
+                assert_eq!(v1.light_ids(), [0x11_22_33]);
+            }
+            HueStreamPacket::V2(_) => panic!(),
+        }
+    }
+
+    #[test]
+    fn parse_packet_v2_missing_uuid() {
+        let mut data = HueStreamHeader::MAGIC.to_vec();
+        data.extend_from_slice(&[
+            0x02, // version
+            0x00, // x0
+            0x00, // seqnr
+            0x00, 0x00, // x1
+            0x00, // color_mode: rgb
+            0x00, // x2,
+        ]);
+
+        // dummy data
+        data.push(0x00);
+
+        let err = HueStreamPacket::parse(&data).unwrap_err();
+
+        assert!(matches!(err, HueError::HueEntertainmentBadHeader));
+    }
+
+    #[test]
+    fn parse_packet_v2_rgb() {
+        let mut data = HueStreamHeader::MAGIC.to_vec();
+        data.extend_from_slice(&[
+            0x02, // version
+            0x00, // x0
+            0x00, // seqnr
+            0x00, 0x00, // x1
+            0x00, // color_mode: rgb
+            0x00, // x2,
+        ]);
+        data.extend_from_slice(b"01010101-0202-0303-0404-050505050505");
+        data.extend_from_slice(&[0x11, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1]);
+
+        let res = HueStreamPacket::parse(&data).unwrap();
+
+        assert_eq!(res.color_mode(), HueStreamColorMode::Rgb);
+    }
+
+    #[test]
+    fn parse_packet_v2_xy() {
+        let mut data = HueStreamHeader::MAGIC.to_vec();
+        data.extend_from_slice(&[
+            0x02, // version
+            0x00, // x0
+            0x00, // seqnr
+            0x00, 0x00, // x1
+            0x01, // color_mode: xy
+            0x00, // x2,
+        ]);
+        data.extend_from_slice(b"01010101-0202-0303-0404-050505050505");
+        data.extend_from_slice(&[0x11, 0xA0, 0xA1, 0xB0, 0xB1, 0xC0, 0xC1]);
+
+        let res = HueStreamPacket::parse(&data).unwrap();
+
+        assert_eq!(res.color_mode(), HueStreamColorMode::Xy);
     }
 }
