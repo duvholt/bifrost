@@ -40,6 +40,7 @@ impl<'a> SimpleProductData<'a> {
 
 static PRODUCT_DATA: LazyLock<BTreeMap<&str, SimpleProductData>> = LazyLock::new(make_product_data);
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
     // use shorter alias for better formatting
     #[allow(clippy::enum_glob_use)]
@@ -96,4 +97,28 @@ pub fn product_archetype(model_id: &str) -> Option<DeviceArchetype> {
 #[must_use]
 pub fn hardware_platform_type(model_id: &str) -> Option<&'static str> {
     product_data(model_id).and_then(|pd| pd.hardware_platform_type)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::DeviceArchetype;
+    use crate::devicedb::{hardware_platform_type, product_archetype, product_data};
+
+    #[test]
+    fn lookup_spf() {
+        assert!(product_data("LCX001").is_some());
+    }
+
+    #[test]
+    fn lookup_archetype() {
+        assert_eq!(
+            product_archetype("LCX001").unwrap(),
+            DeviceArchetype::HueLightstripTv
+        );
+    }
+
+    #[test]
+    fn lookup_platform_type() {
+        assert_eq!(hardware_platform_type("LCX001").unwrap(), "100b-118",);
+    }
 }
