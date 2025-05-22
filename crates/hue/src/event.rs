@@ -100,3 +100,73 @@ pub struct Delete {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Error {}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use uuid::Uuid;
+
+    use crate::api::{RType, Resource, ResourceLink, ResourceRecord};
+    use crate::event::{Add, Delete, Event, EventBlock, Update};
+
+    // just some uuid for testing
+    const ID: Uuid = Uuid::NAMESPACE_DNS;
+
+    #[test]
+    fn add() {
+        let obj = ResourceRecord::new(
+            ID,
+            None,
+            Resource::AuthV1(ResourceLink {
+                rid: ID,
+                rtype: RType::AuthV1,
+            }),
+        );
+
+        let add = EventBlock::add(vec![obj.clone()]);
+        let Event::Add(Add { data }) = add.event else {
+            panic!("Wrong event type");
+        };
+
+        assert!(data.len() == 1);
+
+        assert_eq!(
+            serde_json::to_string(&data[0]).unwrap(),
+            serde_json::to_string(&obj).unwrap()
+        );
+    }
+
+    #[test]
+    fn update() {
+        let diff = json!({"key": "value"});
+
+        let evt = EventBlock::update(&ID, Some("foo".into()), RType::AuthV1, diff.clone()).unwrap();
+        let Event::Update(Update { data }) = evt.event else {
+            panic!("Wrong event type");
+        };
+
+        assert!(data.len() == 1);
+
+        let out = &data[0];
+        assert_eq!(out.id_v1, Some("foo".into()));
+        assert_eq!(out.rtype, RType::AuthV1);
+        assert_eq!(out.data, diff);
+    }
+
+    #[test]
+    fn delete() {
+        let evt = EventBlock::delete(RType::AuthV1.link_to(ID), Some("foo".into())).unwrap();
+
+        let Event::Delete(Delete { data }) = evt.event else {
+            panic!("Wrong event type");
+        };
+
+        assert!(data.len() == 1);
+
+        let out = &data[0];
+        assert_eq!(out.id_v1, Some("foo".into()));
+        assert_eq!(out.rtype, RType::AuthV1);
+        assert_eq!(out.id, ID);
+    }
+}
