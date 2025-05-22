@@ -53,6 +53,8 @@ pub fn bridge_id(mac: MacAddress) -> String {
 
 #[cfg(test)]
 mod tests {
+    use mac_address::MacAddress;
+
     use crate::version::SwVersion;
     use crate::{HUE_BRIDGE_V2_DEFAULT_APIVERSION, HUE_BRIDGE_V2_DEFAULT_SWVERSION};
 
@@ -133,11 +135,32 @@ mod tests {
     /// verify that `HUE_BRIDGE_V2_DEFAULT_SWVERSION` and
     /// `HUE_BRIDGE_V2_DEFAULT_APIVERSION` are synchronized
     #[test]
-    fn test_default_version_match() {
+    fn default_version_match() {
         let ver = SwVersion::new(HUE_BRIDGE_V2_DEFAULT_SWVERSION, String::new());
         assert_eq!(
             HUE_BRIDGE_V2_DEFAULT_APIVERSION,
             ver.get_legacy_apiversion()
         );
+    }
+
+    #[test]
+    fn best_guess_timezone() {
+        let res = crate::best_guess_timezone();
+        assert!(!res.is_empty());
+        assert_ne!(res, "none");
+    }
+
+    #[test]
+    fn bridge_id() {
+        let mac = MacAddress::new([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+        let id = crate::bridge_id(mac);
+        assert_eq!(id, "112233fffe445566");
+    }
+
+    #[test]
+    fn bridge_id_raw() {
+        let mac = MacAddress::new([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+        let id = crate::bridge_id_raw(mac);
+        assert_eq!(id, [0x11, 0x22, 0x33, 0xFF, 0xFE, 0x44, 0x55, 0x66]);
     }
 }
