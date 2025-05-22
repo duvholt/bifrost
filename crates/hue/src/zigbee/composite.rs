@@ -26,6 +26,7 @@ pub enum EffectType {
     Enchant = 0x11,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 impl From<LightEffect> for EffectType {
     fn from(value: LightEffect) -> Self {
         match value {
@@ -51,6 +52,7 @@ pub enum GradientStyle {
     Mirrored = 0x04,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 impl From<LightGradientMode> for GradientStyle {
     fn from(value: LightGradientMode) -> Self {
         match value {
