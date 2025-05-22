@@ -66,6 +66,27 @@ mod tests {
     use crate::{compare, compare_float};
 
     #[test]
+    fn gamma_new() {
+        let gc = GammaCorrection::new(1.0, 2.0, 3.0, 4.0);
+
+        compare!(gc.gamma, 1.0);
+        compare!(gc.transition, 2.0);
+        compare!(gc.slope, 3.0);
+        compare!(gc.offset, 4.0);
+    }
+
+    #[test]
+    fn gamma_default() {
+        let gc = GammaCorrection::default();
+        let none = GammaCorrection::NONE;
+
+        compare!(gc.gamma, none.gamma);
+        compare!(gc.transition, none.transition);
+        compare!(gc.slope, none.slope);
+        compare!(gc.offset, none.offset);
+    }
+
+    #[test]
     fn gamma_none() {
         let gc = GammaCorrection::NONE;
 
