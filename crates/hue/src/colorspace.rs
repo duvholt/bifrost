@@ -216,7 +216,7 @@ mod tests {
     use std::iter::zip;
 
     use crate::colorspace::{ADOBE, ColorSpace, SRGB, WIDE};
-    use crate::{compare, compare_float};
+    use crate::{compare, compare_float, compare_matrix};
 
     fn verify_matrix(cs: &ColorSpace) {
         let xyz = &cs.xyz;
@@ -225,13 +225,8 @@ mod tests {
         let xyzi = xyz.inverted().unwrap();
         let rgbi = rgb.inverted().unwrap();
 
-        zip(xyz.0, rgbi.0).for_each(|(a, b)| {
-            compare!(a, b);
-        });
-
-        zip(rgb.0, xyzi.0).for_each(|(a, b)| {
-            compare!(a, b);
-        });
+        compare_matrix!(xyz.0, rgbi.0);
+        compare_matrix!(rgb.0, xyzi.0);
     }
 
     #[test]
