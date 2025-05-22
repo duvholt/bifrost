@@ -69,6 +69,7 @@ pub fn event_update_apply<T: Serialize + DeserializeOwned>(ma: &T, mb: Value) ->
     Ok(serde_json::from_value(Value::Object(a))?)
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
@@ -192,6 +193,11 @@ mod tests {
 
     #[test]
     fn apply_invalid() {
+        let a = json!({});
+        let b = json!([]);
+
+        assert!(matches!(apply(&a, b).unwrap_err(), HueError::Unmergable));
+
         let a = json!([]);
         let b = json!({});
 
