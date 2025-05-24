@@ -128,6 +128,9 @@ jobs:
           tags: |
             # set latest tag for default branch
             type=raw,value=latest,enable={{is_default_branch}}
+            # maintain {{branch}}-latest tag for each branch
+            type=raw,value={{branch}}-latest
+            # set iso date tag per branch
             type=raw,value={{branch}}-{{date 'YYYY-MM-DD'}}
 
       - name: Create manifest list and push
