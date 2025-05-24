@@ -8,7 +8,10 @@ use bifrost::server::http::HttpServer;
 use bifrost::server::mdns::MdnsService;
 use bifrost::server::{self, Protocol};
 use svc::manager::ServiceManager;
+use svc::manager::SvmClient;
 use svc::serviceid::ServiceId;
+use tokio::signal;
+use tokio::signal::unix::SignalKind;
 
 /*
  * Formatter function to output in syslog format. This makes sense when running
@@ -129,6 +132,31 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     Ok(())
 }
 
+fn install_signal_handlers(appstate: &AppState) -> ApiResult<()> {
+    async fn shutdown(msg: &str, mut mgr: SvmClient) {
+        log::warn!("{msg}");
+        let _ = std::io::stderr().flush();
+        let _ = mgr.shutdown().await;
+    }
+
+    let mgr = appstate.manager();
+    tokio::spawn(async move {
+        if matches!(signal::ctrl_c().await, Ok(())) {
+            shutdown("Ctrl-C pressed, exiting..", mgr).await;
+        }
+    });
+
+    let mgr = appstate.manager();
+    let mut signal = signal::unix::signal(SignalKind::terminate())?;
+    tokio::spawn(async move {
+        if matches!(signal.recv().await, Some(())) {
+            shutdown("SIGTERM received, exiting..", mgr).await;
+        }
+    });
+
+    Ok(())
+}
+
 async fn run() -> ApiResult<()> {
     init_logging()?;
 
@@ -142,14 +170,9 @@ async fn run() -> ApiResult<()> {
 
     let appstate = AppState::from_config(config, client).await?;
 
-    build_tasks(&appstate).await?;
+    install_signal_handlers(&appstate)?;
 
-    tokio::spawn(async move {
-        if matches!(tokio::signal::ctrl_c().await, Ok(())) {
-            log::warn!("Ctrl-C pressed, exiting..");
-            let _ = appstate.manager().shutdown().await;
-        }
-    });
+    build_tasks(&appstate).await?;
 
     future.await??;
 
