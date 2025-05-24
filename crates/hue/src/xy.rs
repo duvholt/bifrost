@@ -43,9 +43,9 @@ impl XY {
         let max_y = Self::COLOR_SPACE.find_maximum_y(x, y);
 
         if max_y > f64::EPSILON {
-            (Self { x, y }, b / max_y * 255.0)
+            (Self { x, y }, (b / max_y * 255.0).min(255.0))
         } else {
-            (Self::D65_WHITE_POINT, 0.0)
+            (Self::D50_WHITE_POINT, 0.0)
         }
     }
 
@@ -79,7 +79,7 @@ impl XY {
         } else if h < 5.0 {
             [m + x, m, m + c]
         } else {
-            [m + c, m + 0.0, m + x]
+            [m + c, m, m + x]
         }
     }
 
@@ -106,8 +106,8 @@ impl XY {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
     pub fn to_quant(&self) -> [u8; 3] {
-        let x = (self.x * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_X) + (0.5 / 4095.))) as u16;
-        let y = (self.y * ((f64::from(0xFFF) / WIDE_GAMUT_MAX_Y) + (0.5 / 4095.))) as u16;
+        let x = ((self.x * f64::from(0xFFF)) / WIDE_GAMUT_MAX_X) as u16;
+        let y = ((self.y * f64::from(0xFFF)) / WIDE_GAMUT_MAX_Y) as u16;
         debug_assert!(x < 0x1000);
         debug_assert!(y < 0x1000);
 
@@ -138,33 +138,10 @@ impl From<XY> for [f64; 2] {
 mod tests {
     use crate::hs::HS;
     use crate::xy::XY;
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < 1e-4);
-        };
-    }
-
-    macro_rules! compare_rgb {
-        ($a:expr, $b:expr) => {{
-            eprintln!("Comparing r");
-            compare!($a[0], $b[0]);
-            eprintln!("Comparing g");
-            compare!($a[1], $b[1]);
-            eprintln!("Comparing b");
-            compare!($a[2], $b[2]);
-        }};
-    }
-
-    macro_rules! compare_hsl_rgb {
-        ($h:expr, $s:expr, $rgb:expr) => {{
-            let sat = $s;
-            compare_rgb!(XY::rgb_from_hsl(HS { hue: $h, sat }, 0.5), $rgb);
-        }};
-    }
+    use crate::{
+        WIDE_GAMUT_MAX_X, WIDE_GAMUT_MAX_Y, compare, compare_float, compare_hsl_rgb, compare_rgb,
+        compare_xy,
+    };
 
     #[test]
     fn rgb_from_hsl() {
@@ -178,5 +155,101 @@ mod tests {
         compare_hsl_rgb!(2.0 / 3.0, sat, [0.0, 0.0, ONE]); // blue
         compare_hsl_rgb!(2.5 / 3.0, sat, [ONE, 0.0, ONE]); // blue-red
         compare_hsl_rgb!(3.0 / 3.0, sat, [ONE, 0.0, 0.0]); // red (wrapped around)
+    }
+
+    #[test]
+    fn xy_from_f64() {
+        let a = XY::from([0.1, 0.2]);
+        let b = XY::new(0.1, 0.2);
+
+        compare!(a.x, b.x);
+        compare!(a.y, b.y);
+    }
+
+    #[test]
+    fn f64_from_xy() {
+        let a = [0.1, 0.2];
+        let b = <[f64; 2]>::from(XY::new(0.1, 0.2));
+
+        compare!(a[0], b[0]);
+        compare!(a[1], b[1]);
+    }
+
+    #[test]
+    fn xy_from_quant_max() {
+        let xy = XY::from_quant([0xFF, 0xFF, 0xFF]);
+        compare!(xy.x, WIDE_GAMUT_MAX_X);
+        compare!(xy.y, WIDE_GAMUT_MAX_Y);
+    }
+
+    #[test]
+    fn xy_from_quant_zero() {
+        let xy = XY::from_quant([0x00, 0x00, 0x00]);
+        compare!(xy.x, 0.0);
+        compare!(xy.y, 0.0);
+    }
+
+    #[test]
+    fn xy_from_quant_middle_x() {
+        let xy = XY::from_quant([0xFF, 0x07, 0x00]);
+        compare!(xy.x, WIDE_GAMUT_MAX_X / 2.0);
+        compare!(xy.y, 0.0);
+    }
+
+    #[test]
+    fn xy_from_quant_middle_y() {
+        let xy = XY::from_quant([0x00, 0x00, 0x80]);
+        compare!(xy.x, 0.0);
+        compare!(xy.y, WIDE_GAMUT_MAX_Y / 2.0 + 0.0001);
+    }
+
+    #[test]
+    fn xy_to_quant_middle_x() {
+        let xy = XY::new(WIDE_GAMUT_MAX_X / 2.0, 0.0);
+
+        assert_eq!(xy.to_quant(), [0xFF, 0x07, 0x00]);
+    }
+
+    #[test]
+    fn xy_to_quant_middle_y() {
+        let xy = XY::new(0.0, WIDE_GAMUT_MAX_Y / 2.0);
+
+        assert_eq!(xy.to_quant(), [0x00, 0xF0, 0x7F]);
+    }
+
+    #[test]
+    fn xy_from_rgb_unit_black() {
+        let (xy, b) = XY::from_rgb_unit(0.0, 0.0, 0.0);
+        compare!(b, 0.0);
+        compare!(xy.x, XY::D50_WHITE_POINT.x);
+        compare!(xy.y, XY::D50_WHITE_POINT.y);
+    }
+
+    #[test]
+    fn xy_from_rgb_unit_white() {
+        let (xy, b) = XY::from_rgb_unit(1.0, 1.0, 1.0);
+        compare!(b, 255.0);
+        compare!(xy.x, XY::D50_WHITE_POINT.x);
+        compare!(xy.y, XY::D50_WHITE_POINT.y);
+    }
+
+    #[test]
+    fn xy_to_rgb_white() {
+        let xy = XY::D50_WHITE_POINT;
+        assert_eq!(xy.to_rgb(255.0), [0xFF, 0xFF, 0xFF]);
+    }
+
+    #[test]
+    fn xy_from_hs() {
+        let (xy, b) = XY::from_hs(HS { hue: 0.0, sat: 0.0 });
+        compare_float!(b, 255.0 / 2.0, 1e-2);
+        compare_xy!(xy, XY::D50_WHITE_POINT);
+    }
+
+    #[test]
+    fn xy_from_hsl() {
+        let (xy, b) = XY::from_hsl(HS { hue: 0.0, sat: 0.0 }, 1.0);
+        compare!(b, 255.0);
+        compare_xy!(xy, XY::D50_WHITE_POINT);
     }
 }

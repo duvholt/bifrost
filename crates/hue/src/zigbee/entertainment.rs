@@ -84,6 +84,15 @@ impl HueEntFrameLightRecord {
     }
 
     #[must_use]
+    pub const fn mode(&self) -> Option<LightRecordMode> {
+        match self.brightness & 0x1F {
+            val if val == LightRecordMode::Device as u16 => Some(LightRecordMode::Device),
+            val if val == LightRecordMode::Segment as u16 => Some(LightRecordMode::Segment),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub const fn raw(&self) -> [u8; 3] {
         self.raw
     }
@@ -177,9 +186,9 @@ impl HueEntSegmentLayout {
 
     pub fn pack(&self) -> HueResult<Vec<u8>> {
         let mut res = vec![];
-        let count = u16::try_from(self.members.len())?;
+        let count = u8::try_from(self.members.len())?;
         res.write_u16::<LE>(0)?;
-        res.write_u16::<LE>(count)?;
+        res.write_u8(count)?;
         for m in &self.members {
             res.write_all(&m.pack()?)?;
         }
@@ -229,7 +238,12 @@ impl HueEntFrame {
 mod tests {
     use packed_struct::prelude::*;
 
-    use crate::zigbee::{HueEntFrameLightRecord, LightRecordMode};
+    use crate::error::HueError;
+    use crate::xy::XY;
+    use crate::zigbee::{
+        HueEntFrame, HueEntFrameLightRecord, HueEntSegment, HueEntSegmentConfig,
+        HueEntSegmentLayout, LightRecordMode,
+    };
 
     #[test]
     fn light_record() {
@@ -266,5 +280,132 @@ mod tests {
         let data = foo.pack().unwrap();
 
         assert_eq!("2211ebffaabbcc", hex::encode(data));
+    }
+
+    #[test]
+    fn light_brightness() {
+        let data = hex::decode("2211e0ffaabbcc").unwrap();
+        let rec = HueEntFrameLightRecord::unpack_from_slice(&data).unwrap();
+        assert_eq!(rec.addr, 0x1122);
+        assert_eq!(rec.brightness(), 0x7FF);
+    }
+
+    #[test]
+    fn light_raw() {
+        let val = HueEntFrameLightRecord {
+            addr: 0,
+            brightness: 0,
+            raw: [1, 2, 3],
+        };
+        assert_eq!(val.raw(), [1, 2, 3]);
+    }
+
+    #[test]
+    fn light_record_mode() {
+        let val = HueEntFrameLightRecord {
+            addr: 0,
+            brightness: LightRecordMode::Device as u16,
+            raw: [0, 0, 0],
+        };
+        assert_eq!(val.mode(), Some(LightRecordMode::Device));
+
+        let val = HueEntFrameLightRecord {
+            addr: 0,
+            brightness: LightRecordMode::Segment as u16,
+            raw: [0, 0, 0],
+        };
+        assert_eq!(val.mode(), Some(LightRecordMode::Segment));
+
+        let val = HueEntFrameLightRecord {
+            addr: 0,
+            brightness: 1,
+            raw: [0, 0, 0],
+        };
+        assert_eq!(val.mode(), None);
+    }
+
+    #[test]
+    fn light_debug() {
+        let xy = XY::new(0.1, 0.2);
+        let val =
+            HueEntFrameLightRecord::new(0x1234, 0x7FF, LightRecordMode::Device, xy.to_quant());
+        assert_eq!(format!("{val:?}"), "<1234> (0.100,0.200)@ffeb");
+    }
+
+    #[test]
+    fn hue_ent_segment_config() {
+        let cfg = HueEntSegmentConfig::new(&[1, 2, 3, 4]);
+        let data = cfg.pack().unwrap();
+        assert_eq!(data, [0x00, 0x04, 1, 0, 2, 0, 3, 0, 4, 0]);
+
+        let rev = HueEntSegmentConfig::parse(&data).unwrap();
+        assert_eq!(rev.members, [1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn hue_ent_segment_layout_invalid() {
+        let err = HueEntSegmentLayout::parse(&[0x00, 0x00]).unwrap_err();
+        assert!(matches!(err, HueError::HueZigbeeDecodeError));
+    }
+
+    #[test]
+    fn hue_ent_segment_layout_odd() {
+        let err = HueEntSegmentLayout::parse(&[0x00, 0x00, 0x01, 0xAA]).unwrap_err();
+        assert!(matches!(err, HueError::HueZigbeeDecodeError));
+    }
+
+    #[test]
+    fn hue_ent_segment_layout() {
+        let cfg = HueEntSegmentLayout::new(&[HueEntSegment {
+            length: 10,
+            index: 20,
+        }]);
+        let data = cfg.pack().unwrap();
+        assert_eq!(data, [0x00, 0x00, 1, 10, 20]);
+
+        let rev = HueEntSegmentLayout::parse(&data).unwrap();
+        assert_eq!(rev.members.len(), 1);
+        assert_eq!(rev.members[0].length, 10);
+        assert_eq!(rev.members[0].index, 20);
+    }
+
+    #[test]
+    fn hue_ent_frame_invalid() {
+        let data = [0x44, 0x33, 0x22, 0x11];
+        let err = HueEntFrame::parse(&data).unwrap_err();
+        assert!(matches!(err, HueError::HueZigbeeDecodeError));
+    }
+
+    #[test]
+    fn hue_ent_frame() {
+        let cfg = HueEntFrame {
+            counter: 0x11_22_33_44,
+            smoothing: 0xAA_BB,
+            blks: vec![HueEntFrameLightRecord {
+                addr: 0x7788,
+                brightness: 0x123,
+                raw: [0xCC, 0xDD, 0xEE],
+            }],
+        };
+        let data = cfg.pack().unwrap();
+
+        assert_eq!(
+            data,
+            [
+                0x44, 0x33, 0x22, 0x11, // counter
+                0xBB, 0xAA, // smoothing
+                0x88, 0x77, // addr
+                0x23, 0x01, // brightness
+                0xCC, 0xDD, 0xEE // raw
+            ]
+        );
+
+        let rev = HueEntFrame::parse(&data).unwrap();
+        assert_eq!(rev.counter, 0x11_22_33_44);
+        assert_eq!(rev.smoothing, 0xAA_BB);
+        assert_eq!(rev.blks.len(), 1);
+        assert_eq!(rev.blks[0].addr, 0x7788);
+        assert_eq!(rev.blks[0].brightness, 0x123);
+        assert_eq!(rev.blks[0].raw(), [0xCC, 0xDD, 0xEE]);
     }
 }

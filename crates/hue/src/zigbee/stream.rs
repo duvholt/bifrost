@@ -161,38 +161,135 @@ mod tests {
 
     use chrono::Duration;
 
-    use crate::zigbee::EntertainmentZigbeeStream as EZS;
+    use crate::zigbee::{
+        EntertainmentZigbeeStream as EZS, PHILIPS_HUE_ZIGBEE_VENDOR_ID, ZigbeeMessage,
+    };
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn zigbee_message() {
+        let zb = ZigbeeMessage::new(0x1122, 0x33, vec![0x44, 0x55]);
+        assert_eq!(zb.cluster, 0x1122);
+        assert_eq!(zb.command, 0x33);
+        assert_eq!(zb.data, [0x44, 0x55]);
+        assert_eq!(zb.ddr, true);
+        assert_eq!(zb.frametype, 1);
+        assert_eq!(zb.mfc, Some(PHILIPS_HUE_ZIGBEE_VENDOR_ID));
+
+        let zb = zb.with_ddr(false);
+        assert_eq!(zb.ddr, false);
+
+        let zb = zb.with_mfc(None);
+        assert_eq!(zb.mfc, None);
+
+        let zb = zb.with_mfc(Some(0x1234));
+        assert_eq!(zb.mfc, Some(0x1234));
+    }
 
     #[test]
-    fn test_duration_zero() {
+    fn entertainment_zigbee_stream_default() {
+        let val = EZS::default();
+        assert_eq!(val.counter, 0);
+        assert_eq!(val.smoothing, EZS::DEFAULT_SMOOTHING);
+    }
+
+    #[test]
+    fn entertainment_zigbee_stream() {
+        let mut val = EZS {
+            smoothing: 0x1122,
+            counter: 0x11_22_33_44,
+        };
+        assert_eq!(val.counter(), 0x11_22_33_44);
+        assert_eq!(val.smoothing(), 0x1122);
+
+        val.set_smoothing(0x3344);
+        assert_eq!(val.smoothing(), 0x3344);
+
+        val.set_smoothing_duration(Duration::milliseconds(0))
+            .unwrap();
+        assert_eq!(val.smoothing(), 0);
+    }
+
+    #[test]
+    fn ezs_reset() {
+        let mut ezs = EZS::new(0x1122);
+
+        let rst = ezs.reset().unwrap();
+        assert_eq!(rst.cluster, EZS::CLUSTER);
+        assert_eq!(rst.command, EZS::CMD_RESET);
+        assert_eq!(rst.data, [0x00, 0x01, 0x22, 0x11, 0x00, 0x00]);
+
+        // counter should be the same
+        assert_eq!(ezs.counter(), 0x1122);
+    }
+
+    #[allow(clippy::bool_assert_comparison, clippy::cast_possible_truncation)]
+    #[test]
+    fn ezs_frame() {
+        let mut ezs = EZS::new(0x1122);
+
+        let rst = ezs.frame(vec![]).unwrap();
+        assert_eq!(rst.cluster, EZS::CLUSTER);
+        assert_eq!(rst.command, EZS::CMD_FRAME);
+        assert_eq!(
+            rst.data,
+            [
+                0x22,
+                0x11,
+                0x00,
+                0x00,
+                ezs.smoothing as u8,
+                (ezs.smoothing >> 8) as u8
+            ]
+        );
+
+        // counter should be incremented
+        assert_eq!(ezs.counter(), 0x1123);
+    }
+
+    #[test]
+    fn ezs_segment_mapping() {
+        let mut ezs = EZS::new(0x1122);
+
+        let rst = ezs.segment_mapping(&[0xA0A1, 0xB0B1]).unwrap();
+        assert_eq!(rst.cluster, EZS::CLUSTER);
+        assert_eq!(rst.command, EZS::CMD_SEGMENT_MAP);
+        assert_eq!(rst.data, [0x00, 0x02, 0xA1, 0xA0, 0xB1, 0xB0]);
+
+        // counter should be the same
+        assert_eq!(ezs.counter(), 0x1122);
+    }
+
+    #[test]
+    fn duration_zero() {
         let zero_dur = Duration::seconds(0);
         let smo = EZS::duration_to_smoothing(zero_dur).unwrap();
         assert_eq!(smo, 0);
     }
 
     #[test]
-    fn test_duration_half() {
+    fn duration_half() {
         let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS / 2);
         let smo = EZS::duration_to_smoothing(max_dur).unwrap();
         assert_eq!(smo, 0x8000);
     }
 
     #[test]
-    fn test_duration_max() {
+    fn duration_max() {
         let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS - 1);
         let smo = EZS::duration_to_smoothing(max_dur).unwrap();
         assert_eq!(smo, 0xFFFF);
     }
 
     #[test]
-    fn test_duration_negative() {
+    fn duration_negative() {
         let max_dur = Duration::microseconds(-1);
         let smo = EZS::duration_to_smoothing(max_dur);
         assert!(smo.is_err());
     }
 
     #[test]
-    fn test_duration_over_limit() {
+    fn duration_over_limit() {
         let max_dur = Duration::microseconds(EZS::SMOOTHING_MAX_MICROS);
         let smo = EZS::duration_to_smoothing(max_dur);
         assert!(smo.is_err());

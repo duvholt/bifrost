@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::sync::LazyLock;
+
 use crate::api::{DeviceArchetype, DeviceProductData};
 
 // This file contains discovered product data from multiple sources,
@@ -10,7 +13,7 @@ use crate::api::{DeviceArchetype, DeviceProductData};
 // provide more realistic API data, even when certain information is not
 // available from the backend (zigbee2mqtt).
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SimpleProductData<'a> {
     pub manufacturer_name: &'a str,
     pub product_name: &'a str,
@@ -35,15 +38,16 @@ impl<'a> SimpleProductData<'a> {
     }
 }
 
-// use shorter alias for better formatting
-#[allow(clippy::enum_glob_use)]
-use DeviceArchetype::*;
-use SimpleProductData as SPD;
+static PRODUCT_DATA: LazyLock<BTreeMap<&str, SimpleProductData>> = LazyLock::new(make_product_data);
 
-#[allow(clippy::match_same_arms)]
-#[must_use]
-pub fn product_data(model_id: &str) -> Option<SimpleProductData<'static>> {
-    let pd = match model_id {
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
+    // use shorter alias for better formatting
+    #[allow(clippy::enum_glob_use)]
+    use DeviceArchetype::*;
+    use SimpleProductData as SPD;
+
+    maplit::btreemap! {
         "915005987201" => SPD::signify("Signe gradient floor", HueSigne, "100b-118"),
         "929003053301_01" => SPD::signify("Hue Ensis up", PendantLong, "100b-11f"),
         "929003053301_02" => SPD::signify("Hue Ensis down", PendantLong, "100b-11f"),
@@ -77,9 +81,12 @@ pub fn product_data(model_id: &str) -> Option<SimpleProductData<'static>> {
             product_archetype: UnknownArchetype,
             hardware_platform_type: Some("1144-0"),
         },
-        _ => return None,
-    };
-    Some(pd)
+    }
+}
+
+#[must_use]
+pub fn product_data(model_id: &str) -> Option<SimpleProductData<'static>> {
+    PRODUCT_DATA.get(model_id).cloned()
 }
 
 #[must_use]
@@ -90,4 +97,28 @@ pub fn product_archetype(model_id: &str) -> Option<DeviceArchetype> {
 #[must_use]
 pub fn hardware_platform_type(model_id: &str) -> Option<&'static str> {
     product_data(model_id).and_then(|pd| pd.hardware_platform_type)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::DeviceArchetype;
+    use crate::devicedb::{hardware_platform_type, product_archetype, product_data};
+
+    #[test]
+    fn lookup_spf() {
+        assert!(product_data("LCX001").is_some());
+    }
+
+    #[test]
+    fn lookup_archetype() {
+        assert_eq!(
+            product_archetype("LCX001").unwrap(),
+            DeviceArchetype::HueLightstripTv
+        );
+    }
+
+    #[test]
+    fn lookup_platform_type() {
+        assert_eq!(hardware_platform_type("LCX001").unwrap(), "100b-118",);
+    }
 }

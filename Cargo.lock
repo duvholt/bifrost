@@ -1029,6 +1029,7 @@ dependencies = [
  "hex",
  "iana-time-zone",
  "mac_address",
+ "maplit",
  "packed_struct",
  "serde",
  "serde_json",

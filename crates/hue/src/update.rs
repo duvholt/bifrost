@@ -30,3 +30,16 @@ pub struct UpdateEntries {
 pub fn update_url_for_bridge(device_type_id: &str, version: u64) -> String {
     format!("{UPDATE_CHECK_URL}?deviceTypeId={device_type_id}&version={version}")
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::update::{UPDATE_CHECK_URL, update_url_for_bridge};
+
+    #[test]
+    fn url() {
+        assert_eq!(
+            update_url_for_bridge("dev", 1234),
+            format!("{UPDATE_CHECK_URL}?deviceTypeId=dev&version=1234")
+        );
+    }
+}

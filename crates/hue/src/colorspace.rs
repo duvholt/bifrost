@@ -52,7 +52,7 @@ impl Matrix3 {
             }
 
             // Divide the row by the diagonal term
-            let inv = 1.0 / d;
+            let inv = d.recip();
             for c in 0..3 {
                 current[[i, c]] *= inv;
                 inverse[[i, c]] *= inv;
@@ -215,16 +215,8 @@ pub const ADOBE: ColorSpace = ColorSpace {
 mod tests {
     use std::iter::zip;
 
-    use crate::colorspace::{ADOBE, ColorSpace, SRGB, WIDE};
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < 1e-4);
-        };
-    }
+    use crate::colorspace::{ADOBE, ColorSpace, Matrix3, SRGB, WIDE};
+    use crate::{compare, compare_float, compare_matrix};
 
     fn verify_matrix(cs: &ColorSpace) {
         let xyz = &cs.xyz;
@@ -233,13 +225,8 @@ mod tests {
         let xyzi = xyz.inverted().unwrap();
         let rgbi = rgb.inverted().unwrap();
 
-        zip(xyz.0, rgbi.0).for_each(|(a, b)| {
-            compare!(a, b);
-        });
-
-        zip(rgb.0, xyzi.0).for_each(|(a, b)| {
-            compare!(a, b);
-        });
+        compare_matrix!(xyz.0, rgbi.0);
+        compare_matrix!(rgb.0, xyzi.0);
     }
 
     #[test]
@@ -255,5 +242,18 @@ mod tests {
     #[test]
     fn iverse_adobe() {
         verify_matrix(&ADOBE);
+    }
+
+    #[test]
+    fn invert_identity() {
+        let ident = Matrix3::identity();
+        let inv = ident.inverted().unwrap();
+        compare_matrix!(ident.0, inv.0);
+    }
+
+    #[test]
+    fn invert_zero() {
+        let zero = Matrix3([0.0; 9]);
+        assert!(zero.inverted().is_none());
     }
 }

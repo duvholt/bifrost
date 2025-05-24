@@ -10,8 +10,6 @@ use crate::date_format;
 use crate::api::ResourceLink;
 #[cfg(feature = "rng")]
 use crate::error::HueResult;
-#[cfg(feature = "rng")]
-use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase", tag = "type")]
@@ -57,16 +55,16 @@ impl EventBlock {
         })
     }
 
-    pub fn delete(link: ResourceLink, id_v1: Option<u32>) -> HueResult<Self> {
+    pub fn delete(link: ResourceLink, id_v1: Option<String>) -> HueResult<Self> {
         Ok(Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),
             event: Event::Delete(Delete {
-                data: vec![json!({
-                    "id": link.rid,
-                    "id_v1": id_v1,
-                    "type": link.rtype,
-                })],
+                data: vec![ObjectDelete {
+                    id: link.rid,
+                    rtype: link.rtype,
+                    id_v1,
+                }],
             }),
         })
     }
@@ -94,9 +92,88 @@ pub struct Update {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ObjectDelete {
+    pub id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id_v1: Option<String>,
+    #[serde(rename = "type")]
+    pub rtype: RType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Delete {
-    pub data: Vec<Value>,
+    pub data: Vec<ObjectDelete>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Error {}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use uuid::Uuid;
+
+    use crate::api::{RType, Resource, ResourceLink, ResourceRecord};
+    use crate::event::{Add, Delete, Event, EventBlock, Update};
+
+    // just some uuid for testing
+    const ID: Uuid = Uuid::NAMESPACE_DNS;
+
+    #[test]
+    fn add() {
+        let obj = ResourceRecord::new(
+            ID,
+            None,
+            Resource::AuthV1(ResourceLink {
+                rid: ID,
+                rtype: RType::AuthV1,
+            }),
+        );
+
+        let add = EventBlock::add(vec![obj.clone()]);
+        let Event::Add(Add { data }) = add.event else {
+            panic!("Wrong event type");
+        };
+
+        assert!(data.len() == 1);
+
+        assert_eq!(
+            serde_json::to_string(&data[0]).unwrap(),
+            serde_json::to_string(&obj).unwrap()
+        );
+    }
+
+    #[test]
+    fn update() {
+        let diff = json!({"key": "value"});
+
+        let evt = EventBlock::update(&ID, Some("foo".into()), RType::AuthV1, diff.clone()).unwrap();
+        let Event::Update(Update { data }) = evt.event else {
+            panic!("Wrong event type");
+        };
+
+        assert!(data.len() == 1);
+
+        let out = &data[0];
+        assert_eq!(out.id_v1, Some("foo".into()));
+        assert_eq!(out.rtype, RType::AuthV1);
+        assert_eq!(out.data, diff);
+    }
+
+    #[test]
+    fn delete() {
+        let evt = EventBlock::delete(RType::AuthV1.link_to(ID), Some("foo".into())).unwrap();
+
+        let Event::Delete(Delete { data }) = evt.event else {
+            panic!("Wrong event type");
+        };
+
+        assert!(data.len() == 1);
+
+        let out = &data[0];
+        assert_eq!(out.id_v1, Some("foo".into()));
+        assert_eq!(out.rtype, RType::AuthV1);
+        assert_eq!(out.id, ID);
+    }
+}

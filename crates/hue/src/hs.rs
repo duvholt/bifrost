@@ -24,22 +24,7 @@ impl From<RawHS> for HS {
 #[cfg(test)]
 mod tests {
     use crate::hs::{HS, RawHS};
-
-    macro_rules! compare {
-        ($expr:expr, $value:expr) => {
-            let a = $expr;
-            let b = $value;
-            eprintln!("{a} vs {b:.4}");
-            assert!((a - b).abs() < 1e-4);
-        };
-    }
-
-    macro_rules! compare_hs {
-        ($a:expr, $b:expr) => {{
-            compare!($a.hue, $b.hue);
-            compare!($a.sat, $b.sat);
-        }};
-    }
+    use crate::{compare, compare_float, compare_hs};
 
     #[test]
     fn from_rawhs_min() {

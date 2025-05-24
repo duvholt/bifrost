@@ -26,6 +26,7 @@ pub enum EffectType {
     Enchant = 0x11,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 impl From<LightEffect> for EffectType {
     fn from(value: LightEffect) -> Self {
         match value {
@@ -44,13 +45,14 @@ impl From<LightEffect> for EffectType {
     }
 }
 
-#[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
+#[derive(PrimitiveEnum_u8, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GradientStyle {
     Linear = 0x00,
     Scattered = 0x02,
     Mirrored = 0x04,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 impl From<LightGradientMode> for GradientStyle {
     fn from(value: LightGradientMode) -> Self {
         match value {
@@ -373,5 +375,319 @@ impl HueZigbeeUpdate {
         }
 
         Ok(())
+    }
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use crate::error::HueError;
+    use crate::xy::XY;
+    use crate::zigbee::{EffectType, GradientParams, GradientStyle, HueZigbeeUpdate};
+    use crate::{compare, compare_float, compare_xy, compare_xy_quant};
+
+    #[test]
+    fn hzb_none() {
+        let hz = HueZigbeeUpdate::new();
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x00, 0x00]);
+    }
+
+    #[test]
+    fn hzb_onoff() {
+        let hz = HueZigbeeUpdate::new().with_on_off(true);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x01, 0x00, 0x01]);
+    }
+
+    #[test]
+    fn hzb_brightness() {
+        let hz = HueZigbeeUpdate::new().with_brightness(0x42);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x02, 0x00, 0x42]);
+    }
+
+    #[test]
+    fn hzb_mirek() {
+        let hz = HueZigbeeUpdate::new().with_color_mirek(0x1234);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x04, 0x00, 0x34, 0x12]);
+    }
+
+    #[test]
+    fn hzb_xy() {
+        let hz = HueZigbeeUpdate::new().with_color_xy(XY::new(0.5, 1.0));
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x08, 0x00, 0xFF, 0x7F, 0xFF, 0xFF]);
+    }
+
+    #[test]
+    fn hzb_fade_speed() {
+        let hz = HueZigbeeUpdate::new().with_fade_speed(0x1234);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x10, 0x00, 0x34, 0x12]);
+    }
+
+    #[test]
+    fn hzb_effect_type() {
+        let hz = HueZigbeeUpdate::new().with_effect_type(EffectType::Candle);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x20, 0x00, 0x01]);
+    }
+
+    #[test]
+    fn hzb_gradient_empty() {
+        let hz = HueZigbeeUpdate::new()
+            .with_gradient_colors(GradientStyle::Scattered, vec![])
+            .unwrap();
+        let bytes = hz.to_vec().unwrap();
+        assert_eq!(
+            bytes,
+            &[
+                0x00, 0x01, // flags
+                0x04, // data length
+                0x00, // number of lights (<< 4)
+                0x02, // style: scattered
+                0x00, 0x00 // padding
+            ]
+        );
+    }
+
+    #[test]
+    fn hzb_gradient_lights() {
+        let col1 = XY::new(0.5, 0.5);
+        let hz = HueZigbeeUpdate::new()
+            .with_gradient_colors(GradientStyle::Scattered, vec![col1])
+            .unwrap();
+        let bytes = hz.to_vec().unwrap();
+        let quant = col1.to_quant();
+        assert_eq!(
+            bytes,
+            &[
+                0x00, 0x01, // flags
+                0x07, // data length
+                0x10, // number of lights (<< 4)
+                0x02, // style: scattered
+                0x00, 0x00, // padding
+                quant[0], quant[1], quant[2],
+            ]
+        );
+    }
+
+    #[test]
+    fn hzb_gradient_too_many() {
+        let col = XY::new(0.5, 0.5);
+        let res = HueZigbeeUpdate::new()
+            .with_gradient_colors(GradientStyle::Scattered, [col].repeat(257));
+        assert!(matches!(res, Err(HueError::TryFromIntError(_))));
+    }
+
+    #[test]
+    fn hzb_effect_speed() {
+        let hz = HueZigbeeUpdate::new().with_effect_speed(0xAB);
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x80, 0x00, 0xAB]);
+    }
+
+    #[test]
+    fn hzb_gradient_params() {
+        let hz = HueZigbeeUpdate::new().with_gradient_params(GradientParams {
+            scale: 0x12,
+            offset: 0x34,
+        });
+        let bytes = hz.to_vec().unwrap();
+
+        assert_eq!(bytes, &[0x40, 0x00, 0x12, 0x34]);
+    }
+
+    #[test]
+    fn hzb_is_empty() {
+        use HueZigbeeUpdate as HZU;
+        assert!(HZU::new().is_empty());
+        assert!(!HZU::new().with_on_off(false).is_empty());
+        assert!(!HZU::new().with_brightness(0x01).is_empty());
+        assert!(!HZU::new().with_color_mirek(0x01).is_empty());
+        assert!(!HZU::new().with_color_xy(XY::D50_WHITE_POINT).is_empty());
+        assert!(!HZU::new().with_color_xy(XY::D50_WHITE_POINT).is_empty());
+        assert!(!HZU::new().with_effect_type(EffectType::Cosmos).is_empty(),);
+        assert!(!HZU::new().with_fade_speed(0x01).is_empty());
+        assert!(
+            !HZU::new()
+                .with_gradient_colors(GradientStyle::Mirrored, vec![])
+                .unwrap()
+                .is_empty(),
+        );
+        assert!(
+            !HZU::new()
+                .with_gradient_params(GradientParams {
+                    scale: 0x01,
+                    offset: 0x02
+                })
+                .is_empty(),
+        );
+    }
+
+    #[test]
+    fn hzb_parse_eof() {
+        let data = [];
+        let mut cur = Cursor::new(data.as_slice());
+        match HueZigbeeUpdate::from_reader(&mut cur) {
+            Ok(_) => panic!(),
+            Err(err) => assert!(matches!(err, HueError::IOError(_))),
+        }
+    }
+
+    #[test]
+    fn hzb_parse_empty() {
+        let data = [0x00, 0x00];
+        let mut cur = Cursor::new(data.as_slice());
+        let res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_onoff() {
+        let data = [0x01, 0x00, 0x01];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert_eq!(res.onoff.take(), Some(0x01));
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_brightness() {
+        let data = [0x02, 0x00, 0x42];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert_eq!(res.brightness.take(), Some(0x42));
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_mirek() {
+        let data = [0x04, 0x00, 0x22, 0x11];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert_eq!(res.color_mirek.take(), Some(0x1122));
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_xy() {
+        let data = [0x08, 0x00, 0xFF, 0x7F, 0xFF, 0xFF];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        let xy = res.color_xy.take().unwrap();
+        compare_xy!(xy, XY::new(0.5, 1.0));
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_fade_speed() {
+        let data = [0x10, 0x00, 0x22, 0x11];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert_eq!(res.fade_speed.take(), Some(0x1122));
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_effect_type() {
+        let data = [0x20, 0x00, 0x01];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert_eq!(
+            res.effect_type.take().unwrap() as u8,
+            EffectType::Candle as u8
+        );
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_effect_speed() {
+        let data = [0x80, 0x00, 0xAB];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        assert_eq!(res.effect_speed.take().unwrap(), 0xAB);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_gradient_params() {
+        let data = [0x40, 0x00, 0x12, 0x34];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+
+        let params = res.gradient_params.take().unwrap();
+        assert_eq!(params.scale, 0x12);
+        assert_eq!(params.offset, 0x34);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_gradient_lights() {
+        let col1 = XY::new(0.70, 0.70);
+
+        let quant = col1.to_quant();
+
+        let data = [
+            0x00,
+            0x01, // flags
+            0x07, // data length
+            0x10, // number of lights (<< 4)
+            0x02, // style: scattered
+            0x00,
+            0x00, // padding
+            quant[0] + 0x01,
+            quant[1],
+            quant[2],
+        ];
+        let mut cur = Cursor::new(data.as_slice());
+        let mut res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+        let gc = res.gradient_colors.take().unwrap();
+        assert_eq!(gc.points.len(), 1);
+        assert_eq!(gc.header.nlights, 1);
+        assert_eq!(gc.header.resv0, 0);
+        assert_eq!(gc.header.resv2, 0);
+        assert_eq!(gc.header.style, GradientStyle::Scattered);
+        eprintln!("{:.4?}", gc.points[0]);
+        compare_xy_quant!(gc.points[0], col1);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn hzb_parse_unknown_flags() {
+        let data = [0x00, 0x20];
+        let mut cur = Cursor::new(data.as_slice());
+        match HueZigbeeUpdate::from_reader(&mut cur) {
+            Ok(_) => panic!(),
+            Err(err) => assert!(matches!(err, HueError::HueZigbeeUnknownFlags(_))),
+        }
+    }
+
+    #[test]
+    fn grad_params_new_is_default() {
+        let a = GradientParams::new();
+        let b = GradientParams::default();
+        assert_eq!(a.offset, b.offset);
+        assert_eq!(a.scale, b.scale);
     }
 }
