@@ -1,7 +1,8 @@
 #![allow(clippy::struct_excessive_bools)]
 
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -43,11 +44,50 @@ pub enum Message {
     #[serde(rename = "bridge/converters")]
     BridgeConverters(Value),
 
+    #[serde(rename = "bridge/response/options")]
+    BridgeOptions(Value),
+
+    #[serde(rename = "bridge/response/touchlink/scan")]
+    BridgeTouchlinkScan(Value),
+
+    #[serde(rename = "bridge/response/permit_join")]
+    BridgePermitJoin(Value),
+
+    #[serde(rename = "bridge/response/networkmap")]
+    BridgeNetworkmap(Value),
+
+    #[serde(rename = "bridge/config")]
+    BridgeConfig(Value),
+
+    #[serde(rename = "bridge/response/group/add")]
+    BridgeResponseGroupAdd(Response<GroupAdd>),
+
+    #[serde(rename = "bridge/response/group/remove")]
+    BridgeResponseGroupRemove(Response<GroupRemove>),
+
+    #[serde(rename = "bridge/response/group/rename")]
+    BridgeResponseGroupRename(Response<GroupRename>),
+
+    #[serde(rename = "bridge/response/group/options")]
+    BridgeResponseGroupOptions(Response<GroupOptions>),
+
     #[serde(rename = "bridge/response/group/members/add")]
-    BridgeGroupMembersAdd(GroupMemberChangeResponse),
+    BridgeGroupMembersAdd(Response<GroupMemberChange>),
 
     #[serde(rename = "bridge/response/group/members/remove")]
-    BridgeGroupMembersRemove(GroupMemberChangeResponse),
+    BridgeGroupMembersRemove(Response<GroupMemberChange>),
+
+    #[serde(rename = "bridge/response/device/remove")]
+    BridgeDeviceRemove(Response<DeviceRemoveResponse>),
+
+    #[serde(rename = "bridge/response/device/options")]
+    BridgeDeviceOptions(Value),
+
+    #[serde(rename = "bridge/response/device/configure_reporting")]
+    BridgeDeviceConfigureReporting(Value),
+
+    #[serde(rename = "bridge/response/device/ota_update/check")]
+    BridgeDeviceOtaUpdateCheck(Value),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -61,12 +101,6 @@ pub enum Endpoint {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GroupMemberChangeResponse {
-    pub data: GroupMemberChange,
-    pub status: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GroupMemberChange {
     pub device: String,
     pub group: String,
@@ -74,6 +108,79 @@ pub struct GroupMemberChange {
     pub endpoint: Option<Endpoint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skip_disable_reporting: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PermitJoin {
+    pub time: u32,
+    pub device: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceRemove {
+    pub id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceRemoveResponse {
+    pub id: String,
+    pub block: bool,
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum Response<T> {
+    Ok {
+        data: T,
+        #[serde(default)]
+        transaction: Option<Value>,
+    },
+    Error {
+        error: Value,
+        #[serde(default)]
+        transaction: Option<Value>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupAdd {
+    pub id: Option<u32>,
+    pub friendly_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupRemove {
+    pub id: String,
+    #[serde(default)]
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupMemberAddRemove {
+    pub device: String,
+    pub endpoint: u8,
+    pub group: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupRename {
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupOptions {
+    pub from: Value,
+    pub to: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceRename {
+    pub from: String,
+    pub to: String,
+    #[serde(default)]
+    pub homeassistant_rename: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, Debug, Copy)]
@@ -95,7 +202,7 @@ impl Debug for IeeeAddress {
 
 impl Display for IeeeAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:08X}", self.0)
+        write!(f, "0x{:016x}", self.0)
     }
 }
 

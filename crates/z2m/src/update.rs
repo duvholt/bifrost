@@ -46,6 +46,8 @@ pub struct DeviceUpdate {
     pub battery: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effect: Option<DeviceEffect>,
 
     /* all other fields */
     #[serde(skip_serializing_if = "HashMap::is_empty")]
@@ -109,6 +111,14 @@ impl DeviceUpdate {
                     })
                     .collect()
             }),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_effect(self, effect: DeviceEffect) -> Self {
+        Self {
+            effect: Some(effect),
             ..self
         }
     }
@@ -228,4 +238,15 @@ impl From<DeviceState> for On {
             on: value == DeviceState::On,
         }
     }
+}
+
+#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceEffect {
+    Blink,
+    Breathe,
+    Okay,
+    ChannelChange,
+    FinishEffect,
+    StopEffect,
 }

@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use itertools::Itertools;
 use maplit::btreeset;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::sync::Notify;
 use tokio::sync::broadcast::{Receiver, Sender};
 use uuid::Uuid;
@@ -13,8 +14,8 @@ use bifrost_api::backend::BackendRequest;
 use hue::api::{
     Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate, Entertainment,
     EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource, ResourceLink,
-    ResourceRecord, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
-    ZigbeeDeviceDiscovery,
+    ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryStatus, Zone,
 };
 use hue::error::{HueError, HueResult};
 use hue::event::EventBlock;
@@ -144,6 +145,24 @@ impl Resources {
         })
     }
 
+    pub fn update_by_type<T: Serialize>(&mut self, func: impl Fn(&mut T)) -> ApiResult<()>
+    where
+        for<'a> &'a mut T: TryFrom<&'a mut Resource, Error = HueError>,
+    {
+        let ids = self.state.res.keys().copied().collect_vec();
+        for id in &ids {
+            let obj = self.state.get_mut(id)?;
+            let x: Result<&mut T, _> = obj.try_into();
+            if x.is_ok() {
+                self.try_update(id, |obj: &mut T| {
+                    func(obj);
+                    Ok(())
+                })?;
+            }
+        }
+        Ok(())
+    }
+
     #[must_use]
     pub fn get_scenes_for_room(&self, id: &Uuid) -> Vec<Uuid> {
         self.state
@@ -188,11 +207,62 @@ impl Resources {
 
     pub fn delete(&mut self, link: &ResourceLink) -> ApiResult<()> {
         log::info!("Deleting {link:?}..");
+
+        // Delete references to this object from other objects
+        self.update_by_type(|bridge_home: &mut BridgeHome| {
+            bridge_home.children.remove(link);
+            bridge_home.services.remove(link);
+        })?;
+
+        self.update_by_type(|device: &mut Device| {
+            device.services.remove(link);
+        })?;
+
+        self.update_by_type(|ec: &mut EntertainmentConfiguration| {
+            ec.locations
+                .service_locations
+                .retain(|sl| sl.service != *link);
+            ec.channels
+                .retain(|chan| !chan.members.iter().any(|c| c.service == *link));
+            ec.light_services.retain(|ls| ls != link);
+        })?;
+
+        self.update_by_type(|room: &mut Room| {
+            room.children.remove(link);
+            room.services.remove(link);
+        })?;
+
+        self.update_by_type(|zone: &mut Zone| {
+            zone.children.remove(link);
+            zone.services.remove(link);
+        })?;
+
+        // Remove resource from state database
         self.state.remove(&link.rid)?;
+
+        // Find ids of all resources owned by the deleted node
+        let owned_by = self
+            .state
+            .res
+            .iter()
+            .filter_map(|(rid, res)| {
+                if res.owner() == Some(*link) {
+                    Some(ResourceLink::new(*rid, res.rtype()))
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+
+        // Delete all resources owned by the deleted node
+        for owned in owned_by {
+            self.delete(&owned)?;
+        }
 
         self.state_updates.notify_one();
 
-        let evt = EventBlock::delete(link)?;
+        let id_v1 = self.state.id_v1(&link.rid);
+        let evt = EventBlock::delete(*link, id_v1)?;
 
         self.hue_event_stream.hue_event(evt);
 
@@ -262,8 +332,11 @@ impl Resources {
 
         let zbdd = ZigbeeDeviceDiscovery {
             owner: link_bridge_dev,
-            status: String::from("ready"),
-            action: Value::Null,
+            status: ZigbeeDeviceDiscoveryStatus::Ready,
+            action: ZigbeeDeviceDiscoveryAction {
+                action_type_values: vec![],
+                search_codes: vec![],
+            },
         };
 
         let zbc = ZigbeeConnectivity {
@@ -516,7 +589,7 @@ impl Resources {
 
     pub fn backend_request(&self, req: BackendRequest) -> ApiResult<()> {
         if !matches!(req, BackendRequest::EntertainmentFrame(_)) {
-            log::debug!("z2m request: {req:#?}");
+            log::debug!("Backend request: {req:#?}");
         }
 
         self.backend_updates.send(Arc::new(req))?;

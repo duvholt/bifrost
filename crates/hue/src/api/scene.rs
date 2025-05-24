@@ -4,7 +4,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink};
+use crate::api::{
+    ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, LightGradientUpdate, On, ResourceLink,
+};
 use crate::date_format;
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -18,18 +20,6 @@ pub enum SceneActive {
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SceneStatus {
     pub active: SceneActive,
-    #[serde(
-        with = "date_format::utc_ms_opt",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub last_recall: Option<DateTime<Utc>>,
-}
-
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct SceneStatusUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active: Option<SceneActive>,
     #[serde(
         with = "date_format::utc_ms_opt",
         default,
@@ -88,7 +78,7 @@ pub struct SceneAction {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on: Option<On>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gradient: Option<Value>,
+    pub gradient: Option<LightGradientUpdate>,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub effects: Value,
 }
@@ -131,8 +121,6 @@ pub struct SceneUpdate {
     pub speed: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_dynamic: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<SceneStatusUpdate>,
 }
 
 impl SceneUpdate {
@@ -163,16 +151,36 @@ impl SceneUpdate {
     }
 }
 
-impl AddAssign<SceneMetadataUpdate> for SceneMetadata {
-    fn add_assign(&mut self, upd: SceneMetadataUpdate) {
-        if let Some(appdata) = upd.appdata {
-            self.appdata = Some(appdata);
+impl AddAssign<&SceneUpdate> for Scene {
+    fn add_assign(&mut self, upd: &SceneUpdate) {
+        if let Some(actions) = &upd.actions {
+            self.actions.clone_from(actions);
         }
-        if let Some(image) = upd.image {
-            self.image = Some(image);
+        if let Some(md) = &upd.metadata {
+            self.metadata += md;
         }
-        if let Some(name) = upd.name {
-            self.name = name;
+        if let Some(palette) = &upd.palette {
+            self.palette.clone_from(palette);
+        }
+        if let Some(speed) = upd.speed {
+            self.speed = speed;
+        }
+        if let Some(auto_dynamic) = upd.auto_dynamic {
+            self.auto_dynamic = auto_dynamic;
+        }
+    }
+}
+
+impl AddAssign<&SceneMetadataUpdate> for SceneMetadata {
+    fn add_assign(&mut self, upd: &SceneMetadataUpdate) {
+        if let Some(appdata) = &upd.appdata {
+            self.appdata = Some(appdata.to_string());
+        }
+        if let Some(image) = &upd.image {
+            self.image = Some(*image);
+        }
+        if let Some(name) = &upd.name {
+            self.name.clone_from(name);
         }
     }
 }

@@ -8,10 +8,12 @@ use bifrost::error::ApiResult;
 use z2m::api::{Availability, Message, RawMessage};
 use z2m::update::DeviceUpdate;
 
+#[allow(clippy::too_many_lines)]
 #[tokio::main]
-#[rustfmt::skip]
 async fn main() -> ApiResult<()> {
-    pretty_env_logger::formatted_builder().filter_level(LevelFilter::Debug).init();
+    pretty_env_logger::formatted_builder()
+        .filter_level(LevelFilter::Debug)
+        .init();
 
     for line in stdin().lines() {
         let line = line?;
@@ -33,42 +35,81 @@ async fn main() -> ApiResult<()> {
                 continue;
             };
 
-            match msg {
-                Message::BridgeInfo(ref obj) => {
+            match &msg {
+                Message::BridgeInfo(obj) => {
                     println!("{:#?}", obj.config_schema);
-                },
-                Message::BridgeLogging(ref obj) => {
+                }
+                Message::BridgeLogging(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeExtensions(ref obj) => {
+                }
+                Message::BridgeExtensions(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeDevices(ref devices) => {
+                }
+                Message::BridgeDevices(devices) => {
                     for dev in devices {
                         println!("{dev:#?}");
                     }
-                },
-                Message::BridgeGroups(ref obj) => {
+                }
+                Message::BridgeGroups(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeDefinitions(ref obj) => {
+                }
+                Message::BridgeDefinitions(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeState(ref obj) => {
+                }
+                Message::BridgeState(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeEvent(ref obj) => {
+                }
+                Message::BridgeEvent(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeConverters(ref obj) => {
+                }
+                Message::BridgeConverters(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeGroupMembersAdd(ref obj) => {
+                }
+                Message::BridgeGroupMembersAdd(obj) => {
                     println!("{obj:#?}");
-                },
-                Message::BridgeGroupMembersRemove(ref obj) => {
+                }
+                Message::BridgeGroupMembersRemove(obj) => {
                     println!("{obj:#?}");
-                },
+                }
+                Message::BridgeOptions(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeTouchlinkScan(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgePermitJoin(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeNetworkmap(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeDeviceConfigureReporting(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeDeviceRemove(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeDeviceOptions(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeDeviceOtaUpdateCheck(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeConfig(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupAdd(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupRemove(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupRename(obj) => {
+                    println!("{obj:#?}");
+                }
+                Message::BridgeResponseGroupOptions(obj) => {
+                    println!("{obj:#?}");
+                }
             }
 
             continue;

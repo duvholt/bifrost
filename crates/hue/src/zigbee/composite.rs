@@ -5,6 +5,7 @@ use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
+use crate::api::{LightEffect, LightGradientMode};
 use crate::error::{HueError, HueResult};
 use crate::flags::TakeFlag;
 use crate::xy::XY;
@@ -25,11 +26,39 @@ pub enum EffectType {
     Enchant = 0x11,
 }
 
+impl From<LightEffect> for EffectType {
+    fn from(value: LightEffect) -> Self {
+        match value {
+            LightEffect::NoEffect => Self::NoEffect,
+            LightEffect::Prism => Self::Prism,
+            LightEffect::Opal => Self::Opal,
+            LightEffect::Glisten => Self::Glisten,
+            LightEffect::Sparkle => Self::Sparkle,
+            LightEffect::Fire => Self::Fireplace,
+            LightEffect::Candle => Self::Candle,
+            LightEffect::Underwater => Self::Underwater,
+            LightEffect::Cosmos => Self::Cosmos,
+            LightEffect::Sunbeam => Self::Sunbeam,
+            LightEffect::Enchant => Self::Enchant,
+        }
+    }
+}
+
 #[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
 pub enum GradientStyle {
     Linear = 0x00,
     Scattered = 0x02,
     Mirrored = 0x04,
+}
+
+impl From<LightGradientMode> for GradientStyle {
+    fn from(value: LightGradientMode) -> Self {
+        match value {
+            LightGradientMode::InterpolatedPalette => Self::Linear,
+            LightGradientMode::InterpolatedPaletteMirrored => Self::Mirrored,
+            LightGradientMode::RandomPixelated => Self::Scattered,
+        }
+    }
 }
 
 bitflags! {

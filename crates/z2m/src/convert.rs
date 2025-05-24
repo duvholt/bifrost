@@ -1,13 +1,15 @@
 use std::collections::BTreeSet;
 
 use hue::api::{
-    ColorGamut, ColorTemperature, DeviceProductData, Dimming, GamutType, LightColor, LightGradient,
-    LightGradientMode, MirekSchema,
+    ColorGamut, ColorTemperature, DeviceProductData, Dimming, GamutType, GroupedLightUpdate,
+    LightColor, LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate,
+    LightUpdate, MirekSchema,
 };
 use hue::devicedb::{hardware_platform_type, product_archetype};
 use hue::xy::XY;
 
 use crate::api::{Device, Expose, ExposeList, ExposeNumeric};
+use crate::update::{DeviceColorMode, DeviceUpdate};
 
 pub trait ExtractExposeNumeric {
     fn extract_mirek_schema(&self) -> Option<MirekSchema>;
@@ -154,5 +156,39 @@ impl ExtractDeviceProductData for DeviceProductData {
             software_version,
             hardware_platform_type,
         }
+    }
+}
+
+impl From<&DeviceUpdate> for LightUpdate {
+    fn from(value: &DeviceUpdate) -> Self {
+        let mut upd = Self::new()
+            .with_on(value.state.map(Into::into))
+            .with_brightness(value.brightness.map(|b| b / 254.0 * 100.0))
+            .with_color_temperature(value.color_temp)
+            .with_gradient(value.gradient.as_ref().map(|s| {
+                LightGradientUpdate {
+                    mode: None,
+                    points: s
+                        .iter()
+                        .map(|hc| LightGradientPoint::xy(hc.to_xy_color()))
+                        .collect(),
+                }
+            }));
+
+        if value.color_mode != Some(DeviceColorMode::ColorTemp) {
+            upd = upd.with_color_xy(value.color.and_then(|col| col.xy));
+        }
+
+        upd
+    }
+}
+
+impl From<&GroupedLightUpdate> for DeviceUpdate {
+    fn from(upd: &GroupedLightUpdate) -> Self {
+        Self::default()
+            .with_state(upd.on.map(|on| on.on))
+            .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+            .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
+            .with_color_xy(upd.color.map(|col| col.xy))
     }
 }

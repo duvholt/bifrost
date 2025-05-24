@@ -57,14 +57,14 @@ impl EventBlock {
         })
     }
 
-    pub fn delete(link: &ResourceLink) -> HueResult<Self> {
+    pub fn delete(link: ResourceLink, id_v1: Option<u32>) -> HueResult<Self> {
         Ok(Self {
             creationtime: Utc::now(),
             id: Uuid::new_v4(),
             event: Event::Delete(Delete {
                 data: vec![json!({
                     "id": link.rid,
-                    "id_v1": format!("/legacy/{}", link.rid.as_simple()),
+                    "id_v1": id_v1,
                     "type": link.rtype,
                 })],
             }),

@@ -4,6 +4,7 @@ use std::ops::{AddAssign, Sub};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::api::device::DeviceIdentifyUpdate;
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
 use crate::hs::HS;
 use crate::legacy_api::ApiLightStateUpdate;
@@ -32,7 +33,8 @@ pub struct Light {
     pub effects: Option<LightEffects>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects_v2: Option<LightEffectsV2>,
-    pub service_id: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradient>,
     #[serde(default)]
@@ -107,7 +109,7 @@ impl Light {
             dynamics: Some(LightDynamics::default()),
             effects: None,
             effects_v2: None,
-            service_id: 0,
+            service_id: Some(0),
             gradient: None,
             identify: Identify {},
             timed_effects: Some(LightTimedEffects {
@@ -182,14 +184,14 @@ impl Light {
     }
 }
 
-impl AddAssign<LightUpdate> for Light {
-    fn add_assign(&mut self, upd: LightUpdate) {
-        if let Some(md) = upd.metadata {
-            if let Some(name) = md.name {
-                self.metadata.name = name;
+impl AddAssign<&LightUpdate> for Light {
+    fn add_assign(&mut self, upd: &LightUpdate) {
+        if let Some(md) = &upd.metadata {
+            if let Some(name) = &md.name {
+                self.metadata.name.clone_from(name);
             }
-            if let Some(archetype) = md.archetype {
-                self.metadata.archetype = archetype;
+            if let Some(archetype) = &md.archetype {
+                self.metadata.archetype = archetype.clone();
             }
         }
 
@@ -217,9 +219,9 @@ impl AddAssign<LightUpdate> for Light {
         }
 
         if let Some(grad) = &mut self.gradient {
-            if let Some(grupd) = upd.gradient {
+            if let Some(grupd) = &upd.gradient {
                 grad.mode = grupd.mode.unwrap_or(grad.mode);
-                grad.points = grupd.points;
+                grad.points.clone_from(&grupd.points);
             }
         }
     }
@@ -626,6 +628,8 @@ pub struct LightUpdate {
     pub powerup: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamics: Option<LightDynamicsUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identify: Option<DeviceIdentifyUpdate>,
 }
 
 impl LightUpdate {
@@ -672,6 +676,11 @@ impl LightUpdate {
             color: hs.into().map(|hs| XY::from_hs(hs).0).map(ColorUpdate::new),
             ..self
         }
+    }
+
+    #[must_use]
+    pub fn with_identify(self, identify: Option<DeviceIdentifyUpdate>) -> Self {
+        Self { identify, ..self }
     }
 
     #[must_use]

@@ -170,9 +170,10 @@ impl ResourceLink {
 
 impl Debug for ResourceLink {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rtype = format!("{:?}", self.rtype).to_lowercase();
+        // we need serde(rename_all = "snake_case") translation
+        let rtype = serde_json::to_string(&self.rtype).unwrap();
         let rid = self.rid;
-        write!(f, "{rtype}/{rid}")
+        write!(f, "{}/{rid}", rtype.trim_matches('"'))
     }
 }
 

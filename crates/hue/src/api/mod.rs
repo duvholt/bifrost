@@ -9,6 +9,7 @@ mod scene;
 mod stream;
 mod stubs;
 mod update;
+mod zigbee_device_discovery;
 
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
@@ -47,10 +48,14 @@ pub use stubs::{
     ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate, DollarRef,
     GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter,
     Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene,
-    Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus,
-    ZigbeeDeviceDiscovery, Zone,
+    Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
 };
 pub use update::Update;
+pub use zigbee_device_discovery::{
+    ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction, ZigbeeDeviceDiscoveryInstallCode,
+    ZigbeeDeviceDiscoveryStatus, ZigbeeDeviceDiscoveryUpdate, ZigbeeDeviceDiscoveryUpdateAction,
+    ZigbeeDeviceDiscoveryUpdateActionType,
+};
 
 use std::fmt::Debug;
 
