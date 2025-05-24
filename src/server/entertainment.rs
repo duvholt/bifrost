@@ -261,7 +261,6 @@ impl EntertainmentService {
 #[async_trait]
 impl Service for EntertainmentService {
     type Error = ApiError;
-    const SIGNAL_STOP: bool = false;
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         let mut bldr = SslContext::builder(SslMethod::dtls_server())?;
@@ -319,10 +318,6 @@ impl Service for EntertainmentService {
 
     async fn stop(&mut self) -> Result<(), Self::Error> {
         self.udp.take();
-        Ok(())
-    }
-
-    async fn signal_stop(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }

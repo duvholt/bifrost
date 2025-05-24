@@ -4,12 +4,14 @@ use std::time::Duration;
 #[cfg(feature = "manager")]
 use tokio::time::sleep;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Retry {
     No,
     Limit(u32),
     Forever,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Policy {
     pub retry: Retry,
     pub delay: Option<Duration>,

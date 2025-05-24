@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use svc::traits::ServiceState;
 use uuid::Uuid;
+
+use svc::serviceid::ServiceName;
+use svc::traits::ServiceState;
 
 use crate::Client;
 use crate::error::BifrostResult;
@@ -10,7 +12,7 @@ use crate::error::BifrostResult;
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Service {
     pub id: Uuid,
-    pub name: String,
+    pub name: ServiceName,
     pub state: ServiceState,
 }
 
@@ -24,12 +26,12 @@ impl Client {
         self.get("service").await
     }
 
-    pub async fn service_stop(&self, id: Uuid) -> BifrostResult<()> {
+    pub async fn service_stop(&self, id: Uuid) -> BifrostResult<Uuid> {
         self.put(&format!("service/{id}"), ServiceState::Stopped)
             .await
     }
 
-    pub async fn service_start(&self, id: Uuid) -> BifrostResult<()> {
+    pub async fn service_start(&self, id: Uuid) -> BifrostResult<Uuid> {
         self.put(&format!("service/{id}"), ServiceState::Running)
             .await
     }

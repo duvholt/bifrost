@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tokio::sync::watch::{self, Receiver, Sender};
 use tokio_ssdp::{Device, Server};
 
-use svc::traits::Service;
+use svc::traits::{Service, StopResult};
 use uuid::Uuid;
 
 use crate::error::ApiError;
@@ -57,7 +57,6 @@ impl SsdpService {
 #[async_trait]
 impl Service for SsdpService {
     type Error = ApiError;
-    const SIGNAL_STOP: bool = true;
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -121,14 +120,14 @@ impl Service for SsdpService {
         Ok(())
     }
 
-    async fn signal_stop(&mut self) -> Result<(), Self::Error> {
+    async fn signal_stop(&mut self) -> Result<StopResult, Self::Error> {
         if let Some(signal) = self.signal.take() {
             log::debug!("Shutting down ssdp..");
             signal
                 .send(true)
                 .map_err(|_| ApiError::service_error("Failed to send stop signal"))?;
         }
-        Ok(())
+        Ok(StopResult::Delivered)
     }
 }
 

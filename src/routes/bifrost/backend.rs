@@ -4,7 +4,6 @@ use axum::routing::post;
 
 use bifrost_api::config::Z2mServer;
 
-use crate::backend::Backend;
 use crate::backend::z2m::Z2mBackend;
 use crate::routes::bifrost::BifrostApiResult;
 use crate::routes::extractor::Json;
@@ -20,12 +19,10 @@ async fn post_backend_z2m(
 
     let mut mgr = state.manager();
 
-    let client = Z2mBackend::new(name.clone(), server, state.config(), state.res.clone())?;
-    let stream = state.res.lock().await.backend_event_stream();
+    let svc = Z2mBackend::new(name.clone(), server, state.config(), state.res.clone())?;
     let name = format!("z2m-{name}");
-    let svc = client.run_forever(stream);
 
-    mgr.register_function(&name, svc).await?;
+    mgr.register_service(&name, svc).await?;
     mgr.start(&name).await?;
 
     Ok(Json(()))

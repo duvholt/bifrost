@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use mac_address::MacAddress;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 
-use svc::traits::Service;
+use svc::traits::{Service, StopResult};
 use tokio::sync::watch::{self, Receiver, Sender};
 
 use crate::error::ApiError;
@@ -33,7 +33,6 @@ impl MdnsService {
 #[async_trait]
 impl Service for MdnsService {
     type Error = ApiError;
-    const SIGNAL_STOP: bool = true;
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -105,7 +104,7 @@ impl Service for MdnsService {
         Ok(())
     }
 
-    async fn signal_stop(&mut self) -> Result<(), Self::Error> {
+    async fn signal_stop(&mut self) -> Result<StopResult, Self::Error> {
         if let Some(signal) = self.signal.take() {
             log::debug!("Shutting down mdns..");
             signal
@@ -113,6 +112,6 @@ impl Service for MdnsService {
                 .map_err(|_| ApiError::service_error("Failed to send stop signal"))?;
         }
 
-        Ok(())
+        Ok(StopResult::Delivered)
     }
 }

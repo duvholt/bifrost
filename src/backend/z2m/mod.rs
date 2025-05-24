@@ -13,17 +13,22 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures::StreamExt;
 use native_tls::TlsConnector;
+use svc::error::SvcError;
+use svc::template::ServiceTemplate;
+use svc::traits::{BoxDynService, Service};
+use thiserror::Error;
+use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::{Mutex, mpsc};
-use tokio::time::sleep;
-use tokio_tungstenite::{Connector, connect_async_tls_with_config};
+use tokio_tungstenite::{
+    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config,
+};
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::ResourceLink;
 use z2m::update::DeviceUpdate;
 
-use crate::backend::Backend;
 use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::websocket::Z2mWebSocket;
@@ -31,6 +36,37 @@ use crate::config::{AppConfig, Z2mServer};
 use crate::error::{ApiError, ApiResult};
 use crate::model::throttle::Throttle;
 use crate::resource::Resources;
+use crate::server::appstate::AppState;
+
+#[derive(Error, Debug)]
+pub enum TemplateError {
+    #[error("No config found for z2m server {0:?}")]
+    NotFound(String),
+}
+
+pub struct Z2mServiceTemplate {
+    state: AppState,
+}
+
+impl Z2mServiceTemplate {
+    #[must_use]
+    pub const fn new(state: AppState) -> Self {
+        Self { state }
+    }
+}
+
+impl ServiceTemplate for Z2mServiceTemplate {
+    fn generate(&self, name: String) -> Result<BoxDynService, SvcError> {
+        let config = self.state.config();
+        let Some(server) = config.z2m.servers.get(&name) else {
+            return Err(SvcError::generation(TemplateError::NotFound(name)));
+        };
+        let svc = Z2mBackend::new(name, server.clone(), config, self.state.res.clone())
+            .map_err(SvcError::generation)?;
+
+        Ok(svc.boxed())
+    }
+}
 
 pub struct Z2mBackend {
     name: String,
@@ -46,6 +82,7 @@ pub struct Z2mBackend {
     counter: u32,
     fps: u32,
     throttle: Throttle,
+    socket: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
 
     // for sending delayed messages over the websocket
     message_rx: mpsc::UnboundedReceiver<(String, DeviceUpdate)>,
@@ -86,6 +123,7 @@ impl Z2mBackend {
             fps,
             message_rx,
             message_tx,
+            socket: None,
             counter: 0,
         })
     }
@@ -119,8 +157,10 @@ impl Z2mBackend {
 }
 
 #[async_trait]
-impl Backend for Z2mBackend {
-    async fn run_forever(mut self, mut chan: Receiver<Arc<BackendRequest>>) -> ApiResult<()> {
+impl Service for Z2mBackend {
+    type Error = ApiError;
+
+    async fn start(&mut self) -> ApiResult<()> {
         // let's not include auth tokens in log output
         let sanitized_url = self.server.get_sanitized_url();
         let url = self.server.get_url();
@@ -154,22 +194,33 @@ impl Backend for Z2mBackend {
             None
         };
 
-        loop {
-            log::info!("[{}] Connecting to {}", self.name, &sanitized_url);
-            match connect_async_tls_with_config(url.as_str(), None, false, connector.clone()).await
-            {
-                Ok((socket, _)) => {
-                    let z2m_socket = Z2mWebSocket::new(self.name.clone(), socket);
-                    let res = self.event_loop(&mut chan, z2m_socket).await;
-                    if let Err(err) = res {
-                        log::error!("[{}] Event loop broke: {err}", self.name);
-                    }
-                }
-                Err(err) => {
-                    log::error!("[{}] Connect failed: {err:?}", self.name);
-                }
+        log::info!("[{}] Connecting to {}", self.name, &sanitized_url);
+        match connect_async_tls_with_config(url.as_str(), None, false, connector.clone()).await {
+            Ok((socket, _)) => {
+                self.socket = Some(socket);
+                Ok(())
             }
-            sleep(Duration::from_millis(2000)).await;
+            Err(err) => {
+                log::error!("[{}] Connect failed: {err:?}", self.name);
+                Err(err.into())
+            }
         }
+    }
+
+    async fn run(&mut self) -> ApiResult<()> {
+        if let Some(socket) = self.socket.take() {
+            let z2m_socket = Z2mWebSocket::new(self.name.clone(), socket);
+            let mut chan = self.state.lock().await.backend_event_stream();
+            let res = self.event_loop(&mut chan, z2m_socket).await;
+            if let Err(err) = res {
+                log::error!("[{}] Event loop broke: {err}", self.name);
+            }
+        }
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> ApiResult<()> {
+        self.socket.take();
+        Ok(())
     }
 }

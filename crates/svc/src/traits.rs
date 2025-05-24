@@ -1,12 +1,15 @@
 use std::error::Error;
 
 use async_trait::async_trait;
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "manager")]
 use crate::error::RunSvcError;
 #[cfg(feature = "manager")]
 use crate::manager::ServiceEvent;
+#[cfg(feature = "manager")]
+use crate::template::ErrorAdapter;
 #[cfg(feature = "manager")]
 use std::future::Future;
 #[cfg(feature = "manager")]
@@ -69,10 +72,14 @@ pub enum ServiceState {
     Failed,
 }
 
+pub enum StopResult {
+    Delivered,
+    NotSupported,
+}
+
 #[async_trait]
 pub trait Service: Send {
     type Error: Error + Send + 'static;
-    const SIGNAL_STOP: bool = false;
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -88,8 +95,44 @@ pub trait Service: Send {
         Ok(())
     }
 
-    async fn signal_stop(&mut self) -> Result<(), Self::Error> {
-        Ok(())
+    async fn signal_stop(&mut self) -> Result<StopResult, Self::Error> {
+        Ok(StopResult::NotSupported)
+    }
+
+    #[cfg(feature = "manager")]
+    fn boxed(self) -> BoxDynService
+    where
+        Self: Sized + Unpin + 'static,
+    {
+        Box::new(ErrorAdapter::new(self)) as BoxDynService
+    }
+}
+
+#[cfg(feature = "manager")]
+pub type BoxDynService = Box<dyn Service<Error = RunSvcError> + Unpin + 'static>;
+
+#[cfg(feature = "manager")]
+impl Service for BoxDynService {
+    type Error = RunSvcError;
+
+    fn run<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).run()
+    }
+
+    fn configure<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).configure()
+    }
+
+    fn start<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).start()
+    }
+
+    fn stop<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<(), Self::Error>> {
+        (**self).stop()
+    }
+
+    fn signal_stop<'a: 'b, 'b>(&'a mut self) -> BoxFuture<'b, Result<StopResult, Self::Error>> {
+        (**self).signal_stop()
     }
 }
 
@@ -106,25 +149,14 @@ pub trait ServiceRunner {
 
 #[cfg(feature = "manager")]
 #[async_trait]
-impl<E: Error + Send + 'static, F> Service for F
+impl<E, F> Service for F
 where
+    E: Error + Send + 'static,
     F: Future<Output = Result<(), E>> + Send + Unpin,
 {
     type Error = E;
 
-    async fn configure(&mut self) -> Result<(), E> {
-        Ok(())
-    }
-
-    async fn start(&mut self) -> Result<(), E> {
-        Ok(())
-    }
-
     async fn run(&mut self) -> Result<(), E> {
         self.await
-    }
-
-    async fn stop(&mut self) -> Result<(), E> {
-        Ok(())
     }
 }

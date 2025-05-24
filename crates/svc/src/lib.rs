@@ -10,3 +10,5 @@ pub mod manager;
 pub mod rpc;
 #[cfg(feature = "manager")]
 pub mod runservice;
+#[cfg(feature = "manager")]
+pub mod template;

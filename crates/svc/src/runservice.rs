@@ -5,9 +5,9 @@ use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::error::RunSvcError;
-use crate::manager::ServiceEvent;
+use crate::manager::{ServiceEvent, ServiceFunc};
 use crate::policy::{Policy, Retry};
-use crate::traits::{Service, ServiceRunner, ServiceState};
+use crate::traits::{Service, ServiceRunner, ServiceState, StopResult};
 
 #[allow(clippy::struct_field_names)]
 struct State {
@@ -98,6 +98,12 @@ impl<S: Service> StandardService<S> {
     pub const fn with_stop_policy(mut self, policy: Policy) -> Self {
         self.stop_policy = policy;
         self
+    }
+}
+
+impl<S: Service + 'static> StandardService<S> {
+    pub fn boxed(self) -> ServiceFunc {
+        Box::new(|a, b, c| self.run(a, b, c))
     }
 }
 
@@ -192,22 +198,26 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                             }
                         },
                         _ = rx.changed() => if *rx.borrow() == ServiceState::Stopped {
-                            if S::SIGNAL_STOP {
-                                log::trace!(target:target, "Service state change requested (graceful)");
-                                svc.signal_stop().await.map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
-                                tokio::select! {
-                                    res = svc.run() => {
-                                        log::trace!(target:target, "Service finished running within timeout: {res:?}");
-                                    },
-                                    () = sleep(Duration::from_secs(1)) => {
-                                        log::warn!("timeout");
+                            log::trace!(target:target, "Stopping service");
+                            let stop = svc.signal_stop().await.map_err(|e| RunSvcError::ServiceError(Box::new(e)))?;
+                            match stop {
+                                StopResult::Delivered => {
+                                    log::trace!(target:target, "Service state change requested (graceful)");
+                                    tokio::select! {
+                                        res = svc.run() => {
+                                            log::trace!(target:target, "Service finished running within timeout: {res:?}");
+                                        },
+                                        () = sleep(Duration::from_secs(1)) => {
+                                            log::warn!("timeout");
+                                        }
                                     }
-                                }
-                                state.set(ServiceState::Stopping)?;
-                            } else {
-                                log::trace!(target:target, "Service state change requested: {:?} -> {:?}", state.get(), *rx.borrow());
-                                if *rx.borrow_and_update() == ServiceState::Stopped {
                                     state.set(ServiceState::Stopping)?;
+                                }
+                                StopResult::NotSupported => {
+                                    log::trace!(target:target, "Service state change requested: {:?} -> {:?}", state.get(), *rx.borrow());
+                                    if *rx.borrow_and_update() == ServiceState::Stopped {
+                                        state.set(ServiceState::Stopping)?;
+                                    }
                                 }
                             }
                         }

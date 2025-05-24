@@ -1,11 +1,68 @@
 use std::fmt::{Debug, Display};
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub struct ServiceName {
+    name: String,
+    instance: Option<String>,
+}
+
+impl From<ServiceName> for String {
+    fn from(value: ServiceName) -> Self {
+        value.to_string()
+    }
+}
+
+impl ServiceName {
+    #[must_use]
+    pub const fn new(name: String, instance: Option<String>) -> Self {
+        Self { name, instance }
+    }
+
+    // suppress clippy false-positive
+    #[allow(clippy::missing_const_for_fn)]
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[must_use]
+    pub fn instance(&self) -> Option<&str> {
+        self.instance.as_deref()
+    }
+}
+
+impl Display for ServiceName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self {
+                name,
+                instance: None,
+            } => write!(f, "{name}"),
+            Self {
+                name,
+                instance: Some(instance),
+            } => write!(f, "{name}@{instance}"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum ServiceId {
-    Name(String),
+    Name(ServiceName),
     Id(Uuid),
+}
+
+impl ServiceId {
+    pub fn instance(name: impl Into<String>, instance: impl Into<String>) -> Self {
+        Self::Name(ServiceName {
+            name: name.into(),
+            instance: Some(instance.into()),
+        })
+    }
 }
 
 impl Display for ServiceId {
@@ -41,13 +98,13 @@ impl IntoServiceId for Uuid {
 
 impl IntoServiceId for String {
     fn service_id(self) -> ServiceId {
-        ServiceId::Name(self)
+        ServiceId::Name(ServiceName::from(self))
     }
 }
 
 impl IntoServiceId for &str {
     fn service_id(self) -> ServiceId {
-        ServiceId::Name(self.to_string())
+        ServiceId::Name(ServiceName::from(self))
     }
 }
 
@@ -59,6 +116,38 @@ impl From<Uuid> for ServiceId {
 
 impl From<String> for ServiceId {
     fn from(value: String) -> Self {
-        Self::Name(value)
+        value.service_id()
+    }
+}
+
+impl From<String> for ServiceName {
+    fn from(value: String) -> Self {
+        if let Some((name, instance)) = value.split_once('@') {
+            Self {
+                name: name.to_string(),
+                instance: Some(instance.to_string()),
+            }
+        } else {
+            Self {
+                name: value,
+                instance: None,
+            }
+        }
+    }
+}
+
+impl From<&str> for ServiceName {
+    fn from(value: &str) -> Self {
+        if let Some((name, instance)) = value.split_once('@') {
+            Self {
+                name: name.to_string(),
+                instance: Some(instance.to_string()),
+            }
+        } else {
+            Self {
+                name: value.to_string(),
+                instance: None,
+            }
+        }
     }
 }
