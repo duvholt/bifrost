@@ -178,7 +178,7 @@ pub struct BehaviorInstanceMetadata {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct BehaviorInstanceUpdate {
-    pub configuration: Option<BehaviorInstanceConfiguration>,
+    pub configuration: Option<Value>,
     pub enabled: Option<bool>,
     pub metadata: Option<BehaviorInstanceMetadata>,
 }
@@ -206,7 +206,7 @@ impl BehaviorInstanceUpdate {
     }
 
     #[must_use]
-    pub fn with_configuration(self, configuration: BehaviorInstanceConfiguration) -> Self {
+    pub fn with_configuration(self, configuration: Value) -> Self {
         Self {
             configuration: Some(configuration),
             ..self
@@ -225,14 +225,7 @@ impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
         }
 
         if let Some(configuration) = upd.configuration {
-            match serde_json::to_value(configuration) {
-                Ok(value) => {
-                    self.configuration = value;
-                }
-                Err(err) => {
-                    // todo: what do we do here?
-                }
-            }
+            self.configuration = configuration;
         }
     }
 }
