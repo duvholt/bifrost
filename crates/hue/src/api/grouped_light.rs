@@ -47,6 +47,12 @@ impl GroupedLight {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GroupedLightDynamicsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u32>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct GroupedLightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,6 +65,8 @@ pub struct GroupedLightUpdate {
     pub color_temperature: Option<ColorTemperatureUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<ResourceLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamics: Option<GroupedLightDynamicsUpdate>,
 }
 
 impl GroupedLightUpdate {

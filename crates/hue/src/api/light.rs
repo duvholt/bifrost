@@ -452,13 +452,9 @@ pub struct LightDynamics {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LightDynamicsUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<LightDynamicsStatus>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status_values: Option<Vec<LightDynamicsStatus>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub speed_valid: Option<bool>,
+    pub duration: Option<u32>,
 }
 
 impl Default for LightDynamics {
