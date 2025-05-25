@@ -55,6 +55,9 @@ pub enum HueError {
 
     #[error("Cannot merge json difference between non-map object")]
     Unmergable,
+
+    #[error("Effect duration out of range: {0}")]
+    EffectDurationOutOfRange(u32),
 }
 
 /// Error types for Hue Bridge v1 API

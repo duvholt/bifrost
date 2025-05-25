@@ -2,14 +2,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::api::{
-    DeviceUpdate, EntertainmentConfigurationUpdate, GroupedLightUpdate, LightUpdate, RType,
-    RoomUpdate, SceneUpdate,
+    BehaviorInstanceUpdate, DeviceUpdate, EntertainmentConfigurationUpdate, GroupedLightUpdate,
+    LightUpdate, RType, RoomUpdate, SceneUpdate,
 };
 
 type BridgeUpdate = Value;
 type BridgeHomeUpdate = Value;
 type ZigbeeDeviceDiscoveryUpdate = Value;
-type BehaviorInstanceUpdate = Value;
 type SmartSceneUpdate = Value;
 type ZoneUpdate = Value;
 type GeolocationUpdate = Value;

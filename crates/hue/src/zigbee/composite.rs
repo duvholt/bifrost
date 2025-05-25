@@ -41,6 +41,7 @@ impl From<LightEffect> for EffectType {
             LightEffect::Cosmos => Self::Cosmos,
             LightEffect::Sunbeam => Self::Sunbeam,
             LightEffect::Enchant => Self::Enchant,
+            LightEffect::Sunrise => Self::Sunrise,
         }
     }
 }

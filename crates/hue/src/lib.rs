@@ -8,6 +8,7 @@ pub mod colortemp;
 pub mod date_format;
 pub mod devicedb;
 pub mod diff;
+pub mod effect_duration;
 pub mod error;
 pub mod flags;
 pub mod gamma;
