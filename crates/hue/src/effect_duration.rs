@@ -1,6 +1,6 @@
 use crate::error::HueResult;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct EffectDuration(pub u8);
 
 const RESOLUTION_01S_BASE: u8 = 0xFC;
