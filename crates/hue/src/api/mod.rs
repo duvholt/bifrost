@@ -382,7 +382,8 @@ impl<'a> V1Reply<'a> {
         self.add_option("on", upd.on)?
             .add_option("bri", upd.bri)?
             .add_option("xy", upd.xy)?
-            .add_option("ct", upd.ct)
+            .add_option("ct", upd.ct)?
+            .add_option("transitiontime", upd.transitiontime)
     }
 
     pub fn add<T: Serialize>(mut self, name: &'a str, value: T) -> HueResult<Self> {

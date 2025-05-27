@@ -449,12 +449,27 @@ pub struct LightDynamics {
     pub speed_valid: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LightDynamicsUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speed: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<u32>,
+}
+
+impl LightDynamicsUpdate {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_duration(self, duration: Option<impl Into<u32>>) -> Self {
+        Self {
+            duration: duration.map(Into::into),
+            ..self
+        }
+    }
 }
 
 impl Default for LightDynamics {
@@ -684,6 +699,11 @@ impl LightUpdate {
     pub fn with_gradient(self, gradient: Option<LightGradientUpdate>) -> Self {
         Self { gradient, ..self }
     }
+
+    #[must_use]
+    pub fn with_dynamics(self, dynamics: Option<LightDynamicsUpdate>) -> Self {
+        Self { dynamics, ..self }
+    }
 }
 
 impl From<&ApiLightStateUpdate> for LightUpdate {
@@ -694,6 +714,10 @@ impl From<&ApiLightStateUpdate> for LightUpdate {
             .with_color_temperature(upd.ct)
             .with_color_hs(upd.hs.map(Into::into))
             .with_color_xy(upd.xy.map(Into::into))
+            .with_dynamics(
+                upd.transitiontime
+                    .map(|t| LightDynamicsUpdate::new().with_duration(Some(t * 100))),
+            )
     }
 }
 
