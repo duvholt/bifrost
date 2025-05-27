@@ -92,11 +92,23 @@ impl Z2mBackend {
         drop(lock);
 
         /* step 1: send generic light update */
+        let transition = upd
+            .dynamics
+            .as_ref()
+            .and_then(|d| d.duration.map(|duration| f64::from(duration) / 1000.0))
+            .or_else(|| {
+                if upd.dimming.is_some() || upd.color_temperature.is_some() || upd.color.is_some() {
+                    Some(0.4)
+                } else {
+                    None
+                }
+            });
         let mut payload = DeviceUpdate::default()
             .with_state(upd.on.map(|on| on.on))
             .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
             .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
-            .with_color_xy(upd.color.map(|col| col.xy));
+            .with_color_xy(upd.color.map(|col| col.xy))
+            .with_transition(transition);
 
         // We don't want to send gradient updates twice, but if hue
         // effects are not supported for this light, this is the best

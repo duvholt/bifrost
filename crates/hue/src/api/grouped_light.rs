@@ -47,6 +47,27 @@ impl GroupedLight {
     }
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+pub struct GroupedLightDynamicsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u32>,
+}
+
+impl GroupedLightDynamicsUpdate {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_duration(self, duration: Option<impl Into<u32>>) -> Self {
+        Self {
+            duration: duration.map(Into::into),
+            ..self
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct GroupedLightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,6 +80,8 @@ pub struct GroupedLightUpdate {
     pub color_temperature: Option<ColorTemperatureUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<ResourceLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamics: Option<GroupedLightDynamicsUpdate>,
 }
 
 impl GroupedLightUpdate {
@@ -103,6 +126,11 @@ impl GroupedLightUpdate {
             ..self
         }
     }
+
+    #[must_use]
+    pub const fn with_dynamics(self, dynamics: Option<GroupedLightDynamicsUpdate>) -> Self {
+        Self { dynamics, ..self }
+    }
 }
 
 /* conversion from v1 api */
@@ -113,5 +141,9 @@ impl From<&ApiLightStateUpdate> for GroupedLightUpdate {
             .with_brightness(upd.bri.map(|b| f64::from(b) / 2.54))
             .with_color_xy(upd.xy.map(XY::from))
             .with_color_temperature(upd.ct)
+            .with_dynamics(
+                upd.transitiontime
+                    .map(|t| GroupedLightDynamicsUpdate::new().with_duration(Some(t * 100))),
+            )
     }
 }

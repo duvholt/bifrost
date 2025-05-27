@@ -484,6 +484,8 @@ pub struct ApiLightStateUpdate {
     pub ct: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none", flatten)]
     pub hs: Option<RawHS>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transitiontime: Option<u16>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -519,6 +521,7 @@ impl From<api::SceneAction> for ApiLightStateUpdate {
             xy: action.color.map(|col| col.xy.into()),
             ct: action.color_temperature.and_then(|ct| ct.mirek),
             hs: None,
+            transitiontime: None,
         }
     }
 }
