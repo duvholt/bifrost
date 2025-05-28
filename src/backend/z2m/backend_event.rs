@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use hue::clamp::Clamp;
+use hue::effect_duration::EffectDuration;
 use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate};
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -60,6 +61,18 @@ impl Z2mBackend {
             }
             if let Some(color) = &act.parameters.color {
                 hz = hz.with_color_xy(color.xy);
+            }
+        }
+
+        if let Some(act) = &upd.timed_effects {
+            if let Some(fx) = act.effect {
+                hz = hz.with_effect_type(fx.into());
+            }
+
+            if let Some(duration) = &act.duration {
+                let EffectDuration(effect_duration) =
+                    EffectDuration::from_seconds((f64::from(*duration) / 1000.0).round() as u32)?;
+                hz = hz.with_effect_speed(effect_duration);
             }
         }
 
