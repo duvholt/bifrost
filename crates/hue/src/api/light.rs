@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::api::device::DeviceIdentifyUpdate;
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
@@ -113,9 +113,9 @@ impl Light {
             gradient: None,
             identify: Identify {},
             timed_effects: Some(LightTimedEffects {
-                status_values: json!(["no_effect", "sunrise", "sunset"]),
-                status: json!("no_effect"),
-                effect_values: json!(["no_effect", "sunrise", "sunset"]),
+                status_values: Vec::from(LightTimedEffect::ALL),
+                status: LightTimedEffect::NoEffect,
+                effect_values: Vec::from(LightTimedEffect::ALL),
             }),
             mode: LightMode::Normal,
             on: On { on: true },
@@ -615,11 +615,15 @@ pub enum LightTimedEffect {
     Sunset,
 }
 
+impl LightTimedEffect {
+    pub const ALL: [Self; 3] = [Self::NoEffect, Self::Sunrise, Self::Sunset];
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightTimedEffects {
-    pub status_values: Value,
-    pub status: Value,
-    pub effect_values: Value,
+    pub status_values: Vec<LightTimedEffect>,
+    pub status: LightTimedEffect,
+    pub effect_values: Vec<LightTimedEffect>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
