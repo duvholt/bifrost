@@ -18,6 +18,13 @@ const RESOLUTION_05M: u32 = 5 * 60; // 5min.
 impl EffectDuration {
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_sign_loss)]
+    pub fn from_ms(milliseconds: u32) -> HueResult<Self> {
+        let rounded_seconds = (f64::from(milliseconds) / 1000.0).round() as u32;
+        Self::from_seconds(rounded_seconds)
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_sign_loss)]
     pub fn from_seconds(seconds: u32) -> HueResult<Self> {
         let (base, resolution) = if seconds < 60 {
             // 1min
@@ -178,7 +185,7 @@ mod tests {
 
         for (input_ms, zigbee_data) in input {
             let nearest_second: u32 = (f64::from(input_ms) / 1000.0).round() as u32;
-            let ed = EffectDuration::from_seconds(nearest_second).unwrap();
+            let ed = EffectDuration::from_ms(input_ms).unwrap();
             let zigbee_effect_duration = (zigbee_data & 0xff) as u8; // last byte is effect duration
             assert_eq!(
                 ed.0, zigbee_effect_duration,

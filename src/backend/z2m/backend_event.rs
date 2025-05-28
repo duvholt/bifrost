@@ -69,9 +69,8 @@ impl Z2mBackend {
                 hz = hz.with_effect_type(fx.into());
             }
 
-            if let Some(duration) = &act.duration {
-                let EffectDuration(effect_duration) =
-                    EffectDuration::from_seconds((f64::from(*duration) / 1000.0).round() as u32)?;
+            if let Some(duration) = act.duration {
+                let EffectDuration(effect_duration) = EffectDuration::from_ms(duration)?;
                 hz = hz.with_effect_speed(effect_duration);
             }
         }
