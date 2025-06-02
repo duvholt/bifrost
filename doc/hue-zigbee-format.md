@@ -211,6 +211,7 @@ Size: 1 byte (specifically, [`zigbee::EffectType`])
 | `Sparkle`    | 0x0a  |
 | `Opal`       | 0x0b  |
 | `Glisten`    | 0x0c  |
+| `Sunset`     | 0x0d  |
 | `Underwater` | 0x0e  |
 | `Cosmos`     | 0x0f  |
 | `Sunbeam`    | 0x10  |
