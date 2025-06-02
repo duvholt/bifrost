@@ -15,14 +15,14 @@ impl EffectDuration {
     const RESOLUTION_15S: u32 = 15; // 15s.
     const RESOLUTION_01M: u32 = 60; // 1min.
     const RESOLUTION_05M: u32 = 5 * 60; // 5min.
-    pub fn from_ms(milliseconds: u32) -> HueResult<Self> {
-        let rounded_seconds = (f64::from(milliseconds) / 1000.0).round() as u32;
+    pub const fn from_ms(milliseconds: u32) -> HueResult<Self> {
+        let rounded_seconds = (milliseconds + 500) / 1000;
         Self::from_seconds(rounded_seconds)
     }
 
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_sign_loss)]
-    pub fn from_seconds(seconds: u32) -> HueResult<Self> {
+    pub const fn from_seconds(seconds: u32) -> HueResult<Self> {
         let (base, resolution) = match seconds {
             0..60 => (Self::RESOLUTION_01S_BASE, Self::RESOLUTION_01S),
             60..293 => (Self::RESOLUTION_05S_BASE, Self::RESOLUTION_05S),
@@ -43,7 +43,7 @@ impl EffectDuration {
             }
         };
         Ok(Self(
-            base - ((f64::from(seconds) / f64::from(resolution)).round() as u8),
+            base - ((seconds + (resolution / 2)) / resolution) as u8,
         ))
     }
 }
