@@ -19,7 +19,8 @@ impl EffectDuration {
     #[allow(clippy::cast_sign_loss)]
     pub const fn from_seconds(seconds: u32) -> HueResult<Self> {
         let (base, resolution) = match seconds {
-            0..60 => (252, Self::RESOLUTION_01S),
+            0..1 => return Ok(Self(251)),
+            1..60 => (252, Self::RESOLUTION_01S),
             60..293 => (204, Self::RESOLUTION_05S),
             293..295 => {
                 return Ok(Self(146));
@@ -328,7 +329,7 @@ mod tests {
 
     #[test]
     pub fn complete_conformance_test() {
-        let mut c = 1000;
+        let mut c = 1;
         for (x, y) in DURATION_BREAKPOINTS {
             while c <= *x {
                 assert_eq!(
