@@ -6,6 +6,7 @@ use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
 use crate::api::{LightEffect, LightGradientMode, LightTimedEffect};
+use crate::effect_duration::EffectDuration;
 use crate::error::{HueError, HueResult};
 use crate::flags::TakeFlag;
 use crate::xy::XY;
@@ -240,6 +241,11 @@ impl HueZigbeeUpdate {
     pub const fn with_effect_speed(mut self, effect_speed: u8) -> Self {
         self.effect_speed = Some(effect_speed);
         self
+    }
+
+    #[must_use]
+    pub const fn with_effect_duration(self, EffectDuration(effect_speed): EffectDuration) -> Self {
+        self.with_effect_speed(effect_speed)
     }
 }
 

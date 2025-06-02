@@ -70,8 +70,7 @@ impl Z2mBackend {
             }
 
             if let Some(duration) = act.duration {
-                let EffectDuration(effect_duration) = EffectDuration::from_ms(duration)?;
-                hz = hz.with_effect_speed(effect_duration);
+                hz = hz.with_effect_duration(EffectDuration::from_ms(duration)?);
             }
         }
 
