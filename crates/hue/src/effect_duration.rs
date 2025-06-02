@@ -4,17 +4,12 @@ use crate::error::{HueError, HueResult};
 pub struct EffectDuration(pub u8);
 
 impl EffectDuration {
-    const RESOLUTION_01S_BASE: u8 = 0xFC;
-    const RESOLUTION_05S_BASE: u8 = 0xCC;
-    const RESOLUTION_15S_BASE: u8 = 0xA5;
-    const RESOLUTION_01M_BASE: u8 = 0x79;
-    const RESOLUTION_05M_BASE: u8 = 0x4A;
-
     const RESOLUTION_01S: u32 = 1; // 1s.
     const RESOLUTION_05S: u32 = 5; // 5s.
     const RESOLUTION_15S: u32 = 15; // 15s.
     const RESOLUTION_01M: u32 = 60; // 1min.
     const RESOLUTION_05M: u32 = 5 * 60; // 5min.
+
     pub const fn from_ms(milliseconds: u32) -> HueResult<Self> {
         let rounded_seconds = (milliseconds + 500) / 1000;
         Self::from_seconds(rounded_seconds)
@@ -24,20 +19,20 @@ impl EffectDuration {
     #[allow(clippy::cast_sign_loss)]
     pub const fn from_seconds(seconds: u32) -> HueResult<Self> {
         let (base, resolution) = match seconds {
-            0..60 => (Self::RESOLUTION_01S_BASE, Self::RESOLUTION_01S),
-            60..293 => (Self::RESOLUTION_05S_BASE, Self::RESOLUTION_05S),
+            0..60 => (252, Self::RESOLUTION_01S),
+            60..293 => (204, Self::RESOLUTION_05S),
             293..295 => {
                 return Ok(Self(146));
             }
-            295..878 => (Self::RESOLUTION_15S_BASE, Self::RESOLUTION_15S),
+            295..878 => (165, Self::RESOLUTION_15S),
             878..885 => {
                 return Ok(Self(107));
             }
-            885..3510 => (Self::RESOLUTION_01M_BASE, Self::RESOLUTION_01M),
+            885..3510 => (121, Self::RESOLUTION_01M),
             3510..3540 => {
                 return Ok(Self(63));
             }
-            3540..=21600 => (Self::RESOLUTION_05M_BASE, Self::RESOLUTION_05M),
+            3540..=21600 => (74, Self::RESOLUTION_05M),
             _ => {
                 return Err(HueError::EffectDurationOutOfRange(seconds));
             }
