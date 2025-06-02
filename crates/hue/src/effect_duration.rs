@@ -1,23 +1,20 @@
-use crate::error::HueResult;
+use crate::error::{HueError, HueResult};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct EffectDuration(pub u8);
 
-const RESOLUTION_01S_BASE: u8 = 0xFC;
-const RESOLUTION_05S_BASE: u8 = 0xCC;
-const RESOLUTION_15S_BASE: u8 = 0xA5;
-const RESOLUTION_01M_BASE: u8 = 0x79;
-const RESOLUTION_05M_BASE: u8 = 0x4A;
-
-const RESOLUTION_01S: u32 = 1; // 1s.
-const RESOLUTION_05S: u32 = 5; // 5s.
-const RESOLUTION_15S: u32 = 15; // 15s.
-const RESOLUTION_01M: u32 = 60; // 1min.
-const RESOLUTION_05M: u32 = 5 * 60; // 5min.
-
 impl EffectDuration {
-    #[allow(clippy::cast_possible_truncation)]
-    #[allow(clippy::cast_sign_loss)]
+    const RESOLUTION_01S_BASE: u8 = 0xFC;
+    const RESOLUTION_05S_BASE: u8 = 0xCC;
+    const RESOLUTION_15S_BASE: u8 = 0xA5;
+    const RESOLUTION_01M_BASE: u8 = 0x79;
+    const RESOLUTION_05M_BASE: u8 = 0x4A;
+
+    const RESOLUTION_01S: u32 = 1; // 1s.
+    const RESOLUTION_05S: u32 = 5; // 5s.
+    const RESOLUTION_15S: u32 = 15; // 15s.
+    const RESOLUTION_01M: u32 = 60; // 1min.
+    const RESOLUTION_05M: u32 = 5 * 60; // 5min.
     pub fn from_ms(milliseconds: u32) -> HueResult<Self> {
         let rounded_seconds = (f64::from(milliseconds) / 1000.0).round() as u32;
         Self::from_seconds(rounded_seconds)
@@ -26,30 +23,24 @@ impl EffectDuration {
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_sign_loss)]
     pub fn from_seconds(seconds: u32) -> HueResult<Self> {
-        let (base, resolution) = if seconds < 60 {
-            // 1min
-            (RESOLUTION_01S_BASE, RESOLUTION_01S)
-        } else if seconds < 293 {
-            // ~5min
-            (RESOLUTION_05S_BASE, RESOLUTION_05S)
-        } else if seconds < 295 {
-            // 293 and 294 do not fit into any of the bases as they both output 145
-            return Ok(Self(146));
-        } else if seconds < 878 {
-            // ~15min
-            (RESOLUTION_15S_BASE, RESOLUTION_15S)
-        } else if seconds < 885 {
-            return Ok(Self(107));
-        } else if seconds < 3510 {
-            // ~60min
-            (RESOLUTION_01M_BASE, RESOLUTION_01M)
-        } else if seconds < 3540 {
-            return Ok(Self(63));
-        } else if seconds <= 6 * 60 * 60 {
-            // 06hrs
-            (RESOLUTION_05M_BASE, RESOLUTION_05M)
-        } else {
-            return Err(crate::error::HueError::EffectDurationOutOfRange(seconds));
+        let (base, resolution) = match seconds {
+            0..60 => (Self::RESOLUTION_01S_BASE, Self::RESOLUTION_01S),
+            60..293 => (Self::RESOLUTION_05S_BASE, Self::RESOLUTION_05S),
+            293..295 => {
+                return Ok(Self(146));
+            }
+            295..878 => (Self::RESOLUTION_15S_BASE, Self::RESOLUTION_15S),
+            878..885 => {
+                return Ok(Self(107));
+            }
+            885..3510 => (Self::RESOLUTION_01M_BASE, Self::RESOLUTION_01M),
+            3510..3540 => {
+                return Ok(Self(63));
+            }
+            3540..=21600 => (Self::RESOLUTION_05M_BASE, Self::RESOLUTION_05M),
+            _ => {
+                return Err(HueError::EffectDurationOutOfRange(seconds));
+            }
         };
         Ok(Self(
             base - ((f64::from(seconds) / f64::from(resolution)).round() as u8),
@@ -86,17 +77,271 @@ mod tests {
         }
     }
 
+    #[allow(clippy::unreadable_literal)]
+    const DURATION_BREAKPOINTS: &[(u32, u8)] = &[
+        (1499, 251),
+        (2499, 250),
+        (3499, 249),
+        (4499, 248),
+        (5499, 247),
+        (6499, 246),
+        (7499, 245),
+        (8499, 244),
+        (9499, 243),
+        (10499, 242),
+        (11499, 241),
+        (12499, 240),
+        (13499, 239),
+        (14499, 238),
+        (15499, 237),
+        (16499, 236),
+        (17499, 235),
+        (18499, 234),
+        (19499, 233),
+        (20499, 232),
+        (21499, 231),
+        (22499, 230),
+        (23499, 229),
+        (24499, 228),
+        (25499, 227),
+        (26499, 226),
+        (27499, 225),
+        (28499, 224),
+        (29499, 223),
+        (30499, 222),
+        (31499, 221),
+        (32499, 220),
+        (33499, 219),
+        (34499, 218),
+        (35499, 217),
+        (36499, 216),
+        (37499, 215),
+        (38499, 214),
+        (39499, 213),
+        (40499, 212),
+        (41499, 211),
+        (42499, 210),
+        (43499, 209),
+        (44499, 208),
+        (45499, 207),
+        (46499, 206),
+        (47499, 205),
+        (48499, 204),
+        (49499, 203),
+        (50499, 202),
+        (51499, 201),
+        (52499, 200),
+        (53499, 199),
+        (54499, 198),
+        (55499, 197),
+        (56499, 196),
+        (57499, 195),
+        (58499, 194),
+        (59499, 193),
+        (62499, 192),
+        (67499, 191),
+        (72499, 190),
+        (77499, 189),
+        (82499, 188),
+        (87499, 187),
+        (92499, 186),
+        (97499, 185),
+        (102499, 184),
+        (107499, 183),
+        (112499, 182),
+        (117499, 181),
+        (122499, 180),
+        (127499, 179),
+        (132499, 178),
+        (137499, 177),
+        (142499, 176),
+        (147499, 175),
+        (152499, 174),
+        (157499, 173),
+        (162499, 172),
+        (167499, 171),
+        (172499, 170),
+        (177499, 169),
+        (182499, 168),
+        (187499, 167),
+        (192499, 166),
+        (197499, 165),
+        (202499, 164),
+        (207499, 163),
+        (212499, 162),
+        (217499, 161),
+        (222499, 160),
+        (227499, 159),
+        (232499, 158),
+        (237499, 157),
+        (242499, 156),
+        (247499, 155),
+        (252499, 154),
+        (257499, 153),
+        (262499, 152),
+        (267499, 151),
+        (272499, 150),
+        (277499, 149),
+        (282499, 148),
+        (287499, 147),
+        (294499, 146),
+        (307499, 145),
+        (322499, 144),
+        (337499, 143),
+        (352499, 142),
+        (367499, 141),
+        (382499, 140),
+        (397499, 139),
+        (412499, 138),
+        (427499, 137),
+        (442499, 136),
+        (457499, 135),
+        (472499, 134),
+        (487499, 133),
+        (502499, 132),
+        (517499, 131),
+        (532499, 130),
+        (547499, 129),
+        (562499, 128),
+        (577499, 127),
+        (592499, 126),
+        (607499, 125),
+        (622499, 124),
+        (637499, 123),
+        (652499, 122),
+        (667499, 121),
+        (682499, 120),
+        (697499, 119),
+        (712499, 118),
+        (727499, 117),
+        (742499, 116),
+        (757499, 115),
+        (772499, 114),
+        (787499, 113),
+        (802499, 112),
+        (817499, 111),
+        (832499, 110),
+        (847499, 109),
+        (862499, 108),
+        (884499, 107),
+        (929499, 106),
+        (989499, 105),
+        (1049499, 104),
+        (1109499, 103),
+        (1169499, 102),
+        (1229499, 101),
+        (1289499, 100),
+        (1349499, 99),
+        (1409499, 98),
+        (1469499, 97),
+        (1529499, 96),
+        (1589499, 95),
+        (1649499, 94),
+        (1709499, 93),
+        (1769499, 92),
+        (1829499, 91),
+        (1889499, 90),
+        (1949499, 89),
+        (2009499, 88),
+        (2069499, 87),
+        (2129499, 86),
+        (2189499, 85),
+        (2249499, 84),
+        (2309499, 83),
+        (2369499, 82),
+        (2429499, 81),
+        (2489499, 80),
+        (2549499, 79),
+        (2609499, 78),
+        (2669499, 77),
+        (2729499, 76),
+        (2789499, 75),
+        (2849499, 74),
+        (2909499, 73),
+        (2969499, 72),
+        (3029499, 71),
+        (3089499, 70),
+        (3149499, 69),
+        (3209499, 68),
+        (3269499, 67),
+        (3329499, 66),
+        (3389499, 65),
+        (3449499, 64),
+        (3539499, 63),
+        (3749499, 62),
+        (4049499, 61),
+        (4349499, 60),
+        (4649499, 59),
+        (4949499, 58),
+        (5249499, 57),
+        (5549499, 56),
+        (5849499, 55),
+        (6149499, 54),
+        (6449499, 53),
+        (6749499, 52),
+        (7049499, 51),
+        (7349499, 50),
+        (7649499, 49),
+        (7949499, 48),
+        (8249499, 47),
+        (8549499, 46),
+        (8849499, 45),
+        (9149499, 44),
+        (9449499, 43),
+        (9749499, 42),
+        (10049499, 41),
+        (10349499, 40),
+        (10649499, 39),
+        (10949499, 38),
+        (11249499, 37),
+        (11549499, 36),
+        (11849499, 35),
+        (12149499, 34),
+        (12449499, 33),
+        (12749499, 32),
+        (13049499, 31),
+        (13349499, 30),
+        (13649499, 29),
+        (13949499, 28),
+        (14249499, 27),
+        (14549499, 26),
+        (14849499, 25),
+        (15149499, 24),
+        (15449499, 23),
+        (15749499, 22),
+        (16049499, 21),
+        (16349499, 20),
+        (16649499, 19),
+        (16949499, 18),
+        (17249499, 17),
+        (17549499, 16),
+        (17849499, 15),
+        (18149499, 14),
+        (18449499, 13),
+        (18749499, 12),
+        (19049499, 11),
+        (19349499, 10),
+        (19649499, 9),
+        (19949499, 8),
+        (20249499, 7),
+        (20549499, 6),
+        (20849499, 5),
+        (21149499, 4),
+        (21449499, 3),
+        (21600000, 2),
+    ];
+
     #[test]
-    pub fn check_for_gaps() {
-        // this test only verifies that there are no gaps when converting from seconds to effect duration
-        // the steps and resolution might still be wrong
-        let six_hours = 6 * 60 * 60;
-        let mut prev = 253;
-        for seconds in 0..six_hours {
-            let EffectDuration(next) = EffectDuration::from_seconds(seconds).unwrap();
-            if next != prev {
-                assert_eq!(next, prev - 1, "Skipped at {seconds}s");
-                prev = next;
+    pub fn complete_conformance_test() {
+        let mut c = 1000;
+        for (x, y) in DURATION_BREAKPOINTS {
+            while c <= *x {
+                assert_eq!(
+                    EffectDuration::from_ms(c).unwrap().0,
+                    *y,
+                    "failed for {c}ms"
+                );
+                c += 1;
             }
         }
     }
@@ -105,92 +350,5 @@ mod tests {
     pub fn out_of_range() {
         let seconds = 10 * 60 * 60; // 10h
         assert!(EffectDuration::from_seconds(seconds).is_err());
-    }
-
-    #[test]
-    #[allow(clippy::unreadable_literal)]
-    #[allow(clippy::cast_possible_truncation)]
-    #[allow(clippy::cast_sign_loss)]
-    pub fn timed_effect_zigbee_dump() {
-        // these values were recorded by request timed_effects to a light
-        // "timed_effects": {
-        //    "effect": "sunrise",
-        //    "duration": 3539000
-        //  }
-        let input: Vec<(u32, u64)> = vec![
-            (1500, 0xb000040009fa),
-            (2500, 0xb000040009f9),
-            (58000, 0xb000040009c2),
-            (59000, 0xb000040009c1),
-            (60000, 0xb000040009c0),
-            (61000, 0xb000040009c0),
-            (63000, 0xb000040009bf),
-            (68000, 0xb000040009be),
-            (73000, 0xb000040009bd),
-            (277000, 0xb00004000995),
-            (278000, 0xb00004000994),
-            (282000, 0xb00004000994),
-            (283000, 0xb00004000993),
-            (287000, 0xb00004000993),
-            (288000, 0xb00004000992),
-            (294000, 0xb00004000992),
-            (295000, 0xb00004000991),
-            (308000, 0xb00004000990),
-            (323000, 0xb0000400098f),
-            (338000, 0xb0000400098e),
-            (353000, 0xb0000400098d),
-            (862000, 0xb0000400096c),
-            (863000, 0xb0000400096b),
-            (864000, 0xb0000400096b),
-            (872000, 0xb0000400096b),
-            (873000, 0xb0000400096b),
-            (874000, 0xb0000400096b),
-            (875000, 0xb0000400096b),
-            (876000, 0xb0000400096b),
-            (877000, 0xb0000400096b),
-            (878000, 0xb0000400096b),
-            (879000, 0xb0000400096b),
-            (880000, 0xb0000400096b),
-            (881000, 0xb0000400096b),
-            (882000, 0xb0000400096b),
-            (883000, 0xb0000400096b),
-            (884000, 0xb0000400096b),
-            (885000, 0xb0000400096a),
-            (886000, 0xb0000400096a),
-            (887000, 0xb0000400096a),
-            (888000, 0xb0000400096a),
-            (899000, 0xb0000400096a),
-            (900000, 0xb0000400096a),
-            (901000, 0xb0000400096a),
-            (930000, 0xb00004000969),
-            (990000, 0xb00004000968),
-            (1050000, 0xb00004000967),
-            (3390000, 0xb00004000940),
-            (3450000, 0xb0000400093f),
-            (3510000, 0xb0000400093f),
-            (3539000, 0xb0000400093f),
-            (3540000, 0xb0000400093e),
-            (3599000, 0xb0000400093e),
-            (3600000, 0xb0000400093e),
-            (3601000, 0xb0000400093e),
-            (3750000, 0xb0000400093d),
-            (4050000, 0xb0000400093c),
-            (4350000, 0xb0000400093b),
-            (20850000, 0xb00004000904),
-            (21150000, 0xb00004000903),
-            (21450000, 0xb00004000902),
-            // max
-            (21600000, 0xb00004000902),
-        ];
-
-        for (input_ms, zigbee_data) in input {
-            let nearest_second: u32 = (f64::from(input_ms) / 1000.0).round() as u32;
-            let ed = EffectDuration::from_ms(input_ms).unwrap();
-            let zigbee_effect_duration = (zigbee_data & 0xff) as u8; // last byte is effect duration
-            assert_eq!(
-                ed.0, zigbee_effect_duration,
-                "Failed to convert {input_ms}ms ({nearest_second}s) into effect duration {zigbee_effect_duration}"
-            );
-        }
     }
 }
