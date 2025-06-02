@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::api::device::DeviceIdentifyUpdate;
 use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
@@ -113,9 +113,9 @@ impl Light {
             gradient: None,
             identify: Identify {},
             timed_effects: Some(LightTimedEffects {
-                status_values: json!(["no_effect", "sunrise", "sunset"]),
-                status: json!("no_effect"),
-                effect_values: json!(["no_effect", "sunrise", "sunset"]),
+                status_values: Vec::from(LightTimedEffect::ALL),
+                status: LightTimedEffect::NoEffect,
+                effect_values: Vec::from(LightTimedEffect::ALL),
             }),
             mode: LightMode::Normal,
             on: On { on: true },
@@ -501,7 +501,6 @@ pub enum LightEffect {
     Cosmos,
     Sunbeam,
     Enchant,
-    Sunrise,
 }
 
 impl LightEffect {
@@ -607,11 +606,32 @@ pub struct LightEffectStatus {
     pub parameters: Option<Value>,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LightTimedEffect {
+    #[default]
+    NoEffect,
+    Sunrise,
+    Sunset,
+}
+
+impl LightTimedEffect {
+    pub const ALL: [Self; 3] = [Self::NoEffect, Self::Sunrise, Self::Sunset];
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightTimedEffects {
-    pub status_values: Value,
-    pub status: Value,
-    pub effect_values: Value,
+    pub status_values: Vec<LightTimedEffect>,
+    pub status: LightTimedEffect,
+    pub effect_values: Vec<LightTimedEffect>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct LightTimedEffectsUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effect: Option<LightTimedEffect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -642,6 +662,8 @@ pub struct LightUpdate {
     pub dynamics: Option<LightDynamicsUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identify: Option<DeviceIdentifyUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timed_effects: Option<LightTimedEffectsUpdate>,
 }
 
 impl LightUpdate {

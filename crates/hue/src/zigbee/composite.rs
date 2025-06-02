@@ -5,7 +5,8 @@ use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
-use crate::api::{LightEffect, LightGradientMode};
+use crate::api::{LightEffect, LightGradientMode, LightTimedEffect};
+use crate::effect_duration::EffectDuration;
 use crate::error::{HueError, HueResult};
 use crate::flags::TakeFlag;
 use crate::xy::XY;
@@ -20,6 +21,7 @@ pub enum EffectType {
     Sparkle = 0x0a,
     Opal = 0x0b,
     Glisten = 0x0c,
+    Sunset = 0x0d,
     Underwater = 0x0e,
     Cosmos = 0x0f,
     Sunbeam = 0x10,
@@ -41,7 +43,17 @@ impl From<LightEffect> for EffectType {
             LightEffect::Cosmos => Self::Cosmos,
             LightEffect::Sunbeam => Self::Sunbeam,
             LightEffect::Enchant => Self::Enchant,
-            LightEffect::Sunrise => Self::Sunrise,
+        }
+    }
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+impl From<LightTimedEffect> for EffectType {
+    fn from(value: LightTimedEffect) -> Self {
+        match value {
+            LightTimedEffect::NoEffect => Self::NoEffect,
+            LightTimedEffect::Sunrise => Self::Sunrise,
+            LightTimedEffect::Sunset => Self::Sunset,
         }
     }
 }
@@ -229,6 +241,11 @@ impl HueZigbeeUpdate {
     pub const fn with_effect_speed(mut self, effect_speed: u8) -> Self {
         self.effect_speed = Some(effect_speed);
         self
+    }
+
+    #[must_use]
+    pub const fn with_effect_duration(self, EffectDuration(effect_speed): EffectDuration) -> Self {
+        self.with_effect_speed(effect_speed)
     }
 }
 

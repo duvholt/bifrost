@@ -38,8 +38,8 @@ pub use light::{
     LightEffectValues, LightEffects, LightEffectsV2, LightEffectsV2Update, LightFunction,
     LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate, LightMetadata,
     LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
-    LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffects,
-    LightUpdate, MirekSchema, On,
+    LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffect,
+    LightTimedEffects, LightTimedEffectsUpdate, LightUpdate, MirekSchema, On,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
 pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
