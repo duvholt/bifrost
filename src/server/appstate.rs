@@ -61,7 +61,7 @@ impl AppState {
         } else {
             log::debug!("No state file found, initializing..");
             res = Resources::new(swversion, State::new());
-            res.init(&hue::bridge_id(config.bridge.mac))?;
+            res.init(&hue::bridge_id(config.bridge.mac), config.bridge.timezone)?;
         }
 
         res.reset_all_streaming()?;
@@ -120,7 +120,7 @@ impl AppState {
             ipaddress: conf.bridge.ipaddress,
             netmask: conf.bridge.netmask,
             gateway: conf.bridge.gateway,
-            timezone: conf.bridge.timezone.to_string(),
+            timezone: conf.bridge.timezone,
             whitelist: HashMap::from([(
                 username,
                 Whitelist {
