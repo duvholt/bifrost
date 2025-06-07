@@ -30,6 +30,7 @@ uuid = { version = "1.13.1", features = ["serde", "v5"] }
 
 mac_address = { version = "1.1.8", features = ["serde"], optional = true }
 maplit = "1.0.2"
+chrono-tz = { version = "0.10.3", features = ["serde"] }
 
 [features]
 default = ["event", "mac", "rng"]

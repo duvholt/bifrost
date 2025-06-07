@@ -899,12 +899,8 @@ impl Capabilities {
                 channels: 20,
             },
             timezones: json!({
-                "values": [
-                    "CET",
-                    "UTC",
-                    "GMT",
-                    "Europe/Copenhagen",
-                ],
+                "values":
+                 chrono_tz::TZ_VARIANTS.iter().collect::<Vec<_>>(),
             }),
         }
     }
