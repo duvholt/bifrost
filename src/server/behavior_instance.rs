@@ -1,11 +1,13 @@
 use std::{iter, sync::Arc, time::Duration};
 
+use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
-use tokio::spawn;
+use svc::traits::Service;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
-use tokio::time::sleep;
+use tokio::time::{sleep, sleep_until};
+use tokio::{select, spawn};
 use tokio_schedule::{Job, every};
 
 use hue::api::{
@@ -17,16 +19,17 @@ use hue::api::{
 use hue::effect_duration::EffectDuration;
 use uuid::Uuid;
 
+use crate::error::ApiError;
 use crate::{error::ApiResult, resource::Resources};
 
 #[derive(Debug)]
-pub struct Scheduler {
+pub struct BehaviorInstanceService {
     jobs: Vec<JoinHandle<()>>,
     res: Arc<Mutex<Resources>>,
     behavior_instances: Vec<ScheduleBehaviorInstance>,
 }
 
-impl Scheduler {
+impl BehaviorInstanceService {
     pub const fn new(res: Arc<Mutex<Resources>>) -> Self {
         Self {
             jobs: vec![],
@@ -88,6 +91,37 @@ impl Scheduler {
                 _ => None,
             })
             .collect()
+    }
+}
+
+#[async_trait]
+impl Service for BehaviorInstanceService {
+    type Error = ApiError;
+
+    async fn run(&mut self) -> Result<(), Self::Error> {
+        const STABILIZE_TIME: Duration = Duration::from_secs(1);
+
+        let rx = self.res.lock().await.state_channel();
+
+        self.update().await;
+
+        loop {
+            /* Wait for change notification */
+            rx.notified().await;
+
+            /* Updates often happen in burst, and we don't want to write the state
+             * file over and over, so ignore repeated update notifications within
+             * STABILIZE_TIME */
+            let deadline = tokio::time::Instant::now() + STABILIZE_TIME;
+            loop {
+                select! {
+                    () = rx.notified() => {},
+                    () = sleep_until(deadline) => break,
+                }
+            }
+
+            self.update().await;
+        }
     }
 }
 
@@ -333,7 +367,7 @@ impl WakeupRequest {
         &self,
         res: Arc<Mutex<Resources>>,
         config: &WakeupConfiguration,
-    ) -> Result<(), crate::error::ApiError> {
+    ) -> Result<(), ApiError> {
         // As reported by the Hue bridge
         const WAKEUP_FADE_MIREK: u16 = 447;
 
@@ -387,7 +421,7 @@ impl WakeupRequest {
         &self,
         res: &Arc<Mutex<Resources>>,
         config: &WakeupConfiguration,
-    ) -> Result<(), crate::error::ApiError> {
+    ) -> Result<(), ApiError> {
         match self {
             Self::Light(resource_link) => {
                 let mut payload = LightUpdate::default()

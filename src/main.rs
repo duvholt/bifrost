@@ -115,8 +115,8 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     )?;
     mgr.register_service("entertainment", svc).await?;
 
-    let svc = server::scheduler(appstate.res.clone());
-    mgr.register_function("scheduler", svc).await?;
+    let svc = server::behavior_instance::BehaviorInstanceService::new(appstate.res.clone());
+    mgr.register_service("behavior-instance", svc).await?;
 
     // register all z2m backends as services
     let template = backend::z2m::Z2mServiceTemplate::new(appstate.clone());
