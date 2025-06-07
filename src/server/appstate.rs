@@ -111,15 +111,16 @@ impl AppState {
 
     pub async fn api_config(&self, username: String) -> ApiResult<ApiConfig> {
         let conf = self.config();
-        let tz = tzfile::Tz::named(&conf.bridge.timezone)?;
-        let localtime = Utc::now().with_timezone(&&tz).naive_local();
+        let localtime = Utc::now()
+            .with_timezone(&conf.bridge.timezone)
+            .naive_local();
 
         let res = ApiConfig {
             short_config: self.api_short_config().await,
             ipaddress: conf.bridge.ipaddress,
             netmask: conf.bridge.netmask,
             gateway: conf.bridge.gateway,
-            timezone: conf.bridge.timezone.clone(),
+            timezone: conf.bridge.timezone.to_string(),
             whitelist: HashMap::from([(
                 username,
                 Whitelist {
