@@ -263,6 +263,12 @@ pub struct ApiConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ApiConfigUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<Tz>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiEffect {
     #[default]
