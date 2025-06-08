@@ -27,7 +27,7 @@ use crate::{error::ApiResult, resource::Resources};
 #[derive(Debug)]
 pub struct BehaviorInstanceService {
     res: Arc<Mutex<Resources>>,
-    jobs: HashMap<Uuid, Vec<JoinHandle<()>>>,
+    jobs: HashMap<Uuid, BehaviorInstanceJob>,
 }
 
 impl BehaviorInstanceService {
@@ -81,35 +81,34 @@ impl BehaviorInstanceService {
         }
     }
 
-    async fn setup_job(&mut self, rid: Uuid) {
-        let new_jobs = self
-            .get_behavior_configuration(rid)
-            .await
-            .and_then(|config| match config {
-                BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                    Some(wakeup(self.res.clone(), &rid, &wakeup_configuration))
-                }
-            });
-
-        if let Some(new_jobs) = new_jobs {
-            if let Some(existing_jobs) = self.jobs.insert(rid, new_jobs) {
-                log::debug!("Aborting existing jobs {}", rid);
-                for job in existing_jobs {
-                    job.abort();
-                }
-            };
+    async fn new_job(&mut self, rid: Uuid) {
+        if let Some(configuration) = self.get_behavior_configuration(rid).await {
+            self.jobs.insert(
+                rid,
+                BehaviorInstanceJob::new(rid, configuration, self.res.clone()),
+            );
         } else {
-            self.delete_job(rid).await;
+            log::warn!("Ignoring unsupported configuration for instance {}", rid);
+        }
+    }
+
+    async fn update_job(&mut self, rid: Uuid) {
+        let configuration = self.get_behavior_configuration(rid).await;
+        if let Some(job) = self.jobs.get_mut(&rid) {
+            match configuration {
+                Some(configuration) => {
+                    job.update_configuration(configuration);
+                }
+                None => {
+                    log::warn!("Unable to get configuration for instance {}, removing", rid);
+                    self.delete_job(rid).await;
+                }
+            }
         }
     }
 
     async fn delete_job(&mut self, rid: Uuid) {
-        if let Some(jobs) = self.jobs.remove(&rid) {
-            log::debug!("Deleting jobs {}", rid);
-            for job in jobs {
-                job.abort();
-            }
-        }
+        self.jobs.remove(&rid);
     }
 }
 
@@ -119,7 +118,7 @@ impl Service for BehaviorInstanceService {
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         for rid in self.get_all_behavior_instances().await {
-            self.setup_job(rid).await;
+            self.new_job(rid).await;
         }
 
         Ok(())
@@ -135,14 +134,14 @@ impl Service for BehaviorInstanceService {
                     Event::Add(add) => {
                         for obj in add.data {
                             if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
-                                self.setup_job(obj.id).await;
+                                self.new_job(obj.id).await;
                             }
                         }
                     }
                     Event::Update(update) => {
                         for obj in update.data {
                             if RType::BehaviorInstance == obj.rtype {
-                                self.setup_job(obj.id).await;
+                                self.update_job(obj.id).await;
                             }
                         }
                     }
@@ -163,15 +162,75 @@ impl Service for BehaviorInstanceService {
     }
 }
 
-fn wakeup(
+#[derive(Debug)]
+struct BehaviorInstanceJob {
+    rid: Uuid,
+    configuration: BehaviorInstanceConfiguration,
     res: Arc<Mutex<Resources>>,
-    id: &Uuid,
-    wakeup_configuration: &WakeupConfiguration,
-) -> Vec<JoinHandle<()>> {
-    let jobs = create_wake_up_jobs(id, wakeup_configuration);
-    jobs.into_iter()
-        .map(move |job| spawn(job.create(res.clone())))
-        .collect()
+    tasks: Vec<JoinHandle<()>>,
+}
+
+impl BehaviorInstanceJob {
+    pub fn new(
+        rid: Uuid,
+        configuration: BehaviorInstanceConfiguration,
+        res: Arc<Mutex<Resources>>,
+    ) -> Self {
+        let mut job = Self {
+            rid,
+            configuration,
+            res,
+            tasks: vec![],
+        };
+        job.update_tasks();
+        log::debug!("Created new behavior instance job: {:?}", job.configuration);
+        job
+    }
+
+    pub fn update_configuration(&mut self, configuration: BehaviorInstanceConfiguration) {
+        self.configuration = configuration;
+        for task in &self.tasks {
+            task.abort();
+        }
+        self.update_tasks();
+    }
+
+    fn update_tasks(&mut self) {
+        let futures = match &self.configuration {
+            BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
+                self.create_wake_up_tasks(&wakeup_configuration)
+            }
+        };
+        let res = self.res.clone();
+        self.tasks = futures
+            .into_iter()
+            .map(move |job| spawn(job.create(res.clone())))
+            .collect();
+    }
+
+    fn create_wake_up_tasks(&self, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
+        let weekdays = configuration.when.recurrence_days.as_ref();
+
+        let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
+            || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
+            |weekdays| Box::new(weekdays.iter().copied().map(ScheduleType::Recurring)),
+        );
+        schedule_types
+            .map(|schedule_type| WakeupJob {
+                resource_id: self.rid.clone(),
+                schedule_type,
+                configuration: configuration.clone(),
+            })
+            .collect()
+    }
+}
+
+impl Drop for BehaviorInstanceJob {
+    fn drop(&mut self) {
+        for task in &self.tasks {
+            task.abort();
+        }
+    }
 }
 
 async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
@@ -226,10 +285,6 @@ impl WakeupJob {
     }
 
     async fn create(self, res: Arc<Mutex<Resources>>) {
-        log::debug!(
-            "Created new behavior instance job: {:?}",
-            self.configuration
-        );
         let now = Local::now();
         let result = match &self.schedule_type {
             ScheduleType::Recurring(weekday) => self.create_recurring(*weekday, res).await,
@@ -280,22 +335,6 @@ impl WakeupJob {
 
         Ok(())
     }
-}
-
-fn create_wake_up_jobs(resource_id: &Uuid, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
-    let weekdays = configuration.when.recurrence_days.as_ref();
-
-    let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
-        || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
-        |weekdays| Box::new(weekdays.iter().copied().map(ScheduleType::Recurring)),
-    );
-    schedule_types
-        .map(|schedule_type| WakeupJob {
-            resource_id: *resource_id,
-            schedule_type,
-            configuration: configuration.clone(),
-        })
-        .collect()
 }
 
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
