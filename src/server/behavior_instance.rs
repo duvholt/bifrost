@@ -1,13 +1,15 @@
+use std::collections::HashMap;
 use std::{iter, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
+use hue::event::Event;
 use svc::traits::Service;
+use tokio::spawn;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
-use tokio::time::{sleep, sleep_until};
-use tokio::{select, spawn};
+use tokio::time::sleep;
 use tokio_schedule::{Job, every};
 
 use hue::api::{
@@ -24,73 +26,90 @@ use crate::{error::ApiResult, resource::Resources};
 
 #[derive(Debug)]
 pub struct BehaviorInstanceService {
-    jobs: Vec<JoinHandle<()>>,
     res: Arc<Mutex<Resources>>,
-    behavior_instances: Vec<ScheduleBehaviorInstance>,
+    jobs: HashMap<Uuid, Vec<JoinHandle<()>>>,
 }
 
 impl BehaviorInstanceService {
-    pub const fn new(res: Arc<Mutex<Resources>>) -> Self {
+    pub fn new(res: Arc<Mutex<Resources>>) -> Self {
         Self {
-            jobs: vec![],
-            behavior_instances: vec![],
+            jobs: HashMap::new(),
             res,
         }
     }
 
-    pub async fn update(&mut self) {
-        let new_behavior_instances = self.get_behavior_instances().await;
-        if new_behavior_instances != self.behavior_instances {
-            self.behavior_instances = new_behavior_instances;
-            self.update_jobs();
-        }
-    }
-
-    fn update_jobs(&mut self) {
-        for job in &self.jobs {
-            job.abort();
-        }
-        self.jobs = self
-            .behavior_instances
-            .iter()
-            .filter(|ScheduleBehaviorInstance(_, bi)| bi.enabled)
-            .filter_map(|ScheduleBehaviorInstance(id, bi)| match bi.script_id {
-                BehaviorScript::WAKE_UP_ID => {
-                    match serde_json::from_value::<WakeupConfiguration>(bi.configuration.clone()) {
-                        Ok(config) => Some((id, BehaviorInstanceConfiguration::Wakeup(config))),
-                        Err(err) => {
-                            log::error!(
-                                "Failed to parse behavior instance {}: {}",
-                                bi.configuration,
-                                err
-                            );
-                            None
-                        }
-                    }
-                }
-                _ => None,
-            })
-            .flat_map(|(id, configuration)| match &configuration {
-                BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                    wakeup(self.res.clone(), id, wakeup_configuration)
-                }
-            })
-            .collect();
-    }
-
-    async fn get_behavior_instances(&self) -> Vec<ScheduleBehaviorInstance> {
+    async fn get_all_behavior_instances(&self) -> Vec<Uuid> {
         self.res
             .lock()
             .await
             .get_resources_by_type(RType::BehaviorInstance)
             .into_iter()
             .filter_map(|r| match r.obj {
-                Resource::BehaviorInstance(behavior_instance) => {
-                    Some(ScheduleBehaviorInstance(r.id, behavior_instance))
-                }
+                Resource::BehaviorInstance(_behavior_instance) => Some(r.id),
                 _ => None,
             })
             .collect()
+    }
+
+    async fn get_behavior_configuration(&self, id: Uuid) -> Option<BehaviorInstanceConfiguration> {
+        let bi = match self.res.lock().await.get_id::<BehaviorInstance>(id) {
+            Ok(bi) => bi.clone(),
+            Err(err) => {
+                log::error!("Failed to find bi {}", err);
+                return None;
+            }
+        };
+        if !bi.enabled {
+            return None;
+        }
+
+        match bi.script_id {
+            BehaviorScript::WAKE_UP_ID => {
+                match serde_json::from_value::<WakeupConfiguration>(bi.configuration.clone()) {
+                    Ok(config) => Some(BehaviorInstanceConfiguration::Wakeup(config)),
+                    Err(err) => {
+                        log::error!(
+                            "Failed to parse behavior instance configuration {}: {}",
+                            bi.configuration,
+                            err
+                        );
+                        None
+                    }
+                }
+            }
+            _ => None,
+        }
+    }
+
+    async fn setup_job(&mut self, rid: Uuid) {
+        let new_jobs = self
+            .get_behavior_configuration(rid)
+            .await
+            .and_then(|config| match config {
+                BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
+                    Some(wakeup(self.res.clone(), &rid, &wakeup_configuration))
+                }
+            });
+
+        if let Some(new_jobs) = new_jobs {
+            if let Some(existing_jobs) = self.jobs.insert(rid, new_jobs) {
+                log::debug!("Aborting existing jobs {}", rid);
+                for job in existing_jobs {
+                    job.abort();
+                }
+            };
+        } else {
+            self.delete_job(rid).await;
+        }
+    }
+
+    async fn delete_job(&mut self, rid: Uuid) {
+        if let Some(jobs) = self.jobs.remove(&rid) {
+            log::debug!("Deleting jobs {}", rid);
+            for job in jobs {
+                job.abort();
+            }
+        }
     }
 }
 
@@ -98,29 +117,48 @@ impl BehaviorInstanceService {
 impl Service for BehaviorInstanceService {
     type Error = ApiError;
 
+    async fn configure(&mut self) -> Result<(), Self::Error> {
+        for rid in self.get_all_behavior_instances().await {
+            self.setup_job(rid).await;
+        }
+
+        Ok(())
+    }
+
     async fn run(&mut self) -> Result<(), Self::Error> {
-        const STABILIZE_TIME: Duration = Duration::from_secs(1);
-
-        let rx = self.res.lock().await.state_channel();
-
-        self.update().await;
+        let mut hue_events = self.res.lock().await.hue_event_stream().subscribe();
 
         loop {
-            /* Wait for change notification */
-            rx.notified().await;
-
-            /* Updates often happen in burst, and we don't want to write the state
-             * file over and over, so ignore repeated update notifications within
-             * STABILIZE_TIME */
-            let deadline = tokio::time::Instant::now() + STABILIZE_TIME;
-            loop {
-                select! {
-                    () = rx.notified() => {},
-                    () = sleep_until(deadline) => break,
+            let event = hue_events.recv().await;
+            match event {
+                Ok(event) => match event.block.event {
+                    Event::Add(add) => {
+                        for obj in add.data {
+                            if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
+                                self.setup_job(obj.id).await;
+                            }
+                        }
+                    }
+                    Event::Update(update) => {
+                        for obj in update.data {
+                            if RType::BehaviorInstance == obj.rtype {
+                                self.setup_job(obj.id).await;
+                            }
+                        }
+                    }
+                    Event::Delete(delete) => {
+                        for obj in delete.data {
+                            if RType::BehaviorInstance == obj.rtype {
+                                self.delete_job(obj.id).await;
+                            }
+                        }
+                    }
+                    Event::Error(_error) => {}
+                },
+                Err(err) => {
+                    log::error!("Failed to read event {}", err);
                 }
             }
-
-            self.update().await;
         }
     }
 }
@@ -146,9 +184,6 @@ async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
         log::error!("Failed to disable behavior instance {:?}", err);
     }
 }
-
-#[derive(Debug, PartialEq)]
-struct ScheduleBehaviorInstance(Uuid, BehaviorInstance);
 
 #[derive(Debug)]
 enum ScheduleType {
