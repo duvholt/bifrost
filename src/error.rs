@@ -2,6 +2,7 @@ use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
+use chrono::{DateTime, Local, NaiveTime};
 use hue::api::RType;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -109,6 +110,9 @@ pub enum ApiError {
     #[error(transparent)]
     NativeTlsError(#[from] native_tls::Error),
 
+    #[error(transparent)]
+    ChronoOutOfRangeError(#[from] chrono::OutOfRangeError),
+
     #[error("Service error: {0}")]
     SvcError(String),
 
@@ -172,6 +176,12 @@ pub enum ApiError {
 
     #[error("Invalid zigbee message")]
     ZigbeeMessageError,
+
+    #[error("Invalid date time conversion {0:?}")]
+    InvalidDateTimeConversion(DateTime<Local>),
+
+    #[error("Invalid naive time")]
+    InvalidNaiveTime,
 }
 
 impl From<SvcError> for ApiError {

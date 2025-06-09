@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bifrost_api::backend::BackendRequest;
+use chrono::offset::LocalResult;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
 use tokio::spawn;
 use tokio::sync::Mutex;
@@ -28,27 +29,28 @@ pub struct WakeupJob {
 }
 
 impl WakeupJob {
-    fn start_datetime(&self, now: DateTime<Local>) -> Result<DateTime<Local>, &'static str> {
+    fn start_datetime(&self, now: DateTime<Local>) -> ApiResult<DateTime<Local>> {
         let start_time = self.start_time()?;
         let next = match now.with_time(start_time) {
-            chrono::offset::LocalResult::Single(time) => time,
-            chrono::offset::LocalResult::Ambiguous(_, latest) => latest,
-            chrono::offset::LocalResult::None => {
-                return Err("with time");
+            LocalResult::Single(time) => time,
+            LocalResult::Ambiguous(_, latest) => latest,
+            LocalResult::None => {
+                return Err(ApiError::InvalidDateTimeConversion(now));
             }
         };
         let wakeup_datetime = if next < now {
-            next.checked_add_days(Days::new(1)).ok_or("add day")?
+            next.checked_add_days(Days::new(1))
+                .ok_or(ApiError::InvalidDateTimeConversion(next))?
         } else {
             next
         };
         Ok(wakeup_datetime)
     }
 
-    fn start_time(&self) -> Result<NaiveTime, &'static str> {
+    fn start_time(&self) -> ApiResult<NaiveTime> {
         let job_time = self.configuration.when.time_point.time();
-        let scheduled_wakeup_time =
-            NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0).ok_or("naive time")?;
+        let scheduled_wakeup_time = NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0)
+            .ok_or(ApiError::InvalidNaiveTime)?;
         // although the scheduled time in the Hue app is the time when lights are at full brightness
         // the job start time is considered to be when the fade in effects starts
         let fade_in_duration = self.configuration.fade_in_duration.to_std();
@@ -57,16 +59,21 @@ impl WakeupJob {
 
     pub async fn create(self) {
         let now = Local::now();
+        let config = self.configuration.clone();
         let result = match &self.schedule_type {
             ScheduleType::Recurring(weekday) => self.create_recurring(*weekday).await,
             ScheduleType::Once() => self.run_once(now),
         };
         if let Err(err) = result {
-            log::error!("Failed to create wake up job: {}", err);
+            log::error!(
+                "Failed to create wake up job: {}, using configuration {:?}",
+                err,
+                config
+            );
         }
     }
 
-    async fn create_recurring(&self, weekday: Weekday) -> Result<(), &'static str> {
+    async fn create_recurring(&self, weekday: Weekday) -> ApiResult<()> {
         let fade_in_start = self.start_time()?;
         every(1)
             .week()
@@ -86,9 +93,9 @@ impl WakeupJob {
         Ok(())
     }
 
-    fn run_once(self, now: DateTime<Local>) -> Result<(), &'static str> {
+    fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
         let fade_in_datetime = self.start_datetime(now)?;
-        let time_until_fade_in = (fade_in_datetime - now).to_std().ok().ok_or("duration")?;
+        let time_until_fade_in = (fade_in_datetime - now).to_std()?;
         spawn(async move {
             sleep(time_until_fade_in).await;
             run_wake_up(self.configuration.clone(), self.res.clone()).await;
