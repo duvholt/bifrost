@@ -201,11 +201,7 @@ impl BehaviorInstanceJob {
                 self.create_wake_up_tasks(&wakeup_configuration)
             }
         };
-        let res = self.res.clone();
-        self.tasks = futures
-            .into_iter()
-            .map(move |job| spawn(job.create(res.clone())))
-            .collect();
+        self.tasks = futures.into_iter().map(|job| spawn(job.create())).collect();
     }
 
     fn create_wake_up_tasks(&self, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
@@ -217,9 +213,10 @@ impl BehaviorInstanceJob {
         );
         schedule_types
             .map(|schedule_type| WakeupJob {
-                resource_id: self.rid.clone(),
+                rid: self.rid.clone(),
                 schedule_type,
                 configuration: configuration.clone(),
+                res: self.res.clone(),
             })
             .collect()
     }
@@ -251,9 +248,10 @@ enum ScheduleType {
 }
 
 pub struct WakeupJob {
-    resource_id: Uuid,
+    rid: Uuid,
     schedule_type: ScheduleType,
     configuration: WakeupConfiguration,
+    res: Arc<Mutex<Resources>>,
 }
 
 impl WakeupJob {
@@ -284,22 +282,18 @@ impl WakeupJob {
         Ok(scheduled_wakeup_time - fade_in_duration)
     }
 
-    async fn create(self, res: Arc<Mutex<Resources>>) {
+    async fn create(self) {
         let now = Local::now();
         let result = match &self.schedule_type {
-            ScheduleType::Recurring(weekday) => self.create_recurring(*weekday, res).await,
-            ScheduleType::Once() => self.run_once(now, res),
+            ScheduleType::Recurring(weekday) => self.create_recurring(*weekday).await,
+            ScheduleType::Once() => self.run_once(now),
         };
         if let Err(err) = result {
             log::error!("Failed to create wake up job: {}", err);
         }
     }
 
-    async fn create_recurring(
-        &self,
-        weekday: Weekday,
-        res: Arc<Mutex<Resources>>,
-    ) -> Result<(), &'static str> {
+    async fn create_recurring(&self, weekday: Weekday) -> Result<(), &'static str> {
         let fade_in_start = self.start_time()?;
         every(1)
             .week()
@@ -309,28 +303,23 @@ impl WakeupJob {
                 fade_in_start.minute(),
                 fade_in_start.second(),
             )
-            .perform(move || {
+            .perform(|| {
                 let wakeup_configuration = self.configuration.clone();
-                let res = res.clone();
                 async move {
-                    spawn(run_wake_up(wakeup_configuration.clone(), res.clone()));
+                    spawn(run_wake_up(wakeup_configuration.clone(), self.res.clone()));
                 }
             })
             .await;
         Ok(())
     }
 
-    fn run_once(
-        self,
-        now: DateTime<Local>,
-        res: Arc<Mutex<Resources>>,
-    ) -> Result<(), &'static str> {
+    fn run_once(self, now: DateTime<Local>) -> Result<(), &'static str> {
         let fade_in_datetime = self.start_datetime(now)?;
         let time_until_fade_in = (fade_in_datetime - now).to_std().ok().ok_or("duration")?;
         spawn(async move {
             sleep(time_until_fade_in).await;
-            run_wake_up(self.configuration.clone(), res.clone()).await;
-            disable_behavior_instance(self.resource_id, res).await;
+            run_wake_up(self.configuration.clone(), self.res.clone()).await;
+            disable_behavior_instance(self.rid, self.res.clone()).await;
         });
 
         Ok(())
