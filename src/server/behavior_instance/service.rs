@@ -15,7 +15,7 @@ use hue::api::{
 };
 use uuid::Uuid;
 
-use crate::error::ApiError;
+use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::server::behavior_instance::wakeup::WakeupJob;
 
@@ -46,64 +46,57 @@ impl BehaviorInstanceService {
             .collect()
     }
 
-    async fn get_behavior_configuration(&self, id: Uuid) -> Option<BehaviorInstanceConfiguration> {
-        let bi = match self.res.lock().await.get_id::<BehaviorInstance>(id) {
-            Ok(bi) => bi.clone(),
-            Err(err) => {
-                log::error!("Failed to find bi {}", err);
-                return None;
-            }
-        };
+    async fn get_behavior_configuration(
+        &self,
+        id: Uuid,
+    ) -> ApiResult<Option<BehaviorInstanceConfiguration>> {
+        let bi = self
+            .res
+            .lock()
+            .await
+            .get_id::<BehaviorInstance>(id)?
+            .clone();
         if !bi.enabled {
-            return None;
+            return Ok(None);
         }
 
         match bi.script_id {
             BehaviorScript::WAKE_UP_ID => {
-                match serde_json::from_value::<WakeupConfiguration>(bi.configuration.clone()) {
-                    Ok(config) => Some(BehaviorInstanceConfiguration::Wakeup(config)),
-                    Err(err) => {
-                        log::error!(
-                            "Failed to parse behavior instance configuration {}: {}",
-                            bi.configuration,
-                            err
-                        );
-                        None
-                    }
-                }
+                let config = serde_json::from_value::<WakeupConfiguration>(bi.configuration)?;
+                Ok(Some(BehaviorInstanceConfiguration::Wakeup(config)))
             }
-            _ => None,
+            _ => Ok(None),
         }
     }
 
-    async fn new_job(&mut self, rid: Uuid) {
-        if let Some(configuration) = self.get_behavior_configuration(rid).await {
+    async fn new_job(&mut self, rid: Uuid) -> ApiResult<()> {
+        if let Some(configuration) = self.get_behavior_configuration(rid).await? {
             self.jobs.insert(
                 rid,
                 BehaviorInstanceJob::new(rid, configuration, self.res.clone()),
             );
-        } else {
-            log::warn!("Ignoring unsupported configuration for instance {}", rid);
         }
+        Ok(())
     }
 
-    async fn update_job(&mut self, rid: Uuid) {
-        let configuration = self.get_behavior_configuration(rid).await;
+    async fn update_job(&mut self, rid: Uuid) -> ApiResult<()> {
+        let configuration = self.get_behavior_configuration(rid).await?;
         if let Some(job) = self.jobs.get_mut(&rid) {
             match configuration {
                 Some(configuration) => {
                     job.update_configuration(configuration);
                 }
                 None => {
-                    log::warn!("Unable to get configuration for instance {}, removing", rid);
-                    self.delete_job(rid).await;
+                    self.delete_job(rid).await?;
                 }
             }
         }
+        Ok(())
     }
 
-    async fn delete_job(&mut self, rid: Uuid) {
+    async fn delete_job(&mut self, rid: Uuid) -> ApiResult<()> {
         self.jobs.remove(&rid);
+        Ok(())
     }
 }
 
@@ -113,7 +106,7 @@ impl Service for BehaviorInstanceService {
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         for rid in self.get_all_behavior_instances().await {
-            self.new_job(rid).await;
+            self.new_job(rid).await?;
         }
 
         Ok(())
@@ -129,21 +122,39 @@ impl Service for BehaviorInstanceService {
                     Event::Add(add) => {
                         for obj in add.data {
                             if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
-                                self.new_job(obj.id).await;
+                                if let Err(err) = self.new_job(obj.id).await {
+                                    log::error!(
+                                        "Failed to create new behavior instance job {}: {}",
+                                        obj.id,
+                                        err
+                                    );
+                                }
                             }
                         }
                     }
                     Event::Update(update) => {
                         for obj in update.data {
                             if RType::BehaviorInstance == obj.rtype {
-                                self.update_job(obj.id).await;
+                                if let Err(err) = self.update_job(obj.id).await {
+                                    log::error!(
+                                        "Failed to update behavior instance job {}: {}",
+                                        obj.id,
+                                        err
+                                    );
+                                }
                             }
                         }
                     }
                     Event::Delete(delete) => {
                         for obj in delete.data {
                             if RType::BehaviorInstance == obj.rtype {
-                                self.delete_job(obj.id).await;
+                                if let Err(err) = self.delete_job(obj.id).await {
+                                    log::error!(
+                                        "Failed to delete behavior instance job {}: {}",
+                                        obj.id,
+                                        err
+                                    );
+                                }
                             }
                         }
                     }
