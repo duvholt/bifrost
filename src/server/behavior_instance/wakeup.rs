@@ -1,19 +1,14 @@
-use std::collections::HashMap;
-use std::{iter, sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 
-use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
-use hue::event::Event;
-use svc::traits::Service;
 use tokio::spawn;
 use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio_schedule::{Job, every};
 
 use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
     GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate, LightTimedEffect,
     LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink, WakeupConfiguration,
     WakeupStyle,
@@ -22,236 +17,14 @@ use hue::effect_duration::EffectDuration;
 use uuid::Uuid;
 
 use crate::error::ApiError;
+use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
 use crate::{error::ApiResult, resource::Resources};
 
-#[derive(Debug)]
-pub struct BehaviorInstanceService {
-    res: Arc<Mutex<Resources>>,
-    jobs: HashMap<Uuid, BehaviorInstanceJob>,
-}
-
-impl BehaviorInstanceService {
-    pub fn new(res: Arc<Mutex<Resources>>) -> Self {
-        Self {
-            jobs: HashMap::new(),
-            res,
-        }
-    }
-
-    async fn get_all_behavior_instances(&self) -> Vec<Uuid> {
-        self.res
-            .lock()
-            .await
-            .get_resources_by_type(RType::BehaviorInstance)
-            .into_iter()
-            .filter_map(|r| match r.obj {
-                Resource::BehaviorInstance(_behavior_instance) => Some(r.id),
-                _ => None,
-            })
-            .collect()
-    }
-
-    async fn get_behavior_configuration(&self, id: Uuid) -> Option<BehaviorInstanceConfiguration> {
-        let bi = match self.res.lock().await.get_id::<BehaviorInstance>(id) {
-            Ok(bi) => bi.clone(),
-            Err(err) => {
-                log::error!("Failed to find bi {}", err);
-                return None;
-            }
-        };
-        if !bi.enabled {
-            return None;
-        }
-
-        match bi.script_id {
-            BehaviorScript::WAKE_UP_ID => {
-                match serde_json::from_value::<WakeupConfiguration>(bi.configuration.clone()) {
-                    Ok(config) => Some(BehaviorInstanceConfiguration::Wakeup(config)),
-                    Err(err) => {
-                        log::error!(
-                            "Failed to parse behavior instance configuration {}: {}",
-                            bi.configuration,
-                            err
-                        );
-                        None
-                    }
-                }
-            }
-            _ => None,
-        }
-    }
-
-    async fn new_job(&mut self, rid: Uuid) {
-        if let Some(configuration) = self.get_behavior_configuration(rid).await {
-            self.jobs.insert(
-                rid,
-                BehaviorInstanceJob::new(rid, configuration, self.res.clone()),
-            );
-        } else {
-            log::warn!("Ignoring unsupported configuration for instance {}", rid);
-        }
-    }
-
-    async fn update_job(&mut self, rid: Uuid) {
-        let configuration = self.get_behavior_configuration(rid).await;
-        if let Some(job) = self.jobs.get_mut(&rid) {
-            match configuration {
-                Some(configuration) => {
-                    job.update_configuration(configuration);
-                }
-                None => {
-                    log::warn!("Unable to get configuration for instance {}, removing", rid);
-                    self.delete_job(rid).await;
-                }
-            }
-        }
-    }
-
-    async fn delete_job(&mut self, rid: Uuid) {
-        self.jobs.remove(&rid);
-    }
-}
-
-#[async_trait]
-impl Service for BehaviorInstanceService {
-    type Error = ApiError;
-
-    async fn configure(&mut self) -> Result<(), Self::Error> {
-        for rid in self.get_all_behavior_instances().await {
-            self.new_job(rid).await;
-        }
-
-        Ok(())
-    }
-
-    async fn run(&mut self) -> Result<(), Self::Error> {
-        let mut hue_events = self.res.lock().await.hue_event_stream().subscribe();
-
-        loop {
-            let event = hue_events.recv().await;
-            match event {
-                Ok(event) => match event.block.event {
-                    Event::Add(add) => {
-                        for obj in add.data {
-                            if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
-                                self.new_job(obj.id).await;
-                            }
-                        }
-                    }
-                    Event::Update(update) => {
-                        for obj in update.data {
-                            if RType::BehaviorInstance == obj.rtype {
-                                self.update_job(obj.id).await;
-                            }
-                        }
-                    }
-                    Event::Delete(delete) => {
-                        for obj in delete.data {
-                            if RType::BehaviorInstance == obj.rtype {
-                                self.delete_job(obj.id).await;
-                            }
-                        }
-                    }
-                    Event::Error(_error) => {}
-                },
-                Err(err) => {
-                    log::error!("Failed to read event {}", err);
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-struct BehaviorInstanceJob {
-    rid: Uuid,
-    configuration: BehaviorInstanceConfiguration,
-    res: Arc<Mutex<Resources>>,
-    tasks: Vec<JoinHandle<()>>,
-}
-
-impl BehaviorInstanceJob {
-    pub fn new(
-        rid: Uuid,
-        configuration: BehaviorInstanceConfiguration,
-        res: Arc<Mutex<Resources>>,
-    ) -> Self {
-        let mut job = Self {
-            rid,
-            configuration,
-            res,
-            tasks: vec![],
-        };
-        job.update_tasks();
-        log::debug!("Created new behavior instance job: {:?}", job.configuration);
-        job
-    }
-
-    pub fn update_configuration(&mut self, configuration: BehaviorInstanceConfiguration) {
-        self.configuration = configuration;
-        for task in &self.tasks {
-            task.abort();
-        }
-        self.update_tasks();
-    }
-
-    fn update_tasks(&mut self) {
-        let futures = match &self.configuration {
-            BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                self.create_wake_up_tasks(&wakeup_configuration)
-            }
-        };
-        self.tasks = futures.into_iter().map(|job| spawn(job.create())).collect();
-    }
-
-    fn create_wake_up_tasks(&self, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
-        let weekdays = configuration.when.recurrence_days.as_ref();
-
-        let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
-            || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
-            |weekdays| Box::new(weekdays.iter().copied().map(ScheduleType::Recurring)),
-        );
-        schedule_types
-            .map(|schedule_type| WakeupJob {
-                rid: self.rid.clone(),
-                schedule_type,
-                configuration: configuration.clone(),
-                res: self.res.clone(),
-            })
-            .collect()
-    }
-}
-
-impl Drop for BehaviorInstanceJob {
-    fn drop(&mut self) {
-        for task in &self.tasks {
-            task.abort();
-        }
-    }
-}
-
-async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
-    let upd = BehaviorInstanceUpdate::default().with_enabled(false);
-    let upd_result = res
-        .lock()
-        .await
-        .update::<BehaviorInstance>(&id, |bi| *bi += upd);
-    if let Err(err) = upd_result {
-        log::error!("Failed to disable behavior instance {:?}", err);
-    }
-}
-
-#[derive(Debug)]
-enum ScheduleType {
-    Recurring(Weekday),
-    Once(),
-}
-
 pub struct WakeupJob {
-    rid: Uuid,
-    schedule_type: ScheduleType,
-    configuration: WakeupConfiguration,
-    res: Arc<Mutex<Resources>>,
+    pub rid: Uuid,
+    pub schedule_type: ScheduleType,
+    pub configuration: WakeupConfiguration,
+    pub res: Arc<Mutex<Resources>>,
 }
 
 impl WakeupJob {
@@ -282,7 +55,7 @@ impl WakeupJob {
         Ok(scheduled_wakeup_time - fade_in_duration)
     }
 
-    async fn create(self) {
+    pub async fn create(self) {
         let now = Local::now();
         let result = match &self.schedule_type {
             ScheduleType::Recurring(weekday) => self.create_recurring(*weekday).await,
