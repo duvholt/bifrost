@@ -136,7 +136,10 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                 // Hue effects do not support grouped lights so we need to send indivial requests to each light
                 lights_in_room
                     .into_iter()
-                    .map(|(resource_link, _)| WakeupRequest::Light(*resource_link))
+                    .filter_map(|(resource_link, light)| match light.on.on {
+                        false => Some(WakeupRequest::Light(*resource_link)),
+                        true => None,
+                    })
                     .collect()
             } else {
                 room.grouped_light_service()
@@ -159,9 +162,10 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
             })
             .flat_map(|(resource_link, resource)| match resource.obj {
                 Resource::Room(room) => room_requests(&room),
-                Resource::Light(_light) => {
-                    vec![WakeupRequest::Light(resource_link)]
-                }
+                Resource::Light(light) => match light.on.on {
+                    false => vec![WakeupRequest::Light(resource_link)],
+                    true => vec![],
+                },
                 Resource::BridgeHome(_bridge_home) => {
                     let all_rooms = lock.get_resources_by_type(RType::Room);
                     all_rooms
