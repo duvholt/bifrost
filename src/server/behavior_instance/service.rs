@@ -81,15 +81,17 @@ impl BehaviorInstanceService {
 
     async fn update_job(&mut self, rid: Uuid) -> ApiResult<()> {
         let configuration = self.get_behavior_configuration(rid).await?;
-        if let Some(job) = self.jobs.get_mut(&rid) {
-            match configuration {
-                Some(configuration) => {
-                    job.update_configuration(configuration);
-                }
-                None => {
-                    self.delete_job(rid).await?;
-                }
+        match (self.jobs.get_mut(&rid), configuration) {
+            (Some(job), Some(configuration)) => {
+                job.update_configuration(configuration);
             }
+            (Some(_job), None) => {
+                self.delete_job(rid).await?;
+            }
+            (None, Some(_configuration)) => {
+                self.new_job(rid).await?;
+            }
+            (None, None) => {}
         }
         Ok(())
     }
@@ -122,6 +124,7 @@ impl Service for BehaviorInstanceService {
                     Event::Add(add) => {
                         for obj in add.data {
                             if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
+                                log::debug!("Adding behavior instance job {}", obj.id);
                                 if let Err(err) = self.new_job(obj.id).await {
                                     log::error!(
                                         "Failed to create new behavior instance job {}: {}",
@@ -135,6 +138,7 @@ impl Service for BehaviorInstanceService {
                     Event::Update(update) => {
                         for obj in update.data {
                             if RType::BehaviorInstance == obj.rtype {
+                                log::debug!("Updating behavior instance job {}", obj.id);
                                 if let Err(err) = self.update_job(obj.id).await {
                                     log::error!(
                                         "Failed to update behavior instance job {}: {}",
@@ -148,6 +152,7 @@ impl Service for BehaviorInstanceService {
                     Event::Delete(delete) => {
                         for obj in delete.data {
                             if RType::BehaviorInstance == obj.rtype {
+                                log::debug!("Deleting behavior instance job {}", obj.id);
                                 if let Err(err) = self.delete_job(obj.id).await {
                                     log::error!(
                                         "Failed to delete behavior instance job {}: {}",
