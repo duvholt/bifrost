@@ -213,9 +213,21 @@ async fn delete_resource_id(
     log::info!("DELETE {rlink:?}");
 
     match rlink.rtype {
+        /* Allowed (delete from state) */
+        RType::BehaviorInstance => {
+            let mut lock = state.res.lock().await;
+
+            /* check that the resource exists, otherwise we should return 404 */
+            lock.get_resource(&rlink)?;
+
+            lock.delete(&rlink)?;
+
+            drop(lock);
+
+            V2Reply::ok(rlink)
+        }
         /* Allowed (send request to backend) */
-        RType::BehaviorInstance
-        | RType::Device
+        RType::Device
         | RType::EntertainmentConfiguration
         | RType::GeofenceClient
         | RType::MatterFabric
