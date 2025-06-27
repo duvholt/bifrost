@@ -99,30 +99,25 @@ impl GroupedLightUpdate {
     }
 
     #[must_use]
-    pub const fn with_on(self, on: Option<On>) -> Self {
-        Self { on, ..self }
-    }
-
-    #[must_use]
-    pub const fn with_color_temperature(self, mirek: Option<u16>) -> Self {
+    pub fn with_on(self, on: impl Into<Option<On>>) -> Self {
         Self {
-            color_temperature: if let Some(ct) = mirek {
-                Some(ColorTemperatureUpdate::new(ct))
-            } else {
-                None
-            },
+            on: on.into(),
             ..self
         }
     }
 
     #[must_use]
-    pub const fn with_color_xy(self, val: Option<XY>) -> Self {
+    pub fn with_color_temperature(self, mirek: impl Into<Option<u16>>) -> Self {
         Self {
-            color: if let Some(xy) = val {
-                Some(ColorUpdate { xy })
-            } else {
-                None
-            },
+            color_temperature: mirek.into().map(ColorTemperatureUpdate::new),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_color_xy(self, val: impl Into<Option<XY>>) -> Self {
+        Self {
+            color: val.into().map(ColorUpdate::new),
             ..self
         }
     }

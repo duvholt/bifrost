@@ -4,15 +4,16 @@ use std::time::Duration;
 use bifrost_api::backend::BackendRequest;
 use chrono::offset::LocalResult;
 use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
+use itertools::Itertools;
 use tokio::spawn;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tokio_schedule::{Job, every};
 
 use hue::api::{
-    GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate, LightTimedEffect,
-    LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink, WakeupConfiguration,
-    WakeupStyle,
+    Device, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
+    LightTimedEffect, LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink,
+    Room, WakeupConfiguration, WakeupStyle,
 };
 use hue::effect_duration::EffectDuration;
 use uuid::Uuid;
@@ -119,10 +120,35 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
 
     let requests = {
         let lock = res.lock().await;
+        let room_requests = |room: &Room| {
+            let lights_in_room: Vec<_> = room
+                .children
+                .iter()
+                .filter_map(|rl| lock.get::<Device>(rl).ok())
+                .filter_map(Device::light_service)
+                .filter_map(|light_rl| lock.get::<Light>(light_rl).ok().map(|l| (light_rl, l)))
+                .collect();
+            if config.style == Some(WakeupStyle::Sunrise)
+                && lights_in_room
+                    .iter()
+                    .any(|(_, light)| light.effects.is_some())
+            {
+                // Hue effects do not support grouped lights so we need to send indivial requests to each light
+                lights_in_room
+                    .into_iter()
+                    .map(|(resource_link, _)| WakeupRequest::Light(*resource_link))
+                    .collect()
+            } else {
+                room.grouped_light_service()
+                    .map_or_else(Vec::new, |grouped_light| {
+                        vec![WakeupRequest::Group(*grouped_light)]
+                    })
+            }
+        };
         resource_links
             .into_iter()
             .filter_map(|resource_link| {
-                let resource = lock.get_resource_by_id(&resource_link.rid);
+                let resource = lock.get_resource(&resource_link);
                 match resource {
                     Ok(resource) => Some((resource_link, resource)),
                     Err(err) => {
@@ -132,11 +158,7 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                 }
             })
             .flat_map(|(resource_link, resource)| match resource.obj {
-                Resource::Room(room) => room
-                    .grouped_light_service()
-                    .map_or_else(Vec::new, |grouped_light| {
-                        vec![WakeupRequest::Group(*grouped_light)]
-                    }),
+                Resource::Room(room) => room_requests(&room),
                 Resource::Light(_light) => {
                     vec![WakeupRequest::Light(resource_link)]
                 }
@@ -145,13 +167,10 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                     all_rooms
                         .into_iter()
                         .filter_map(|room_resource| match room_resource.obj {
-                            Resource::Room(room) => {
-                                let grouped_light = room.grouped_light_service()?;
-                                Some(WakeupRequest::Group(*grouped_light))
-                            }
+                            Resource::Room(room) => Some(room_requests(&room)),
                             _ => None,
                         })
-                        .collect()
+                        .concat()
                 }
                 _ => Vec::new(),
             })
@@ -193,7 +212,7 @@ impl WakeupRequest {
                 .get::<Light>(resource_link)?
                 .effects
                 .is_some(),
-            Self::Group(_) => false, // todo: implement when grouped light support effects
+            Self::Group(_) => false,
         };
         let use_sunrise_effect =
             light_supports_effects && config.style == Some(WakeupStyle::Sunrise);
@@ -214,49 +233,62 @@ impl WakeupRequest {
         // As reported by the Hue bridge
         const WAKEUP_FADE_MIREK: u16 = 447;
 
-        // Reset brightness and set color temperature
-        let reset_backend_request = match self {
+        let initial_backend_requests = match self {
             Self::Light(resource_link) => {
-                let payload = LightUpdate::default()
-                    .with_on(Some(On::new(true)))
-                    .with_brightness(Some(0.0))
-                    .with_color_temperature(Some(WAKEUP_FADE_MIREK));
-                BackendRequest::LightUpdate(*resource_link, payload)
+                let on_brightness = LightUpdate::default()
+                    .with_on(On::new(true))
+                    .with_brightness(Some(1.0));
+                let color_temperature =
+                    LightUpdate::default().with_color_temperature(WAKEUP_FADE_MIREK);
+
+                vec![
+                    BackendRequest::LightUpdate(*resource_link, on_brightness),
+                    BackendRequest::LightUpdate(*resource_link, color_temperature),
+                ]
             }
             Self::Group(resource_link) => {
-                let payload = GroupedLightUpdate::default()
-                    .with_on(Some(On::new(true)))
-                    .with_brightness(Some(0.0))
-                    .with_color_temperature(Some(WAKEUP_FADE_MIREK));
-                BackendRequest::GroupedLightUpdate(*resource_link, payload)
+                let brightness = GroupedLightUpdate::default()
+                    .with_on(On::new(true))
+                    .with_brightness(Some(1.0));
+                let color_temperature =
+                    GroupedLightUpdate::default().with_color_temperature(WAKEUP_FADE_MIREK);
+                vec![
+                    BackendRequest::GroupedLightUpdate(*resource_link, brightness),
+                    BackendRequest::GroupedLightUpdate(*resource_link, color_temperature),
+                ]
             }
         };
-        res.lock().await.backend_request(reset_backend_request)?;
-
-        sleep(Duration::from_secs(1)).await;
+        for request in initial_backend_requests {
+            res.lock().await.backend_request(request)?;
+        }
 
         // Start fade in to set brightness
-        let on_backend_request = match self {
+        let on_backend_requests = match self {
             Self::Light(resource_link) => {
-                let payload = LightUpdate::default()
+                let brightness = LightUpdate::default()
                     .with_brightness(Some(config.end_brightness))
                     .with_dynamics(Some(
                         LightDynamicsUpdate::new()
-                            .with_duration(Some(config.fade_in_duration.seconds * 1000)),
+                            .with_duration(Some((config.fade_in_duration.seconds) * 1000)),
                     ));
-                BackendRequest::LightUpdate(*resource_link, payload)
+                vec![BackendRequest::LightUpdate(*resource_link, brightness)]
             }
             Self::Group(resource_link) => {
-                let payload = GroupedLightUpdate::default()
+                let brightness = GroupedLightUpdate::default()
                     .with_brightness(Some(config.end_brightness))
                     .with_dynamics(Some(
                         GroupedLightDynamicsUpdate::new()
-                            .with_duration(Some(config.fade_in_duration.seconds * 1000)),
+                            .with_duration(Some((config.fade_in_duration.seconds) * 1000)),
                     ));
-                BackendRequest::GroupedLightUpdate(*resource_link, payload)
+                vec![BackendRequest::GroupedLightUpdate(
+                    *resource_link,
+                    brightness,
+                )]
             }
         };
-        res.lock().await.backend_request(on_backend_request)?;
+        for request in on_backend_requests {
+            res.lock().await.backend_request(request)?;
+        }
         Ok(())
     }
 
