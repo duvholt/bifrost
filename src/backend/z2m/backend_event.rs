@@ -16,6 +16,7 @@ use hue::api::{
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
+use z2m::api::DeviceRead;
 use z2m::update::{DeviceEffect, DeviceUpdate};
 
 use crate::backend::z2m::Z2mBackend;
@@ -184,7 +185,21 @@ impl Z2mBackend {
             if !hz.is_empty() {
                 hz = hz.with_fade_speed(0x0001);
 
+                let read_payload = DeviceRead::default()
+                    .with_state(
+                        hz.onoff.is_some() || hz.brightness.is_some() || hz.effect_type.is_some(),
+                    )
+                    .with_color(
+                        hz.color_mirek.is_some()
+                            || hz.color_xy.is_some()
+                            || hz.effect_type.is_some(),
+                    )
+                    .with_brightness(hz.brightness.is_some() || hz.effect_type.is_some());
+
                 z2mws.send_hue_effects(topic, hz).await?;
+
+                // Do an explicit attribute read since Hue specific updates do not automatically update z2m state
+                z2mws.send_read(&topic, &read_payload).await?;
             }
         }
 
