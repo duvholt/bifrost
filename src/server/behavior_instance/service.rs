@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use std::{iter, sync::Arc};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Weekday;
@@ -178,7 +178,7 @@ struct BehaviorInstanceJob {
     rid: Uuid,
     configuration: BehaviorInstanceConfiguration,
     res: Arc<Mutex<Resources>>,
-    tasks: Vec<JoinHandle<()>>,
+    task: Option<JoinHandle<()>>,
 }
 
 impl BehaviorInstanceJob {
@@ -191,51 +191,50 @@ impl BehaviorInstanceJob {
             rid,
             configuration,
             res,
-            tasks: vec![],
+            task: None,
         };
-        job.update_tasks();
+        job.update_task();
         log::debug!("Created new behavior instance job: {:?}", job.configuration);
         job
     }
 
     pub fn update_configuration(&mut self, configuration: BehaviorInstanceConfiguration) {
         self.configuration = configuration;
-        for task in &self.tasks {
+        self.update_task();
+    }
+
+    fn update_task(&mut self) {
+        if let Some(task) = &self.task {
             task.abort();
         }
-        self.update_tasks();
-    }
 
-    fn update_tasks(&mut self) {
-        let futures = match &self.configuration {
+        let job = match &self.configuration {
             BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                self.create_wake_up_tasks(&wakeup_configuration)
+                self.create_wake_up_task(&wakeup_configuration)
             }
         };
-        self.tasks = futures.into_iter().map(|job| spawn(job.create())).collect();
+        self.task = Some(spawn(job.create()));
     }
 
-    fn create_wake_up_tasks(&self, configuration: &WakeupConfiguration) -> Vec<WakeupJob> {
+    fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> WakeupJob {
         let weekdays = configuration.when.recurrence_days.as_ref();
 
-        let schedule_types: Box<dyn Iterator<Item = ScheduleType>> = weekdays.map_or_else(
-            || Box::new(iter::once(ScheduleType::Once())) as Box<dyn Iterator<Item = ScheduleType>>,
-            |weekdays| Box::new(weekdays.iter().copied().map(ScheduleType::Recurring)),
-        );
-        schedule_types
-            .map(|schedule_type| WakeupJob {
-                rid: self.rid.clone(),
-                schedule_type,
-                configuration: configuration.clone(),
-                res: self.res.clone(),
-            })
-            .collect()
+        let schedule_type = match weekdays {
+            Some(weekdays) => ScheduleType::Recurring(weekdays.iter().cloned().collect()),
+            None => ScheduleType::Once(),
+        };
+        WakeupJob {
+            rid: self.rid.clone(),
+            schedule_type,
+            configuration: configuration.clone(),
+            res: self.res.clone(),
+        }
     }
 }
 
 impl Drop for BehaviorInstanceJob {
     fn drop(&mut self) {
-        for task in &self.tasks {
+        if let Some(task) = &self.task {
             task.abort();
         }
     }
@@ -254,6 +253,6 @@ pub async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
 
 #[derive(Debug)]
 pub enum ScheduleType {
-    Recurring(Weekday),
+    Recurring(HashSet<Weekday>),
     Once(),
 }

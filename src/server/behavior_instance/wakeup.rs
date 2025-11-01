@@ -97,7 +97,7 @@ impl WakeupJob {
         let now = Local::now();
         let config = self.configuration.clone();
         let result = match &self.schedule_type {
-            ScheduleType::Recurring(weekday) => self.create_recurring(*weekday).await,
+            ScheduleType::Recurring(weekdays) => self.create_recurring(weekdays.clone()).await,
             ScheduleType::Once() => self.run_once(now),
         };
         if let Err(err) = result {
@@ -109,17 +109,15 @@ impl WakeupJob {
         }
     }
 
-    async fn create_recurring(&self, weekday: Weekday) -> ApiResult<()> {
-        let mut weekdays = HashSet::new();
-        weekdays.insert(weekday);
+    async fn create_recurring(&self, weekdays: HashSet<Weekday>) -> ApiResult<()> {
         let fade_in_start = self.start_time()?;
         loop {
             let now = Local::now();
             let fade_in_datetime =
                 WakeupJob::next_weekday_occurrence(&weekdays, &fade_in_start, &now)?;
             log::debug!(
-                "Recurring wakeup task for {}, {} will run at {}",
-                &weekday,
+                "Recurring wakeup task for {:?}, {} will run at {}",
+                &weekdays,
                 &fade_in_start,
                 &fade_in_datetime
             );
