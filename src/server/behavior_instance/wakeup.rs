@@ -1,14 +1,13 @@
+use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bifrost_api::backend::BackendRequest;
 use chrono::offset::LocalResult;
-use chrono::{DateTime, Days, Local, NaiveTime, Timelike, Weekday};
+use chrono::{DateTime, Datelike, Days, Local, NaiveTime, TimeZone, Weekday};
 use itertools::Itertools;
 use tokio::spawn;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use tokio_schedule::{Job, every};
 
 use hue::api::{
     Device, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
@@ -57,6 +56,43 @@ impl WakeupJob {
         Ok(scheduled_wakeup_time - fade_in_duration)
     }
 
+    fn next_weekday_occurrence(
+        weekdays: &HashSet<Weekday>,
+        time: &NaiveTime,
+        now: &DateTime<Local>,
+    ) -> ApiResult<DateTime<Local>> {
+        let now_date = now.date_naive();
+
+        // In most cases we shouldn't need to iterate more than 7 days,
+        // but in edge cases like leap years we might have to check further into the future.
+        // In case of any bugs we don't want to loop forever so it should be safe to just check the next 3 weeks
+        for days_to_add in 0..21 {
+            let Some(next_date) = now_date.checked_add_days(Days::new(days_to_add)) else {
+                // unlikely to happen as we're dealing with a naive date, but let's skip if something weird happens
+                continue;
+            };
+            if !weekdays.contains(&next_date.weekday()) {
+                continue;
+            }
+            let datetime = next_date.and_time(time.clone());
+            match Local.from_local_datetime(&datetime) {
+                LocalResult::Single(candidate) | LocalResult::Ambiguous(_, candidate) => {
+                    if &candidate >= now {
+                        return Ok(candidate);
+                    }
+                }
+                LocalResult::None => {
+                    // Time does not exist on this day (e.g. DST jump forward).
+                    continue;
+                }
+            }
+        }
+        return Err(ApiError::NoNextWeekdayOccurence(
+            time.clone(),
+            weekdays.clone(),
+        ));
+    }
+
     pub async fn create(self) {
         let now = Local::now();
         let config = self.configuration.clone();
@@ -74,29 +110,36 @@ impl WakeupJob {
     }
 
     async fn create_recurring(&self, weekday: Weekday) -> ApiResult<()> {
+        let mut weekdays = HashSet::new();
+        weekdays.insert(weekday);
         let fade_in_start = self.start_time()?;
-        every(1)
-            .week()
-            .on(weekday)
-            .at(
-                fade_in_start.hour(),
-                fade_in_start.minute(),
-                fade_in_start.second(),
-            )
-            .perform(|| {
-                let wakeup_configuration = self.configuration.clone();
-                async move {
-                    spawn(run_wake_up(wakeup_configuration.clone(), self.res.clone()));
-                }
-            })
-            .await;
-        Ok(())
+        loop {
+            let now = Local::now();
+            let fade_in_datetime =
+                WakeupJob::next_weekday_occurrence(&weekdays, &fade_in_start, &now)?;
+            log::debug!(
+                "Recurring wakeup task for {}, {} will run at {}",
+                &weekday,
+                &fade_in_start,
+                &fade_in_datetime
+            );
+            let time_until_fade_in = (fade_in_datetime - now).to_std()?;
+            sleep(time_until_fade_in).await;
+            run_wake_up(self.configuration.clone(), self.res.clone()).await;
+        }
     }
 
     fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
+        let start_time = self.start_time()?;
         let fade_in_datetime = self.start_datetime(now)?;
         let time_until_fade_in = (fade_in_datetime - now).to_std()?;
         spawn(async move {
+            log::debug!(
+                "Wakeup once task for {} will run at {}",
+                start_time,
+                fade_in_datetime
+            );
+
             sleep(time_until_fade_in).await;
             run_wake_up(self.configuration.clone(), self.res.clone()).await;
             disable_behavior_instance(self.rid, self.res.clone()).await;

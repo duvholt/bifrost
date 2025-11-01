@@ -1,8 +1,9 @@
+use std::collections::HashSet;
 use std::num::{ParseIntError, TryFromIntError};
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
-use chrono::{DateTime, Local, NaiveTime};
+use chrono::{DateTime, Local, NaiveTime, Weekday};
 use hue::api::RType;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -182,6 +183,9 @@ pub enum ApiError {
 
     #[error("Invalid naive time")]
     InvalidNaiveTime,
+
+    #[error("No next weekday occurence {0:?} {0:?}")]
+    NoNextWeekdayOccurence(NaiveTime, HashSet<Weekday>),
 }
 
 impl From<SvcError> for ApiError {
