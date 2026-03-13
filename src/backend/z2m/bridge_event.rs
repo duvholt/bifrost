@@ -112,6 +112,17 @@ impl Z2mBackend {
                     dev.model_id.as_deref().unwrap_or("<unknown model>")
                 );
                 self.add_light(dev, exp).await?;
+            } else if dev.expose_action() {
+                log::info!(
+                    "[{}] Adding switch {:?}: [{}] ({})",
+                    self.name,
+                    dev.ieee_address,
+                    dev.friendly_name,
+                    dev.model_id.as_deref().unwrap_or("<unknown model>")
+                );
+                if dev.model_id == Some("RWL021".to_string()) {
+                    self.add_switch(dev).await?;
+                }
             } else {
                 log::debug!(
                     "[{}] Ignoring unsupported device {}",
@@ -120,18 +131,6 @@ impl Z2mBackend {
                 );
                 self.ignore.insert(dev.friendly_name.clone());
             }
-            /*
-            if dev.expose_action() {
-                log::info!(
-                    "[{}] Adding switch {:?}: [{}] ({})",
-                    self.name,
-                    dev.ieee_address,
-                    dev.friendly_name,
-                    dev.model_id.as_deref().unwrap_or("<unknown model>")
-                );
-                self.add_switch(dev).await?;
-            }
-            */
         }
 
         Ok(())

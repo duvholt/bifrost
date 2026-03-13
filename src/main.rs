@@ -186,7 +186,7 @@ async fn run() -> ApiResult<()> {
 #[tokio::main]
 async fn main() {
     if let Err(err) = run().await {
-        log::error!("Bifrost error: {err}");
+        log::error!("Bifrost error: {err:#?}");
         log::error!("Fatal error encountered, cannot continue.");
     }
 }

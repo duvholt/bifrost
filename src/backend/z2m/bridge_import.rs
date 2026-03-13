@@ -13,6 +13,7 @@ use hue::api::{
     Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::scene_icons;
+use z2m::api::Expose::Enum;
 use z2m::api::ExposeLight;
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
@@ -147,53 +148,91 @@ impl Z2mBackend {
         Ok(())
     }
 
-    pub async fn add_switch(&mut self, dev: &z2m::api::Device) -> ApiResult<()> {
-        let name = &dev.friendly_name;
+    pub async fn add_switch(&mut self, apidev: &z2m::api::Device) -> ApiResult<()> {
+        let name = &apidev.friendly_name;
 
-        let link_device = RType::Device.deterministic(&dev.ieee_address);
-        let link_button = RType::Button.deterministic(&dev.ieee_address);
-        let link_zbc = RType::ZigbeeConnectivity.deterministic(&dev.ieee_address);
+        let link_device = RType::Device.deterministic(&apidev.ieee_address);
 
+        self.map.insert(name.to_owned(), link_device);
+        self.rmap.insert(link_device, name.to_owned());
+
+        let link_zbc = RType::ZigbeeConnectivity.deterministic(&apidev.ieee_address);
+
+        let mut services = btreeset![link_zbc];
+        let mut buttons = vec![];
+
+        let mut control_id = 1;
+        for expose in apidev.exposes() {
+            log::info!("Expose! {:?}", expose);
+            if let Enum(enum_expose) = expose {
+                for button_name in ["on", "up", "down", "off"] {
+                    let link_button =
+                        RType::Button.deterministic((&apidev.ieee_address, button_name));
+                    let button = Button {
+                        owner: link_device,
+                        metadata: ButtonMetadata { control_id },
+                        button: ButtonData {
+                            last_event: Some(String::from("short_release")),
+                            button_report: Some(ButtonReport {
+                                updated: Utc::now(),
+                                event: String::from("short_release"),
+                            }),
+                            repeat_interval: Some(800),
+                            event_values: Some(json!([
+                                "initial_press",
+                                "repeat",
+                                "short_release",
+                                "long_release",
+                                "long_press"
+                            ])),
+                        },
+                    };
+                    buttons.push((link_button, button));
+                    services.insert(link_button);
+
+                    self.map.insert(button_name.to_owned(), link_button);
+                    self.rmap.insert(link_button, button_name.to_owned());
+
+                    control_id += 1;
+                }
+            }
+        }
+
+        let str_or_unknown = |name: Option<&String>| name.map_or("<unknown>", |v| v).to_string();
+
+        let product_name = apidev.definition.as_ref().map(|d| &d.description);
         let dev = hue::api::Device {
-            product_data: DeviceProductData::guess_from_device(dev),
-            metadata: Metadata::new(DeviceArchetype::UnknownArchetype, "foo"),
-            services: btreeset![link_button, link_zbc],
+            product_data: DeviceProductData {
+                product_name: str_or_unknown(product_name),
+                // necessary?
+                manufacturer_name: DeviceProductData::SIGNIFY_MANUFACTURER_NAME.to_owned(),
+                certified: true,
+                ..DeviceProductData::guess_from_device(apidev)
+            },
+            metadata: Metadata::new(
+                DeviceArchetype::UnknownArchetype,
+                &str_or_unknown(product_name),
+            ),
+            services,
             identify: None,
             usertest: None,
         };
 
-        self.map.insert(name.clone(), link_button);
-        self.rmap.insert(link_button, name.clone());
-
         let mut res = self.state.lock().await;
-        let button = Button {
-            owner: link_device,
-            metadata: ButtonMetadata { control_id: 0 },
-            button: ButtonData {
-                last_event: None,
-                button_report: Some(ButtonReport {
-                    updated: Utc::now(),
-                    event: String::from("initial_press"),
-                }),
-                repeat_interval: Some(100),
-                event_values: Some(json!(["initial_press", "repeat"])),
-            },
-        };
 
-        let zbc = ZigbeeConnectivity {
-            owner: link_device,
-            mac_address: String::from("11:22:33:44:55:66:77:89"),
-            status: ZigbeeConnectivityStatus::ConnectivityIssue,
-            channel: Some(json!({
-                "status": "set",
-                "value": "channel_25",
-            })),
+        let zigcon = ZigbeeConnectivity {
+            channel: None,
             extended_pan_id: None,
+            mac_address: apidev.ieee_address.as_mac(),
+            owner: link_device,
+            status: ZigbeeConnectivityStatus::Connected,
         };
 
         res.add(&link_device, Resource::Device(dev))?;
-        res.add(&link_button, Resource::Button(button))?;
-        res.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
+        for (link_button, button) in buttons {
+            res.add(&link_button, Resource::Button(button))?;
+        }
+        res.add(&link_zbc, Resource::ZigbeeConnectivity(zigcon))?;
         drop(res);
 
         Ok(())

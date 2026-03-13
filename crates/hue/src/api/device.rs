@@ -42,6 +42,10 @@ impl Device {
         self.service(RType::Light)
     }
 
+    pub fn button_service(&self) -> Option<&ResourceLink> {
+        self.service(RType::Button)
+    }
+
     #[must_use]
     pub fn entertainment_service(&self) -> Option<&ResourceLink> {
         self.service(RType::Entertainment)
