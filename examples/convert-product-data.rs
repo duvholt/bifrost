@@ -13,6 +13,7 @@ use hue::devicedb::{SimpleProductData, product_data};
 
 fn print_std(obj: DeviceProductData) {
     let spd = SimpleProductData {
+        model_id: Some(&obj.model_id),
         manufacturer_name: &obj.manufacturer_name,
         product_name: &obj.product_name,
         product_archetype: obj.product_archetype,

@@ -120,9 +120,7 @@ impl Z2mBackend {
                     dev.friendly_name,
                     dev.model_id.as_deref().unwrap_or("<unknown model>")
                 );
-                if dev.model_id == Some("RWL021".to_string()) {
-                    self.add_switch(dev).await?;
-                }
+                self.add_switch(dev).await?;
             } else {
                 log::debug!(
                     "[{}] Ignoring unsupported device {}",

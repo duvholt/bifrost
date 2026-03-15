@@ -158,13 +158,17 @@ impl Z2mBackend {
 
         let link_zbc = RType::ZigbeeConnectivity.deterministic(&apidev.ieee_address);
 
+        // missing services:
+        // device_power
+        // device_software_update
+
         let mut services = btreeset![link_zbc];
         let mut buttons = vec![];
 
         let mut control_id = 1;
         for expose in apidev.exposes() {
-            log::info!("Expose! {:?}", expose);
             if let Enum(enum_expose) = expose {
+                log::info!("Expose! {:?}", expose);
                 for button_name in ["on", "up", "down", "off"] {
                     let link_button =
                         RType::Button.deterministic((&apidev.ieee_address, button_name));
@@ -198,21 +202,9 @@ impl Z2mBackend {
             }
         }
 
-        let str_or_unknown = |name: Option<&String>| name.map_or("<unknown>", |v| v).to_string();
-
-        let product_name = apidev.definition.as_ref().map(|d| &d.description);
         let dev = hue::api::Device {
-            product_data: DeviceProductData {
-                product_name: str_or_unknown(product_name),
-                // necessary?
-                manufacturer_name: DeviceProductData::SIGNIFY_MANUFACTURER_NAME.to_owned(),
-                certified: true,
-                ..DeviceProductData::guess_from_device(apidev)
-            },
-            metadata: Metadata::new(
-                DeviceArchetype::UnknownArchetype,
-                &str_or_unknown(product_name),
-            ),
+            product_data: DeviceProductData::guess_from_device(apidev),
+            metadata: Metadata::new(DeviceArchetype::UnknownArchetype, name),
             services,
             identify: None,
             usertest: None,
