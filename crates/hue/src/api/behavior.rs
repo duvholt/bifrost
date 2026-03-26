@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::AddAssign;
 
 use serde::{Deserialize, Deserializer, Serialize};
@@ -44,6 +45,29 @@ impl BehaviorScript {
             version: "0.0.1".to_string(),
         }
     }
+
+    pub const HUE_ACCESSORIES_ID: Uuid = uuid!("67d9395b-4403-42cc-b5f0-740b699d67c6");
+
+    #[must_use]
+    pub fn hue_accessories() -> Self {
+        Self {
+            configuration_schema: DollarRef {
+                dref: Some("config.json#".to_string()),
+            },
+            description: "Generic switches script".to_string(),
+            max_number_instances: None,
+            metadata: BehaviorScriptMetadata {
+                name: "Hue Accessories".to_string(),
+                category: "accessory".to_string(),
+            },
+            state_schema: DollarRef {
+                dref: Some("state.json#".to_string()),
+            },
+            supported_features: vec![],
+            trigger_schema: DollarRef { dref: None },
+            version: "0.0.1".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -82,6 +106,7 @@ pub struct BehaviorInstance {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum BehaviorInstanceConfiguration {
     Wakeup(WakeupConfiguration),
+    HueAccessories(HueAccessoriesConfiguration),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -102,6 +127,79 @@ pub struct WakeupConfiguration {
 pub enum WakeupStyle {
     Sunrise,
     Basic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HueAccessoriesConfiguration {
+    pub buttons: HashMap<String, ButtonConfiguration>,
+    pub device: ResourceLink,
+    pub model_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ButtonConfiguration {
+    pub on_long_press: Option<ButtonAction>,
+    pub on_short_release: Option<ButtonAction>,
+    pub on_repeat: Option<ButtonAction>,
+    #[serde(rename = "where")]
+    pub where_field: Vec<configuration::Where>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ButtonAction {
+    TimeBasedExtended(TimeBasedExtended),
+    RecallSingleExtended(RecallSingleExtended),
+    SceneCycleExtended(SceneCycleExtended),
+    Action(Action),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimeBasedExtended {
+    pub slots: Vec<TimeBasedExtendedSlot>,
+    pub with_off: WithOff,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WithOff {
+    enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimeBasedExtendedSlot {
+    pub actions: Vec<ActionWrapper<Action>>,
+    pub start_time: configuration::Time,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionWrapper<T> {
+    action: T,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Action {
+    HomeOff,
+    AllOff,
+    LastOn,
+    DoNothing,
+    DimDown,
+    DimUp,
+    DimAlternate,
+    Recall(ResourceLink),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecallSingleExtended {
+    pub actions: Vec<ActionWrapper<Action>>,
+    pub with_off: WithOff,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SceneCycleExtended {
+    pub repeat_timeout: Option<configuration::Duration>,
+    pub slots: Vec<Vec<ActionWrapper<Action>>>,
+    pub with_off: WithOff,
 }
 
 pub mod configuration {

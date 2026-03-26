@@ -378,11 +378,13 @@ impl Resources {
     }
 
     pub fn add_behavior_scripts(&mut self) -> ApiResult<()> {
-        let wake_up_link = ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript);
-
         self.add(
-            &wake_up_link,
+            &ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript),
             Resource::BehaviorScript(BehaviorScript::wake_up()),
+        )?;
+        self.add(
+            &ResourceLink::new(BehaviorScript::HUE_ACCESSORIES_ID, RType::BehaviorScript),
+            Resource::BehaviorScript(BehaviorScript::hue_accessories()),
         )?;
 
         Ok(())

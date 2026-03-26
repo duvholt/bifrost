@@ -15,8 +15,8 @@ mod zigbee_device_discovery;
 
 pub use behavior::{
     BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata, BehaviorInstanceNew,
-    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, WakeupConfiguration,
-    WakeupStyle,
+    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, HueAccessoriesConfiguration,
+    WakeupConfiguration, WakeupStyle,
 };
 pub use bridge_home::BridgeHome;
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};

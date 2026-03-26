@@ -10,8 +10,8 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
 use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript, RType,
-    Resource, WakeupConfiguration,
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
+    HueAccessoriesConfiguration, RType, Resource, WakeupConfiguration,
 };
 use uuid::Uuid;
 
@@ -64,6 +64,11 @@ impl BehaviorInstanceService {
             BehaviorScript::WAKE_UP_ID => {
                 let config = serde_json::from_value::<WakeupConfiguration>(bi.configuration)?;
                 Ok(Some(BehaviorInstanceConfiguration::Wakeup(config)))
+            }
+            BehaviorScript::HUE_ACCESSORIES_ID => {
+                let config =
+                    serde_json::from_value::<HueAccessoriesConfiguration>(bi.configuration)?;
+                Ok(Some(BehaviorInstanceConfiguration::HueAccessories(config)))
             }
             _ => Ok(None),
         }
@@ -203,10 +208,16 @@ impl BehaviorInstanceJob {
 
         let job = match &self.configuration {
             BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                self.create_wake_up_task(wakeup_configuration)
+                Some(self.create_wake_up_task(wakeup_configuration))
+            }
+            BehaviorInstanceConfiguration::HueAccessories(hue_accessories_configuration) => {
+                dbg!(hue_accessories_configuration);
+                None
             }
         };
-        self.task = Some(spawn(job.create()));
+        if let Some(job) = job {
+            self.task = Some(spawn(job.create()));
+        }
     }
 
     fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> WakeupJob {
