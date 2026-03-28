@@ -71,9 +71,38 @@ impl Z2mBackend {
     }
 
     async fn handle_device_message(&mut self, msg: RawMessage) -> ApiResult<()> {
-        if msg.topic.ends_with("/availability") || msg.topic.ends_with("/action") {
+        if msg.topic.ends_with("/availability") {
             // availability: https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html#zigbee2mqtt-friendly-name-availability
-            // action: https://www.home-assistant.io/integrations/device_trigger.mqtt/
+            return Ok(());
+        }
+
+        if msg.topic.ends_with("/action") {
+            if let Some(device) = msg.topic.split('/').next() {
+                dbg!(&device, &msg.payload);
+                let hue_dimmer_postfixes = ["_press_release", "_press", "_hold_release", "_hold"];
+                if let Some((press_state, button_name)) =
+                    msg.payload.as_str().and_then(|button_state| {
+                        for postfix in &hue_dimmer_postfixes {
+                            if button_state.ends_with(postfix) {
+                                return Some((postfix, button_state.trim_end_matches(postfix)));
+                            }
+                        }
+                        None
+                    })
+                {
+                    let device_button_name = format!("{device}/{button_name}");
+                    let Some(ref val) = self.map.get(&device_button_name).copied() else {
+                        log::warn!(
+                            "[{}] Unknown button pressed {} {}",
+                            self.name,
+                            &msg.topic,
+                            &msg.payload,
+                        );
+                        return Ok(());
+                    };
+                    log::info!("Button pressed {:?} {} {}", val, button_name, press_state);
+                }
+            }
             return Ok(());
         }
 

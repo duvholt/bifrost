@@ -194,7 +194,8 @@ impl Z2mBackend {
                     buttons.push((link_button, button));
                     services.insert(link_button);
 
-                    self.map.insert(button_name.to_owned(), link_button);
+                    let button_map_name = format!("{name}/{button_name}");
+                    self.map.insert(button_map_name, link_button);
                     self.rmap.insert(link_button, button_name.to_owned());
 
                     control_id += 1;
