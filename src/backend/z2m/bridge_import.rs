@@ -1,20 +1,19 @@
 use std::collections::HashSet;
 
-use chrono::Utc;
 use maplit::btreeset;
 use serde_json::json;
 use uuid::Uuid;
 
 use hue::api::{
-    BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DeviceArchetype,
-    DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight,
-    Light, LightEffects, LightEffectsV2, LightMetadata, Metadata, RType, Resource, ResourceLink,
-    Room, RoomArchetype, RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
-    Stub, Taurus, ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    BridgeHome, Button, DeviceArchetype, DeviceProductData, Entertainment, EntertainmentSegment,
+    EntertainmentSegments, GroupedLight, Light, LightEffects, LightEffectsV2, LightMetadata,
+    Metadata, RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
+    SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus, ZigbeeConnectivity,
+    ZigbeeConnectivityStatus,
 };
 use hue::scene_icons;
-use z2m::api::Expose::Enum;
 use z2m::api::ExposeLight;
+use z2m::button::Z2mButtonDevice;
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
@@ -148,7 +147,7 @@ impl Z2mBackend {
         Ok(())
     }
 
-    pub async fn add_switch(&mut self, apidev: &z2m::api::Device) -> ApiResult<()> {
+    pub async fn add_switch(&mut self, apidev: &z2m::api::Device) -> ApiResult<Option<()>> {
         let name = &apidev.friendly_name;
 
         let link_device = RType::Device.deterministic(&apidev.ieee_address);
@@ -165,42 +164,23 @@ impl Z2mBackend {
         let mut services = btreeset![link_zbc];
         let mut buttons = vec![];
 
-        let mut control_id = 1;
-        for expose in apidev.exposes() {
-            if let Enum(enum_expose) = expose {
-                log::info!("Expose! {:?}", expose);
-                for button_name in ["on", "up", "down", "off"] {
-                    let link_button =
-                        RType::Button.deterministic((&apidev.ieee_address, button_name));
-                    let button = Button {
-                        owner: link_device,
-                        metadata: ButtonMetadata { control_id },
-                        button: ButtonData {
-                            last_event: Some(String::from("short_release")),
-                            button_report: Some(ButtonReport {
-                                updated: Utc::now(),
-                                event: String::from("short_release"),
-                            }),
-                            repeat_interval: Some(800),
-                            event_values: Some(json!([
-                                "initial_press",
-                                "repeat",
-                                "short_release",
-                                "long_release",
-                                "long_press"
-                            ])),
-                        },
-                    };
-                    buttons.push((link_button, button));
-                    services.insert(link_button);
+        let Some(model_id) = &apidev.model_id else {
+            return Ok(None);
+        };
 
-                    let button_map_name = format!("{name}/{button_name}");
-                    self.map.insert(button_map_name, link_button);
-                    self.rmap.insert(link_button, button_name.to_owned());
+        let Some(button_device) = Z2mButtonDevice::from_model_id(&model_id) else {
+            return Ok(None);
+        };
 
-                    control_id += 1;
-                }
-            }
+        for button in &button_device.buttons {
+            let link_button = RType::Button.deterministic((&apidev.ieee_address, &button.name));
+            let button = Button {
+                owner: link_device,
+                metadata: button.metadata.clone(),
+                button: button.data.clone(),
+            };
+            buttons.push((link_button, button));
+            services.insert(link_button);
         }
 
         let dev = hue::api::Device {
@@ -228,7 +208,7 @@ impl Z2mBackend {
         res.add(&link_zbc, Resource::ZigbeeConnectivity(zigcon))?;
         drop(res);
 
-        Ok(())
+        Ok(Some(()))
     }
 
     #[allow(clippy::too_many_lines)]

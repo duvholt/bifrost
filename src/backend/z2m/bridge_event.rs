@@ -7,6 +7,7 @@ use hue::api::{DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource,
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
 };
+use z2m::button::Z2mButtonDevice;
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
@@ -76,32 +77,25 @@ impl Z2mBackend {
             return Ok(());
         }
 
-        if msg.topic.ends_with("/action") {
-            if let Some(device) = msg.topic.split('/').next() {
-                dbg!(&device, &msg.payload);
-                let hue_dimmer_postfixes = ["_press_release", "_press", "_hold_release", "_hold"];
-                if let Some((press_state, button_name)) =
-                    msg.payload.as_str().and_then(|button_state| {
-                        for postfix in &hue_dimmer_postfixes {
-                            if button_state.ends_with(postfix) {
-                                return Some((postfix, button_state.trim_end_matches(postfix)));
-                            }
-                        }
-                        None
-                    })
-                {
-                    let device_button_name = format!("{device}/{button_name}");
-                    let Some(ref val) = self.map.get(&device_button_name).copied() else {
-                        log::warn!(
-                            "[{}] Unknown button pressed {} {}",
-                            self.name,
-                            &msg.topic,
-                            &msg.payload,
-                        );
-                        return Ok(());
-                    };
-                    log::info!("Button pressed {:?} {} {}", val, button_name, press_state);
+        if let Some(device_topic) = msg.topic.strip_suffix("/action") {
+            let Some(ref link) = self.map.get(device_topic).copied() else {
+                if !self.ignore.contains(&msg.topic) {
+                    log::warn!(
+                        "[{}] Action on unknown topic {} {}",
+                        self.name,
+                        &msg.topic,
+                        &msg.payload,
+                    );
                 }
+                return Ok(());
+            };
+
+            let res = self.handle_action(&link.rid, &msg.payload).await;
+            if let Err(ref err) = res {
+                log::error!(
+                    "Cannot parse update: {err}\n{}",
+                    serde_json::to_string_pretty(&msg.payload)?
+                );
             }
             return Ok(());
         }
@@ -129,6 +123,31 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn handle_action(&mut self, rid: &Uuid, payload: &Value) -> Result<(), ApiError> {
+        let obj = self.state.lock().await.get_resource_by_id(&rid)?.obj;
+        let device = match obj {
+            Resource::Device(device) => device,
+            _ => return Ok(()),
+        };
+        let Some(button_device) = Z2mButtonDevice::from_model_id(&device.product_data.model_id)
+        else {
+            return Ok(());
+        };
+        let Some(action) = payload.as_str() else {
+            return Ok(());
+        };
+        let Some(button_action) = button_device.map_button(action) else {
+            log::warn!("[{}] Unknown button pressed {}", self.name, &payload);
+            return Ok(());
+        };
+        log::info!(
+            "Button pressed {} {:?}",
+            device.metadata.name,
+            button_action
+        );
+        return Ok(());
+    }
+
     async fn bridge_devices(&mut self, devices: &BridgeDevices) -> ApiResult<()> {
         for dev in devices {
             self.network.insert(dev.friendly_name.clone(), dev.clone());
@@ -149,7 +168,14 @@ impl Z2mBackend {
                     dev.friendly_name,
                     dev.model_id.as_deref().unwrap_or("<unknown model>")
                 );
-                self.add_switch(dev).await?;
+                if self.add_switch(dev).await?.is_none() {
+                    log::debug!(
+                        "[{}] Ignoring unsupported switch device {}",
+                        self.name,
+                        dev.friendly_name
+                    );
+                    self.ignore.insert(dev.friendly_name.to_string());
+                }
             } else {
                 log::debug!(
                     "[{}] Ignoring unsupported device {}",

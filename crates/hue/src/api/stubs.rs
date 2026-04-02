@@ -1,48 +1,16 @@
 use std::collections::BTreeSet;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::api::{DeviceArchetype, LightFunction, ResourceLink, SceneMetadata};
-use crate::{best_guess_timezone, date_format};
+use crate::best_guess_timezone;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Bridge {
     pub bridge_id: String,
     pub owner: ResourceLink,
     pub time_zone: TimeZone,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Button {
-    pub owner: ResourceLink,
-    pub metadata: ButtonMetadata,
-    pub button: ButtonData,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ButtonMetadata {
-    pub control_id: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ButtonData {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub button_report: Option<ButtonReport>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_event: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub repeat_interval: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_values: Option<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ButtonReport {
-    #[serde(with = "date_format::utc_ms")]
-    pub updated: DateTime<Utc>,
-    pub event: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
