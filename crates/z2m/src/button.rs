@@ -17,7 +17,7 @@ pub struct Z2mButton {
 
 #[derive(Debug, Clone)]
 pub struct Z2mButtonMapping {
-    pub control_id: usize,
+    pub control_id: u32,
     pub action: ButtonEvent,
 }
 

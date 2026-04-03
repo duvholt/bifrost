@@ -20,7 +20,9 @@ pub use behavior::{
     WakeupConfiguration, WakeupStyle,
 };
 pub use bridge_home::BridgeHome;
-pub use button::{Button, ButtonData, ButtonEvent, ButtonMetadata, ButtonReport};
+pub use button::{
+    Button, ButtonData, ButtonDataUpdate, ButtonEvent, ButtonMetadata, ButtonReport, ButtonUpdate,
+};
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
 pub use entertainment_config::{

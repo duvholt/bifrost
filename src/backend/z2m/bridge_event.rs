@@ -1,9 +1,13 @@
+use chrono::Utc;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
-use hue::api::{DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, Room};
+use hue::api::{
+    Button, ButtonDataUpdate, ButtonReport, ButtonUpdate, DimmingUpdate, GroupedLight, Light,
+    LightUpdate, RType, Resource, Room,
+};
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
 };
@@ -145,6 +149,33 @@ impl Z2mBackend {
             device.metadata.name,
             button_action
         );
+
+        let mut lock = self.state.lock().await;
+        let button = device.button_services().into_iter().find_map(|b| {
+            if let Some(res) = lock.get_resource(b).ok() {
+                if let Resource::Button(button) = &res.obj {
+                    if button.metadata.control_id == button_action.control_id {
+                        return Some(res.clone());
+                    }
+                }
+            }
+            return None;
+        });
+
+        if let Some(button) = button {
+            lock.update::<Button>(&button.id, |button| {
+                *button += ButtonUpdate::new().with_button(
+                    ButtonDataUpdate::new()
+                        .with_button_report(ButtonReport {
+                            updated: Utc::now(),
+                            event: button_action.action,
+                        })
+                        .with_last_event(button_action.action),
+                );
+            })?;
+        }
+        drop(lock);
+
         return Ok(());
     }
 

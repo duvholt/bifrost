@@ -38,12 +38,20 @@ impl Device {
     }
 
     #[must_use]
+    pub fn services(&self, rtype: RType) -> Vec<&ResourceLink> {
+        self.services
+            .iter()
+            .filter(|rl| rl.rtype == rtype)
+            .collect()
+    }
+
+    #[must_use]
     pub fn light_service(&self) -> Option<&ResourceLink> {
         self.service(RType::Light)
     }
 
-    pub fn button_service(&self) -> Option<&ResourceLink> {
-        self.service(RType::Button)
+    pub fn button_services(&self) -> Vec<&ResourceLink> {
+        self.services(RType::Button)
     }
 
     #[must_use]

@@ -474,10 +474,8 @@ impl Resources {
                     self.state
                         .id_v1(&light.rid)
                         .map(|id| format!("/lights/{id}"))
-                } else if let Some(button) = dev.button_service() {
-                    self.state
-                        .id_v1(&button.rid)
-                        .map(|id| format!("/sensors/{id}"))
+                } else if !dev.button_services().is_empty() {
+                    Some(format!("/sensors/{id}"))
                 } else {
                     None
                 }
