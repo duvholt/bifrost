@@ -63,6 +63,9 @@ impl HueAccessoriesJob {
                 if let Some(short_release_action) = &button_configuration.on_short_release {
                     log::info!("Short release button! {short_release_action:?}");
                 }
+                if let Some(repeat_action) = &button_configuration.on_repeat {
+                    log::info!("Short release  repeat button! {repeat_action:?}");
+                }
             }
             ButtonEvent::LongRelease => {}
             ButtonEvent::DoubleShortRelease => {}

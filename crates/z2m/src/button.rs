@@ -30,8 +30,22 @@ impl Z2mButtonDevice {
         }
     }
 
-    pub fn map_button(&self, action: &str) -> Option<Z2mButtonMapping> {
-        self.mappings.get(&action).cloned()
+    pub fn get_controller_id(&self, action: &str) -> Option<u32> {
+        self.mappings.get(&action).map(|m| m.control_id)
+    }
+
+    pub fn next_button_event(&self, button_data: &ButtonData, action: &str) -> Option<ButtonEvent> {
+        let mapped_button_event = self.mappings.get(&action).cloned()?.action;
+        let Some(current_button_report) = &button_data.button_report else {
+            return Some(mapped_button_event);
+        };
+        Some(match mapped_button_event {
+            ButtonEvent::LongPress => match current_button_report.event {
+                ButtonEvent::LongPress | ButtonEvent::Repeat => ButtonEvent::Repeat,
+                _ => mapped_button_event,
+            },
+            _ => mapped_button_event,
+        })
     }
 }
 

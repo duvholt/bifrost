@@ -5,8 +5,8 @@ use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
 use hue::api::{
-    Button, ButtonDataUpdate, ButtonReport, ButtonUpdate, DimmingUpdate, GroupedLight, Light,
-    LightUpdate, RType, Resource, Room,
+    Button, ButtonDataUpdate, ButtonReport, ButtonUpdate, Device, DimmingUpdate, GroupedLight,
+    Light, LightUpdate, RType, Resource, Room,
 };
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
@@ -94,7 +94,7 @@ impl Z2mBackend {
                 return Ok(());
             };
 
-            let res = self.handle_action(&link.rid, &msg.payload).await;
+            let res = self.handle_action(link.rid, &msg.payload).await;
             if let Err(ref err) = res {
                 log::error!(
                     "Cannot parse update: {err}\n{}",
@@ -127,53 +127,64 @@ impl Z2mBackend {
         Ok(())
     }
 
-    async fn handle_action(&mut self, rid: &Uuid, payload: &Value) -> Result<(), ApiError> {
-        let obj = self.state.lock().await.get_resource_by_id(&rid)?.obj;
-        let device = match obj {
-            Resource::Device(device) => device,
-            _ => return Ok(()),
-        };
-        let Some(button_device) = Z2mButtonDevice::from_model_id(&device.product_data.model_id)
+    async fn handle_action(&mut self, rid: Uuid, payload: &Value) -> Result<(), ApiError> {
+        let mut lock = self.state.lock().await;
+
+        let device = lock.get_id::<Device>(rid.clone())?;
+        let Some(z2m_button_device) = Z2mButtonDevice::from_model_id(&device.product_data.model_id)
         else {
             return Ok(());
         };
         let Some(action) = payload.as_str() else {
+            log::warn!("[{}] Unable to parse action payload {}", self.name, payload);
             return Ok(());
         };
-        let Some(button_action) = button_device.map_button(action) else {
-            log::warn!("[{}] Unknown button pressed {}", self.name, &payload);
+        let Some(button_controller_id) = z2m_button_device.get_controller_id(action) else {
+            log::warn!("[{}] Unknown button pressed {}", self.name, action);
+            return Ok(());
+        };
+
+        let Some((button_link, button_controller)) =
+            device.button_services().into_iter().find_map(|link| {
+                if let Some(button) = lock.get::<Button>(link).ok() {
+                    if button.metadata.control_id == button_controller_id {
+                        return Some((link.clone(), button));
+                    }
+                }
+                return None;
+            })
+        else {
+            log::error!(
+                "[{}] Unable to find button controller for {} with controller id {}",
+                self.name,
+                rid,
+                button_controller_id
+            );
+            return Ok(());
+        };
+        let Some(button_action) =
+            z2m_button_device.next_button_event(&button_controller.button, action)
+        else {
             return Ok(());
         };
         log::debug!(
-            "Recevied button action {} {:?}",
+            "[{}] Recevied button action {} {:?}",
+            self.name,
             device.metadata.name,
             button_action
         );
 
-        let mut lock = self.state.lock().await;
-        let button = device.button_services().into_iter().find_map(|b| {
-            if let Some(res) = lock.get_resource(b).ok() {
-                if let Resource::Button(button) = &res.obj {
-                    if button.metadata.control_id == button_action.control_id {
-                        return Some(res.clone());
-                    }
-                }
-            }
-            return None;
-        });
-
-        if let Some(button) = button {
-            lock.update::<Button>(&button.id, |button| {
-                *button += ButtonUpdate::new().with_button(
-                    ButtonDataUpdate::new()
-                        .with_button_report(ButtonReport {
-                            updated: Utc::now(),
-                            event: button_action.action,
-                        })
-                        .with_last_event(button_action.action),
-                );
-            })?;
-        }
+        // The actual handling of button events is done in the hue accessories behavior instance which listens for button updates
+        lock.update::<Button>(&button_link.rid, |button| {
+            *button += ButtonUpdate::new().with_button(
+                ButtonDataUpdate::new()
+                    .with_button_report(ButtonReport {
+                        updated: Utc::now(),
+                        event: button_action,
+                    })
+                    .with_last_event(button_action),
+            );
+        })?;
         drop(lock);
 
         return Ok(());
