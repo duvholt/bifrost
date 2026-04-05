@@ -240,10 +240,7 @@ impl BehaviorInstanceJob {
         &self,
         configuration: &HueAccessoriesConfiguration,
     ) -> HueAccessoriesJob {
-        HueAccessoriesJob {
-            configuration: configuration.clone(),
-            res: self.res.clone(),
-        }
+        HueAccessoriesJob::new(configuration.clone(), self.res.clone())
     }
 }
 

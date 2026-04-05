@@ -173,7 +173,7 @@ pub struct TimeBasedExtendedSlot {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionWrapper<T> {
-    action: T,
+    pub action: T,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]

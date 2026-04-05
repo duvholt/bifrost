@@ -15,9 +15,10 @@ mod update;
 mod zigbee_device_discovery;
 
 pub use behavior::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata, BehaviorInstanceNew,
-    BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, ButtonConfiguration,
-    HueAccessoriesConfiguration, WakeupConfiguration, WakeupStyle,
+    Action, BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
+    BehaviorInstanceNew, BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata,
+    ButtonAction, ButtonConfiguration, HueAccessoriesConfiguration, TimeBasedExtended,
+    TimeBasedExtendedSlot, WakeupConfiguration, WakeupStyle, configuration,
 };
 pub use bridge_home::BridgeHome;
 pub use button::{
