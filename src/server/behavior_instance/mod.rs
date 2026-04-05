@@ -1,3 +1,4 @@
+mod hue_accessories;
 mod service;
 mod wakeup;
 

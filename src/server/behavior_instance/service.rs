@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
+use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
 use crate::server::behavior_instance::wakeup::WakeupJob;
 
 #[derive(Debug)]
@@ -206,18 +207,17 @@ impl BehaviorInstanceJob {
             task.abort();
         }
 
-        let job = match &self.configuration {
+        let task = match &self.configuration {
             BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                Some(self.create_wake_up_task(wakeup_configuration))
+                let job = self.create_wake_up_task(wakeup_configuration);
+                spawn(job.create())
             }
             BehaviorInstanceConfiguration::HueAccessories(hue_accessories_configuration) => {
-                dbg!(hue_accessories_configuration);
-                None
+                let job = self.create_hue_accessories_task(hue_accessories_configuration);
+                spawn(job.create())
             }
         };
-        if let Some(job) = job {
-            self.task = Some(spawn(job.create()));
-        }
+        self.task = Some(task);
     }
 
     fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> WakeupJob {
@@ -231,6 +231,16 @@ impl BehaviorInstanceJob {
         WakeupJob {
             rid: self.rid,
             schedule_type,
+            configuration: configuration.clone(),
+            res: self.res.clone(),
+        }
+    }
+
+    fn create_hue_accessories_task(
+        &self,
+        configuration: &HueAccessoriesConfiguration,
+    ) -> HueAccessoriesJob {
+        HueAccessoriesJob {
             configuration: configuration.clone(),
             res: self.res.clone(),
         }

@@ -144,8 +144,8 @@ impl Z2mBackend {
             log::warn!("[{}] Unknown button pressed {}", self.name, &payload);
             return Ok(());
         };
-        log::info!(
-            "Button pressed {} {:?}",
+        log::debug!(
+            "Recevied button action {} {:?}",
             device.metadata.name,
             button_action
         );

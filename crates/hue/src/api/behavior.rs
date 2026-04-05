@@ -131,7 +131,7 @@ pub enum WakeupStyle {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HueAccessoriesConfiguration {
-    pub buttons: HashMap<String, ButtonConfiguration>,
+    pub buttons: HashMap<Uuid, ButtonConfiguration>,
     pub device: ResourceLink,
     pub model_id: String,
 }
