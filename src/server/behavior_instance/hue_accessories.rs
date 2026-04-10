@@ -4,8 +4,10 @@ use std::sync::Arc;
 use bifrost_api::backend::BackendRequest;
 use chrono::{Local, NaiveTime};
 use hue::api::{
-    Action, Button, ButtonAction, ButtonConfiguration, ButtonEvent, HueAccessoriesConfiguration,
-    RType, SceneActive, SceneStatus, SceneUpdate, TimeBasedExtendedSlot, configuration,
+    Action, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
+    DimmingDeltaUpdate, GroupedLightDynamicsUpdate, GroupedLightUpdate,
+    HueAccessoriesConfiguration, RType, Room, SceneActive, SceneStatus, SceneUpdate,
+    TimeBasedExtendedSlot, configuration,
 };
 use hue::event::Event;
 use tokio::sync::Mutex;
@@ -21,6 +23,8 @@ pub struct HueAccessoriesJob {
 }
 
 impl HueAccessoriesJob {
+    const BRIGHTNESS_DELTA: f64 = 20.0;
+
     pub fn new(configuration: HueAccessoriesConfiguration, res: Arc<Mutex<Resources>>) -> Self {
         Self {
             configuration,
@@ -158,9 +162,10 @@ impl HueAccessoriesJob {
     async fn run_action(
         &self,
         actions: &[&Action],
-        where_field: &[configuration::Where],
+        where_configs: &[configuration::Where],
     ) -> Result<(), ApiError> {
-        for action in actions {
+        for (i, action) in actions.iter().enumerate() {
+            let where_config = where_configs.get(i);
             match action {
                 Action::DoNothing => {}
                 Action::HomeOff => {
@@ -173,10 +178,12 @@ impl HueAccessoriesJob {
                     log::warn!("Unimplemented LastOn action triggered");
                 }
                 Action::DimDown => {
-                    log::warn!("Unimplemented DimDown action triggered");
+                    self.dim_action(where_config, DimmingDeltaAction::Down)
+                        .await?;
                 }
                 Action::DimUp => {
-                    log::warn!("Unimplemented DimUp action triggered");
+                    self.dim_action(where_config, DimmingDeltaAction::Up)
+                        .await?;
                 }
                 Action::DimAlternate => {
                     log::warn!("Unimplemented DimAlternate action triggered");
@@ -192,6 +199,37 @@ impl HueAccessoriesJob {
                     self.res.lock().await.backend_request(request)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    async fn dim_action(
+        &self,
+        where_config: Option<&configuration::Where>,
+        dimming_delta_action: DimmingDeltaAction,
+    ) -> Result<(), ApiError> {
+        let Some(where_config) = where_config else {
+            return Ok(());
+        };
+        let room = self
+            .res
+            .lock()
+            .await
+            .get::<Room>(&where_config.group)?
+            .clone();
+        if let Some(grouped_light) = room.grouped_light_service() {
+            let request = BackendRequest::GroupedLightUpdate(
+                grouped_light.clone(),
+                GroupedLightUpdate::new()
+                    .with_dimming_delta(Some(DimmingDeltaUpdate::new(
+                        dimming_delta_action,
+                        Self::BRIGHTNESS_DELTA,
+                    )))
+                    .with_dynamics(Some(
+                        GroupedLightDynamicsUpdate::new().with_duration(Some(1000u32)),
+                    )),
+            );
+            self.res.lock().await.backend_request(request)?;
         }
         Ok(())
     }
