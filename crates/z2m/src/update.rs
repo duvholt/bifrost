@@ -16,6 +16,8 @@ pub struct DeviceUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brightness: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub brightness_step: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temp: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_mode: Option<DeviceColorMode>,
@@ -79,6 +81,14 @@ impl DeviceUpdate {
     pub fn with_brightness(self, brightness: Option<f64>) -> Self {
         Self {
             brightness: brightness.map(|b| b.clamp(1.0, 254.0)),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_brightness_step(self, brightness_step: Option<f64>) -> Self {
+        Self {
+            brightness_step: brightness_step.map(|b| b.clamp(-254.0, 254.0)),
             ..self
         }
     }
