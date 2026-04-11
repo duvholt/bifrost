@@ -172,7 +172,15 @@ impl HueAccessoriesJob {
                     log::warn!("Unimplemented HomeOff action triggered");
                 }
                 Action::AllOff => {
-                    log::warn!("Unimplemented AllOff action triggered");
+                    if let Some(grouped_light_link) =
+                        self.get_grouped_light_link(where_config).await?
+                    {
+                        let request = BackendRequest::GroupedLightUpdate(
+                            grouped_light_link,
+                            GroupedLightUpdate::new().with_on(On::new(false)),
+                        );
+                        self.res.lock().await.backend_request(request)?;
+                    }
                 }
                 Action::LastOn => {
                     if let Some(grouped_light_link) =
