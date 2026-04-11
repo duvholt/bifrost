@@ -6,8 +6,8 @@ use chrono::{Local, NaiveTime};
 use hue::api::{
     Action, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
     DimmingDeltaUpdate, GroupedLightDynamicsUpdate, GroupedLightUpdate,
-    HueAccessoriesConfiguration, RType, Room, SceneActive, SceneStatus, SceneUpdate,
-    TimeBasedExtendedSlot, configuration,
+    HueAccessoriesConfiguration, On, RType, ResourceLink, Room, SceneActive, SceneStatus,
+    SceneUpdate, TimeBasedExtendedSlot, configuration,
 };
 use hue::event::Event;
 use tokio::sync::Mutex;
@@ -175,7 +175,15 @@ impl HueAccessoriesJob {
                     log::warn!("Unimplemented AllOff action triggered");
                 }
                 Action::LastOn => {
-                    log::warn!("Unimplemented LastOn action triggered");
+                    if let Some(grouped_light_link) =
+                        self.get_grouped_light_link(where_config).await?
+                    {
+                        let request = BackendRequest::GroupedLightUpdate(
+                            grouped_light_link,
+                            GroupedLightUpdate::new().with_on(On::new(true)),
+                        );
+                        self.res.lock().await.backend_request(request)?;
+                    }
                 }
                 Action::DimDown => {
                     self.dim_action(where_config, DimmingDeltaAction::Down)
@@ -208,18 +216,9 @@ impl HueAccessoriesJob {
         where_config: Option<&configuration::Where>,
         dimming_delta_action: DimmingDeltaAction,
     ) -> Result<(), ApiError> {
-        let Some(where_config) = where_config else {
-            return Ok(());
-        };
-        let room = self
-            .res
-            .lock()
-            .await
-            .get::<Room>(&where_config.group)?
-            .clone();
-        if let Some(grouped_light) = room.grouped_light_service() {
+        if let Some(grouped_light) = self.get_grouped_light_link(where_config).await? {
             let request = BackendRequest::GroupedLightUpdate(
-                grouped_light.clone(),
+                grouped_light,
                 GroupedLightUpdate::new()
                     .with_dimming_delta(Some(DimmingDeltaUpdate::new(
                         dimming_delta_action,
@@ -232,6 +231,22 @@ impl HueAccessoriesJob {
             self.res.lock().await.backend_request(request)?;
         }
         Ok(())
+    }
+
+    async fn get_grouped_light_link(
+        &self,
+        where_config: Option<&configuration::Where>,
+    ) -> Result<Option<ResourceLink>, ApiError> {
+        let Some(where_config) = where_config else {
+            return Ok(None);
+        };
+        let room = self
+            .res
+            .lock()
+            .await
+            .get::<Room>(&where_config.group)?
+            .clone();
+        Ok(room.grouped_light_service().copied())
     }
 }
 
