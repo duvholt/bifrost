@@ -4,7 +4,7 @@ use std::sync::Arc;
 use bifrost_api::backend::BackendRequest;
 use chrono::{Local, NaiveTime};
 use hue::api::{
-    Action, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
+    Action, BridgeHome, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
     DimmingDeltaUpdate, GroupedLightDynamicsUpdate, GroupedLightUpdate,
     HueAccessoriesConfiguration, On, RType, ResourceLink, Room, SceneActive, SceneStatus,
     SceneUpdate, TimeBasedExtendedSlot, configuration,
@@ -169,7 +169,18 @@ impl HueAccessoriesJob {
             match action {
                 Action::DoNothing => {}
                 Action::HomeOff => {
-                    log::warn!("Unimplemented HomeOff action triggered");
+                    let lock = self.res.lock().await;
+                    for bridge_home in lock.get_resources_by_type(RType::BridgeHome) {
+                        let bridge_home: BridgeHome = bridge_home.obj.try_into()?;
+                        if let Some(grouped_light_link) = bridge_home.grouped_light_service() {
+                            let request = BackendRequest::GroupedLightUpdate(
+                                grouped_light_link.clone(),
+                                GroupedLightUpdate::new().with_on(On::new(false)),
+                            );
+                            lock.backend_request(request)?;
+                        }
+                    }
+                    drop(lock);
                 }
                 Action::AllOff => {
                     if let Some(grouped_light_link) =
