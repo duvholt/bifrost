@@ -201,6 +201,10 @@ impl Z2mBackend {
             status: ZigbeeConnectivityStatus::Connected,
         };
 
+        if let Some(model_id) = &apidev.model_id {
+            // needed to look up button mappings when handling actions
+            res.aux_set(&link_device, AuxData::new().with_model_id(&model_id));
+        }
         res.add(&link_device, Resource::Device(dev))?;
         for (link_button, button) in buttons {
             res.add(&link_button, Resource::Button(button))?;

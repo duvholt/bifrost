@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use hue::api::{
     Button, ButtonDataUpdate, ButtonReport, ButtonUpdate, Device, DimmingUpdate, GroupedLight,
-    Light, LightUpdate, RType, Resource, Room,
+    Light, LightUpdate, RType, Resource, ResourceLink, Room,
 };
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
@@ -94,7 +94,7 @@ impl Z2mBackend {
                 return Ok(());
             };
 
-            let res = self.handle_action(link.rid, &msg.payload).await;
+            let res = self.handle_action(link, &msg.payload).await;
             if let Err(ref err) = res {
                 log::error!(
                     "Cannot parse update: {err}\n{}",
@@ -127,12 +127,22 @@ impl Z2mBackend {
         Ok(())
     }
 
-    async fn handle_action(&mut self, rid: Uuid, payload: &Value) -> Result<(), ApiError> {
+    async fn handle_action(
+        &mut self,
+        link: &ResourceLink,
+        payload: &Value,
+    ) -> Result<(), ApiError> {
         let mut lock = self.state.lock().await;
 
-        let device = lock.get_id::<Device>(rid.clone())?;
-        let Some(z2m_button_device) = Z2mButtonDevice::from_model_id(&device.product_data.model_id)
-        else {
+        let device = lock.get_id::<Device>(link.rid.clone())?;
+        let model_id = if let Ok(aux) = lock.aux_get(&link) {
+            aux.model_id
+                .as_deref()
+                .unwrap_or(&device.product_data.model_id)
+        } else {
+            &device.product_data.model_id
+        };
+        let Some(z2m_button_device) = Z2mButtonDevice::from_model_id(model_id) else {
             return Ok(());
         };
         let Some(action) = payload.as_str() else {
@@ -157,7 +167,7 @@ impl Z2mBackend {
             log::error!(
                 "[{}] Unable to find button controller for {} with controller id {}",
                 self.name,
-                rid,
+                link.rid,
                 button_controller_id
             );
             return Ok(());
