@@ -15,12 +15,6 @@ pub struct Bridge {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BridgeHome {
-    pub children: BTreeSet<ResourceLink>,
-    pub services: BTreeSet<ResourceLink>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Button {
     pub owner: ResourceLink,
     pub metadata: ButtonMetadata,
