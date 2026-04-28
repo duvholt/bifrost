@@ -608,8 +608,12 @@ impl Resources {
             log::debug!("Backend request: {req:#?}");
         }
 
-        self.backend_updates.send(Arc::new(req))?;
+        self.backend_updates.send(Arc::new(req)).ok();
 
         Ok(())
+    }
+
+    pub fn backend_sender(&self) -> Sender<Arc<BackendRequest>> {
+        self.backend_updates.clone()
     }
 }

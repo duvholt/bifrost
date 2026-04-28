@@ -114,8 +114,6 @@ impl EntStream {
             z2mws.send_zigbee_message(dev, &mapping).await?;
         }
 
-        self.stop_stream(z2mws).await?;
-
         Ok(())
     }
 

@@ -15,6 +15,7 @@ use crate::model::state::{State, StateVersion};
 use crate::resource::Resources;
 use crate::server::certificate;
 use crate::server::updater::VersionUpdater;
+use bifrost_api::backend::BackendRequest;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -22,6 +23,7 @@ pub struct AppState {
     upd: Arc<Mutex<VersionUpdater>>,
     svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
+    pub backend: tokio::sync::broadcast::Sender<Arc<BackendRequest>>,
 }
 
 impl AppState {
@@ -66,6 +68,7 @@ impl AppState {
         res.reset_all_streaming()?;
 
         let conf = Arc::new(config);
+        let backend = res.backend_sender();
         let res = Arc::new(Mutex::new(res));
 
         Ok(Self {
@@ -73,6 +76,7 @@ impl AppState {
             upd,
             svm,
             res,
+            backend,
         })
     }
 

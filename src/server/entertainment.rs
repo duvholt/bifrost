@@ -37,15 +37,22 @@ pub struct EntertainmentService {
     udp: Option<Arc<UdpListener>>,
     ctx: Option<SslContext>,
     res: Arc<Mutex<Resources>>,
+    backend_updates: tokio::sync::broadcast::Sender<Arc<BackendRequest>>,
 }
 
 impl EntertainmentService {
-    pub fn new(addr: Ipv4Addr, port: u16, res: Arc<Mutex<Resources>>) -> ApiResult<Self> {
+    pub fn new(
+        addr: Ipv4Addr,
+        port: u16,
+        res: Arc<Mutex<Resources>>,
+        backend_updates: tokio::sync::broadcast::Sender<Arc<BackendRequest>>,
+    ) -> ApiResult<Self> {
         let res = Self {
             addr: SocketAddr::new(addr.into(), port),
             udp: None,
             ctx: None,
             res,
+            backend_updates,
         };
 
         Ok(res)
@@ -225,7 +232,11 @@ impl EntertainmentService {
             log::trace!("Packet buffer: {}", view.escape_ascii());
 
             let raw = HueStreamPacket::parse(view)?;
-            let pkt = Self::translate_frame(&*self.res.lock().await, raw)?;
+            let pkt = if let HueStreamPacket::V2(v2) = raw {
+                v2
+            } else {
+                Self::translate_frame(&*self.res.lock().await, raw)?
+            };
 
             if pkt.color_mode() != header.color_mode() {
                 log::error!("Entertainment Mode color_mode changed mid-stream.");
@@ -246,7 +257,7 @@ impl EntertainmentService {
 
             fps += 1;
             let req = BackendRequest::EntertainmentFrame(pkt.lights);
-            self.res.lock().await.backend_request(req)?;
+            self.backend_updates.send(Arc::new(req)).ok();
 
             sz = Self::read_frame(&mut sess, &mut buf).await?;
             if sz == 0 {
