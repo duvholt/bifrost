@@ -161,18 +161,6 @@ impl Service for Z2mBackend {
     type Error = ApiError;
 
     async fn start(&mut self) -> ApiResult<()> {
-        // Drop any stale entertainment stream left over from a previous connection.
-        // Z2mBackend is reused across reconnects (only run() is re-called), so
-        // entstream must be explicitly cleared here to avoid writing Zigbee frames
-        // on a dead socket and to unblock the Hue app from a stuck Active state.
-        if self.entstream.take().is_some() {
-            log::warn!(
-                "[{}] Dropping stale entertainment stream on reconnect",
-                self.name
-            );
-            self.state.lock().await.reset_all_streaming()?;
-        }
-
         // let's not include auth tokens in log output
         let sanitized_url = self.server.get_sanitized_url();
         let url = self.server.get_url();
@@ -192,6 +180,18 @@ impl Service for Z2mBackend {
     }
 
     async fn run(&mut self) -> ApiResult<()> {
+        // Drop any stale entertainment stream left over from a previous connection.
+        // Z2mBackend is reused across reconnects (only run() is re-called), so
+        // entstream must be explicitly cleared here to avoid writing Zigbee frames
+        // on a dead socket and to unblock the Hue app from a stuck Active state.
+        if self.entstream.take().is_some() {
+            log::warn!(
+                "[{}] Dropping stale entertainment stream on reconnect",
+                self.name
+            );
+            self.state.lock().await.reset_all_streaming()?;
+        }
+
         let sanitized_url = self.server.get_sanitized_url();
         let url = self.server.get_url();
         // if tls verification is disabled, build a TlsConnector that explicitly
