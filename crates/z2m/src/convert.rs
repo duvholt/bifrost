@@ -19,7 +19,11 @@ impl ExtractExposeNumeric for ExposeNumeric {
     #[must_use]
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     fn extract_mirek_schema(&self) -> Option<MirekSchema> {
-        if self.unit.as_deref() == Some("mired") {
+        let is_mired = self.unit.as_deref() == Some("mired")
+            || self.base.name.as_deref() == Some("color_temp")
+            || self.base.name.as_deref() == Some("color_temperature");
+
+        if is_mired {
             if let (Some(min), Some(max)) = (self.value_min, self.value_max) {
                 return Some(MirekSchema {
                     mirek_minimum: min as u32,
@@ -110,6 +114,71 @@ impl ExtractColorTemperature for ColorTemperature {
 pub trait ExtractDimming: Sized {
     #[must_use]
     fn extract_from_expose(expose: &Expose) -> Option<Self>;
+}
+
+pub trait ExtractLightEffects: Sized {
+    #[must_use]
+    fn extract_from_expose(expose: &Expose) -> Option<Self>;
+}
+
+impl ExtractLightEffects for hue::api::LightEffects {
+    #[must_use]
+    fn extract_from_expose(expose: &Expose) -> Option<Self> {
+        let Expose::Enum(enum_exp) = expose else {
+            return None;
+        };
+
+        let mut effects = Vec::new();
+        effects.push(hue::api::LightEffect::NoEffect);
+
+        for val in &enum_exp.values {
+            if let Some(s) = val.as_str() {
+                match s {
+                    "blink" => effects.push(hue::api::LightEffect::Sparkle),
+                    "breathe" => effects.push(hue::api::LightEffect::Opal),
+                    "okay" => effects.push(hue::api::LightEffect::Glisten),
+                    "channel_change" => effects.push(hue::api::LightEffect::Prism),
+                    "colorloop" => effects.push(hue::api::LightEffect::Prism),
+                    "finish_effect" | "stop_effect" => {},
+                    _ => {}
+                }
+            }
+        }
+
+        if effects.len() > 1 {
+            effects.sort();
+            effects.dedup();
+            Some(Self {
+                status_values: effects.clone(),
+                status: hue::api::LightEffect::NoEffect,
+                effect_values: effects,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+pub trait ExtractLightEffectsV2: Sized {
+    #[must_use]
+    fn extract_from_expose(expose: &Expose) -> Option<Self>;
+}
+
+impl ExtractLightEffectsV2 for hue::api::LightEffectsV2 {
+    #[must_use]
+    fn extract_from_expose(expose: &Expose) -> Option<Self> {
+        let effects_v1 = hue::api::LightEffects::extract_from_expose(expose)?;
+        Some(Self {
+            action: hue::api::LightEffectValues {
+                effect_values: effects_v1.effect_values.clone(),
+            },
+            status: hue::api::LightEffectStatus {
+                effect: hue::api::LightEffect::NoEffect,
+                effect_values: effects_v1.effect_values,
+                parameters: None,
+            },
+        })
+    }
 }
 
 impl ExtractDimming for Dimming {

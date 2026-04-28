@@ -76,8 +76,16 @@ impl Z2mBackend {
         light.gradient = gradient.and_then(ExtractLightGradient::extract_from_expose);
         log::trace!("Detected gradient support: {:?}", &light.gradient);
 
+        light.effects = expose
+            .feature("effect")
+            .and_then(z2m::convert::ExtractLightEffects::extract_from_expose);
+
+        light.effects_v2 = expose
+            .feature("effect")
+            .and_then(z2m::convert::ExtractLightEffectsV2::extract_from_expose);
+
         if effects {
-            log::trace!("Detected Hue light: enabling effects");
+            log::trace!("Detected Hue light: overriding effects");
             light.effects = Some(LightEffects::all());
             light.effects_v2 = Some(LightEffectsV2::all());
         }
