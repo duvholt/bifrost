@@ -216,14 +216,16 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
 
     if let Some(action) = &upd.action {
         let ent: &EntertainmentConfiguration = lock.get(&rlink)?;
-        let svc = ent.light_services.clone();
+        let mode = match action {
+            EntertainmentConfigurationAction::Start => LightMode::Streaming,
+            EntertainmentConfigurationAction::Stop => LightMode::Normal,
+        };
 
-        lock.update::<Light>(&svc[0].rid, |light| {
-            light.mode = match action {
-                EntertainmentConfigurationAction::Start => LightMode::Streaming,
-                EntertainmentConfigurationAction::Stop => LightMode::Normal,
-            }
-        })?;
+        for svc in &ent.light_services {
+            lock.update::<Light>(&svc.rid, |light| {
+                light.mode = mode;
+            })?;
+        }
     }
 
     let bridge_ent = find_bridge_entertainment(&lock)?;
