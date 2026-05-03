@@ -116,7 +116,7 @@ pub struct Device {
     pub service_list: Vec<Service>,
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub device_list: Vec<Device>,
+    pub device_list: Vec<Self>,
 
     #[serde(rename = "presentationURL", skip_serializing_if = "Option::is_none")]
     pub presentation_url: Option<String>,
@@ -238,6 +238,7 @@ pub struct Icon {
     url: Url,
 }
 
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service {
     #[serde(rename = "serviceType")]

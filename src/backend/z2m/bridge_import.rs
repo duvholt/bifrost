@@ -304,7 +304,7 @@ impl Z2mBackend {
         let mut metadata = RoomMetadata::new(RoomArchetype::Home, room_name);
         if let Some(room_conf) = self.config.rooms.get(&topic) {
             if let Some(name) = &room_conf.name {
-                metadata.name = name.clone();
+                metadata.name.clone_from(name);
             }
             if let Some(icon) = &room_conf.icon {
                 metadata.archetype = *icon;

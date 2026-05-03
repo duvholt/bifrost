@@ -63,7 +63,6 @@ impl GroupedLightDynamicsUpdate {
     pub fn with_duration(self, duration: Option<impl Into<u32>>) -> Self {
         Self {
             duration: duration.map(Into::into),
-            ..self
         }
     }
 }
