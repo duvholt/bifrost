@@ -16,7 +16,6 @@ pub trait ExtractExposeNumeric {
 }
 
 impl ExtractExposeNumeric for ExposeNumeric {
-    #[must_use]
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     fn extract_mirek_schema(&self) -> Option<MirekSchema> {
         if self.unit.as_deref() == Some("mired") {
@@ -60,7 +59,6 @@ pub trait ExtractLightGradient {
 }
 
 impl ExtractLightGradient for LightGradient {
-    #[must_use]
     fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
         match expose {
             ExposeList {
@@ -88,7 +86,6 @@ pub trait ExtractColorTemperature: Sized {
 }
 
 impl ExtractColorTemperature for ColorTemperature {
-    #[must_use]
     fn extract_from_expose(expose: &Expose) -> Option<Self> {
         let Expose::Numeric(num) = expose else {
             return None;
@@ -113,7 +110,6 @@ pub trait ExtractDimming: Sized {
 }
 
 impl ExtractDimming for Dimming {
-    #[must_use]
     fn extract_from_expose(expose: &Expose) -> Option<Self> {
         let Expose::Numeric(_) = expose else {
             return None;
@@ -132,7 +128,6 @@ pub trait ExtractDeviceProductData {
 }
 
 impl ExtractDeviceProductData for DeviceProductData {
-    #[must_use]
     fn guess_from_device(dev: &Device) -> Self {
         fn str_or_unknown(name: Option<&String>) -> String {
             name.map_or("<unknown>", |v| v).to_string()
