@@ -174,7 +174,7 @@ impl AddAssign<&SceneUpdate> for Scene {
 impl AddAssign<&SceneMetadataUpdate> for SceneMetadata {
     fn add_assign(&mut self, upd: &SceneMetadataUpdate) {
         if let Some(appdata) = &upd.appdata {
-            self.appdata = Some(appdata.to_string());
+            self.appdata = Some(appdata.clone());
         }
         if let Some(image) = &upd.image {
             self.image = Some(*image);

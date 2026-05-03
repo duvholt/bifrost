@@ -117,7 +117,7 @@ impl Z2mBackend {
                     self.name,
                     dev.friendly_name
                 );
-                self.ignore.insert(dev.friendly_name.to_string());
+                self.ignore.insert(dev.friendly_name.clone());
             }
             /*
             if dev.expose_action() {
