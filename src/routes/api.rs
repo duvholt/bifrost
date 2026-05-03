@@ -58,7 +58,7 @@ fn get_lights(res: &MutexGuard<Resources>) -> ApiResult<HashMap<String, ApiLight
     let mut lights = HashMap::new();
 
     for rr in res.get_resources_by_type(RType::Light) {
-        let light: Light = rr.obj.try_into()?;
+        let light: Box<Light> = rr.obj.try_into()?;
         let dev = res.get::<Device>(&light.owner)?;
         lights.insert(
             res.get_id_v1(rr.id)?,

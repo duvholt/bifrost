@@ -138,7 +138,7 @@ impl Z2mBackend {
         let mut res = self.state.lock().await;
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
-        res.add(&link_light, Resource::Light(light))?;
+        res.add(&link_light, Resource::Light(Box::new(light)))?;
         res.add(&link_enttm, Resource::Entertainment(enttm))?;
         res.add(&link_taurus, Resource::Taurus(taurus))?;
         res.add(&link_zigcon, Resource::ZigbeeConnectivity(zigcon))?;
