@@ -1,0 +1,2 @@
+# FIXME: Increased from the default 128 limit to handle ApiError
+large-error-threshold = 160
