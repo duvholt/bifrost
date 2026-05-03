@@ -245,7 +245,7 @@ impl From<DeviceState> for On {
     }
 }
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceEffect {
     Blink,
@@ -254,4 +254,7 @@ pub enum DeviceEffect {
     ChannelChange,
     FinishEffect,
     StopEffect,
+    None,
+    #[serde(untagged)]
+    Unknown(String),
 }
