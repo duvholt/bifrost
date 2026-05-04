@@ -247,6 +247,8 @@ impl Z2mBackend {
 
                 self.bridge_device_remove(data).await?;
             }
+
+            Message::BridgeHealth(_) => {}
         }
         Ok(())
     }
