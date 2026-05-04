@@ -4,10 +4,12 @@ use std::sync::Arc;
 
 use camino::Utf8Path;
 use chrono::Utc;
+use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
 
 use hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use svc::manager::SvmClient;
+use bifrost_api::backend::BackendRequest;
 
 use crate::config::AppConfig;
 use crate::error::ApiResult;
@@ -15,7 +17,6 @@ use crate::model::state::{State, StateVersion};
 use crate::resource::Resources;
 use crate::server::certificate;
 use crate::server::updater::VersionUpdater;
-use bifrost_api::backend::BackendRequest;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -23,7 +24,7 @@ pub struct AppState {
     upd: Arc<Mutex<VersionUpdater>>,
     svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
-    pub backend: tokio::sync::broadcast::Sender<Arc<BackendRequest>>,
+    pub backend: Sender<Arc<BackendRequest>>,
 }
 
 impl AppState {

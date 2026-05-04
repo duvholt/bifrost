@@ -13,6 +13,7 @@ use nix::sys::socket::sockopt::RcvBuf;
 use openssl::ssl::{Ssl, SslContext, SslMethod};
 use tokio::io::AsyncReadExt;
 use tokio::net::UdpSocket;
+use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tokio_openssl::SslStream;
@@ -37,7 +38,7 @@ pub struct EntertainmentService {
     udp: Option<Arc<UdpListener>>,
     ctx: Option<SslContext>,
     res: Arc<Mutex<Resources>>,
-    backend_updates: tokio::sync::broadcast::Sender<Arc<BackendRequest>>,
+    backend_updates: Sender<Arc<BackendRequest>>,
 }
 
 impl EntertainmentService {
@@ -45,7 +46,7 @@ impl EntertainmentService {
         addr: Ipv4Addr,
         port: u16,
         res: Arc<Mutex<Resources>>,
-        backend_updates: tokio::sync::broadcast::Sender<Arc<BackendRequest>>,
+        backend_updates: Sender<Arc<BackendRequest>>,
     ) -> ApiResult<Self> {
         let res = Self {
             addr: SocketAddr::new(addr.into(), port),
@@ -191,9 +192,9 @@ impl EntertainmentService {
         }
     }
 
-    pub fn translate_frame(res: &Resources, pkt: HueStreamPacket) -> ApiResult<HueStreamPacketV2> {
+    pub async fn translate_frame(&self, pkt: HueStreamPacket) -> ApiResult<HueStreamPacketV2> {
         match pkt {
-            HueStreamPacket::V1(v1) => Self::translate_v1_frame(res, v1),
+            HueStreamPacket::V1(v1) => Self::translate_v1_frame(&*self.res.lock().await, v1),
             HueStreamPacket::V2(v2) => Ok(v2),
         }
     }
@@ -212,9 +213,9 @@ impl EntertainmentService {
         log::trace!("First entertainment frame: {}", hex::encode(&buf[..sz]));
         let raw = HueStreamPacket::parse(&buf[..sz])?;
 
-        let lock = self.res.lock().await;
+        let header = self.translate_frame(raw).await?;
 
-        let header = Self::translate_frame(&lock, raw)?;
+        let lock = self.res.lock().await;
 
         // look up entertainment area, to make sure it exists
         let _ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
@@ -232,11 +233,7 @@ impl EntertainmentService {
             log::trace!("Packet buffer: {}", view.escape_ascii());
 
             let raw = HueStreamPacket::parse(view)?;
-            let pkt = if let HueStreamPacket::V2(v2) = raw {
-                v2
-            } else {
-                Self::translate_frame(&*self.res.lock().await, raw)?
-            };
+            let pkt = self.translate_frame(raw).await?;
 
             if pkt.color_mode() != header.color_mode() {
                 log::error!("Entertainment Mode color_mode changed mid-stream.");
