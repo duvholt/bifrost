@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::fmt::Write;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -242,6 +243,19 @@ pub enum Availability {
 #[derive(Serialize, Deserialize, Clone, Hash)]
 #[serde(transparent)]
 pub struct IeeeAddress(#[serde(deserialize_with = "ieee_address")] u64);
+
+impl IeeeAddress {
+    #[must_use]
+    // Format as hex MAC address (00:11::22:AA etc)
+    pub fn as_mac(&self) -> String {
+        self.0
+            .to_be_bytes()
+            .into_iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+}
 
 impl Debug for IeeeAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -815,4 +829,16 @@ pub enum DeviceEndpointBindingTarget {
 pub struct DeviceEndpointClusters {
     pub input: Vec<String>,
     pub output: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IeeeAddress;
+
+    #[test]
+    fn ieee_adress_as_mac() {
+        let ieee_adress: IeeeAddress = serde_json::from_str("\"0x134e6d229e21652a\"").unwrap();
+
+        assert_eq!("13:4e:6d:22:9e:21:65:2a".to_string(), ieee_adress.as_mac());
+    }
 }

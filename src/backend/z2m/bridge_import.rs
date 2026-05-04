@@ -130,7 +130,7 @@ impl Z2mBackend {
         let zigcon = ZigbeeConnectivity {
             channel: None,
             extended_pan_id: None,
-            mac_address: apidev.ieee_address.to_string(),
+            mac_address: apidev.ieee_address.as_mac(),
             owner: link_device,
             status: ZigbeeConnectivityStatus::Connected,
         };
