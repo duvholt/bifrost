@@ -468,7 +468,10 @@ impl Z2mBackend {
             // transitionss, even at low frame rates!
             es.stream.set_smoothing_duration(self.throttle.interval())?;
 
-            log::info!("Starting entertainment mode stream at {} fps", self.fps);
+            if let Some(mut old) = self.entstream.take() {
+                log::debug!("Cleaning up previous entertainment session..");
+                old.stop_stream(z2mws).await.ok();
+            }
 
             es.start_stream(z2mws).await?;
 

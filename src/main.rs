@@ -112,6 +112,7 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
         bconf.ipaddress,
         bconf.entm_port,
         appstate.res.clone(),
+        appstate.backend.clone(),
     )?;
     mgr.register_service("entertainment", svc).await?;
 

@@ -5,7 +5,9 @@ use std::sync::Arc;
 use camino::Utf8Path;
 use chrono::Utc;
 use tokio::sync::Mutex;
+use tokio::sync::broadcast::Sender;
 
+use bifrost_api::backend::BackendRequest;
 use hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
 use svc::manager::SvmClient;
 
@@ -22,6 +24,7 @@ pub struct AppState {
     upd: Arc<Mutex<VersionUpdater>>,
     svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
+    pub backend: Sender<Arc<BackendRequest>>,
 }
 
 impl AppState {
@@ -66,6 +69,7 @@ impl AppState {
         res.reset_all_streaming()?;
 
         let conf = Arc::new(config);
+        let backend = res.backend_sender();
         let res = Arc::new(Mutex::new(res));
 
         Ok(Self {
@@ -73,6 +77,7 @@ impl AppState {
             upd,
             svm,
             res,
+            backend,
         })
     }
 
