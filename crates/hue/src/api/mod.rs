@@ -1,4 +1,5 @@
 mod behavior;
+mod bridge_home;
 mod device;
 mod entertainment;
 mod entertainment_config;
@@ -17,6 +18,7 @@ pub use behavior::{
     BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata, WakeupConfiguration,
     WakeupStyle,
 };
+pub use bridge_home::BridgeHome;
 pub use device::{Device, DeviceArchetype, DeviceProductData, DeviceUpdate, Identify};
 pub use entertainment::{Entertainment, EntertainmentSegment, EntertainmentSegments};
 pub use entertainment_config::{
@@ -50,11 +52,10 @@ pub use scene::{
 use serde::ser::SerializeMap;
 pub use stream::HueStreamKey;
 pub use stubs::{
-    Bridge, BridgeHome, Button, ButtonData, ButtonMetadata, ButtonReport, DevicePower,
-    DeviceSoftwareUpdate, DollarRef, GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion,
-    Homekit, LightLevel, Matter, Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage,
-    RelativeRotary, SmartScene, Taurus, Temperature, TimeZone, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus, Zone,
+    Bridge, Button, ButtonData, ButtonMetadata, ButtonReport, DevicePower, DeviceSoftwareUpdate,
+    DollarRef, GeofenceClient, Geolocation, GroupedLightLevel, GroupedMotion, Homekit, LightLevel,
+    Matter, Metadata, MetadataUpdate, Motion, PrivateGroup, PublicImage, RelativeRotary,
+    SmartScene, Taurus, Temperature, TimeZone, ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
 };
 pub use update::Update;
 pub use zigbee_device_discovery::{

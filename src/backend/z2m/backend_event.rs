@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    ColorTemperatureUpdate, Entertainment, EntertainmentConfiguration, GroupedLight,
+    BridgeHome, ColorTemperatureUpdate, Entertainment, EntertainmentConfiguration, GroupedLight,
     GroupedLightUpdate, Light, LightEffectsV2Update, LightGradientMode, LightUpdate, RType,
     Resource, ResourceLink, Room, RoomUpdate, Scene, SceneActive, SceneStatus, SceneStatusEnum,
     SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
@@ -313,12 +313,38 @@ impl Z2mBackend {
         link: &ResourceLink,
         upd: &GroupedLightUpdate,
     ) -> ApiResult<()> {
-        let room = self.state.lock().await.get::<GroupedLight>(link)?.owner;
+        let owner = self.state.lock().await.get::<GroupedLight>(link)?.owner;
 
-        if let Some(topic) = self.rmap.get(&room) {
-            z2mws.send_update(topic, &upd.into()).await?;
+        match owner.rtype {
+            RType::Room | RType::Zone => {
+                if let Some(topic) = self.rmap.get(&owner) {
+                    z2mws.send_update(topic, &upd.into()).await?;
+                }
+            }
+            RType::BridgeHome => {
+                // Apply grouped light update to all rooms
+                let lock = self.state.lock().await;
+                let home = lock.get::<BridgeHome>(&owner)?.clone();
+                let room_grouped_lights: Vec<_> = home
+                    .children
+                    .into_iter()
+                    .filter_map(|child_link| {
+                        if child_link.rtype == RType::Room {
+                            let room = lock.get::<Room>(&child_link).ok()?;
+                            room.grouped_light_service().copied()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                drop(lock);
+                for room_grouped_light in room_grouped_lights {
+                    Box::pin(self.backend_grouped_light_update(z2mws, &room_grouped_light, upd))
+                        .await?;
+                }
+            }
+            _ => {}
         }
-
         Ok(())
     }
 
