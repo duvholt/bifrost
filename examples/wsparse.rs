@@ -110,6 +110,9 @@ async fn main() -> ApiResult<()> {
                 Message::BridgeResponseGroupOptions(obj) => {
                     println!("{obj:#?}");
                 }
+                Message::BridgeHealth(obj) => {
+                    println!("{obj:#?}");
+                }
             }
 
             continue;
