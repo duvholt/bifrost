@@ -104,7 +104,7 @@ pub enum Resource {
     GroupedLightLevel(GroupedLightLevel),
     GroupedMotion(GroupedMotion),
     Homekit(Homekit),
-    Light(Light),
+    Light(Box<Light>),
     LightLevel(LightLevel),
     Matter(Matter),
     Motion(Motion),
@@ -314,6 +314,53 @@ macro_rules! resource_conversion_impl {
     };
 }
 
+#[macro_export]
+macro_rules! resource_conversion_box_impl {
+    ( $name:ident ) => {
+        impl<'a> TryFrom<&'a mut Resource> for &'a mut $name {
+            type Error = HueError;
+
+            fn try_from(value: &'a mut Resource) -> Result<Self, Self::Error> {
+                if let Resource::$name(obj) = value {
+                    Ok(obj)
+                } else {
+                    Err(HueError::WrongType(RType::Light, value.rtype()))
+                }
+            }
+        }
+
+        impl<'a> TryFrom<&'a Resource> for &'a $name {
+            type Error = HueError;
+
+            fn try_from(value: &'a Resource) -> Result<Self, Self::Error> {
+                if let Resource::$name(obj) = value {
+                    Ok(obj)
+                } else {
+                    Err(HueError::WrongType(RType::Light, value.rtype()))
+                }
+            }
+        }
+
+        impl TryFrom<Resource> for Box<$name> {
+            type Error = HueError;
+
+            fn try_from(value: Resource) -> Result<Self, Self::Error> {
+                if let Resource::$name(obj) = value {
+                    Ok(obj)
+                } else {
+                    Err(HueError::WrongType(RType::Light, value.rtype()))
+                }
+            }
+        }
+
+        impl From<$name> for Resource {
+            fn from(value: $name) -> Self {
+                Resource::$name(Box::new(value))
+            }
+        }
+    };
+}
+
 // AuthV1 is not a real resource (only used in links)
 // resource_conversion_impl!(AuthV1);
 resource_conversion_impl!(BehaviorInstance);
@@ -332,7 +379,7 @@ resource_conversion_impl!(GroupedLight);
 resource_conversion_impl!(GroupedLightLevel);
 resource_conversion_impl!(GroupedMotion);
 resource_conversion_impl!(Homekit);
-resource_conversion_impl!(Light);
+resource_conversion_box_impl!(Light);
 resource_conversion_impl!(LightLevel);
 resource_conversion_impl!(Matter);
 resource_conversion_impl!(Motion);

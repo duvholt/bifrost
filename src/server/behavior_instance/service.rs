@@ -86,7 +86,7 @@ impl BehaviorInstanceService {
                 job.update_configuration(configuration);
             }
             (Some(_job), None) => {
-                self.delete_job(rid).await?;
+                self.delete_job(rid);
             }
             (None, Some(_configuration)) => {
                 self.new_job(rid).await?;
@@ -96,9 +96,8 @@ impl BehaviorInstanceService {
         Ok(())
     }
 
-    async fn delete_job(&mut self, rid: Uuid) -> ApiResult<()> {
+    fn delete_job(&mut self, rid: Uuid) {
         self.jobs.remove(&rid);
-        Ok(())
     }
 }
 
@@ -153,13 +152,7 @@ impl Service for BehaviorInstanceService {
                         for obj in delete.data {
                             if RType::BehaviorInstance == obj.rtype {
                                 log::debug!("Deleting behavior instance job {}", obj.id);
-                                if let Err(err) = self.delete_job(obj.id).await {
-                                    log::error!(
-                                        "Failed to delete behavior instance job {}: {}",
-                                        obj.id,
-                                        err
-                                    );
-                                }
+                                self.delete_job(obj.id);
                             }
                         }
                     }
@@ -210,7 +203,7 @@ impl BehaviorInstanceJob {
 
         let job = match &self.configuration {
             BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                self.create_wake_up_task(&wakeup_configuration)
+                self.create_wake_up_task(wakeup_configuration)
             }
         };
         self.task = Some(spawn(job.create()));
@@ -219,12 +212,13 @@ impl BehaviorInstanceJob {
     fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> WakeupJob {
         let weekdays = configuration.when.recurrence_days.as_ref();
 
+        #[allow(clippy::option_if_let_else)]
         let schedule_type = match weekdays {
-            Some(weekdays) => ScheduleType::Recurring(weekdays.iter().cloned().collect()),
+            Some(weekdays) => ScheduleType::Recurring(weekdays.iter().copied().collect()),
             None => ScheduleType::Once(),
         };
         WakeupJob {
-            rid: self.rid.clone(),
+            rid: self.rid,
             schedule_type,
             configuration: configuration.clone(),
             res: self.res.clone(),

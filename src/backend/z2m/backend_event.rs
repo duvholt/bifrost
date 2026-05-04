@@ -172,7 +172,7 @@ impl Z2mBackend {
                     // (and only) way to do it
                     .with_gradient(upd.gradient.clone()),
             );
-        };
+        }
 
         if let Some(payload) = payload {
             z2mws.send_update(topic, &payload).await?;
@@ -199,7 +199,7 @@ impl Z2mBackend {
                 z2mws.send_hue_effects(topic, hz).await?;
 
                 // Do an explicit attribute read since Hue specific updates do not automatically update z2m state
-                z2mws.send_read(&topic, &read_payload).await?;
+                z2mws.send_read(topic, &read_payload).await?;
             }
         }
 

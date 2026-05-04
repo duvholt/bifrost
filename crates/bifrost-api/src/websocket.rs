@@ -9,6 +9,6 @@ use crate::service::Service;
 pub enum Update {
     AppConfig(AppConfig),
     HueEvent(EventBlock),
-    BackendRequest(BackendRequest),
+    BackendRequest(Box<BackendRequest>),
     ServiceUpdate(Service),
 }

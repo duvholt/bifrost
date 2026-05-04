@@ -141,9 +141,9 @@ impl DeviceRead {
         Self::default()
     }
 
-    fn to_field_value(changed: bool) -> Option<String> {
+    const fn to_field_value(changed: bool) -> Option<String> {
         // https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html#zigbee2mqtt-friendly-name-get
-        if changed { Some("".to_string()) } else { None }
+        if changed { Some(String::new()) } else { None }
     }
 
     #[must_use]

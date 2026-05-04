@@ -56,9 +56,10 @@ impl WakeupJob {
         Ok(scheduled_wakeup_time - fade_in_duration)
     }
 
+    #[allow(clippy::needless_continue)]
     fn next_weekday_occurrence(
         weekdays: &HashSet<Weekday>,
-        time: &NaiveTime,
+        time: NaiveTime,
         now: &DateTime<Local>,
     ) -> ApiResult<DateTime<Local>> {
         let now_date = now.date_naive();
@@ -74,7 +75,7 @@ impl WakeupJob {
             if !weekdays.contains(&next_date.weekday()) {
                 continue;
             }
-            let datetime = next_date.and_time(time.clone());
+            let datetime = next_date.and_time(time);
             match Local.from_local_datetime(&datetime) {
                 LocalResult::Single(candidate) | LocalResult::Ambiguous(_, candidate) => {
                     if &candidate >= now {
@@ -87,10 +88,7 @@ impl WakeupJob {
                 }
             }
         }
-        return Err(ApiError::NoNextWeekdayOccurence(
-            time.clone(),
-            weekdays.clone(),
-        ));
+        Err(ApiError::NoNextWeekdayOccurence(time, weekdays.clone()))
     }
 
     pub async fn create(self) {
@@ -113,8 +111,7 @@ impl WakeupJob {
         let fade_in_start = self.start_time()?;
         loop {
             let now = Local::now();
-            let fade_in_datetime =
-                WakeupJob::next_weekday_occurrence(&weekdays, &fade_in_start, &now)?;
+            let fade_in_datetime = Self::next_weekday_occurrence(&weekdays, fade_in_start, &now)?;
             log::debug!(
                 "Recurring wakeup task for {:?}, {} will run at {}",
                 &weekdays,
@@ -176,9 +173,12 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                 // Hue effects do not support grouped lights so we need to send indivial requests to each light
                 lights_in_room
                     .into_iter()
-                    .filter_map(|(resource_link, light)| match light.on.on {
-                        false => Some(WakeupRequest::Light(*resource_link)),
-                        true => None,
+                    .filter_map(|(resource_link, light)| {
+                        if light.on.on {
+                            None
+                        } else {
+                            Some(WakeupRequest::Light(*resource_link))
+                        }
                     })
                     .collect()
             } else {
@@ -202,10 +202,13 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
             })
             .flat_map(|(resource_link, resource)| match resource.obj {
                 Resource::Room(room) => room_requests(&room),
-                Resource::Light(light) => match light.on.on {
-                    false => vec![WakeupRequest::Light(resource_link)],
-                    true => vec![],
-                },
+                Resource::Light(light) => {
+                    if light.on.on {
+                        vec![]
+                    } else {
+                        vec![WakeupRequest::Light(resource_link)]
+                    }
+                }
                 Resource::BridgeHome(_bridge_home) => {
                     let all_rooms = lock.get_resources_by_type(RType::Room);
                     all_rooms
@@ -355,7 +358,7 @@ impl WakeupRequest {
                     .backend_request(BackendRequest::LightUpdate(*resource_link, payload))?;
             }
             Self::Group(_resource_link) => {}
-        };
+        }
         Ok(())
     }
 

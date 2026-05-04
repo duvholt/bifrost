@@ -47,7 +47,9 @@ impl WebSocketTask {
         backend_event: &Arc<BackendRequest>,
     ) -> BifrostApiResult<Option<Update>> {
         log::info!("Backend event: {backend_event:?}");
-        Ok(Some(Update::BackendRequest((**backend_event).clone())))
+        Ok(Some(Update::BackendRequest(Box::new(
+            (**backend_event).clone(),
+        ))))
     }
 
     fn handle_hue_event(&self, hue_event: HueEventRecord) -> BifrostApiResult<Option<Update>> {

@@ -52,9 +52,9 @@ impl Z2mBackend {
             usertest: None,
         };
 
-        self.map.insert(name.to_string(), link_light);
-        self.rmap.insert(link_device, name.to_string());
-        self.rmap.insert(link_light, name.to_string());
+        self.map.insert(name.clone(), link_light);
+        self.rmap.insert(link_device, name.clone());
+        self.rmap.insert(link_light, name.clone());
 
         let mut light = Light::new(link_device, metadata);
 
@@ -138,7 +138,7 @@ impl Z2mBackend {
         let mut res = self.state.lock().await;
         res.aux_set(&link_light, AuxData::new().with_topic(name));
         res.add(&link_device, Resource::Device(dev))?;
-        res.add(&link_light, Resource::Light(light))?;
+        res.add(&link_light, Resource::Light(Box::new(light)))?;
         res.add(&link_enttm, Resource::Entertainment(enttm))?;
         res.add(&link_taurus, Resource::Taurus(taurus))?;
         res.add(&link_zigcon, Resource::ZigbeeConnectivity(zigcon))?;
@@ -162,8 +162,8 @@ impl Z2mBackend {
             usertest: None,
         };
 
-        self.map.insert(name.to_string(), link_button);
-        self.rmap.insert(link_button, name.to_string());
+        self.map.insert(name.clone(), link_button);
+        self.rmap.insert(link_button, name.clone());
 
         let mut res = self.state.lock().await;
         let button = Button {
@@ -227,7 +227,7 @@ impl Z2mBackend {
             .map(|f| RType::Device.deterministic(&f.ieee_address))
             .collect();
 
-        let topic = grp.friendly_name.to_string();
+        let topic = grp.friendly_name.clone();
 
         let mut res = self.state.lock().await;
 
@@ -241,7 +241,7 @@ impl Z2mBackend {
                 metadata: SceneMetadata {
                     appdata: None,
                     image: guess_scene_icon(&scn.name),
-                    name: scn.name.to_string(),
+                    name: scn.name.clone(),
                 },
                 palette: json!({
                     "color": [],
@@ -304,7 +304,7 @@ impl Z2mBackend {
         let mut metadata = RoomMetadata::new(RoomArchetype::Home, room_name);
         if let Some(room_conf) = self.config.rooms.get(&topic) {
             if let Some(name) = &room_conf.name {
-                metadata.name = name.to_string();
+                metadata.name.clone_from(name);
             }
             if let Some(icon) = &room_conf.icon {
                 metadata.archetype = *icon;
