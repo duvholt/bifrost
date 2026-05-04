@@ -128,28 +128,31 @@ fn make_channels(
         let ent: &Entertainment = lock.get(&location.service)?;
 
         if let Some(segs) = &ent.segments {
-            for index in 0..segs.segments.len() {
-                channels.push(EntertainmentConfigurationChannels {
-                    channel_id,
-                    position: POSITIONS[index % POSITIONS.len()].clone(),
-                    members: vec![EntertainmentConfigurationStreamMembers {
-                        service: location.service,
-                        index: u16::try_from(index)?,
-                    }],
-                });
-                channel_id += 1;
+            if segs.segments.len() > 1 {
+                for index in 0..segs.segments.len() {
+                    channels.push(EntertainmentConfigurationChannels {
+                        channel_id,
+                        position: POSITIONS[index % POSITIONS.len()].clone(),
+                        members: vec![EntertainmentConfigurationStreamMembers {
+                            service: location.service,
+                            index: u16::try_from(index)?,
+                        }],
+                    });
+                    channel_id += 1;
+                }
+                continue;
             }
-        } else {
-            channels.push(EntertainmentConfigurationChannels {
-                channel_id,
-                position: pos.clone(),
-                members: vec![EntertainmentConfigurationStreamMembers {
-                    service: location.service,
-                    index: 0,
-                }],
-            });
-            channel_id += 1;
         }
+
+        channels.push(EntertainmentConfigurationChannels {
+            channel_id,
+            position: pos.clone(),
+            members: vec![EntertainmentConfigurationStreamMembers {
+                service: location.service,
+                index: 0,
+            }],
+        });
+        channel_id += 1;
     }
 
     Ok(channels)
@@ -212,15 +215,23 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
     }
 
     if let Some(action) = &upd.action {
-        let ent: &EntertainmentConfiguration = lock.get(&rlink)?;
-        let svc = ent.light_services.clone();
+        let rids: Vec<_> = lock
+            .get::<EntertainmentConfiguration>(&rlink)?
+            .light_services
+            .iter()
+            .map(|s| s.rid.clone())
+            .collect();
 
-        lock.update::<Light>(&svc[0].rid, |light| {
-            light.mode = match action {
-                EntertainmentConfigurationAction::Start => LightMode::Streaming,
-                EntertainmentConfigurationAction::Stop => LightMode::Normal,
-            }
-        })?;
+        let mode = match action {
+            EntertainmentConfigurationAction::Start => LightMode::Streaming,
+            EntertainmentConfigurationAction::Stop => LightMode::Normal,
+        };
+
+        for rid in rids {
+            lock.update::<Light>(&rid, |light| {
+                light.mode = mode;
+            })?;
+        }
     }
 
     let bridge_ent = find_bridge_entertainment(&lock)?;
