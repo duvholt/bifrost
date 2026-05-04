@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
 use hue::api::{
-    ColorGamut, ColorTemperature, DeviceProductData, Dimming, GamutType, GroupedLightUpdate,
-    LightColor, LightGradient, LightGradientMode, LightGradientPoint, LightGradientUpdate,
-    LightUpdate, MirekSchema,
+    ColorGamut, ColorTemperature, DeviceProductData, Dimming, DimmingDeltaAction, GamutType,
+    GroupedLightUpdate, LightColor, LightGradient, LightGradientMode, LightGradientPoint,
+    LightGradientUpdate, LightUpdate, MirekSchema,
 };
 use hue::devicedb::{hardware_platform_type, product_archetype};
 use hue::xy::XY;
@@ -183,6 +183,13 @@ impl From<&GroupedLightUpdate> for DeviceUpdate {
         Self::default()
             .with_state(upd.on.map(|on| on.on))
             .with_brightness(upd.dimming.map(|dim| dim.brightness / 100.0 * 254.0))
+            .with_brightness_step(upd.dimming_delta.map(|dim_delta| {
+                let brightness = dim_delta.brightness_delta / 100.0 * 254.0;
+                match dim_delta.action {
+                    DimmingDeltaAction::Up => brightness,
+                    DimmingDeltaAction::Down => -brightness,
+                }
+            }))
             .with_color_temp(upd.color_temperature.and_then(|ct| ct.mirek))
             .with_color_xy(upd.color.map(|col| col.xy))
             .with_transition(

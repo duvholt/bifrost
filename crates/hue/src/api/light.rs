@@ -643,6 +643,8 @@ pub struct LightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimming: Option<DimmingUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimming_delta: Option<DimmingDeltaUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<ColorUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
@@ -726,6 +728,13 @@ impl LightUpdate {
     pub fn with_dynamics(self, dynamics: Option<LightDynamicsUpdate>) -> Self {
         Self { dynamics, ..self }
     }
+
+    pub fn with_dimming_delta(self, dimming_delta: Option<DimmingDeltaUpdate>) -> Self {
+        Self {
+            dimming_delta,
+            ..self
+        }
+    }
 }
 
 impl From<&ApiLightStateUpdate> for LightUpdate {
@@ -761,6 +770,29 @@ impl From<Dimming> for DimmingUpdate {
             brightness: value.brightness,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub struct DimmingDeltaUpdate {
+    pub action: DimmingDeltaAction,
+    pub brightness_delta: f64,
+}
+
+impl DimmingDeltaUpdate {
+    #[must_use]
+    pub const fn new(action: DimmingDeltaAction, brightness_delta: f64) -> Self {
+        Self {
+            action,
+            brightness_delta,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DimmingDeltaAction {
+    Up,
+    Down,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

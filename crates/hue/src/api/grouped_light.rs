@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::api::{ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, On, ResourceLink, Stub};
+use crate::api::{
+    ColorTemperatureUpdate, ColorUpdate, DimmingDeltaUpdate, DimmingUpdate, On, ResourceLink, Stub,
+};
 use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
 
@@ -74,6 +76,8 @@ pub struct GroupedLightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimming: Option<DimmingUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimming_delta: Option<DimmingDeltaUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<ColorUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
@@ -124,6 +128,13 @@ impl GroupedLightUpdate {
     #[must_use]
     pub const fn with_dynamics(self, dynamics: Option<GroupedLightDynamicsUpdate>) -> Self {
         Self { dynamics, ..self }
+    }
+
+    pub fn with_dimming_delta(self, dimming_delta: Option<DimmingDeltaUpdate>) -> Self {
+        Self {
+            dimming_delta,
+            ..self
+        }
     }
 }
 
