@@ -215,14 +215,20 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
     }
 
     if let Some(action) = &upd.action {
-        let ent: &EntertainmentConfiguration = lock.get(&rlink)?;
+        let rids: Vec<_> = lock
+            .get::<EntertainmentConfiguration>(&rlink)?
+            .light_services
+            .iter()
+            .map(|s| s.rid.clone())
+            .collect();
+
         let mode = match action {
             EntertainmentConfigurationAction::Start => LightMode::Streaming,
             EntertainmentConfigurationAction::Stop => LightMode::Normal,
         };
 
-        for svc in &ent.light_services {
-            lock.update::<Light>(&svc.rid, |light| {
+        for rid in rids {
+            lock.update::<Light>(&rid, |light| {
                 light.mode = mode;
             })?;
         }
