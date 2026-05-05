@@ -10,9 +10,10 @@ use uuid::Uuid;
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
-    EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffectsV2Update,
-    LightGradientMode, LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene,
-    SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
+    EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffect,
+    LightEffectsV2Update, LightGradientMode, LightUpdate, RType, Resource, ResourceLink, Room,
+    RoomUpdate, Scene, SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate,
+    ZigbeeDeviceDiscoveryUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
@@ -113,6 +114,22 @@ impl Z2mBackend {
             lock.update::<Light>(&link.rid, |light| {
                 if let Some(gr) = &mut light.gradient {
                     gr.mode = mode;
+                }
+            })?;
+        }
+        // Effect state is currently not retrieved from backend updates either
+        if let Some(upd) = upd.effects_v2.as_ref() {
+            lock.update::<Light>(&link.rid, |light| {
+                if let Some(effects_v2) = &mut light.effects_v2 {
+                    *effects_v2 += upd;
+                }
+                if let Some(effects) = &mut light.effects {
+                    let light_effect = upd
+                        .action
+                        .as_ref()
+                        .and_then(|a| a.effect)
+                        .unwrap_or(LightEffect::NoEffect);
+                    effects.status = light_effect;
                 }
             })?;
         }
