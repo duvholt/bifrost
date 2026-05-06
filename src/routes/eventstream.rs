@@ -46,8 +46,11 @@ pub async fn get_clip_v2(
         Ok(Event::default().id(evt_id).json_data(json)?)
     });
 
-    Sse::new(hello.chain(stream))
-        .keep_alive(KeepAlive::new().interval(Duration::from_secs(15)).text("hi"))
+    Sse::new(hello.chain(stream)).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("hi"),
+    )
 }
 
 pub fn router() -> Router<AppState> {
