@@ -13,6 +13,7 @@ use nix::sys::socket::sockopt::RcvBuf;
 use openssl::ssl::{Ssl, SslContext, SslMethod};
 use tokio::io::AsyncReadExt;
 use tokio::net::UdpSocket;
+use tokio::spawn;
 use tokio::sync::Mutex;
 use tokio::sync::broadcast::Sender;
 use tokio::time::timeout;
@@ -33,30 +34,17 @@ use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
 
-pub struct EntertainmentService {
-    addr: SocketAddr,
-    udp: Option<Arc<UdpListener>>,
-    ctx: Option<SslContext>,
+struct EntertainmentSocket {
     res: Arc<Mutex<Resources>>,
     backend_updates: Sender<Arc<BackendRequest>>,
 }
 
-impl EntertainmentService {
-    pub fn new(
-        addr: Ipv4Addr,
-        port: u16,
-        res: Arc<Mutex<Resources>>,
-        backend_updates: Sender<Arc<BackendRequest>>,
-    ) -> ApiResult<Self> {
-        let res = Self {
-            addr: SocketAddr::new(addr.into(), port),
-            udp: None,
-            ctx: None,
+impl EntertainmentSocket {
+    fn new(res: Arc<Mutex<Resources>>, backend_updates: Sender<Arc<BackendRequest>>) -> Self {
+        Self {
             res,
             backend_updates,
-        };
-
-        Ok(res)
+        }
     }
 
     async fn read_frame(sess: &mut SslStream<UdpStream>, buf: &mut [u8]) -> ApiResult<usize> {
@@ -199,7 +187,7 @@ impl EntertainmentService {
         }
     }
 
-    pub async fn run_loop(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
+    pub async fn listen(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
         let mut buf = [0u8; 1024];
 
         timeout(Duration::from_secs(5), Pin::new(&mut sess).accept())
@@ -266,6 +254,33 @@ impl EntertainmentService {
     }
 }
 
+pub struct EntertainmentService {
+    addr: SocketAddr,
+    udp: Option<Arc<UdpListener>>,
+    ctx: Option<SslContext>,
+    res: Arc<Mutex<Resources>>,
+    backend_updates: Sender<Arc<BackendRequest>>,
+}
+
+impl EntertainmentService {
+    pub fn new(
+        addr: Ipv4Addr,
+        port: u16,
+        res: Arc<Mutex<Resources>>,
+        backend_updates: Sender<Arc<BackendRequest>>,
+    ) -> ApiResult<Self> {
+        let res = Self {
+            addr: SocketAddr::new(addr.into(), port),
+            udp: None,
+            ctx: None,
+            res,
+            backend_updates,
+        };
+
+        Ok(res)
+    }
+}
+
 #[async_trait]
 impl Service for EntertainmentService {
     type Error = ApiError;
@@ -313,14 +328,17 @@ impl Service for EntertainmentService {
             let (socket, _addr) = udp.accept().await?;
             let ssl = Ssl::new(ctx)?;
             let stream = SslStream::new(ssl, socket)?;
+            let entertainment_socket =
+                EntertainmentSocket::new(self.res.clone(), self.backend_updates.clone());
 
-            match self.run_loop(stream).await {
-                Ok(()) => log::info!("Entertainment stream finished"),
-                Err(err) => log::error!("Entertainment stream error: {err}"),
-            }
+            log::debug!("Listening to new entertainment socket stream");
 
-            let req = BackendRequest::EntertainmentStop();
-            self.res.lock().await.backend_request(req)?;
+            spawn(async move {
+                match entertainment_socket.listen(stream).await {
+                    Ok(()) => log::info!("Entertainment stream finished"),
+                    Err(err) => log::error!("Entertainment stream error: {err}"),
+                }
+            });
         }
     }
 
