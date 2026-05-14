@@ -5,13 +5,18 @@ use byteorder::{LittleEndian as LE, ReadBytesExt, WriteBytesExt};
 use packed_struct::derive::{PackedStruct, PrimitiveEnum_u8};
 use packed_struct::{PackedStruct, PackedStructSlice, PrimitiveEnum};
 
-use crate::api::{LightEffect, LightGradientMode, LightTimedEffect};
+use crate::api::{
+    ColorUpdate, LightEffect, LightEffectActionUpdate, LightEffectParameters, LightEffectsV2Update,
+    LightGradientMode, LightGradientPoint, LightGradientUpdate, LightTimedEffect,
+    LightTimedEffectsUpdate, LightUpdate, On,
+};
+use crate::clamp::Clamp;
 use crate::effect_duration::EffectDuration;
 use crate::error::{HueError, HueResult};
 use crate::flags::TakeFlag;
 use crate::xy::XY;
 
-#[derive(PrimitiveEnum_u8, Debug, Copy, Clone)]
+#[derive(PrimitiveEnum_u8, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EffectType {
     NoEffect = 0x00,
     Candle = 0x01,
@@ -393,6 +398,69 @@ impl HueZigbeeUpdate {
         }
 
         Ok(())
+    }
+}
+
+impl From<HueZigbeeUpdate> for LightUpdate {
+    fn from(hz: HueZigbeeUpdate) -> Self {
+        let mut upd = Self::new()
+            .with_on(hz.onoff.map(|o| On::new(o > 0)))
+            .with_brightness(hz.brightness.map(|b| (b as f64) / 254.0 * 100.0))
+            .with_color_temperature(hz.color_mirek)
+            .with_color_xy(hz.color_xy);
+
+        if let Some(effect_type) = hz.effect_type {
+            if let Some(light_effect) = LightEffect::ALL.iter().copied().find(|&e| {
+                let e: EffectType = e.into();
+                e == effect_type
+            }) {
+                let action = Some(LightEffectActionUpdate {
+                    effect: Some(light_effect),
+                    parameters: LightEffectParameters {
+                        color: upd.color,
+                        color_temperature: upd.color_temperature,
+                        speed: hz.effect_speed.map(Clamp::unit_from_u8_light),
+                    },
+                });
+                upd.effects_v2 = Some(LightEffectsV2Update {
+                    action: action,
+                    status: None,
+                });
+                upd.timed_effects = Some(LightTimedEffectsUpdate::no_effect());
+            } else if let Some(light_timed_effect) = LightTimedEffect::ALL.into_iter().find(|&e| {
+                let e: EffectType = e.into();
+                e == effect_type
+            }) {
+                upd.effects_v2 = Some(LightEffectsV2Update::no_effect());
+                upd.timed_effects = Some(LightTimedEffectsUpdate {
+                    effect: Some(light_timed_effect),
+                    duration: None,
+                });
+            }
+        } else {
+            upd.effects_v2 = Some(LightEffectsV2Update::no_effect());
+            upd.timed_effects = Some(LightTimedEffectsUpdate::no_effect());
+        }
+
+        if let Some(gradient_colors) = &hz.gradient_colors {
+            upd.gradient = Some(LightGradientUpdate {
+                mode: Some(match gradient_colors.header.style {
+                    GradientStyle::Linear => LightGradientMode::InterpolatedPalette,
+                    GradientStyle::Mirrored => LightGradientMode::InterpolatedPaletteMirrored,
+                    GradientStyle::Scattered => LightGradientMode::RandomPixelated,
+                }),
+                points: gradient_colors
+                    .points
+                    .iter()
+                    .copied()
+                    .map(|point| LightGradientPoint {
+                        color: ColorUpdate::new(point),
+                    })
+                    .collect(),
+            })
+        }
+
+        upd
     }
 }
 

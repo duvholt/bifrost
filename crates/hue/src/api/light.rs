@@ -224,6 +224,26 @@ impl AddAssign<&LightUpdate> for Light {
                 grad.points.clone_from(&grupd.points);
             }
         }
+
+        if let Some(upd) = &upd.effects_v2 {
+            if let Some(effects) = &mut self.effects_v2 {
+                *effects += upd;
+            }
+            if let Some(effects) = &mut self.effects {
+                let light_effect = upd
+                    .action
+                    .as_ref()
+                    .and_then(|a| a.effect)
+                    .unwrap_or(LightEffect::NoEffect);
+                effects.status = light_effect;
+            }
+        }
+
+        if let Some(upd) = &upd.timed_effects {
+            if let Some(timed_effects) = &mut self.timed_effects {
+                timed_effects.status = upd.effect.unwrap_or(LightTimedEffect::NoEffect);
+            }
+        }
     }
 }
 
@@ -537,7 +557,7 @@ impl LightEffects {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LightEffectsV2 {
     pub action: LightEffectValues,
     pub status: LightEffectStatus,
@@ -575,6 +595,35 @@ pub struct LightEffectsV2Update {
     pub status: Option<Value>,
 }
 
+impl LightEffectsV2Update {
+    pub fn no_effect() -> Self {
+        Self {
+            action: Some(LightEffectActionUpdate {
+                effect: Some(LightEffect::NoEffect),
+                parameters: LightEffectParameters {
+                    color: None,
+                    color_temperature: None,
+                    speed: None,
+                },
+            }),
+            status: None,
+        }
+    }
+}
+
+impl AddAssign<&LightEffectsV2Update> for LightEffectsV2 {
+    fn add_assign(&mut self, upd: &LightEffectsV2Update) {
+        let light_effect = upd
+            .action
+            .as_ref()
+            .and_then(|a| a.effect)
+            .unwrap_or(LightEffect::NoEffect);
+
+        self.status.effect = light_effect;
+        self.status.parameters = upd.action.as_ref().map(|a| a.parameters.clone());
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LightEffectActionUpdate {
@@ -583,12 +632,12 @@ pub struct LightEffectActionUpdate {
     pub parameters: LightEffectParameters,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LightEffectParameters {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<ColorUpdate>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
     pub speed: Option<f32>,
 }
@@ -598,12 +647,12 @@ pub struct LightEffectValues {
     pub effect_values: Vec<LightEffect>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LightEffectStatus {
     pub effect: LightEffect,
     pub effect_values: Vec<LightEffect>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parameters: Option<Value>,
+    pub parameters: Option<LightEffectParameters>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -632,6 +681,15 @@ pub struct LightTimedEffectsUpdate {
     pub effect: Option<LightTimedEffect>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<u32>,
+}
+
+impl LightTimedEffectsUpdate {
+    pub fn no_effect() -> Self {
+        Self {
+            effect: Some(LightTimedEffect::NoEffect),
+            duration: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

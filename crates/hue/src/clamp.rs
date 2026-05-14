@@ -2,6 +2,7 @@ pub trait Clamp {
     fn unit_to_u8_clamped(self) -> u8;
     fn unit_to_u8_clamped_light(self) -> u8;
     fn unit_from_u8(value: u8) -> Self;
+    fn unit_from_u8_light(value: u8) -> Self;
 }
 
 impl Clamp for f32 {
@@ -18,6 +19,10 @@ impl Clamp for f32 {
     fn unit_from_u8(value: u8) -> Self {
         Self::from(value) / 255.0
     }
+
+    fn unit_from_u8_light(value: u8) -> Self {
+        Self::from(value) / 254.0
+    }
 }
 
 impl Clamp for f64 {
@@ -33,6 +38,10 @@ impl Clamp for f64 {
 
     fn unit_from_u8(value: u8) -> Self {
         Self::from(value) / 255.0
+    }
+
+    fn unit_from_u8_light(value: u8) -> Self {
+        Self::from(value) / 254.0
     }
 }
 
