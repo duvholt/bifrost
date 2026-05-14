@@ -25,6 +25,8 @@ pub struct Light {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature_delta: Option<Stub>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_configuration: Option<ContentConfiguration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dimming: Option<Dimming>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimming_delta: Option<Stub>,
@@ -104,6 +106,7 @@ impl Light {
             color: None,
             color_temperature: None,
             color_temperature_delta: Some(Stub),
+            content_configuration: None,
             dimming: None,
             dimming_delta: Some(Stub),
             dynamics: Some(LightDynamics::default()),
@@ -242,6 +245,30 @@ impl AddAssign<&LightUpdate> for Light {
         if let Some(upd) = &upd.timed_effects {
             if let Some(timed_effects) = &mut self.timed_effects {
                 timed_effects.status = upd.effect.unwrap_or(LightTimedEffect::NoEffect);
+            }
+        }
+
+        if let Some(content_configuration_upd) = &upd.content_configuration {
+            if let Some(content_configuration) = &mut self.content_configuration {
+                if let Some(order_type_upd) = content_configuration_upd
+                    .order
+                    .as_ref()
+                    .and_then(|o| o.order)
+                {
+                    if let Some(order) = &mut content_configuration.order {
+                        order.order = order_type_upd;
+                    }
+                }
+
+                if let Some(orientation_upd) = content_configuration_upd
+                    .orientation
+                    .as_ref()
+                    .and_then(|o| o.orientation)
+                {
+                    if let Some(orientation) = &mut content_configuration.orientation {
+                        orientation.orientation = orientation_upd;
+                    }
+                }
             }
         }
     }
@@ -707,6 +734,8 @@ pub struct LightUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature: Option<ColorTemperatureUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_configuration: Option<ContentConfigurationUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub gradient: Option<LightGradientUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effects: Option<LightEffectsUpdate>,
@@ -983,6 +1012,63 @@ impl From<ColorTemperature> for Option<ColorTemperatureUpdate> {
     fn from(value: ColorTemperature) -> Self {
         value.mirek.map(ColorTemperatureUpdate::new)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ContentConfiguration {
+    pub orientation: Option<ContentConfigurationOrientation>,
+    pub order: Option<ContentConfigurationOrder>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ContentConfigurationOrientation {
+    pub configurable: bool,
+    pub orientation: OrientationType,
+    pub status: ContentConfigurationStatusType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum OrientationType {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ContentConfigurationOrder {
+    pub configurable: bool,
+    pub order: OrderType,
+    pub status: ContentConfigurationStatusType,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum OrderType {
+    Forward,
+    Reversed,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentConfigurationStatusType {
+    Set,
+    Changing,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ContentConfigurationUpdate {
+    pub orientation: Option<ContentConfigurationOrientationUpdate>,
+    pub order: Option<ContentConfigurationOrderUpdate>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ContentConfigurationOrientationUpdate {
+    pub orientation: Option<OrientationType>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ContentConfigurationOrderUpdate {
+    pub order: Option<OrderType>,
 }
 
 #[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq)]

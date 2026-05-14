@@ -5,9 +5,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use hue::api::{
-    BridgeHome, Button, DeviceArchetype, DeviceProductData, Entertainment, EntertainmentSegment,
-    EntertainmentSegments, GroupedLight, Light, LightEffects, LightEffectsV2, LightMetadata,
-    Metadata, RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
+    BridgeHome, Button, ContentConfiguration, ContentConfigurationOrder,
+    ContentConfigurationOrientation, ContentConfigurationStatusType, DeviceArchetype,
+    DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight,
+    Light, LightEffects, LightEffectsV2, LightMetadata, Metadata, OrderType, OrientationType,
+    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
     SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus, ZigbeeConnectivity,
     ZigbeeConnectivityStatus,
 };
@@ -80,6 +82,21 @@ impl Z2mBackend {
             log::trace!("Detected Hue light: enabling effects");
             light.effects = Some(LightEffects::all());
             light.effects_v2 = Some(LightEffectsV2::all());
+        }
+
+        if gradient.is_some() {
+            light.content_configuration = Some(ContentConfiguration {
+                orientation: Some(ContentConfigurationOrientation {
+                    configurable: true,
+                    orientation: OrientationType::Horizontal,
+                    status: ContentConfigurationStatusType::Set,
+                }),
+                order: Some(ContentConfigurationOrder {
+                    configurable: true,
+                    order: OrderType::Forward,
+                    status: ContentConfigurationStatusType::Set,
+                }),
+            })
         }
 
         let segments = if gradient.is_some() {
