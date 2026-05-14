@@ -31,8 +31,8 @@ pub const WIDE_GAMUT_MAX_X: f64 = 0.7347;
 pub const WIDE_GAMUT_MAX_Y: f64 = 0.8264;
 
 pub const HUE_BRIDGE_V2_MODEL_ID: &str = "BSB002";
-pub const HUE_BRIDGE_V2_DEFAULT_SWVERSION: u64 = 1_970_084_010;
-pub const HUE_BRIDGE_V2_DEFAULT_APIVERSION: &str = "1.70.0";
+pub const HUE_BRIDGE_V2_DEFAULT_SWVERSION: u64 = 1_977_090_000;
+pub const HUE_BRIDGE_V2_DEFAULT_APIVERSION: &str = "1.77.0";
 
 #[must_use]
 pub fn best_guess_timezone() -> String {
