@@ -50,6 +50,8 @@ pub struct DeviceUpdate {
     pub transition: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effect: Option<DeviceEffect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub philips_raw: Option<String>,
 
     /* all other fields */
     #[serde(skip_serializing_if = "HashMap::is_empty")]

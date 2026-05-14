@@ -50,6 +50,7 @@ impl Z2mBackend {
         }
 
         let upd = DeviceUpdate::deserialize(payload)?;
+        log::trace!("Device update {upd:#?}");
 
         let obj = self.state.lock().await.get_resource_by_id(rid)?.obj;
         match obj {

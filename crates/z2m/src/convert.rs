@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::io::Cursor;
 
 use hue::api::{
     ColorGamut, ColorTemperature, DeviceProductData, Dimming, DimmingDeltaAction, GamutType,
@@ -6,7 +7,9 @@ use hue::api::{
     LightGradientUpdate, LightUpdate, MirekSchema,
 };
 use hue::devicedb::{hardware_platform_type, product_archetype};
+use hue::error::HueError;
 use hue::xy::XY;
+use hue::zigbee::HueZigbeeUpdate;
 
 use crate::api::{Device, Expose, ExposeList, ExposeNumeric};
 use crate::update::{DeviceColorMode, DeviceUpdate};
@@ -156,6 +159,28 @@ impl ExtractDeviceProductData for DeviceProductData {
 
 impl From<&DeviceUpdate> for LightUpdate {
     fn from(value: &DeviceUpdate) -> Self {
+        if let Some(philips_raw) = &value.philips_raw {
+            match hex::decode(&philips_raw)
+                .map_err(HueError::from)
+                .and_then(|data| {
+                    let mut cur = Cursor::new(data);
+                    HueZigbeeUpdate::from_reader(&mut cur)
+                }) {
+                Ok(hz) => {
+                    let upd = hz.into();
+                    log::trace!(
+                        "Converted Philips raw update to light update {philips_raw} {upd:#?}"
+                    );
+                    return upd;
+                }
+                Err(err) => {
+                    log::error!(
+                        "Failed to parse Philips Hue raw update {philips_raw}: {err}. Falling back to using z2m data"
+                    );
+                }
+            }
+        }
+
         let mut upd = Self::new()
             .with_on(value.state.map(Into::into))
             .with_brightness(value.brightness.map(|b| b / 254.0 * 100.0))

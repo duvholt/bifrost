@@ -16,7 +16,9 @@ keywords.workspace = true
 workspace = true
 
 [dependencies]
+hex = "0.4.3"
 hue = { version = "0.1.0", path = "../hue", default-features = false }
+log = "0.4.29"
 serde = "1.0.219"
 serde_json = "1.0.140"
 thiserror = "2.0.12"

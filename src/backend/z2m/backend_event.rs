@@ -10,10 +10,9 @@ use uuid::Uuid;
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
-    EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffect,
-    LightEffectsV2Update, LightGradientMode, LightUpdate, RType, Resource, ResourceLink, Room,
-    RoomUpdate, Scene, SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate,
-    ZigbeeDeviceDiscoveryUpdate,
+    EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffectsV2Update,
+    LightGradientMode, LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene,
+    SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
@@ -72,7 +71,7 @@ impl Z2mBackend {
                 hz = hz.with_effect_type(fx.into());
             }
             if let Some(speed) = &act.parameters.speed {
-                hz = hz.with_effect_speed(speed.unit_to_u8_clamped());
+                hz = hz.with_effect_speed(speed.unit_to_u8_clamped_light());
             }
             if let Some(mirek) = &act.parameters.color_temperature.and_then(|ct| ct.mirek) {
                 hz = hz.with_color_mirek(*mirek);
@@ -105,43 +104,18 @@ impl Z2mBackend {
             return Ok(());
         };
 
-        let mut lock = self.state.lock().await;
-
-        // We cannot recover .mode from backend updates, since these only contain
-        // the gradient colors. So we have no choice, but to update the mode
-        // here. Otherwise, the information would be lost.
-        if let Some(mode) = upd.gradient.as_ref().and_then(|gr| gr.mode) {
-            lock.update::<Light>(&link.rid, |light| {
-                if let Some(gr) = &mut light.gradient {
-                    gr.mode = mode;
-                }
-            })?;
-        }
-        // Effect state is currently not retrieved from backend updates either
-        if let Some(upd) = upd.effects_v2.as_ref() {
-            lock.update::<Light>(&link.rid, |light| {
-                if let Some(effects_v2) = &mut light.effects_v2 {
-                    *effects_v2 += upd;
-                }
-                if let Some(effects) = &mut light.effects {
-                    let light_effect = upd
-                        .action
-                        .as_ref()
-                        .and_then(|a| a.effect)
-                        .unwrap_or(LightEffect::NoEffect);
-                    effects.status = light_effect;
-                }
-            })?;
-        }
-        let hue_effects = lock.get::<Light>(link)?.effects.is_some();
-        drop(lock);
+        let hue_effects = self
+            .state
+            .lock()
+            .await
+            .get::<Light>(link)?
+            .effects
+            .is_some();
 
         let mut payload: Option<DeviceUpdate> = None;
 
         // handle "identify" request (light breathing)
         if upd.identify.is_some() {
-            // handle "identify" request (light breathing)
-
             payload = Some(
                 payload
                     .unwrap_or_default()
@@ -209,17 +183,7 @@ impl Z2mBackend {
             if !hz.is_empty() {
                 hz = hz.with_fade_speed(0x0001);
 
-                let read_payload = DeviceRead::default()
-                    .with_state(
-                        hz.onoff.is_some() || hz.brightness.is_some() || hz.effect_type.is_some(),
-                    )
-                    .with_color(
-                        hz.color_mirek.is_some()
-                            || hz.color_xy.is_some()
-                            || hz.effect_type.is_some(),
-                    )
-                    .with_brightness(hz.brightness.is_some() || hz.effect_type.is_some());
-
+                let read_payload = DeviceRead::default().with_state(true);
                 z2mws.send_hue_effects(topic, hz).await?;
 
                 // Do an explicit attribute read since Hue specific updates do not automatically update z2m state
