@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use crate::api::{DeviceArchetype, DeviceProductData};
+use crate::gradient::{GRADIENT_929004610402, GRADIENT_LCX005, GradientProductData};
 
 // This file contains discovered product data from multiple sources,
 // including data samples from the community, and various open source or public
@@ -20,6 +21,7 @@ pub struct SimpleProductData<'a> {
     pub product_name: &'a str,
     pub product_archetype: DeviceArchetype,
     pub hardware_platform_type: Option<&'a str>,
+    pub gradient: Option<GradientProductData>,
 }
 
 impl<'a> SimpleProductData<'a> {
@@ -36,6 +38,15 @@ impl<'a> SimpleProductData<'a> {
             product_name,
             product_archetype,
             hardware_platform_type: Some(hardware_platform_type),
+            gradient: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_gradient(self, gradient: GradientProductData) -> Self {
+        Self {
+            gradient: Some(gradient),
+            ..self
         }
     }
 }
@@ -53,6 +64,7 @@ fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
         "915005987201" => SPD::signify("Signe gradient floor", HueSigne, "100b-118"),
         "929003053301_01" => SPD::signify("Hue Ensis up", PendantLong, "100b-11f"),
         "929003053301_02" => SPD::signify("Hue Ensis down", PendantLong, "100b-11f"),
+        "929004610402" => SPD::signify("Hue Flux strip light", HueLightstrip, "100b-118").with_gradient(GRADIENT_929004610402.clone()),
         "LCA001" => SPD::signify("Hue color lamp", SultanBulb, "100b-112"),
         "LCD007" => SPD::signify("Hue color downlight", RecessedCeiling, "100b-114"),
         "LCE002" => SPD::signify("Hue color candle", CandleBulb, "100b-114"),
@@ -60,8 +72,8 @@ fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
         "LCT014" => SPD::signify("Hue color lamp", SultanBulb, "100b-10c"),
         "LCT015" => SPD::signify("Hue color lamp", SultanBulb, "100b-10c"),
         "LCT016" => SPD::signify("Hue color lamp", SultanBulb, "100b-10c"),
-        "LCX001" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118"),
-        "LCX005" => SPD::signify("Hue play gradient lightstrip", HueLightstripPc, "100b-118"),
+        "LCX001" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
+        "LCX005" => SPD::signify("Hue play gradient lightstrip", HueLightstripPc, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
         "LLC020" => SPD::signify("Hue go", HueGo, "100b-108"),
         "LOM001" => SPD::signify("Hue Smart plug", Plug, "100b-115"),
         "LST002" => SPD::signify("Hue lightstrip plus", HueLightstrip, "100b-10f"),
@@ -83,6 +95,7 @@ fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
             product_name: "Lutron Aurora",
             product_archetype: UnknownArchetype,
             hardware_platform_type: Some("1144-0"),
+            gradient: None,
         },
         "GreenPower_2" => SPD {
             model_id: Some("FOHSWITCH"),
@@ -90,6 +103,7 @@ fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
             product_name: "Works with Hue Switch",
             product_archetype: UnknownArchetype,
             hardware_platform_type: None,
+            gradient: None,
         },
     }
 }
@@ -107,6 +121,13 @@ pub fn product_archetype(model_id: &str) -> Option<DeviceArchetype> {
 #[must_use]
 pub fn hardware_platform_type(model_id: &str) -> Option<&'static str> {
     product_data(model_id).and_then(|pd| pd.hardware_platform_type)
+}
+
+#[must_use]
+pub fn gradient_product_data(model_id: &str) -> GradientProductData {
+    product_data(model_id)
+        .and_then(|pd| pd.gradient)
+        .unwrap_or_else(|| GRADIENT_929004610402.clone())
 }
 
 #[cfg(test)]

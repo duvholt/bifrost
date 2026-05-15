@@ -18,6 +18,7 @@ fn print_std(obj: DeviceProductData) {
         product_name: &obj.product_name,
         product_archetype: obj.product_archetype,
         hardware_platform_type: obj.hardware_platform_type.as_deref(),
+        gradient: None,
     };
     println!(
         "{:?} => {},",

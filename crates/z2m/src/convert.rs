@@ -8,6 +8,7 @@ use hue::api::{
 };
 use hue::devicedb::product_data;
 use hue::error::HueError;
+use hue::gradient::GradientProductData;
 use hue::xy::XY;
 use hue::zigbee::HueZigbeeUpdate;
 
@@ -56,13 +57,19 @@ impl ExtractLightColor for LightColor {
 
 pub trait ExtractLightGradient {
     #[must_use]
-    fn extract_from_expose(expose: &ExposeList) -> Option<Self>
+    fn extract_from_expose(
+        expose: &ExposeList,
+        gradient_product_data: &GradientProductData,
+    ) -> Option<Self>
     where
         Self: Sized;
 }
 
 impl ExtractLightGradient for LightGradient {
-    fn extract_from_expose(expose: &ExposeList) -> Option<Self> {
+    fn extract_from_expose(
+        expose: &ExposeList,
+        gradient_product_data: &GradientProductData,
+    ) -> Option<Self> {
         match expose {
             ExposeList {
                 length_max: Some(max),
@@ -76,7 +83,7 @@ impl ExtractLightGradient for LightGradient {
                 ]),
                 points_capable: *max.min(&5),
                 points: vec![],
-                pixel_count: *max.min(&7),
+                pixel_count: gradient_product_data.pixel_count,
             }),
             _ => None,
         }

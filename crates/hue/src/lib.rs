@@ -12,6 +12,7 @@ pub mod effect_duration;
 pub mod error;
 pub mod flags;
 pub mod gamma;
+pub mod gradient;
 pub mod hs;
 pub mod legacy_api;
 pub mod scene_icons;
