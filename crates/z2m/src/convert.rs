@@ -80,6 +80,7 @@ impl ExtractLightGradient for LightGradient {
                     LightGradientMode::InterpolatedPalette,
                     LightGradientMode::InterpolatedPaletteMirrored,
                     LightGradientMode::RandomPixelated,
+                    LightGradientMode::SegmentedPalette,
                 ]),
                 points_capable: *max.min(&5),
                 points: vec![],

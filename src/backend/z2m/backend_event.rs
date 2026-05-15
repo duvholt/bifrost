@@ -57,6 +57,7 @@ impl Z2mBackend {
                     Some(LightGradientMode::InterpolatedPalette) => 0x28,
                     Some(LightGradientMode::InterpolatedPaletteMirrored) => 0x18,
                     Some(LightGradientMode::RandomPixelated) => 0x38,
+                    Some(LightGradientMode::SegmentedPalette) => 0x28,
                     None => 0x18,
                 },
                 offset: 0x00,

@@ -345,6 +345,7 @@ pub enum LightGradientMode {
     InterpolatedPalette,
     InterpolatedPaletteMirrored,
     RandomPixelated,
+    SegmentedPalette,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
