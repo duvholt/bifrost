@@ -13,13 +13,13 @@ use hue::api::{
 };
 use hue::scene_icons;
 use z2m::api::ExposeLight;
-use z2m::button::Z2mButtonDevice;
 use z2m::convert::{
     ExtractColorTemperature, ExtractDeviceProductData, ExtractDimming, ExtractLightColor,
     ExtractLightGradient,
 };
 
 use crate::backend::z2m::Z2mBackend;
+use crate::backend::z2m::button::Z2mButtonDevice;
 use crate::error::ApiResult;
 use crate::model::state::AuxData;
 

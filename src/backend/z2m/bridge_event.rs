@@ -14,10 +14,10 @@ use hue::api::{
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
 };
-use z2m::button::Z2mButtonDevice;
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
+use crate::backend::z2m::button::Z2mButtonDevice;
 use crate::error::{ApiError, ApiResult};
 
 impl Z2mBackend {

@@ -1,6 +1,7 @@
 mod backend_event;
 mod bridge_event;
 mod bridge_import;
+mod button;
 pub mod entertainment;
 pub mod learn;
 pub mod websocket;
@@ -27,9 +28,9 @@ use tokio_tungstenite::{
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::ResourceLink;
-use z2m::button::Z2mButtonDevice;
 use z2m::update::DeviceUpdate;
 
+use crate::backend::z2m::button::Z2mButtonDevice;
 use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::websocket::Z2mWebSocket;

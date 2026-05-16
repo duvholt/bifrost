@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
-use hue::api::{ButtonData, ButtonEvent, ButtonMetadata};
+use hue::api::{
+    Button, ButtonData, ButtonDataUpdate, ButtonEvent, ButtonMetadata, ButtonReport, ButtonUpdate,
+};
 
 #[derive(Debug)]
 pub struct Z2mButtonDevice {
     pub buttons: Vec<Z2mButton>,
     mappings: HashMap<&'static str, Z2mButtonMapping>,
+    required_longpress_workaround: bool,
 }
 
 #[derive(Debug)]
@@ -56,6 +59,7 @@ impl Z2mButtonDevice {
 fn friends_of_hue_switch() -> Z2mButtonDevice {
     let events = vec![ButtonEvent::InitialPress, ButtonEvent::ShortRelease];
     Z2mButtonDevice {
+        required_longpress_workaround: true,
         buttons: vec![
             Z2mButton {
                 name: "1".to_string(),
@@ -123,6 +127,7 @@ fn hue_dimmer_switch() -> Z2mButtonDevice {
         ButtonEvent::LongPress,
     ];
     Z2mButtonDevice {
+        required_longpress_workaround: false,
         buttons: vec![
             Z2mButton {
                 name: "on".to_string(),
