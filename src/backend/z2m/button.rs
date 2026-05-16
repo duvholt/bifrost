@@ -1,26 +1,37 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use chrono::Utc;
+use chrono::{DateTime, TimeDelta, Utc};
 use hue::api::{
     Button, ButtonData, ButtonDataUpdate, ButtonEvent, ButtonMetadata, ButtonReport, ButtonUpdate,
     Device, ResourceLink,
 };
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle, time::sleep};
 
 use crate::{error::ApiResult, resource::Resources};
 
 pub struct Z2mButtonHandler {
     data: Z2mButtonData,
     res: Arc<Mutex<Resources>>,
+    prev_button_press: Arc<Mutex<Option<DateTime<Utc>>>>,
+    button_repeat_task: Option<JoinHandle<()>>,
 }
 
 impl Z2mButtonHandler {
     pub fn from_model_id(res: Arc<Mutex<Resources>>, model_id: &str) -> Option<Self> {
         let button_data = Z2mButtonData::from_model_id(model_id);
-        button_data.map(|data| Self { data, res })
+        button_data.map(|data| Self {
+            data,
+            res,
+            prev_button_press: Arc::new(Mutex::new(None)),
+            button_repeat_task: None,
+        })
     }
 
     pub async fn handle_action(&mut self, device: &Device, action: &str) -> ApiResult<()> {
+        if let Some(button_repeat_task) = &self.button_repeat_task {
+            button_repeat_task.abort();
+            self.button_repeat_task = None;
+        }
         let Some(button_controller_id) = self.data.get_controller_id(action) else {
             log::warn!("Unknown button pressed {}", action);
             return Ok(());
@@ -52,26 +63,109 @@ impl Z2mButtonHandler {
         else {
             return Ok(());
         };
-        log::debug!(
+        log::trace!(
             "Recevied button action {} {} {:?}",
             button_controller.metadata.control_id,
             device.metadata.name,
             button_event
         );
 
-        self.update_button(button_link, button_event).await?;
+        if self.data.required_longpress_workaround {
+            // The Friends of Hue switch (e.g. EnOcean PTM 215Z) only sends press and release events
+            // This is an attempt to emulate the Hue dimmer switch behavior using only these two actions
+            // It's worth noting that the real bridge doesn't send button state updates for the FoH switch,
+            // but it's easier in Bifrost to do it properly, so we do it anyway.
+            match button_event {
+                ButtonEvent::InitialPress => {
+                    log::trace!("Button long press workaround: setting last button press");
+                    *self.prev_button_press.lock().await = Some(Utc::now());
+                    Self::update_button(self.res.clone(), button_link, ButtonEvent::InitialPress)
+                        .await?;
+                    let prev_button_press = self.prev_button_press.clone();
+                    let res = self.res.clone();
+                    self.button_repeat_task = Some(tokio::spawn(Self::send_fake_repeat(
+                        res,
+                        button_link,
+                        prev_button_press,
+                    )));
+                }
+                ButtonEvent::ShortRelease => {
+                    let prev_button_press = *self.prev_button_press.lock().await;
+                    log::trace!(
+                        "Button long press workaround: last button pressed {:?}",
+                        prev_button_press
+                    );
+                    if let Some(prev_short_press) = prev_button_press {
+                        let event = if (Utc::now() - prev_short_press) > TimeDelta::seconds(1) {
+                            ButtonEvent::LongRelease
+                        } else {
+                            ButtonEvent::ShortRelease
+                        };
+                        *self.prev_button_press.lock().await = None;
+                        Self::update_button(self.res.clone(), button_link, event).await?;
+                    }
+                }
+                ButtonEvent::Repeat
+                | ButtonEvent::LongRelease
+                | ButtonEvent::DoubleShortRelease
+                | ButtonEvent::LongPress => {
+                    *self.prev_button_press.lock().await = None;
+                    // These events are not possible for FOHSWITCH
+                    Self::update_button(self.res.clone(), button_link, button_event).await?;
+                }
+            }
+        } else {
+            Self::update_button(self.res.clone(), button_link, button_event).await?;
+        }
 
         Ok(())
     }
 
+    async fn send_fake_repeat(
+        res: Arc<Mutex<Resources>>,
+        button_link: ResourceLink,
+        prev_button_press: Arc<Mutex<Option<DateTime<Utc>>>>,
+    ) {
+        // Send up to 10 repeat events
+        for i in 1..10 {
+            sleep(Duration::from_secs(1)).await;
+            match *prev_button_press.lock().await {
+                Some(timestamp) => {
+                    if (Utc::now() + TimeDelta::seconds(i)) < timestamp {
+                        // Button has likely been pressed again
+                        return;
+                    }
+                }
+                None => {
+                    // Button already released
+                    return;
+                }
+            }
+            let event = if i == 1 {
+                ButtonEvent::LongPress
+            } else {
+                ButtonEvent::Repeat
+            };
+            if let Err(err) = Self::update_button(res.clone(), button_link, event).await {
+                log::error!("Failed to update button state {err}");
+            }
+        }
+        log::debug!("Timed out waiting for button release");
+        if let Err(err) =
+            Self::update_button(res.clone(), button_link, ButtonEvent::LongRelease).await
+        {
+            log::error!("Failed to update button state {err}");
+        }
+    }
+
     async fn update_button(
-        &mut self,
+        res: Arc<Mutex<Resources>>,
         button_link: ResourceLink,
         button_event: ButtonEvent,
     ) -> ApiResult<()> {
+        log::debug!("Setting button state to {button_event:?} for {button_link:?}");
         // The actual handling of button events is done in the hue accessories behavior instance which listens for button updates
-        self.res
-            .lock()
+        res.lock()
             .await
             .update::<Button>(&button_link.rid, |button| {
                 *button += ButtonUpdate::new().with_button(
