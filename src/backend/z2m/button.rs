@@ -1,11 +1,94 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use chrono::Utc;
 use hue::api::{
     Button, ButtonData, ButtonDataUpdate, ButtonEvent, ButtonMetadata, ButtonReport, ButtonUpdate,
+    Device, ResourceLink,
 };
+use tokio::sync::Mutex;
+
+use crate::{error::ApiResult, resource::Resources};
+
+pub struct Z2mButtonHandler {
+    data: Z2mButtonData,
+    res: Arc<Mutex<Resources>>,
+}
+
+impl Z2mButtonHandler {
+    pub fn from_model_id(res: Arc<Mutex<Resources>>, model_id: &str) -> Option<Self> {
+        let button_data = Z2mButtonData::from_model_id(model_id);
+        button_data.map(|data| Self { data, res })
+    }
+
+    pub async fn handle_action(&mut self, device: &Device, action: &str) -> ApiResult<()> {
+        let Some(button_controller_id) = self.data.get_controller_id(action) else {
+            log::warn!("Unknown button pressed {}", action);
+            return Ok(());
+        };
+
+        let lock = self.res.lock().await;
+        let Some((button_link, button_controller)) =
+            device.button_services().into_iter().find_map(|link| {
+                if let Some(button) = lock.get::<Button>(link).ok() {
+                    if button.metadata.control_id == button_controller_id {
+                        return Some((link.clone(), button.clone()));
+                    }
+                }
+                return None;
+            })
+        else {
+            log::error!(
+                "Unable to find button controller for {} with controller id {}",
+                device.metadata.name,
+                button_controller_id
+            );
+            return Ok(());
+        };
+        drop(lock);
+
+        let Some(button_event) = self
+            .data
+            .next_button_event(&button_controller.button, action)
+        else {
+            return Ok(());
+        };
+        log::debug!(
+            "Recevied button action {} {} {:?}",
+            button_controller.metadata.control_id,
+            device.metadata.name,
+            button_event
+        );
+
+        self.update_button(button_link, button_event).await?;
+
+        Ok(())
+    }
+
+    async fn update_button(
+        &mut self,
+        button_link: ResourceLink,
+        button_event: ButtonEvent,
+    ) -> ApiResult<()> {
+        // The actual handling of button events is done in the hue accessories behavior instance which listens for button updates
+        self.res
+            .lock()
+            .await
+            .update::<Button>(&button_link.rid, |button| {
+                *button += ButtonUpdate::new().with_button(
+                    ButtonDataUpdate::new()
+                        .with_button_report(ButtonReport {
+                            updated: Utc::now(),
+                            event: button_event,
+                        })
+                        .with_last_event(button_event),
+                );
+            })?;
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
-pub struct Z2mButtonDevice {
+pub struct Z2mButtonData {
     pub buttons: Vec<Z2mButton>,
     mappings: HashMap<&'static str, Z2mButtonMapping>,
     required_longpress_workaround: bool,
@@ -24,7 +107,7 @@ pub struct Z2mButtonMapping {
     pub action: ButtonEvent,
 }
 
-impl Z2mButtonDevice {
+impl Z2mButtonData {
     pub fn from_model_id(model_id: &str) -> Option<Self> {
         match model_id {
             "RWL021" | "RWL022" => Some(hue_dimmer_switch()),
@@ -37,11 +120,7 @@ impl Z2mButtonDevice {
         self.mappings.get(&action).map(|m| m.control_id)
     }
 
-    pub fn next_button_event(
-        &mut self,
-        button_data: &ButtonData,
-        action: &str,
-    ) -> Option<ButtonEvent> {
+    fn next_button_event(&mut self, button_data: &ButtonData, action: &str) -> Option<ButtonEvent> {
         let mapped_button_event = self.mappings.get(&action).cloned()?.action;
         let Some(current_button_report) = &button_data.button_report else {
             return Some(mapped_button_event);
@@ -56,9 +135,9 @@ impl Z2mButtonDevice {
     }
 }
 
-fn friends_of_hue_switch() -> Z2mButtonDevice {
+fn friends_of_hue_switch() -> Z2mButtonData {
     let events = vec![ButtonEvent::InitialPress, ButtonEvent::ShortRelease];
-    Z2mButtonDevice {
+    Z2mButtonData {
         required_longpress_workaround: true,
         buttons: vec![
             Z2mButton {
@@ -118,7 +197,7 @@ fn friends_of_hue_switch() -> Z2mButtonDevice {
     }
 }
 
-fn hue_dimmer_switch() -> Z2mButtonDevice {
+fn hue_dimmer_switch() -> Z2mButtonData {
     let events = vec![
         ButtonEvent::InitialPress,
         ButtonEvent::Repeat,
@@ -126,7 +205,7 @@ fn hue_dimmer_switch() -> Z2mButtonDevice {
         ButtonEvent::LongRelease,
         ButtonEvent::LongPress,
     ];
-    Z2mButtonDevice {
+    Z2mButtonData {
         required_longpress_workaround: false,
         buttons: vec![
             Z2mButton {

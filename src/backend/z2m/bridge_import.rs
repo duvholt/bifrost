@@ -19,7 +19,7 @@ use z2m::convert::{
 };
 
 use crate::backend::z2m::Z2mBackend;
-use crate::backend::z2m::button::Z2mButtonDevice;
+use crate::backend::z2m::button::Z2mButtonData;
 use crate::error::ApiResult;
 use crate::model::state::AuxData;
 
@@ -168,7 +168,7 @@ impl Z2mBackend {
             return Ok(None);
         };
 
-        let Some(button_device) = Z2mButtonDevice::from_model_id(&model_id) else {
+        let Some(button_device) = Z2mButtonData::from_model_id(&model_id) else {
             return Ok(None);
         };
 
