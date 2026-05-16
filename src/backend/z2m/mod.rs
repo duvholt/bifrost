@@ -27,6 +27,7 @@ use tokio_tungstenite::{
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::ResourceLink;
+use z2m::button::Z2mButtonDevice;
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::entertainment::EntStream;
@@ -83,6 +84,7 @@ pub struct Z2mBackend {
     fps: u32,
     throttle: Throttle,
     socket: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    button_devices: HashMap<String, Arc<Mutex<Z2mButtonDevice>>>,
 
     // for sending delayed messages over the websocket
     message_rx: mpsc::UnboundedReceiver<(String, DeviceUpdate)>,
@@ -107,6 +109,7 @@ impl Z2mBackend {
         let network = HashMap::new();
         let entstream = None;
         let throttle = Throttle::from_fps(fps);
+        let button_devices = HashMap::new();
         let (message_tx, message_rx) = mpsc::unbounded_channel();
         Ok(Self {
             name,
@@ -123,6 +126,7 @@ impl Z2mBackend {
             fps,
             message_rx,
             message_tx,
+            button_devices,
             socket: None,
             counter: 0,
         })

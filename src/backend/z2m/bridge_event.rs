@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use chrono::Utc;
 use serde::Deserialize;
 use serde_json::Value;
+use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
@@ -132,27 +135,35 @@ impl Z2mBackend {
         link: &ResourceLink,
         payload: &Value,
     ) -> Result<(), ApiError> {
-        let mut lock = self.state.lock().await;
+        let lock = self.state.lock().await;
 
-        let device = lock.get_id::<Device>(link.rid.clone())?;
-        let model_id = if let Ok(aux) = lock.aux_get(&link) {
+        let device = lock.get_id::<Device>(link.rid.clone())?.clone();
+        let model_id: String = if let Ok(aux) = lock.aux_get(&link) {
             aux.model_id
-                .as_deref()
+                .as_ref()
                 .unwrap_or(&device.product_data.model_id)
+                .clone()
         } else {
-            &device.product_data.model_id
+            device.product_data.model_id.clone()
         };
-        let Some(z2m_button_device) = Z2mButtonDevice::from_model_id(model_id) else {
-            return Ok(());
-        };
+        drop(lock);
         let Some(action) = payload.as_str() else {
             log::warn!("[{}] Unable to parse action payload {}", self.name, payload);
             return Ok(());
         };
-        let Some(button_controller_id) = z2m_button_device.get_controller_id(action) else {
+
+        let Some(z2m_button_device) = self.get_button_device(&model_id) else {
+            log::info!("Ignored unsupported button device {model_id} with action {action}");
+            return Ok(());
+        };
+
+        let Some(button_controller_id) = z2m_button_device.lock().await.get_controller_id(action)
+        else {
             log::warn!("[{}] Unknown button pressed {}", self.name, action);
             return Ok(());
         };
+
+        let mut lock = self.state.lock().await;
 
         let Some((button_link, button_controller)) =
             device.button_services().into_iter().find_map(|link| {
@@ -172,14 +183,18 @@ impl Z2mBackend {
             );
             return Ok(());
         };
-        let Some(button_action) =
-            z2m_button_device.next_button_event(&button_controller.button, action)
+
+        let Some(button_action) = z2m_button_device
+            .lock()
+            .await
+            .next_button_event(&button_controller.button, action)
         else {
             return Ok(());
         };
         log::debug!(
-            "[{}] Recevied button action {} {:?}",
+            "[{}] Recevied button action {} {} {:?}",
             self.name,
+            button_controller.metadata.control_id,
             device.metadata.name,
             button_action
         );
@@ -198,6 +213,20 @@ impl Z2mBackend {
         drop(lock);
 
         return Ok(());
+    }
+
+    fn get_button_device(&mut self, model_id: &str) -> Option<Arc<Mutex<Z2mButtonDevice>>> {
+        let button_device = self.button_devices.get(model_id);
+        match button_device {
+            Some(z2m_button_device) => Some(z2m_button_device.clone()),
+            None => {
+                let z2m_button_device = Z2mButtonDevice::from_model_id(model_id)?;
+                let zbd = Arc::new(Mutex::new(z2m_button_device));
+                self.button_devices
+                    .insert(model_id.to_string(), zbd.clone());
+                Some(zbd.clone())
+            }
+        }
     }
 
     async fn bridge_devices(&mut self, devices: &BridgeDevices) -> ApiResult<()> {

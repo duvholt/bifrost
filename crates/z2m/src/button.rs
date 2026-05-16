@@ -34,7 +34,11 @@ impl Z2mButtonDevice {
         self.mappings.get(&action).map(|m| m.control_id)
     }
 
-    pub fn next_button_event(&self, button_data: &ButtonData, action: &str) -> Option<ButtonEvent> {
+    pub fn next_button_event(
+        &mut self,
+        button_data: &ButtonData,
+        action: &str,
+    ) -> Option<ButtonEvent> {
         let mapped_button_event = self.mappings.get(&action).cloned()?.action;
         let Some(current_button_report) = &button_data.button_report else {
             return Some(mapped_button_event);
