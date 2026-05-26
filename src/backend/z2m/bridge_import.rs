@@ -5,12 +5,15 @@ use serde_json::json;
 use uuid::Uuid;
 
 use hue::api::{
-    BridgeHome, Button, DeviceArchetype, DeviceProductData, Entertainment, EntertainmentSegment,
-    EntertainmentSegments, GroupedLight, Light, LightEffects, LightEffectsV2, LightMetadata,
-    Metadata, RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
+    BridgeHome, Button, ContentConfiguration, ContentConfigurationOrder,
+    ContentConfigurationOrientation, ContentConfigurationStatusType, DeviceArchetype,
+    DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight,
+    Light, LightEffects, LightEffectsV2, LightMetadata, Metadata, OrderType, OrientationType,
+    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
     SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus, ZigbeeConnectivity,
     ZigbeeConnectivityStatus,
 };
+use hue::devicedb::gradient_product_data;
 use hue::scene_icons;
 use z2m::api::ExposeLight;
 use z2m::convert::{
@@ -43,6 +46,7 @@ impl Z2mBackend {
         let effects =
             apidev.manufacturer.as_deref() == Some(DeviceProductData::SIGNIFY_MANUFACTURER_NAME);
         let gradient = apidev.expose_gradient();
+        let gradient_product_data = gradient_product_data(&product_data.model_id);
 
         let dev = hue::api::Device {
             product_data,
@@ -73,7 +77,9 @@ impl Z2mBackend {
             .and_then(ExtractLightColor::extract_from_expose);
         log::trace!("Detected color: {:?}", &light.color);
 
-        light.gradient = gradient.and_then(ExtractLightGradient::extract_from_expose);
+        light.gradient = gradient.and_then(|gradient| {
+            ExtractLightGradient::extract_from_expose(gradient, &gradient_product_data)
+        });
         log::trace!("Detected gradient support: {:?}", &light.gradient);
 
         if effects {
@@ -82,16 +88,26 @@ impl Z2mBackend {
             light.effects_v2 = Some(LightEffectsV2::all());
         }
 
+        if gradient.is_some() {
+            light.content_configuration = Some(ContentConfiguration {
+                orientation: Some(ContentConfigurationOrientation {
+                    configurable: true,
+                    orientation: OrientationType::Horizontal,
+                    status: ContentConfigurationStatusType::Set,
+                }),
+                order: Some(ContentConfigurationOrder {
+                    configurable: true,
+                    order: OrderType::Forward,
+                    status: ContentConfigurationStatusType::Set,
+                }),
+            })
+        }
+
         let segments = if gradient.is_some() {
             EntertainmentSegments {
                 configurable: false,
                 max_segments: 10,
-                segments: (0..7)
-                    .map(|x| EntertainmentSegment {
-                        start: x,
-                        length: 1,
-                    })
-                    .collect(),
+                segments: gradient_product_data.entertainment_segments.to_vec(),
             }
         } else {
             EntertainmentSegments {

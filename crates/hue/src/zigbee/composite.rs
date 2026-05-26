@@ -68,6 +68,7 @@ pub enum GradientStyle {
     Linear = 0x00,
     Scattered = 0x02,
     Mirrored = 0x04,
+    Segmented = 0x06,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -77,6 +78,7 @@ impl From<LightGradientMode> for GradientStyle {
             LightGradientMode::InterpolatedPalette => Self::Linear,
             LightGradientMode::InterpolatedPaletteMirrored => Self::Mirrored,
             LightGradientMode::RandomPixelated => Self::Scattered,
+            LightGradientMode::SegmentedPalette => Self::Segmented,
         }
     }
 }
@@ -448,6 +450,7 @@ impl From<HueZigbeeUpdate> for LightUpdate {
                     GradientStyle::Linear => LightGradientMode::InterpolatedPalette,
                     GradientStyle::Mirrored => LightGradientMode::InterpolatedPaletteMirrored,
                     GradientStyle::Scattered => LightGradientMode::RandomPixelated,
+                    GradientStyle::Segmented => LightGradientMode::SegmentedPalette,
                 }),
                 points: gradient_colors
                     .points

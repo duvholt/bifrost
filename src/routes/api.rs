@@ -5,6 +5,7 @@ use axum::extract::{Path, State};
 use axum::routing::{get, post, put};
 use bytes::Bytes;
 use chrono::Utc;
+use hue::devicedb::gradient_product_data;
 use log::{info, warn};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -30,7 +31,7 @@ use hue::legacy_api::{
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::{STANDARD_APPLICATION_ID, STANDARD_CLIENT_KEY};
-use crate::routes::clip::entertainment_configuration::{self, POSITIONS};
+use crate::routes::clip::entertainment_configuration;
 use crate::routes::extractor::Json;
 use crate::routes::{ApiV1Error, ApiV1Result};
 use crate::server::appstate::AppState;
@@ -252,12 +253,15 @@ fn lights_v1_to_ec_locations(
 ) -> ApiResult<EntertainmentConfigurationLocationsNew> {
     let mut service_locations = vec![];
 
-    let mut positions = POSITIONS.iter().cycle();
-
     for id in lights {
         let light_uuid = res.from_id_v1(id.parse().map_err(ApiError::ParseIntError)?)?;
         let light = res.get_id::<Light>(light_uuid)?;
         let device = res.get::<Device>(&light.owner)?;
+
+        let mut positions = gradient_product_data(&device.product_data.model_id)
+            .entertainment_channel_positions
+            .iter()
+            .cycle();
 
         // FIXME: not the best error mapping
         let ent_svc = device

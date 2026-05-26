@@ -1,3 +1,4 @@
+use hue::devicedb::gradient_product_data;
 use hue::error::HueError;
 use serde_json::Value;
 use uuid::{Uuid, uuid};
@@ -9,7 +10,7 @@ use hue::api::{
     EntertainmentConfigurationStatus, EntertainmentConfigurationStreamMembers,
     EntertainmentConfigurationStreamProxy, EntertainmentConfigurationStreamProxyMode,
     EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, Light,
-    LightMode, Position, RType, Resource, ResourceLink,
+    LightMode, RType, Resource, ResourceLink,
 };
 
 use crate::error::ApiResult;
@@ -17,45 +18,6 @@ use crate::resource::Resources;
 use crate::routes::auth::STANDARD_APPLICATION_ID;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
-
-// FIXME: These are hard-coded values fitting for an LCX005 gradient light chain
-pub const POSITIONS: &[Position] = &[
-    Position {
-        x: -0.4,
-        y: 0.8,
-        z: -0.4,
-    },
-    Position {
-        x: -0.4,
-        y: 0.8,
-        z: 0.4,
-    },
-    Position {
-        x: -0.22,
-        y: 0.8,
-        z: 0.4,
-    },
-    Position {
-        x: 0.0,
-        y: 0.8,
-        z: 0.4,
-    },
-    Position {
-        x: 0.22,
-        y: 0.8,
-        z: 0.4,
-    },
-    Position {
-        x: 0.4,
-        y: 0.8,
-        z: 0.4,
-    },
-    Position {
-        x: 0.4,
-        y: 0.8,
-        z: -0.4,
-    },
-];
 
 pub async fn post_resource(state: &AppState, req: Value) -> ApiV2Result {
     let new: EntertainmentConfigurationNew = serde_json::from_value(req)?;
@@ -127,12 +89,17 @@ fn make_channels(
         };
         let ent: &Entertainment = lock.get(&location.service)?;
 
+        let device = lock.get::<Device>(&ent.owner)?;
+
+        let gradient = gradient_product_data(&device.product_data.model_id);
+
+        let positions = gradient.entertainment_channel_positions;
         if let Some(segs) = &ent.segments {
             if segs.segments.len() > 1 {
                 for index in 0..segs.segments.len() {
                     channels.push(EntertainmentConfigurationChannels {
                         channel_id,
-                        position: POSITIONS[index % POSITIONS.len()].clone(),
+                        position: positions[index % positions.len()].clone(),
                         members: vec![EntertainmentConfigurationStreamMembers {
                             service: location.service,
                             index: u16::try_from(index)?,

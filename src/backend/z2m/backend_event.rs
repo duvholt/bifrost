@@ -11,8 +11,8 @@ use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
     EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffectsV2Update,
-    LightGradientMode, LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene,
-    SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
+    LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene, SceneActive, SceneStatus,
+    SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
@@ -53,12 +53,7 @@ impl Z2mBackend {
             )?;
 
             hz = hz.with_gradient_params(GradientParams {
-                scale: match grad.mode {
-                    Some(LightGradientMode::InterpolatedPalette) => 0x28,
-                    Some(LightGradientMode::InterpolatedPaletteMirrored) => 0x18,
-                    Some(LightGradientMode::RandomPixelated) => 0x38,
-                    None => 0x18,
-                },
+                scale: u8::try_from(grad.points.len())? << 3,
                 offset: 0x00,
             });
         }
