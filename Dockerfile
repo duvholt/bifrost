@@ -1,5 +1,5 @@
 # Building Stage
-ARG RUST_VERSION=1.85
+ARG RUST_VERSION=1.95
 FROM rust:${RUST_VERSION}-slim-bookworm AS build
 WORKDIR /app
 COPY LICENSE LICENSE
