@@ -1,15 +1,21 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde_json::Value;
+use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite;
 use uuid::Uuid;
 
-use hue::api::{DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, Room};
+use hue::api::{
+    Device, DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, ResourceLink, Room,
+};
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
 };
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
+use crate::backend::z2m::button::Z2mButtonHandler;
 use crate::error::{ApiError, ApiResult};
 
 impl Z2mBackend {
@@ -71,9 +77,31 @@ impl Z2mBackend {
     }
 
     async fn handle_device_message(&mut self, msg: RawMessage) -> ApiResult<()> {
-        if msg.topic.ends_with("/availability") || msg.topic.ends_with("/action") {
+        if msg.topic.ends_with("/availability") {
             // availability: https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html#zigbee2mqtt-friendly-name-availability
-            // action: https://www.home-assistant.io/integrations/device_trigger.mqtt/
+            return Ok(());
+        }
+
+        if let Some(device_topic) = msg.topic.strip_suffix("/action") {
+            let Some(ref link) = self.map.get(device_topic).copied() else {
+                if !self.ignore.contains(&msg.topic) {
+                    log::warn!(
+                        "[{}] Action on unknown topic {} {}",
+                        self.name,
+                        &msg.topic,
+                        &msg.payload,
+                    );
+                }
+                return Ok(());
+            };
+
+            let res = self.handle_action(link, &msg.payload).await;
+            if let Err(ref err) = res {
+                log::error!(
+                    "Cannot parse update: {err}\n{}",
+                    serde_json::to_string_pretty(&msg.payload)?
+                );
+            }
             return Ok(());
         }
 
@@ -100,6 +128,59 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn handle_action(
+        &mut self,
+        link: &ResourceLink,
+        payload: &Value,
+    ) -> Result<(), ApiError> {
+        let lock = self.state.lock().await;
+
+        let device = lock.get_id::<Device>(link.rid.clone())?.clone();
+        let model_id: String = if let Ok(aux) = lock.aux_get(&link) {
+            aux.model_id
+                .as_ref()
+                .unwrap_or(&device.product_data.model_id)
+                .clone()
+        } else {
+            device.product_data.model_id.clone()
+        };
+        drop(lock);
+        let Some(action) = payload.as_str() else {
+            log::warn!("[{}] Unable to parse action payload {}", self.name, payload);
+            return Ok(());
+        };
+
+        let Some(z2m_button_device) = self.get_button_handler(link, &model_id) else {
+            log::info!("Ignored unsupported button device {model_id} with action {action}");
+            return Ok(());
+        };
+        z2m_button_device
+            .lock()
+            .await
+            .handle_action(&device, action)
+            .await?;
+
+        return Ok(());
+    }
+
+    fn get_button_handler(
+        &mut self,
+        resource_link: &ResourceLink,
+        model_id: &str,
+    ) -> Option<Arc<Mutex<Z2mButtonHandler>>> {
+        let handler = self.button_handlers.get(resource_link);
+        match handler {
+            Some(handler) => Some(handler.clone()),
+            None => {
+                let handler = Z2mButtonHandler::from_model_id(self.state.clone(), model_id)?;
+                let handler = Arc::new(Mutex::new(handler));
+                self.button_handlers
+                    .insert(resource_link.clone(), handler.clone());
+                Some(handler.clone())
+            }
+        }
+    }
+
     async fn bridge_devices(&mut self, devices: &BridgeDevices) -> ApiResult<()> {
         for dev in devices {
             self.network.insert(dev.friendly_name.clone(), dev.clone());
@@ -112,6 +193,22 @@ impl Z2mBackend {
                     dev.model_id.as_deref().unwrap_or("<unknown model>")
                 );
                 self.add_light(dev, exp).await?;
+            } else if dev.expose_action() {
+                log::info!(
+                    "[{}] Adding switch {:?}: [{}] ({})",
+                    self.name,
+                    dev.ieee_address,
+                    dev.friendly_name,
+                    dev.model_id.as_deref().unwrap_or("<unknown model>")
+                );
+                if self.add_switch(dev).await?.is_none() {
+                    log::debug!(
+                        "[{}] Ignoring unsupported switch device {}",
+                        self.name,
+                        dev.friendly_name
+                    );
+                    self.ignore.insert(dev.friendly_name.to_string());
+                }
             } else {
                 log::debug!(
                     "[{}] Ignoring unsupported device {}",
@@ -120,18 +217,6 @@ impl Z2mBackend {
                 );
                 self.ignore.insert(dev.friendly_name.clone());
             }
-            /*
-            if dev.expose_action() {
-                log::info!(
-                    "[{}] Adding switch {:?}: [{}] ({})",
-                    self.name,
-                    dev.ieee_address,
-                    dev.friendly_name,
-                    dev.model_id.as_deref().unwrap_or("<unknown model>")
-                );
-                self.add_switch(dev).await?;
-            }
-            */
         }
 
         Ok(())

@@ -182,7 +182,7 @@ impl<S: Service> ServiceRunner for StandardService<S> {
                             Err(err) => {
                                 self.run_policy.sleep().await;
                                 if self.run_policy.should_retry(state.retry()) {
-                                    log::warn!(target:target, "Service failed to start, retrying..");
+                                    log::warn!(target:target, "Service failed to start, retrying: {err}");
                                 } else {
                                     log::error!(target:target, "Failed to run service: {err}");
                                     match svc.stop().await {

@@ -6,7 +6,7 @@ use hue::api::{
     GroupedLightUpdate, LightColor, LightGradient, LightGradientMode, LightGradientPoint,
     LightGradientUpdate, LightUpdate, MirekSchema,
 };
-use hue::devicedb::{hardware_platform_type, product_archetype};
+use hue::devicedb::product_data;
 use hue::error::HueError;
 use hue::xy::XY;
 use hue::zigbee::HueZigbeeUpdate;
@@ -132,18 +132,50 @@ pub trait ExtractDeviceProductData {
 
 impl ExtractDeviceProductData for DeviceProductData {
     fn guess_from_device(dev: &Device) -> Self {
-        fn str_or_unknown(name: Option<&String>) -> String {
+        fn str_or_unknown(name: Option<&str>) -> String {
             name.map_or("<unknown>", |v| v).to_string()
         }
 
-        let product_name = str_or_unknown(dev.definition.as_ref().map(|def| &def.model));
-        let model_id = str_or_unknown(dev.model_id.as_ref());
-        let manufacturer_name = str_or_unknown(dev.manufacturer.as_ref());
-        let certified = manufacturer_name == Self::SIGNIFY_MANUFACTURER_NAME;
-        let software_version = str_or_unknown(dev.software_build_id.as_ref());
+        let dev_model_id = str_or_unknown(dev.model_id.as_deref());
 
-        let product_archetype = product_archetype(&model_id).unwrap_or_default();
-        let hardware_platform_type = hardware_platform_type(&model_id).map(ToString::to_string);
+        let product_data: Option<hue::devicedb::SimpleProductData<'_>> =
+            product_data(&dev_model_id);
+
+        let model_id = str_or_unknown(
+            product_data
+                .as_ref()
+                .and_then(|p| p.model_id)
+                .or(dev.model_id.as_deref()),
+        );
+
+        let product_name = str_or_unknown(
+            product_data
+                .as_ref()
+                .map(|p| p.product_name)
+                .or_else(|| dev.definition.as_ref().map(|def| def.model.as_str())),
+        );
+
+        let manufacturer_name = str_or_unknown(
+            product_data
+                .as_ref()
+                .map(|p| p.manufacturer_name)
+                .or(dev.manufacturer.as_deref()),
+        );
+        let certified = manufacturer_name == Self::SIGNIFY_MANUFACTURER_NAME;
+        let software_version = dev
+            .software_build_id
+            .as_deref()
+            .unwrap_or("0.0.0")
+            .to_string();
+
+        let product_archetype = product_data
+            .as_ref()
+            .map(|p| p.product_archetype.clone())
+            .unwrap_or_default();
+        let hardware_platform_type = product_data
+            .as_ref()
+            .and_then(|p| p.hardware_platform_type)
+            .map(ToString::to_string);
 
         Self {
             model_id,

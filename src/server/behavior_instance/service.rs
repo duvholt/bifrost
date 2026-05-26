@@ -10,13 +10,14 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
 use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript, RType,
-    Resource, WakeupConfiguration,
+    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
+    HueAccessoriesConfiguration, RType, Resource, WakeupConfiguration,
 };
 use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
+use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
 use crate::server::behavior_instance::wakeup::WakeupJob;
 
 #[derive(Debug)]
@@ -64,6 +65,11 @@ impl BehaviorInstanceService {
             BehaviorScript::WAKE_UP_ID => {
                 let config = serde_json::from_value::<WakeupConfiguration>(bi.configuration)?;
                 Ok(Some(BehaviorInstanceConfiguration::Wakeup(config)))
+            }
+            BehaviorScript::HUE_ACCESSORIES_ID => {
+                let config =
+                    serde_json::from_value::<HueAccessoriesConfiguration>(bi.configuration)?;
+                Ok(Some(BehaviorInstanceConfiguration::HueAccessories(config)))
             }
             _ => Ok(None),
         }
@@ -201,12 +207,17 @@ impl BehaviorInstanceJob {
             task.abort();
         }
 
-        let job = match &self.configuration {
+        let task = match &self.configuration {
             BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                self.create_wake_up_task(wakeup_configuration)
+                let job = self.create_wake_up_task(wakeup_configuration);
+                spawn(job.create())
+            }
+            BehaviorInstanceConfiguration::HueAccessories(hue_accessories_configuration) => {
+                let job = self.create_hue_accessories_task(hue_accessories_configuration);
+                spawn(job.create())
             }
         };
-        self.task = Some(spawn(job.create()));
+        self.task = Some(task);
     }
 
     fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> WakeupJob {
@@ -223,6 +234,13 @@ impl BehaviorInstanceJob {
             configuration: configuration.clone(),
             res: self.res.clone(),
         }
+    }
+
+    fn create_hue_accessories_task(
+        &self,
+        configuration: &HueAccessoriesConfiguration,
+    ) -> HueAccessoriesJob {
+        HueAccessoriesJob::new(configuration.clone(), self.res.clone())
     }
 }
 

@@ -1,6 +1,7 @@
 mod backend_event;
 mod bridge_event;
 mod bridge_import;
+mod button;
 pub mod entertainment;
 pub mod learn;
 pub mod websocket;
@@ -29,6 +30,7 @@ use bifrost_api::backend::BackendRequest;
 use hue::api::ResourceLink;
 use z2m::update::DeviceUpdate;
 
+use crate::backend::z2m::button::Z2mButtonHandler;
 use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::learn::SceneLearn;
 use crate::backend::z2m::websocket::Z2mWebSocket;
@@ -83,6 +85,7 @@ pub struct Z2mBackend {
     fps: u32,
     throttle: Throttle,
     socket: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    button_handlers: HashMap<ResourceLink, Arc<Mutex<Z2mButtonHandler>>>,
 
     // for sending delayed messages over the websocket
     message_rx: mpsc::UnboundedReceiver<(String, DeviceUpdate)>,
@@ -107,6 +110,7 @@ impl Z2mBackend {
         let network = HashMap::new();
         let entstream = None;
         let throttle = Throttle::from_fps(fps);
+        let button_handlers = HashMap::new();
         let (message_tx, message_rx) = mpsc::unbounded_channel();
         Ok(Self {
             name,
@@ -123,6 +127,7 @@ impl Z2mBackend {
             fps,
             message_rx,
             message_tx,
+            button_handlers,
             socket: None,
             counter: 0,
         })

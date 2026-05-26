@@ -15,6 +15,7 @@ use crate::api::{DeviceArchetype, DeviceProductData};
 
 #[derive(Debug, Clone)]
 pub struct SimpleProductData<'a> {
+    pub model_id: Option<&'a str>,
     pub manufacturer_name: &'a str,
     pub product_name: &'a str,
     pub product_archetype: DeviceArchetype,
@@ -30,6 +31,7 @@ impl<'a> SimpleProductData<'a> {
         hardware_platform_type: &'a str,
     ) -> Self {
         Self {
+            model_id: None,
             manufacturer_name: DeviceProductData::SIGNIFY_MANUFACTURER_NAME,
             product_name,
             product_archetype,
@@ -76,10 +78,18 @@ fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
         "SML003" => SPD::signify("Hue motion sensor", UnknownArchetype, "100b-11b"),
 
         "Z3-1BRL" => SPD {
+            model_id: None,
             manufacturer_name: "Lutron",
             product_name: "Lutron Aurora",
             product_archetype: UnknownArchetype,
             hardware_platform_type: Some("1144-0"),
+        },
+        "GreenPower_2" => SPD {
+            model_id: Some("FOHSWITCH"),
+            manufacturer_name: "PhilipsFoH",
+            product_name: "Works with Hue Switch",
+            product_archetype: UnknownArchetype,
+            hardware_platform_type: None,
         },
     }
 }

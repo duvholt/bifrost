@@ -378,11 +378,13 @@ impl Resources {
     }
 
     pub fn add_behavior_scripts(&mut self) -> ApiResult<()> {
-        let wake_up_link = ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript);
-
         self.add(
-            &wake_up_link,
+            &ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript),
             Resource::BehaviorScript(BehaviorScript::wake_up()),
+        )?;
+        self.add(
+            &ResourceLink::new(BehaviorScript::HUE_ACCESSORIES_ID, RType::BehaviorScript),
+            Resource::BehaviorScript(BehaviorScript::hue_accessories()),
         )?;
 
         Ok(())
@@ -467,10 +469,19 @@ impl Resources {
             Resource::Room(_) => Some(format!("/groups/{id}")),
 
             /* Devices (that are lights) map to the light service's id_v1 */
-            Resource::Device(dev) => dev
-                .light_service()
-                .and_then(|light| self.state.id_v1(&light.rid))
-                .map(|id| format!("/lights/{id}")),
+            Resource::Device(dev) => {
+                if let Some(light) = dev.light_service() {
+                    self.state
+                        .id_v1(&light.rid)
+                        .map(|id| format!("/lights/{id}"))
+                } else if !dev.button_services().is_empty() {
+                    Some(format!("/sensors/{id}"))
+                } else {
+                    None
+                }
+            }
+
+            Resource::Button(_) => Some(format!("/sensors/{id}")),
 
             Resource::EntertainmentConfiguration(_dev) => Some(format!("/groups/{id}")),
 
@@ -489,7 +500,6 @@ impl Resources {
             | Resource::BehaviorInstance(_)
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
-            | Resource::Button(_)
             | Resource::CameraMotion(_)
             | Resource::Contact(_)
             | Resource::DevicePower(_)
