@@ -1,3 +1,4 @@
+use bifrost_api::backend::BackendRequest;
 use hue::devicedb::gradient_product_data;
 use hue::error::HueError;
 use serde_json::Value;
@@ -186,7 +187,7 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
             .get::<EntertainmentConfiguration>(&rlink)?
             .light_services
             .iter()
-            .map(|s| s.rid.clone())
+            .map(|s| s.rid)
             .collect();
 
         let mode = match action {
@@ -204,13 +205,13 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
     let bridge_ent = find_bridge_entertainment(&lock)?;
 
     lock.update::<EntertainmentConfiguration>(&rlink.rid, |ec| {
-        if let Some(_locations) = upd.locations {
+        if let Some(_locations) = &upd.locations {
             ec.locations = locations.unwrap();
             ec.channels = channels;
             ec.light_services = light_services;
         }
 
-        if let Some(proxy) = upd.stream_proxy {
+        if let Some(proxy) = &upd.stream_proxy {
             match proxy {
                 EntertainmentConfigurationStreamProxyUpdate::Auto => {
                     ec.stream_proxy.mode = EntertainmentConfigurationStreamProxyMode::Auto;
@@ -218,20 +219,20 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
                 }
                 EntertainmentConfigurationStreamProxyUpdate::Manual { node } => {
                     ec.stream_proxy.mode = EntertainmentConfigurationStreamProxyMode::Manual;
-                    ec.stream_proxy.node = node;
+                    ec.stream_proxy.node = *node;
                 }
             }
         }
 
-        if let Some(ctype) = upd.configuration_type {
-            ec.configuration_type = ctype;
+        if let Some(ctype) = &upd.configuration_type {
+            ec.configuration_type = ctype.clone();
         }
 
-        if let Some(md) = upd.metadata {
-            ec.metadata = md;
+        if let Some(md) = &upd.metadata {
+            ec.metadata = md.clone();
         }
 
-        if let Some(action) = upd.action {
+        if let Some(action) = &upd.action {
             match action {
                 EntertainmentConfigurationAction::Start => {
                     ec.active_streamer =
@@ -245,6 +246,16 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
             }
         }
     })?;
+
+    match upd.action {
+        Some(EntertainmentConfigurationAction::Start) => {
+            lock.backend_request(BackendRequest::EntertainmentStart(rlink.rid))?;
+        }
+        Some(EntertainmentConfigurationAction::Stop) => {
+            lock.backend_request(BackendRequest::EntertainmentStop())?;
+        }
+        None => {}
+    }
 
     drop(lock);
 

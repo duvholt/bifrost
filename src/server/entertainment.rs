@@ -208,9 +208,6 @@ impl EntertainmentSocket {
         // look up entertainment area, to make sure it exists
         let _ent: &EntertainmentConfiguration = lock.get_id(header.area)?;
 
-        // request entertainment mode start
-        lock.backend_request(BackendRequest::EntertainmentStart(header.area))?;
-
         drop(lock);
 
         let mut fps = 0;
@@ -333,7 +330,7 @@ impl Service for EntertainmentService {
 
             log::debug!("Listening to new entertainment socket stream");
 
-            spawn(async move {
+            tokio::spawn(async move {
                 match entertainment_socket.listen(stream).await {
                     Ok(()) => log::info!("Entertainment stream finished"),
                     Err(err) => log::error!("Entertainment stream error: {err}"),
