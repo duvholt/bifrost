@@ -4,6 +4,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::os::fd::AsFd;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -13,9 +14,8 @@ use nix::sys::socket::sockopt::RcvBuf;
 use openssl::ssl::{Ssl, SslContext, SslMethod};
 use tokio::io::AsyncReadExt;
 use tokio::net::UdpSocket;
-use tokio::spawn;
-use tokio::sync::Mutex;
 use tokio::sync::broadcast::Sender;
+use tokio::sync::{Mutex, mpsc};
 use tokio::time::timeout;
 use tokio_openssl::SslStream;
 use udp_stream::{UdpListenBuilder, UdpListener, UdpStream};
@@ -342,5 +342,90 @@ impl Service for EntertainmentService {
     async fn stop(&mut self) -> Result<(), Self::Error> {
         self.udp.take();
         Ok(())
+    }
+}
+
+pub struct EntertainmentWatcherService {
+    res: Arc<Mutex<Resources>>,
+    tx: mpsc::Sender<EntertainmentEvent>,
+    rx: mpsc::Receiver<EntertainmentEvent>,
+}
+
+impl EntertainmentWatcherService {
+    pub fn new(res: Arc<Mutex<Resources>>) -> Self {
+        let (tx, rx) = mpsc::channel(100);
+
+        Self { res, tx, rx }
+    }
+}
+
+enum EntertainmentEvent {
+    Start,
+    Stop,
+    Frame,
+}
+
+#[async_trait]
+impl Service for EntertainmentWatcherService {
+    type Error = ApiError;
+
+    async fn start(&mut self) -> Result<(), Self::Error> {
+        let mut chan = self.res.lock().await.backend_event_stream();
+
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            loop {
+                let recv_event = chan.recv().await;
+                let backend_request = match recv_event {
+                    Ok(event) => match &*event {
+                        BackendRequest::EntertainmentStart(_) => Some(EntertainmentEvent::Start),
+                        BackendRequest::EntertainmentStop() => Some(EntertainmentEvent::Stop),
+                        BackendRequest::EntertainmentFrame(_) => Some(EntertainmentEvent::Frame),
+                        _ => None,
+                    },
+                    Err(_err) => None,
+                };
+                if let Some(backend_request) = backend_request
+                    && tx.send(backend_request).await.is_err()
+                {
+                    return;
+                }
+            }
+        });
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<(), Self::Error> {
+        const TIMEOUT: Duration = Duration::from_secs(10);
+        let mut active = false;
+
+        loop {
+            let event = if active {
+                match timeout(TIMEOUT, self.rx.recv()).await {
+                    Err(_) => {
+                        log::warn!("Timeout while waiting for entertainment frames");
+                        self.res
+                            .lock()
+                            .await
+                            .backend_request(BackendRequest::EntertainmentStop())?;
+                        None
+                    }
+                    Ok(event) => event,
+                }
+            } else {
+                self.rx.recv().await
+            };
+            if let Some(event) = event {
+                match event {
+                    EntertainmentEvent::Start => {
+                        active = true;
+                    }
+                    EntertainmentEvent::Frame => {}
+                    EntertainmentEvent::Stop => {
+                        active = false;
+                    }
+                }
+            }
+        }
     }
 }
