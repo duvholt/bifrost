@@ -115,6 +115,8 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
         appstate.backend.clone(),
     )?;
     mgr.register_service("entertainment", svc).await?;
+    let svc = server::entertainment::EntertainmentWatcherService::new(appstate.res.clone());
+    mgr.register_service("entertainment-watcher", svc).await?;
 
     let svc = server::behavior_instance::BehaviorInstanceService::new(appstate.res.clone());
     mgr.register_service("behavior-instance", svc).await?;
