@@ -470,6 +470,11 @@ impl Z2mBackend {
         if let Some(target) = targets.first() {
             let mut es = EntStream::new(self.counter, target, addrs, channels);
 
+            // hack: This diverges from the observed behavior of the Hue bridge.
+            // The real fix is to persist the latest value of the entertainment counter,
+            // but for now resetting the stream to the last known counter seems to work good enough.
+            es.reset_stream(z2mws).await?;
+
             // Not even a real Philips Hue bridge uses this trick!
             //
             // We set the entertainment mode fade speed ("smoothing")
@@ -504,7 +509,7 @@ impl Z2mBackend {
         if let Some(es) = &mut self.entstream.take() {
             let mut lock = self.state.lock().await;
 
-            es.stop_stream(z2mws).await?;
+            es.reset_stream(z2mws).await?;
 
             self.counter = es.stream.counter();
 

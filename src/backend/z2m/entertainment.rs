@@ -102,11 +102,11 @@ impl EntStream {
         Ok(())
     }
 
-    pub async fn stop_stream(&mut self, z2mws: &mut Z2mWebSocket) -> ApiResult<()> {
-        let stop = self.stream.reset()?;
+    pub async fn reset_stream(&mut self, z2mws: &mut Z2mWebSocket) -> ApiResult<()> {
+        let reset = self.stream.reset()?;
         for topic in self.addrs.keys() {
-            log::debug!("Sending stop to {topic}");
-            z2mws.send_zigbee_message(topic, &stop).await?;
+            log::debug!("Sending reset to {topic}");
+            z2mws.send_zigbee_message(topic, &reset).await?;
         }
 
         Ok(())
