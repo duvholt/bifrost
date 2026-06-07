@@ -18,6 +18,7 @@ pub struct BridgeConfig {
     pub name: String,
     pub mac: MacAddress,
     pub ipaddress: Ipv4Addr,
+    pub bind_ipaddress: Option<Ipv4Addr>,
     pub http_port: u16,
     pub https_port: u16,
     pub entm_port: u16,

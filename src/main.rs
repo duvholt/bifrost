@@ -66,6 +66,7 @@ fn init_logging() -> ApiResult<()> {
 #[allow(clippy::similar_names)]
 async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let bconf = &appstate.config().bridge;
+    let bind_ipaddress = bconf.bind_ipaddress.unwrap_or(bconf.ipaddress);
 
     let mut mgr = appstate.manager();
 
@@ -76,14 +77,14 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
 
     // register plain http service
     let http_service = HttpServer::http(
-        bconf.ipaddress,
+        bind_ipaddress,
         bconf.http_port,
         server::build_service(Protocol::Http, appstate.clone()),
     );
     mgr.register_service("http", http_service).await?;
 
     let https_service = HttpServer::https_openssl(
-        bconf.ipaddress,
+        bind_ipaddress,
         bconf.https_port,
         server::build_service(Protocol::Https, appstate.clone()),
         &appstate.config().bifrost.cert_file,
@@ -104,12 +105,17 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     mgr.register_function("version-updater", svc).await?;
 
     // register ssdp listener
-    let svc = server::ssdp::SsdpService::new(bconf.mac, bconf.ipaddress, appstate.updater());
+    let svc = server::ssdp::SsdpService::new(
+        bconf.mac,
+        bconf.ipaddress,
+        bind_ipaddress,
+        appstate.updater(),
+    );
     mgr.register_service("ssdp", svc).await?;
 
     // register entertainment streaming listener
     let svc = server::entertainment::EntertainmentService::new(
-        bconf.ipaddress,
+        bind_ipaddress,
         bconf.entm_port,
         appstate.res.clone(),
         appstate.backend.clone(),

@@ -19,6 +19,7 @@ pub struct SsdpService {
     usn: Uuid,
     mac: MacAddress,
     ip: Ipv4Addr,
+    bind_ip: Ipv4Addr,
     signal: Option<Sender<bool>>,
     shutdown: Option<Receiver<bool>>,
 }
@@ -41,12 +42,18 @@ pub fn hue_bridge_usn(mac: MacAddress) -> Uuid {
 
 impl SsdpService {
     #[must_use]
-    pub fn new(mac: MacAddress, ip: Ipv4Addr, updater: Arc<Mutex<VersionUpdater>>) -> Self {
+    pub fn new(
+        mac: MacAddress,
+        ip: Ipv4Addr,
+        bind_ip: Ipv4Addr,
+        updater: Arc<Mutex<VersionUpdater>>,
+    ) -> Self {
         Self {
             service: None,
             updater,
             mac,
             ip,
+            bind_ip,
             usn: hue_bridge_usn(mac),
             shutdown: None,
             signal: None,
@@ -107,7 +114,7 @@ impl Service for SsdpService {
                 },
 
                 // wait for server to run (indefinitely)
-                res = svc.clone().serve_addr(self.ip)? => {
+                res = svc.clone().serve_addr(self.bind_ip)? => {
                     res?;
                 }
             }
