@@ -55,8 +55,15 @@ impl AppState {
                     State::from_v0(yaml)?
                 }
                 StateVersion::V1 => {
-                    log::info!("Detected state file version 1. Loading..");
+                    log::info!("Detected state file version 1. Upgrading to new version..");
+                    let backup_path = &config.bifrost.state_file.with_extension("v1.bak");
+                    fs::rename(&config.bifrost.state_file, backup_path)?;
+                    log::info!("  ..saved old state file as {backup_path}");
                     State::from_v1(yaml)?
+                }
+                StateVersion::V2 => {
+                    log::info!("Detected state file version 2. Loading..");
+                    State::from_v2(yaml)?
                 }
             };
             res = Resources::new(swversion, state);

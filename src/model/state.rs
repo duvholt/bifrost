@@ -106,9 +106,12 @@ pub enum StateVersion {
     /// Version 0: (`res`, `aux`) tuple, no version field in state
     V0 = 0,
 
-    #[default]
     /// Version 1: { `version`, `aux`, `id_v1`, `res` } map
     V1 = 1,
+
+    #[default]
+    /// Version 2: Same as v1 but with a MAC address migration
+    V2 = 2,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -203,6 +206,34 @@ impl State {
     }
 
     pub fn from_v1(state: Value) -> ApiResult<Self> {
+        let mut v1_state: State = serde_yml::from_value(state)?;
+
+        log::debug!("Migrate ZigbeeConnectivity mac address");
+        for resource in v1_state.res.values_mut() {
+            if let Resource::ZigbeeConnectivity(zigbee_connectivity) = resource
+                && zigbee_connectivity.mac_address.starts_with("0x")
+            {
+                log::trace!(
+                    "Migrating ZigbeeConnectivity mac address for {}",
+                    zigbee_connectivity.mac_address
+                );
+                zigbee_connectivity.mac_address =
+                    migrate_mac_address(&zigbee_connectivity.mac_address)?;
+                log::trace!(
+                    "Migrated ZigbeeConnectivity mac address for {} to {}",
+                    zigbee_connectivity.owner.rid,
+                    zigbee_connectivity.mac_address
+                );
+            }
+        }
+
+        Ok(Self {
+            version: StateVersion::V2,
+            ..v1_state
+        })
+    }
+
+    pub fn from_v2(state: Value) -> ApiResult<Self> {
         Ok(serde_yml::from_value(state)?)
     }
 
@@ -211,6 +242,7 @@ impl State {
         match Self::version(&state)? {
             StateVersion::V0 => Self::from_v0(state),
             StateVersion::V1 => Self::from_v1(state),
+            StateVersion::V2 => Self::from_v2(state),
         }
     }
 
@@ -256,4 +288,15 @@ impl State {
     pub fn from_id_v1(&self, id: &u32) -> Option<Uuid> {
         self.id_v1.uuid(id)
     }
+}
+
+fn migrate_mac_address(zbc_mac_address: &str) -> Result<String, ApiError> {
+    let mac_num = u64::from_str_radix(zbc_mac_address.trim_start_matches("0x"), 16)?;
+    let mac_address = mac_num
+        .to_be_bytes()
+        .into_iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<Vec<_>>()
+        .join(":");
+    Ok(mac_address)
 }
