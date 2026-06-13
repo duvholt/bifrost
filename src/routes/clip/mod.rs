@@ -98,6 +98,7 @@ async fn post_resource(
         | RType::BridgeHome
         | RType::Button
         | RType::CameraMotion
+        | RType::Clip
         | RType::Contact
         | RType::Device
         | RType::DevicePower
@@ -163,6 +164,7 @@ async fn put_resource_id(
         RType::Bridge
         | RType::Button
         | RType::CameraMotion
+        | RType::Clip
         | RType::Contact
         | RType::DevicePower
         | RType::DeviceSoftwareUpdate
@@ -256,6 +258,7 @@ async fn delete_resource_id(
         | RType::BridgeHome
         | RType::Button
         | RType::CameraMotion
+        | RType::Clip
         | RType::Contact
         | RType::DevicePower
         | RType::DeviceSoftwareUpdate

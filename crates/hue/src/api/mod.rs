@@ -60,7 +60,7 @@ pub use scene::{
 use serde::ser::SerializeMap;
 pub use stream::HueStreamKey;
 pub use stubs::{
-    Bridge, DevicePower, DeviceSoftwareUpdate, DollarRef, GeofenceClient, Geolocation,
+    Bridge, Clip, DevicePower, DeviceSoftwareUpdate, DollarRef, GeofenceClient, Geolocation,
     GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter, Metadata, MetadataUpdate,
     Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene, Taurus, Temperature, TimeZone,
     ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
@@ -102,6 +102,7 @@ pub enum Resource {
     Bridge(Bridge),
     BridgeHome(BridgeHome),
     Button(Button),
+    Clip(Clip),
     Device(Device),
     DevicePower(DevicePower),
     DeviceSoftwareUpdate(DeviceSoftwareUpdate),
@@ -150,6 +151,7 @@ impl Resource {
             Self::BridgeHome(_) => RType::BridgeHome,
             Self::Button(_) => RType::Button,
             Self::CameraMotion(_) => RType::CameraMotion,
+            Self::Clip(_) => RType::Clip,
             Self::Contact(_) => RType::Contact,
             Self::Device(_) => RType::Device,
             Self::DevicePower(_) => RType::DevicePower,
@@ -194,6 +196,7 @@ impl Resource {
             Self::Bridge(obj) => Some(obj.owner),
             Self::BridgeHome(_) => None,
             Self::Button(obj) => Some(obj.owner),
+            Self::Clip(_) => None,
             Self::Device(_) => None,
             Self::DevicePower(obj) => Some(obj.owner),
             Self::DeviceSoftwareUpdate(obj) => Some(obj.owner),
@@ -271,6 +274,7 @@ impl Resource {
             RType::ServiceGroup => Self::ServiceGroup(obj),
             RType::Tamper => Self::Tamper(obj),
             RType::ZgpConnectivity => Self::ZgpConnectivity(obj),
+            RType::Clip => Self::Clip(from_value(obj)?),
         };
         Ok(res)
     }

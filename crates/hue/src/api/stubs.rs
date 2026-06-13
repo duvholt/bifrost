@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::api::{DeviceArchetype, LightFunction, ResourceLink, SceneMetadata};
+use crate::api::{DeviceArchetype, LightFunction, RType, ResourceLink, SceneMetadata};
 use crate::best_guess_timezone;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -11,6 +11,11 @@ pub struct Bridge {
     pub bridge_id: String,
     pub owner: ResourceLink,
     pub time_zone: TimeZone,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Clip {
+    pub resources: Vec<RType>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -8,13 +8,13 @@ use serde::Serialize;
 use serde_json::json;
 use tokio::sync::Notify;
 use tokio::sync::broadcast::{Receiver, Sender};
-use uuid::Uuid;
+use uuid::{Uuid, uuid};
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    BehaviorScript, Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate,
-    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource,
-    ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
+    BehaviorScript, Bridge, BridgeHome, Clip, Device, DeviceArchetype, DeviceProductData,
+    DimmingUpdate, Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, On,
+    RType, Resource, ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction,
     ZigbeeDeviceDiscoveryStatus, Zone,
 };
@@ -390,6 +390,55 @@ impl Resources {
         Ok(())
     }
 
+    pub fn add_clip(&mut self) -> ApiResult<()> {
+        self.add(
+            &ResourceLink::new(uuid!("a3752057-d413-4ac5-807a-8d22439678e3"), RType::Clip),
+            Resource::Clip(Clip {
+                resources: vec![
+                    RType::BehaviorScript,
+                    RType::BehaviorInstance,
+                    RType::GeofenceClient,
+                    RType::Geolocation,
+                    RType::SmartScene,
+                    RType::Clip,
+                    RType::BridgeHome,
+                    RType::GroupedLight,
+                    RType::GroupedLightLevel,
+                    RType::GroupedMotion,
+                    RType::Room,
+                    RType::ServiceGroup,
+                    RType::Zone,
+                    RType::Scene,
+                    RType::Homekit,
+                    RType::Bridge,
+                    RType::Button,
+                    RType::Device,
+                    RType::DevicePower,
+                    RType::DeviceSoftwareUpdate,
+                    RType::Entertainment,
+                    RType::Light,
+                    RType::LightLevel,
+                    RType::ZigbeeConnectivity,
+                    RType::ZgpConnectivity,
+                    RType::Motion,
+                    RType::CameraMotion,
+                    RType::RelativeRotary,
+                    RType::Temperature,
+                    RType::ZigbeeDeviceDiscovery,
+                    RType::Contact,
+                    RType::Tamper,
+                    // RType::Speaker,
+                    // RType::BellButton,
+                    // RType::SwitchInputConfiguration,
+                    RType::Matter,
+                    RType::MatterFabric,
+                    RType::EntertainmentConfiguration,
+                ],
+            }),
+        )?;
+        Ok(())
+    }
+
     pub fn get_next_scene_id(&self, room: &ResourceLink) -> HueResult<u32> {
         let mut set: HashSet<u32> = HashSet::new();
 
@@ -501,6 +550,7 @@ impl Resources {
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
             | Resource::CameraMotion(_)
+            | Resource::Clip(_)
             | Resource::Contact(_)
             | Resource::DevicePower(_)
             | Resource::DeviceSoftwareUpdate(_)
