@@ -115,11 +115,7 @@ impl Light {
             service_id: Some(0),
             gradient: None,
             identify: Identify {},
-            timed_effects: Some(LightTimedEffects {
-                status_values: Vec::from(LightTimedEffect::ALL),
-                status: LightTimedEffect::NoEffect,
-                effect_values: Vec::from(LightTimedEffect::ALL),
-            }),
+            timed_effects: None,
             mode: LightMode::Normal,
             on: On { on: true },
             product_data: Some(LightProductData {

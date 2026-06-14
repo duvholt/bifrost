@@ -8,10 +8,10 @@ use hue::api::{
     BridgeHome, Button, ContentConfiguration, ContentConfigurationOrder,
     ContentConfigurationOrientation, ContentConfigurationStatusType, DeviceArchetype,
     DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight,
-    Light, LightEffects, LightEffectsV2, LightMetadata, Metadata, OrderType, OrientationType,
-    RType, Resource, ResourceLink, Room, RoomArchetype, RoomMetadata, Scene, SceneActive,
-    SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus, ZigbeeConnectivity,
-    ZigbeeConnectivityStatus,
+    Light, LightEffects, LightEffectsV2, LightMetadata, LightTimedEffect, LightTimedEffects,
+    Metadata, OrderType, OrientationType, RType, Resource, ResourceLink, Room, RoomArchetype,
+    RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 use hue::devicedb::gradient_product_data;
 use hue::scene_icons;
@@ -86,6 +86,11 @@ impl Z2mBackend {
             log::trace!("Detected Hue light: enabling effects");
             light.effects = Some(LightEffects::all());
             light.effects_v2 = Some(LightEffectsV2::all());
+            light.timed_effects = Some(LightTimedEffects {
+                status_values: Vec::from(LightTimedEffect::ALL),
+                status: LightTimedEffect::NoEffect,
+                effect_values: Vec::from(LightTimedEffect::ALL),
+            });
         }
 
         if gradient.is_some() {
@@ -100,7 +105,7 @@ impl Z2mBackend {
                     order: OrderType::Forward,
                     status: ContentConfigurationStatusType::Set,
                 }),
-            })
+            });
         }
 
         let segments = if gradient.is_some() {
