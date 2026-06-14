@@ -345,6 +345,29 @@ impl Z2mBackend {
         Ok(())
     }
 
+    async fn backend_room_create(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        room: &Room,
+    ) -> ApiResult<()> {
+        let friendly_name = room.metadata.name.clone();
+        let topic = friendly_name.clone();
+
+        // Store metadata
+        self.state
+            .lock()
+            .await
+            .add(link, Resource::Room(room.clone()))?;
+
+        z2mws.send_group_add(friendly_name).await?;
+        for member in &room.children {
+            let friendly_name = &self.rmap[member];
+            z2mws.send_group_member_add(&topic, friendly_name).await?;
+        }
+        Ok(())
+    }
+
     async fn backend_room_update(
         &self,
         z2mws: &mut Z2mWebSocket,
@@ -577,6 +600,10 @@ impl Z2mBackend {
 
             BackendRequest::GroupedLightUpdate(link, upd) => {
                 self.backend_grouped_light_update(z2mws, link, upd).await
+            }
+
+            BackendRequest::RoomCreate(link, room) => {
+                self.backend_room_create(z2mws, link, room).await
             }
 
             BackendRequest::RoomUpdate(link, upd) => {

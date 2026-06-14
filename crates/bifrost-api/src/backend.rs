@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use hue::api::{
-    GroupedLightUpdate, LightUpdate, ResourceLink, RoomUpdate, Scene, SceneUpdate,
+    GroupedLightUpdate, LightUpdate, ResourceLink, Room, RoomUpdate, Scene, SceneUpdate,
     ZigbeeDeviceDiscoveryUpdate,
 };
 use hue::stream::HueStreamLightsV2;
@@ -21,6 +21,7 @@ pub enum BackendRequest {
 
     GroupedLightUpdate(ResourceLink, GroupedLightUpdate),
 
+    RoomCreate(ResourceLink, Room),
     RoomUpdate(ResourceLink, RoomUpdate),
 
     Delete(ResourceLink),

@@ -52,7 +52,7 @@ pub use light::{
     OrientationType,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
-pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
+pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomNew, RoomUpdate};
 pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusEnum, SceneUpdate,

@@ -82,10 +82,10 @@ async fn post_resource(
         RType::EntertainmentConfiguration => ent_conf::post_resource(&state, req).await,
         RType::Scene => scene::post_scene(&state, req).await,
         RType::BehaviorInstance => behavior_instance::post_behavior_instance(&state, req).await,
+        RType::Room => room::post_room(&state, req).await,
 
         /* Not supported yet by Bifrost */
         RType::GeofenceClient
-        | RType::Room
         | RType::ServiceGroup
         | RType::SmartScene
         | RType::Zone => {

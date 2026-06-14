@@ -6,7 +6,7 @@ use hue::zigbee::{HueZigbeeUpdate, ZigbeeMessage};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-use z2m::api::{DeviceRead, DeviceRemove, GroupMemberChange, PermitJoin};
+use z2m::api::{DeviceRead, DeviceRemove, GroupAdd, GroupMemberChange, PermitJoin};
 use z2m::request::Z2mPayload;
 use z2m::update::DeviceUpdate;
 use z2m::{api::RawMessage, request::Z2mRequest};
@@ -39,6 +39,10 @@ impl Z2mWebSocket {
         /* ); */
 
         let api_req = match &payload {
+            Z2mRequest::GroupAdd(value) => RawMessage {
+                topic: "bridge/request/group/add".into(),
+                payload: serde_json::to_value(value)?,
+            },
             Z2mRequest::GroupMemberAdd(value) => RawMessage {
                 topic: "bridge/request/group/members/add".into(),
                 payload: serde_json::to_value(value)?,
@@ -104,6 +108,15 @@ impl Z2mWebSocket {
         let z2mreq = Z2mRequest::DeviceRead(payload);
 
         self.send(topic, &z2mreq).await
+    }
+
+    pub async fn send_group_add(&mut self, friendly_name: String) -> ApiResult<()> {
+        let z2mreq = Z2mRequest::GroupAdd(GroupAdd {
+            id: None,
+            friendly_name,
+        });
+
+        self.send("", &z2mreq).await
     }
 
     pub async fn send_group_member_add(

@@ -364,7 +364,14 @@ impl Z2mBackend {
             })?;
         }
 
-        res.add(&link_room, Resource::Room(room))?;
+        if res.get::<Room>(&link_room).is_ok()  {
+            res.update::<Room>(&link_room.rid, |r| {
+                r.services = room.services;
+                r.children = room.children;
+            })?;
+        } else {
+            res.add(&link_room, Resource::Room(room))?;
+        }
 
         let glight = GroupedLight::new(link_room);
 

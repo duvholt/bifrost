@@ -25,6 +25,12 @@ pub struct Room {
     pub services: BTreeSet<ResourceLink>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RoomNew {
+    pub children: BTreeSet<ResourceLink>,
+    pub metadata: RoomMetadata,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct RoomUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
