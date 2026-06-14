@@ -278,7 +278,6 @@ impl Resources {
         let link_bridge = RType::Bridge.deterministic(&bridge_id);
         let link_bridge_home = RType::BridgeHome.deterministic(format!("{bridge_id}HOME"));
         let link_bridge_dev = RType::Device.deterministic(link_bridge.rid);
-        let link_bridge_home_dev = RType::Device.deterministic(link_bridge_home.rid);
         let link_bridge_ent = RType::Entertainment.deterministic(link_bridge.rid);
         let link_zbdd = RType::ZigbeeDeviceDiscovery.deterministic(link_bridge.rid);
         let link_zbc = RType::ZigbeeConnectivity.deterministic(link_bridge.rid);
@@ -296,14 +295,6 @@ impl Resources {
             bridge_id,
             owner: link_bridge_dev,
             time_zone: TimeZone::best_guess(),
-        };
-
-        let bridge_home_dev = Device {
-            product_data: DeviceProductData::hue_bridge_v2(&self.version),
-            metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost Bridge Home"),
-            services: btreeset![link_bridge],
-            identify: None,
-            usertest: None,
         };
 
         let bridge_home = BridgeHome {
@@ -345,7 +336,6 @@ impl Resources {
 
         self.add(&link_bridge_dev, Resource::Device(bridge_dev))?;
         self.add(&link_bridge, Resource::Bridge(bridge))?;
-        self.add(&link_bridge_home_dev, Resource::Device(bridge_home_dev))?;
         self.add(&link_bridge_home, Resource::BridgeHome(bridge_home))?;
         self.add(&link_zbdd, Resource::ZigbeeDeviceDiscovery(zbdd))?;
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
