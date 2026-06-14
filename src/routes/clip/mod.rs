@@ -55,7 +55,10 @@ impl<T: Serialize> V2Reply<T> {
 
 async fn get_all_resources(State(state): State<AppState>) -> ApiV2Result {
     let lock = state.res.lock().await;
-    let res = lock.get_resources();
+    let mut res: Vec<_> = lock.get_resources();
+    // Undocumented Hue bridge behavior: resources are sorted alphabetically by resource type
+    // Otherwise this can trigger a bug in the Hue app where switching bridges doesn't work properly without restarting the app
+    res.sort_by_key(|r| serde_json::to_string(&r.obj.rtype()).unwrap_or(String::new()));
     drop(lock);
     V2Reply::list(res)
 }
