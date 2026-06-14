@@ -13,8 +13,8 @@ use uuid::{Uuid, uuid};
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BehaviorScript, Bridge, BridgeHome, Clip, Device, DeviceArchetype, DeviceProductData,
-    DimmingUpdate, Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, On,
-    RType, Resource, ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
+    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, RType, Resource,
+    ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction,
     ZigbeeDeviceDiscoveryStatus, Zone,
 };
@@ -311,29 +311,7 @@ impl Resources {
             services: btreeset![link_bhome_glight],
         };
 
-        let bhome_glight = GroupedLight {
-            alert: json!({
-                "action_values": [
-                    "breathe",
-                ]
-            }),
-            dimming: Some(DimmingUpdate { brightness: 8.7 }),
-            color: Some(Stub),
-            color_temperature: Some(Stub),
-            color_temperature_delta: Some(Stub),
-            dimming_delta: Stub,
-            dynamics: Stub,
-            on: Some(On { on: true }),
-            owner: link_bridge_home,
-            signaling: json!({
-                "signal_values": [
-                    "alternating",
-                    "no_signal",
-                    "on_off",
-                    "on_off_color",
-                ]
-            }),
-        };
+        let bhome_glight = GroupedLight::new(link_bridge_home);
 
         let zbdd = ZigbeeDeviceDiscovery {
             owner: link_bridge_dev,

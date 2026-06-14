@@ -1,15 +1,20 @@
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::api::{
-    ColorTemperatureUpdate, ColorUpdate, DimmingDeltaUpdate, DimmingUpdate, On, ResourceLink, Stub,
+    ColorTemperatureUpdate, ColorUpdate, DimmingDeltaUpdate, DimmingUpdate, LightAlert,
+    LightSignal, LightSignaling, On, ResourceLink, Stub,
 };
 use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GroupedLight {
-    pub alert: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert: Option<LightAlert>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dimming: Option<DimmingUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<Stub>,
@@ -17,29 +22,41 @@ pub struct GroupedLight {
     pub color_temperature: Option<Stub>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temperature_delta: Option<Stub>,
-    #[serde(default)]
-    pub dimming_delta: Stub,
-    #[serde(default)]
-    pub dynamics: Stub,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimming_delta: Option<Stub>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamics: Option<Stub>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub on: Option<On>,
     pub owner: ResourceLink,
-    pub signaling: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signaling: Option<LightSignaling>,
 }
 
 impl GroupedLight {
     #[must_use]
-    pub const fn new(room: ResourceLink) -> Self {
+    pub fn new(room: ResourceLink) -> Self {
         Self {
-            alert: Value::Null,
-            dimming: None,
+            alert: Some(LightAlert {
+                action_values: BTreeSet::from([String::from("breathe")]),
+            }),
+            dimming: Some(DimmingUpdate { brightness: 0.0 }),
             color: Some(Stub),
             color_temperature: Some(Stub),
             color_temperature_delta: Some(Stub),
-            dimming_delta: Stub,
-            dynamics: Stub,
-            on: None,
+            dimming_delta: Some(Stub),
+            dynamics: Some(Stub),
+            on: Some(On::new(true)),
             owner: room,
-            signaling: Value::Null,
+            signaling: Some(LightSignaling {
+                signal_values: vec![
+                    LightSignal::Alternating,
+                    LightSignal::NoSignal,
+                    LightSignal::OnOff,
+                    LightSignal::OnOffColor,
+                ],
+                status: Value::Null,
+            }),
         }
     }
 

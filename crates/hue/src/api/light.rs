@@ -331,7 +331,7 @@ pub enum LightMode {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightAlert {
-    action_values: BTreeSet<String>,
+    pub action_values: BTreeSet<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialOrd, Ord, Eq, PartialEq)]
