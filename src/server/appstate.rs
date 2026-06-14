@@ -72,6 +72,7 @@ impl AppState {
             res = Resources::new(swversion, State::new());
             res.init(&hue::bridge_id(config.bridge.mac))?;
         }
+        res.add_clip()?;
 
         res.reset_all_streaming()?;
 

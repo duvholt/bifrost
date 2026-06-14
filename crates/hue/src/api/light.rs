@@ -115,11 +115,7 @@ impl Light {
             service_id: Some(0),
             gradient: None,
             identify: Identify {},
-            timed_effects: Some(LightTimedEffects {
-                status_values: Vec::from(LightTimedEffect::ALL),
-                status: LightTimedEffect::NoEffect,
-                effect_values: Vec::from(LightTimedEffect::ALL),
-            }),
+            timed_effects: None,
             mode: LightMode::Normal,
             on: On { on: true },
             product_data: Some(LightProductData {
@@ -335,7 +331,7 @@ pub enum LightMode {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct LightAlert {
-    action_values: BTreeSet<String>,
+    pub action_values: BTreeSet<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, PartialOrd, Ord, Eq, PartialEq)]

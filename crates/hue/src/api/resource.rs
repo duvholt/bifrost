@@ -18,6 +18,7 @@ pub enum RType {
     BridgeHome,
     Button,
     CameraMotion,
+    Clip,
     Contact,
     Device,
     DevicePower,
@@ -104,6 +105,7 @@ impl Hash for RType {
             Self::ServiceGroup => 35,
             Self::Tamper => 36,
             Self::ZgpConnectivity => 37,
+            Self::Clip => 38,
         };
 
         index.hash(state);

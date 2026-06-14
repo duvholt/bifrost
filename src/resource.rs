@@ -8,12 +8,12 @@ use serde::Serialize;
 use serde_json::json;
 use tokio::sync::Notify;
 use tokio::sync::broadcast::{Receiver, Sender};
-use uuid::Uuid;
+use uuid::{Uuid, uuid};
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
-    BehaviorScript, Bridge, BridgeHome, Device, DeviceArchetype, DeviceProductData, DimmingUpdate,
-    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, On, RType, Resource,
+    BehaviorScript, Bridge, BridgeHome, Clip, Device, DeviceArchetype, DeviceProductData,
+    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, RType, Resource,
     ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction,
     ZigbeeDeviceDiscoveryStatus, Zone,
@@ -278,7 +278,6 @@ impl Resources {
         let link_bridge = RType::Bridge.deterministic(&bridge_id);
         let link_bridge_home = RType::BridgeHome.deterministic(format!("{bridge_id}HOME"));
         let link_bridge_dev = RType::Device.deterministic(link_bridge.rid);
-        let link_bridge_home_dev = RType::Device.deterministic(link_bridge_home.rid);
         let link_bridge_ent = RType::Entertainment.deterministic(link_bridge.rid);
         let link_zbdd = RType::ZigbeeDeviceDiscovery.deterministic(link_bridge.rid);
         let link_zbc = RType::ZigbeeConnectivity.deterministic(link_bridge.rid);
@@ -298,42 +297,12 @@ impl Resources {
             time_zone: TimeZone::best_guess(),
         };
 
-        let bridge_home_dev = Device {
-            product_data: DeviceProductData::hue_bridge_v2(&self.version),
-            metadata: Metadata::new(DeviceArchetype::BridgeV2, "Bifrost Bridge Home"),
-            services: btreeset![link_bridge],
-            identify: None,
-            usertest: None,
-        };
-
         let bridge_home = BridgeHome {
             children: btreeset![link_bridge_dev],
             services: btreeset![link_bhome_glight],
         };
 
-        let bhome_glight = GroupedLight {
-            alert: json!({
-                "action_values": [
-                    "breathe",
-                ]
-            }),
-            dimming: Some(DimmingUpdate { brightness: 8.7 }),
-            color: Some(Stub),
-            color_temperature: Some(Stub),
-            color_temperature_delta: Some(Stub),
-            dimming_delta: Stub,
-            dynamics: Stub,
-            on: Some(On { on: true }),
-            owner: link_bridge_home,
-            signaling: json!({
-                "signal_values": [
-                    "alternating",
-                    "no_signal",
-                    "on_off",
-                    "on_off_color",
-                ]
-            }),
-        };
+        let bhome_glight = GroupedLight::new(link_bridge_home);
 
         let zbdd = ZigbeeDeviceDiscovery {
             owner: link_bridge_dev,
@@ -367,7 +336,6 @@ impl Resources {
 
         self.add(&link_bridge_dev, Resource::Device(bridge_dev))?;
         self.add(&link_bridge, Resource::Bridge(bridge))?;
-        self.add(&link_bridge_home_dev, Resource::Device(bridge_home_dev))?;
         self.add(&link_bridge_home, Resource::BridgeHome(bridge_home))?;
         self.add(&link_zbdd, Resource::ZigbeeDeviceDiscovery(zbdd))?;
         self.add(&link_zbc, Resource::ZigbeeConnectivity(zbc))?;
@@ -387,6 +355,55 @@ impl Resources {
             Resource::BehaviorScript(BehaviorScript::hue_accessories()),
         )?;
 
+        Ok(())
+    }
+
+    pub fn add_clip(&mut self) -> ApiResult<()> {
+        self.add(
+            &ResourceLink::new(uuid!("a3752057-d413-4ac5-807a-8d22439678e3"), RType::Clip),
+            Resource::Clip(Clip {
+                resources: vec![
+                    RType::BehaviorScript,
+                    RType::BehaviorInstance,
+                    RType::GeofenceClient,
+                    RType::Geolocation,
+                    RType::SmartScene,
+                    RType::Clip,
+                    RType::BridgeHome,
+                    RType::GroupedLight,
+                    RType::GroupedLightLevel,
+                    RType::GroupedMotion,
+                    RType::Room,
+                    RType::ServiceGroup,
+                    RType::Zone,
+                    RType::Scene,
+                    RType::Homekit,
+                    RType::Bridge,
+                    RType::Button,
+                    RType::Device,
+                    RType::DevicePower,
+                    RType::DeviceSoftwareUpdate,
+                    RType::Entertainment,
+                    RType::Light,
+                    RType::LightLevel,
+                    RType::ZigbeeConnectivity,
+                    RType::ZgpConnectivity,
+                    RType::Motion,
+                    RType::CameraMotion,
+                    RType::RelativeRotary,
+                    RType::Temperature,
+                    RType::ZigbeeDeviceDiscovery,
+                    RType::Contact,
+                    RType::Tamper,
+                    // RType::Speaker,
+                    // RType::BellButton,
+                    // RType::SwitchInputConfiguration,
+                    RType::Matter,
+                    RType::MatterFabric,
+                    RType::EntertainmentConfiguration,
+                ],
+            }),
+        )?;
         Ok(())
     }
 
@@ -501,6 +518,7 @@ impl Resources {
             | Resource::BehaviorScript(_)
             | Resource::Bridge(_)
             | Resource::CameraMotion(_)
+            | Resource::Clip(_)
             | Resource::Contact(_)
             | Resource::DevicePower(_)
             | Resource::DeviceSoftwareUpdate(_)
