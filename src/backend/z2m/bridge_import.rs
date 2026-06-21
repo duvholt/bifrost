@@ -238,8 +238,21 @@ impl Z2mBackend {
 
     #[allow(clippy::too_many_lines)]
     pub async fn add_group(&mut self, grp: &z2m::api::Group) -> ApiResult<()> {
-        let room_name;
+        let link_room = RType::Room.deterministic(grp.id);
+        let link_glight = RType::GroupedLight.deterministic(link_room.rid);
+        let topic = grp.friendly_name.clone();
 
+        // We want to set group light aux data for all groups since it is used to calculate the next available group id
+        let glight = GroupedLight::new(link_room);
+        let mut lock = self.state.lock().await;
+        lock.add(&link_glight, Resource::GroupedLight(glight))?;
+        lock.aux_set(
+            &link_glight,
+            AuxData::new().with_topic(&topic).with_index(grp.id),
+        );
+        drop(lock);
+
+        let room_name;
         if let Some(ref prefix) = self.server.group_prefix {
             if let Some(name) = grp.friendly_name.strip_prefix(prefix) {
                 room_name = name;
@@ -255,16 +268,11 @@ impl Z2mBackend {
             room_name = &grp.friendly_name;
         }
 
-        let link_room = RType::Room.deterministic(grp.id);
-        let link_glight = RType::GroupedLight.deterministic(link_room.rid);
-
         let children = grp
             .members
             .iter()
             .map(|f| RType::Device.deterministic(&f.ieee_address))
             .collect();
-
-        let topic = grp.friendly_name.clone();
 
         let mut res = self.state.lock().await;
 
@@ -372,14 +380,6 @@ impl Z2mBackend {
         } else {
             res.add(&link_room, Resource::Room(room))?;
         }
-
-        let glight = GroupedLight::new(link_room);
-
-        res.add(&link_glight, Resource::GroupedLight(glight))?;
-        res.aux_set(
-            &link_glight,
-            AuxData::new().with_topic(&topic).with_index(grp.id),
-        );
 
         drop(res);
 

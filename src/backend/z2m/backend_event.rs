@@ -352,8 +352,11 @@ impl Z2mBackend {
         room_id: u32,
         room: &Room,
     ) -> ApiResult<()> {
-        let friendly_name = room.metadata.name.clone();
-        let topic = friendly_name.clone();
+        let friendly_name = self.server.group_prefix.as_ref().map_or_else(
+            || room.metadata.name.clone(),
+            |group_prefix| format!("{group_prefix}{}", room.metadata.name),
+        );
+        let topic = room.metadata.name.clone();
 
         // Store metadata
         self.state

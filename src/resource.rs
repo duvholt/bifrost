@@ -411,11 +411,10 @@ impl Resources {
     pub fn get_next_room_id(&self) -> HueResult<u32> {
         let mut set: HashSet<u32> = HashSet::new();
 
-        // todo: this won't work if `group_prefix` is set
-        for room in self.get_resources_by_type(RType::GroupedLight) {
+        for grouped_light in self.get_resources_by_type(RType::GroupedLight) {
             let Ok(AuxData {
                 index: Some(index), ..
-            }) = self.state.aux_get(&room.id)
+            }) = self.state.aux_get(&grouped_light.id)
             else {
                 continue;
             };
