@@ -442,6 +442,16 @@ impl Z2mBackend {
                 }
             }
 
+            RType::Room => {
+                if let Some(topic) = self.rmap.get(link) {
+                    log::info!("[{}] Requesting z2m removal of {}", self.name, &topic);
+                    z2mws.send_group_remove(topic.clone()).await?;
+                } else {
+                    log::info!("[{}] Deleting orphaned room {:?}", self.name, link);
+                    self.state.lock().await.delete(link)?;
+                }
+            }
+
             rtype => {
                 log::warn!(
                     "[{}] Deleting objects of type {rtype:?} is not supported",

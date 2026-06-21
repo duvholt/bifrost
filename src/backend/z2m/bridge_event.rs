@@ -10,7 +10,8 @@ use hue::api::{
     Device, DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, ResourceLink, Room,
 };
 use z2m::api::{
-    BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
+    BridgeDevices, DeviceRemoveResponse, GroupMemberChange, GroupRemove, Message, RawMessage,
+    Response,
 };
 use z2m::update::DeviceUpdate;
 
@@ -222,6 +223,34 @@ impl Z2mBackend {
         Ok(())
     }
 
+
+    async fn bridge_group_remove(&mut self, grp: &GroupRemove) -> ApiResult<()> {
+        let mut lock = self.state.lock().await;
+        let link_room = if let Ok(group_id) = grp.id.clone().parse::<u32>() {
+            RType::Room.deterministic(group_id)
+        } else {
+            let Some(glight_link) = self.map.get(&grp.id) else {
+                return Ok(());
+            };
+            let Ok(glight) = lock.get::<GroupedLight>(glight_link).cloned() else {
+                return Ok(());
+            };
+            glight.owner
+        };
+
+        let Some(topic) = self.rmap.get(&link_room) else {
+            return Ok(());
+        };
+
+        lock.delete(&link_room)?;
+        self.map.remove(topic);
+        self.rmap.insert(link_room, topic.clone());
+
+        log::info!("[{}] Bridge deleted room {:?}", self.name, link_room);
+        drop(lock);
+        Ok(())
+    }
+
     async fn bridge_device_remove(&mut self, data: &DeviceRemoveResponse) -> ApiResult<()> {
         if let Some(rlink) = self.map.get(&data.id) {
             match rlink.rtype {
@@ -300,7 +329,13 @@ impl Z2mBackend {
             Message::BridgeDeviceConfigureReporting(obj) => {}
             Message::BridgeConfig(obj) => {}
             Message::BridgeResponseGroupAdd(obj) => {}
-            Message::BridgeResponseGroupRemove(obj) => {}
+            Message::BridgeResponseGroupRemove(obj) => {
+                let Response::Ok { data: remove, .. } = obj else {
+                    log::warn!("[{}] Error reported from z2m: {obj:?}", self.name);
+                    return Ok(());
+                };
+                self.bridge_group_remove(remove).await?;
+            }
             Message::BridgeResponseGroupRename(obj) => {}
             Message::BridgeResponseGroupOptions(obj) => {}
 
