@@ -49,11 +49,11 @@ impl Z2mBackend {
     }
 
     async fn handle_update(&mut self, rid: &Uuid, payload: &Value) -> ApiResult<()> {
-        if let Value::String(string) = payload {
-            if string.is_empty() {
-                log::debug!("Ignoring empty payload for {rid}");
-                return Ok(());
-            }
+        if let Value::String(string) = payload
+            && string.is_empty()
+        {
+            log::debug!("Ignoring empty payload for {rid}");
+            return Ok(());
         }
 
         let upd = DeviceUpdate::deserialize(payload)?;
@@ -136,8 +136,8 @@ impl Z2mBackend {
     ) -> Result<(), ApiError> {
         let lock = self.state.lock().await;
 
-        let device = lock.get_id::<Device>(link.rid.clone())?.clone();
-        let model_id: String = if let Ok(aux) = lock.aux_get(&link) {
+        let device = lock.get_id::<Device>(link.rid)?.clone();
+        let model_id: String = if let Ok(aux) = lock.aux_get(link) {
             aux.model_id
                 .as_ref()
                 .unwrap_or(&device.product_data.model_id)
@@ -161,7 +161,7 @@ impl Z2mBackend {
             .handle_action(&device, action)
             .await?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn get_button_handler(
@@ -170,15 +170,13 @@ impl Z2mBackend {
         model_id: &str,
     ) -> Option<Arc<Mutex<Z2mButtonHandler>>> {
         let handler = self.button_handlers.get(resource_link);
-        match handler {
-            Some(handler) => Some(handler.clone()),
-            None => {
-                let handler = Z2mButtonHandler::from_model_id(self.state.clone(), model_id)?;
-                let handler = Arc::new(Mutex::new(handler));
-                self.button_handlers
-                    .insert(resource_link.clone(), handler.clone());
-                Some(handler.clone())
-            }
+        if let Some(handler) = handler {
+            Some(handler.clone())
+        } else {
+            let handler = Z2mButtonHandler::from_model_id(self.state.clone(), model_id)?;
+            let handler = Arc::new(Mutex::new(handler));
+            self.button_handlers.insert(*resource_link, handler.clone());
+            Some(handler)
         }
     }
 
@@ -208,7 +206,7 @@ impl Z2mBackend {
                         self.name,
                         dev.friendly_name
                     );
-                    self.ignore.insert(dev.friendly_name.to_string());
+                    self.ignore.insert(dev.friendly_name.clone());
                 }
             } else {
                 log::debug!(
@@ -222,7 +220,6 @@ impl Z2mBackend {
 
         Ok(())
     }
-
 
     async fn bridge_group_remove(&mut self, grp: &GroupRemove) -> ApiResult<()> {
         let mut lock = self.state.lock().await;

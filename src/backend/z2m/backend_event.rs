@@ -377,31 +377,31 @@ impl Z2mBackend {
     ) -> ApiResult<()> {
         let lock = self.state.lock().await;
 
-        if let Some(children) = &upd.children {
-            if let Some(topic) = self.rmap.get(link) {
-                let room = lock.get::<Room>(link)?.clone();
-                drop(lock);
+        if let Some(children) = &upd.children
+            && let Some(topic) = self.rmap.get(link)
+        {
+            let room = lock.get::<Room>(link)?.clone();
+            drop(lock);
 
-                let known_existing: BTreeSet<_> = room
-                    .children
-                    .iter()
-                    .filter(|device| self.rmap.contains_key(device))
-                    .collect();
+            let known_existing: BTreeSet<_> = room
+                .children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
 
-                let known_new: BTreeSet<_> = children
-                    .iter()
-                    .filter(|device| self.rmap.contains_key(device))
-                    .collect();
+            let known_new: BTreeSet<_> = children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
 
-                for add in known_new.difference(&known_existing) {
-                    let friendly_name = &self.rmap[add];
-                    z2mws.send_group_member_add(topic, friendly_name).await?;
-                }
+            for add in known_new.difference(&known_existing) {
+                let friendly_name = &self.rmap[add];
+                z2mws.send_group_member_add(topic, friendly_name).await?;
+            }
 
-                for remove in known_existing.difference(&known_new) {
-                    let friendly_name = &self.rmap[remove];
-                    z2mws.send_group_member_remove(topic, friendly_name).await?;
-                }
+            for remove in known_existing.difference(&known_new) {
+                let friendly_name = &self.rmap[remove];
+                z2mws.send_group_member_remove(topic, friendly_name).await?;
             }
         }
 
@@ -507,7 +507,7 @@ impl Z2mBackend {
                 } else {
                     LightRecordMode::Device
                 };
-                channels.insert(chan.channel_id as u8, (segment_addr, mode));
+                channels.insert(u8::try_from(chan.channel_id)?, (segment_addr, mode));
 
                 targets.push(topic);
             }
@@ -543,10 +543,10 @@ impl Z2mBackend {
         z2mws: &mut Z2mWebSocket,
         frame: &HueStreamLightsV2,
     ) -> ApiResult<()> {
-        if let Some(es) = &mut self.entstream {
-            if self.throttle.tick() {
-                es.frame(z2mws, frame).await?;
-            }
+        if let Some(es) = &mut self.entstream
+            && self.throttle.tick()
+        {
+            es.frame(z2mws, frame).await?;
         }
 
         Ok(())

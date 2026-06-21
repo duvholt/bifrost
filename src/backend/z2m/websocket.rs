@@ -124,10 +124,7 @@ impl Z2mWebSocket {
     }
 
     pub async fn send_group_remove(&mut self, id: String) -> ApiResult<()> {
-        let z2mreq = Z2mRequest::GroupRemove(GroupRemove {
-            id,
-            force: false,
-        });
+        let z2mreq = Z2mRequest::GroupRemove(GroupRemove { id, force: false });
 
         self.send("", &z2mreq).await
     }

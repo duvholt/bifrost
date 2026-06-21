@@ -85,10 +85,7 @@ async fn post_resource(
         RType::Room => room::post_room(&state, req).await,
 
         /* Not supported yet by Bifrost */
-        RType::GeofenceClient
-        | RType::ServiceGroup
-        | RType::SmartScene
-        | RType::Zone => {
+        RType::GeofenceClient | RType::ServiceGroup | RType::SmartScene | RType::Zone => {
             let err = ApiError::CreateNotYetSupported(rtype);
             log::warn!("{err}");
             Err(err)

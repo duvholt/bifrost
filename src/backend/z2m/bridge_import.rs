@@ -189,7 +189,7 @@ impl Z2mBackend {
             return Ok(None);
         };
 
-        let Some(button_device) = Z2mButtonData::from_model_id(&model_id) else {
+        let Some(button_device) = Z2mButtonData::from_model_id(model_id) else {
             return Ok(None);
         };
 
@@ -224,7 +224,7 @@ impl Z2mBackend {
 
         if let Some(model_id) = &apidev.model_id {
             // needed to look up button mappings when handling actions
-            res.aux_set(&link_device, AuxData::new().with_model_id(&model_id));
+            res.aux_set(&link_device, AuxData::new().with_model_id(model_id));
         }
         res.add(&link_device, Resource::Device(dev))?;
         for (link_button, button) in buttons {

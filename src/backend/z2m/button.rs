@@ -33,19 +33,19 @@ impl Z2mButtonHandler {
             self.button_repeat_task = None;
         }
         let Some(button_controller_id) = self.data.get_controller_id(action) else {
-            log::warn!("Unknown button pressed {}", action);
+            log::warn!("Unknown button pressed {action}");
             return Ok(());
         };
 
         let lock = self.res.lock().await;
         let Some((button_link, button_controller)) =
             device.button_services().into_iter().find_map(|link| {
-                if let Some(button) = lock.get::<Button>(link).ok() {
-                    if button.metadata.control_id == button_controller_id {
-                        return Some((link.clone(), button.clone()));
-                    }
+                if let Ok(button) = lock.get::<Button>(link)
+                    && button.metadata.control_id == button_controller_id
+                {
+                    return Some((*link, button.clone()));
                 }
-                return None;
+                None
             })
         else {
             log::error!(
@@ -92,8 +92,7 @@ impl Z2mButtonHandler {
                 ButtonEvent::ShortRelease => {
                     let prev_button_press = *self.prev_button_press.lock().await;
                     log::trace!(
-                        "Button long press workaround: last button pressed {:?}",
-                        prev_button_press
+                        "Button long press workaround: last button pressed {prev_button_press:?}"
                     );
                     if let Some(prev_short_press) = prev_button_press {
                         let event = if (Utc::now() - prev_short_press) > TimeDelta::seconds(1) {
@@ -129,7 +128,8 @@ impl Z2mButtonHandler {
         // Send up to 10 repeat events
         for i in 1..10 {
             sleep(Duration::from_secs(1)).await;
-            match *prev_button_press.lock().await {
+            let timestamp = *prev_button_press.lock().await;
+            match timestamp {
                 Some(timestamp) => {
                     if (Utc::now() + TimeDelta::seconds(i)) < timestamp {
                         // Button has likely been pressed again
@@ -214,7 +214,7 @@ impl Z2mButtonData {
         self.mappings.get(&action).map(|m| m.control_id)
     }
 
-    fn next_button_event(&mut self, button_data: &ButtonData, action: &str) -> Option<ButtonEvent> {
+    fn next_button_event(&self, button_data: &ButtonData, action: &str) -> Option<ButtonEvent> {
         let mapped_button_event = self.mappings.get(&action).cloned()?.action;
         let Some(current_button_report) = &button_data.button_report else {
             return Some(mapped_button_event);
@@ -270,7 +270,7 @@ fn friends_of_hue_switch() -> Z2mButtonData {
                     button_report: None,
                     last_event: None,
                     repeat_interval: Some(0),
-                    event_values: Some(events.clone()),
+                    event_values: Some(events),
                 },
                 metadata: ButtonMetadata { control_id: 4 },
             },
@@ -338,7 +338,7 @@ fn hue_dimmer_switch() -> Z2mButtonData {
                     button_report: None,
                     last_event: None,
                     repeat_interval: Some(800),
-                    event_values: Some(events.clone()),
+                    event_values: Some(events),
                 },
                 metadata: ButtonMetadata { control_id: 4 },
             },
