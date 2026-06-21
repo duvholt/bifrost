@@ -110,9 +110,9 @@ impl Z2mWebSocket {
         self.send(topic, &z2mreq).await
     }
 
-    pub async fn send_group_add(&mut self, friendly_name: String) -> ApiResult<()> {
+    pub async fn send_group_add(&mut self, room_id: u32, friendly_name: String) -> ApiResult<()> {
         let z2mreq = Z2mRequest::GroupAdd(GroupAdd {
-            id: None,
+            id: Some(room_id),
             friendly_name,
         });
 

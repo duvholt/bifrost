@@ -37,6 +37,7 @@ pub struct Resources {
 
 impl Resources {
     const MAX_SCENE_ID: u32 = 100;
+    const MAX_ROOM_ID: u32 = 100;
     const HUE_EVENTS_BUFFER_SIZE: usize = 128;
 
     #[allow(clippy::new_without_default)]
@@ -405,6 +406,29 @@ impl Resources {
             }),
         )?;
         Ok(())
+    }
+
+    pub fn get_next_room_id(&self) -> HueResult<u32> {
+        let mut set: HashSet<u32> = HashSet::new();
+
+        // todo: this won't work if `group_prefix` is set
+        for room in self.get_resources_by_type(RType::GroupedLight) {
+            let Ok(AuxData {
+                index: Some(index), ..
+            }) = self.state.aux_get(&room.id)
+            else {
+                continue;
+            };
+
+            set.insert(*index);
+        }
+
+        for x in 1..Self::MAX_ROOM_ID {
+            if !set.contains(&x) {
+                return Ok(x);
+            }
+        }
+        Err(HueError::Full(RType::Room))
     }
 
     pub fn get_next_scene_id(&self, room: &ResourceLink) -> HueResult<u32> {

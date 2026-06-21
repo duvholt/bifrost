@@ -21,7 +21,7 @@ pub enum BackendRequest {
 
     GroupedLightUpdate(ResourceLink, GroupedLightUpdate),
 
-    RoomCreate(ResourceLink, Room),
+    RoomCreate(ResourceLink, u32, Room),
     RoomUpdate(ResourceLink, RoomUpdate),
 
     Delete(ResourceLink),

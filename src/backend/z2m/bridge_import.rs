@@ -255,8 +255,8 @@ impl Z2mBackend {
             room_name = &grp.friendly_name;
         }
 
-        let link_room = RType::Room.deterministic(&grp.friendly_name);
-        let link_glight = RType::GroupedLight.deterministic((link_room.rid, grp.id));
+        let link_room = RType::Room.deterministic(grp.id);
+        let link_glight = RType::GroupedLight.deterministic(link_room.rid);
 
         let children = grp
             .members
@@ -364,7 +364,7 @@ impl Z2mBackend {
             })?;
         }
 
-        if res.get::<Room>(&link_room).is_ok()  {
+        if res.get::<Room>(&link_room).is_ok() {
             res.update::<Room>(&link_room.rid, |r| {
                 r.services = room.services;
                 r.children = room.children;
@@ -376,6 +376,11 @@ impl Z2mBackend {
         let glight = GroupedLight::new(link_room);
 
         res.add(&link_glight, Resource::GroupedLight(glight))?;
+        res.aux_set(
+            &link_glight,
+            AuxData::new().with_topic(&topic).with_index(grp.id),
+        );
+
         drop(res);
 
         Ok(())

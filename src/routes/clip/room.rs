@@ -36,8 +36,10 @@ pub async fn post_room(state: &AppState, post: Value) -> ApiV2Result {
         metadata: new.metadata,
         services: BTreeSet::new(),
     };
-    let rlink = RType::Room.deterministic(&room.metadata.name);
-    lock.backend_request(BackendRequest::RoomCreate(rlink, room))?;
+
+    let room_id = lock.get_next_room_id()?;
+    let rlink = RType::Room.deterministic(room_id);
+    lock.backend_request(BackendRequest::RoomCreate(rlink, room_id, room))?;
 
     drop(lock);
 
