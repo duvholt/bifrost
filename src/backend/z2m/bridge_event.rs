@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use hue::api::{
     Device, DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, ResourceLink, Room,
+    Zone,
 };
 use z2m::api::{
     BridgeDevices, DeviceRemoveResponse, GroupMemberChange, GroupRemove, Message, RawMessage,
@@ -276,30 +277,54 @@ impl Z2mBackend {
         change: &GroupMemberChange,
         added: bool,
     ) -> ApiResult<()> {
-        if let Some(light) = self.map.get(&change.device) {
+        if let Some(light_link) = self.map.get(&change.device) {
             let mut lock = self.state.lock().await;
-            let device = lock.get::<Light>(light)?.clone();
+            let light = lock.get::<Light>(light_link)?.clone();
 
-            let device_link = device.owner;
-            if let Some(room) = self.map.get(&change.group) {
-                let room_link = lock.get::<GroupedLight>(room)?.owner;
-                let exists = lock
-                    .get::<Room>(&room_link)?
-                    .children
-                    .contains(&device_link);
+            let device_link = light.owner;
+            if let Some(group) = self.map.get(&change.group) {
+                let owner_link = lock.get::<GroupedLight>(group)?.owner;
+                match owner_link.rtype {
+                    RType::Room => {
+                        // Room uses device as children
+                        let exists = lock
+                            .get::<Room>(&owner_link)?
+                            .children
+                            .contains(&device_link);
 
-                if added {
-                    if !exists {
-                        lock.update(&room_link.rid, |room: &mut Room| {
-                            room.children.insert(device_link);
-                        })?;
+                        if added {
+                            if !exists {
+                                lock.update(&owner_link.rid, |room: &mut Room| {
+                                    room.children.insert(device_link);
+                                })?;
+                            }
+                        } else {
+                            if exists {
+                                lock.update(&owner_link.rid, |room: &mut Room| {
+                                    room.children.remove(&device_link);
+                                })?;
+                            }
+                        }
                     }
-                } else {
-                    if exists {
-                        lock.update(&room_link.rid, |room: &mut Room| {
-                            room.children.remove(&device_link);
-                        })?;
+                    RType::Zone => {
+                        // Zone uses light as children
+                        let exists = lock.get::<Zone>(&owner_link)?.children.contains(light_link);
+
+                        if added {
+                            if !exists {
+                                lock.update(&owner_link.rid, |zone: &mut Zone| {
+                                    zone.children.insert(*light_link);
+                                })?;
+                            }
+                        } else {
+                            if exists {
+                                lock.update(&owner_link.rid, |zone: &mut Zone| {
+                                    zone.children.remove(light_link);
+                                })?;
+                            }
+                        }
                     }
+                    _ => {}
                 }
             }
         }

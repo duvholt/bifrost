@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -158,14 +156,6 @@ pub struct ZigbeeConnectivity {
     pub mac_address: String,
     pub owner: ResourceLink,
     pub status: ZigbeeConnectivityStatus,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Zone {
-    pub metadata: Metadata,
-    pub children: BTreeSet<ResourceLink>,
-    #[serde(default)]
-    pub services: BTreeSet<ResourceLink>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

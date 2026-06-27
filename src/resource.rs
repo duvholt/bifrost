@@ -37,7 +37,7 @@ pub struct Resources {
 
 impl Resources {
     const MAX_SCENE_ID: u32 = 100;
-    const MAX_ROOM_ID: u32 = 100;
+    const MAX_GROUP_ID: u32 = 100;
     const HUE_EVENTS_BUFFER_SIZE: usize = 128;
 
     #[allow(clippy::new_without_default)]
@@ -168,7 +168,7 @@ impl Resources {
     }
 
     #[must_use]
-    pub fn get_scenes_for_room(&self, id: &Uuid) -> Vec<Uuid> {
+    pub fn get_scenes_for_group(&self, id: &Uuid) -> Vec<Uuid> {
         self.state
             .res
             .iter()
@@ -408,7 +408,7 @@ impl Resources {
         Ok(())
     }
 
-    pub fn get_next_room_id(&self) -> HueResult<u32> {
+    pub fn get_next_group_id(&self) -> HueResult<u32> {
         let mut set: HashSet<u32> = HashSet::new();
 
         for grouped_light in self.get_resources_by_type(RType::GroupedLight) {
@@ -422,7 +422,7 @@ impl Resources {
             set.insert(*index);
         }
 
-        for x in 1..Self::MAX_ROOM_ID {
+        for x in 1..Self::MAX_GROUP_ID {
             if !set.contains(&x) {
                 return Ok(x);
             }
@@ -490,6 +490,7 @@ impl Resources {
     zigbee_connectivity       /lights/{id}
     zigbee_connectivity       null
     zigbee_device_discovery   null
+    zone                      /groups/{id}
      */
 
     #[must_use]
@@ -506,7 +507,7 @@ impl Resources {
             }
 
             /* Rooms are mapped directly */
-            Resource::Room(_) => Some(format!("/groups/{id}")),
+            Resource::Room(_) | Resource::Zone(_) => Some(format!("/groups/{id}")),
 
             /* Devices (that are lights) map to the light service's id_v1 */
             Resource::Device(dev) => {
@@ -564,8 +565,7 @@ impl Resources {
             | Resource::Temperature(_)
             | Resource::ZgpConnectivity(_)
             | Resource::ZigbeeConnectivity(_)
-            | Resource::ZigbeeDeviceDiscovery(_)
-            | Resource::Zone(_) => None,
+            | Resource::ZigbeeDeviceDiscovery(_) => None,
         }
     }
 

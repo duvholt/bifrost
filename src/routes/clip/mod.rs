@@ -6,6 +6,7 @@ pub mod light;
 pub mod room;
 pub mod scene;
 pub mod zigbee_device_discovery;
+pub mod zone;
 
 use bifrost_api::backend::BackendRequest;
 use entertainment_configuration as ent_conf;
@@ -83,9 +84,10 @@ async fn post_resource(
         RType::Scene => scene::post_scene(&state, req).await,
         RType::BehaviorInstance => behavior_instance::post_behavior_instance(&state, req).await,
         RType::Room => room::post_room(&state, req).await,
+        RType::Zone => zone::post_zone(&state, req).await,
 
         /* Not supported yet by Bifrost */
-        RType::GeofenceClient | RType::ServiceGroup | RType::SmartScene | RType::Zone => {
+        RType::GeofenceClient | RType::ServiceGroup | RType::SmartScene => {
             let err = ApiError::CreateNotYetSupported(rtype);
             log::warn!("{err}");
             Err(err)
@@ -153,6 +155,7 @@ async fn put_resource_id(
         RType::Light => light::put_light(&state, rlink, put).await,
         RType::Scene => scene::put_scene(&state, rlink, put).await,
         RType::Room => room::put_room(&state, rlink, put).await,
+        RType::Zone => zone::put_zone(&state, rlink, put).await,
         RType::ZigbeeDeviceDiscovery => {
             zigbee_device_discovery::put_zigbee_device_discovery(&state, rlink, put).await
         }
@@ -182,8 +185,7 @@ async fn put_resource_id(
         | RType::SmartScene
         | RType::Temperature
         | RType::ZgpConnectivity
-        | RType::ZigbeeConnectivity
-        | RType::Zone => {
+        | RType::ZigbeeConnectivity => {
             /* check that the resource exists, otherwise we should return 404 */
             state.res.lock().await.get_resource(&rlink)?;
 

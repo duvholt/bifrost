@@ -13,6 +13,7 @@ mod stream;
 mod stubs;
 mod update;
 mod zigbee_device_discovery;
+mod zone;
 
 pub use behavior::{
     Action, BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
@@ -63,7 +64,7 @@ pub use stubs::{
     Bridge, Clip, DevicePower, DeviceSoftwareUpdate, DollarRef, GeofenceClient, Geolocation,
     GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter, Metadata, MetadataUpdate,
     Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene, Taurus, Temperature, TimeZone,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 pub use update::Update;
 pub use zigbee_device_discovery::{
@@ -71,6 +72,7 @@ pub use zigbee_device_discovery::{
     ZigbeeDeviceDiscoveryStatus, ZigbeeDeviceDiscoveryUpdate, ZigbeeDeviceDiscoveryUpdateAction,
     ZigbeeDeviceDiscoveryUpdateActionType,
 };
+pub use zone::{Zone, ZoneNew, ZoneUpdate};
 
 use std::fmt::Debug;
 

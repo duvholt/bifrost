@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use hue::api::{
     GroupedLightUpdate, LightUpdate, ResourceLink, Room, RoomUpdate, Scene, SceneUpdate,
-    ZigbeeDeviceDiscoveryUpdate,
+    ZigbeeDeviceDiscoveryUpdate, Zone, ZoneUpdate,
 };
 use hue::stream::HueStreamLightsV2;
 
@@ -23,6 +23,9 @@ pub enum BackendRequest {
 
     RoomCreate(ResourceLink, u32, Room),
     RoomUpdate(ResourceLink, RoomUpdate),
+
+    ZoneCreate(ResourceLink, u32, Zone),
+    ZoneUpdate(ResourceLink, ZoneUpdate),
 
     Delete(ResourceLink),
 

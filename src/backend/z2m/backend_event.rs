@@ -13,7 +13,7 @@ use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
     EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffectsV2Update,
     LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene, SceneActive, SceneStatus,
-    SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
+    SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate, Zone, ZoneUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
@@ -251,7 +251,7 @@ impl Z2mBackend {
 
         if let Some(recall) = &upd.recall {
             if recall.action == Some(SceneStatusEnum::Active) {
-                let scenes = lock.get_scenes_for_room(&scene.group.rid);
+                let scenes = lock.get_scenes_for_group(&scene.group.rid);
                 for rid in scenes {
                     lock.update::<Scene>(&rid, |scn| {
                         scn.status = Some(SceneStatus {
@@ -265,10 +265,10 @@ impl Z2mBackend {
                     })?;
                 }
 
-                let room = lock.get::<Scene>(link)?.group;
+                let group = lock.get::<Scene>(link)?.group;
                 drop(lock);
 
-                if let Some(topic) = self.rmap.get(&room).cloned() {
+                if let Some(topic) = self.rmap.get(&group).cloned() {
                     log::info!("[{}] Recall scene: {link:?}", self.name);
 
                     let mut lock = self.state.lock().await;
@@ -349,25 +349,33 @@ impl Z2mBackend {
         &self,
         z2mws: &mut Z2mWebSocket,
         link: &ResourceLink,
-        room_id: u32,
+        group_id: u32,
         room: &Room,
     ) -> ApiResult<()> {
-        let friendly_name = self.server.group_prefix.as_ref().map_or_else(
+        let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
             || room.metadata.name.clone(),
             |group_prefix| format!("{group_prefix}{}", room.metadata.name),
         );
-        let topic = room.metadata.name.clone();
 
         // Store metadata
-        self.state
-            .lock()
-            .await
-            .add(link, Resource::Room(room.clone()))?;
+        let mut lock = self.state.lock().await;
 
-        z2mws.send_group_add(room_id, friendly_name).await?;
+        lock.add(link, Resource::Room(room.clone()))?;
+        let link_glight = RType::GroupedLight.deterministic(group_id);
+        lock.add(
+            &link_glight,
+            Resource::GroupedLight(GroupedLight::new(*link)),
+        )?;
+        drop(lock);
+
+        z2mws
+            .send_group_add(group_id, group_friendly_name.clone())
+            .await?;
         for member in &room.children {
             let friendly_name = &self.rmap[member];
-            z2mws.send_group_member_add(&topic, friendly_name).await?;
+            z2mws
+                .send_group_member_add(&group_friendly_name, friendly_name)
+                .await?;
         }
         Ok(())
     }
@@ -387,6 +395,80 @@ impl Z2mBackend {
             drop(lock);
 
             let known_existing: BTreeSet<_> = room
+                .children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
+
+            let known_new: BTreeSet<_> = children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
+
+            for add in known_new.difference(&known_existing) {
+                let friendly_name = &self.rmap[add];
+                z2mws.send_group_member_add(topic, friendly_name).await?;
+            }
+
+            for remove in known_existing.difference(&known_new) {
+                let friendly_name = &self.rmap[remove];
+                z2mws.send_group_member_remove(topic, friendly_name).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn backend_zone_create(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        group_id: u32,
+        zone: &Zone,
+    ) -> ApiResult<()> {
+        let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
+            || zone.metadata.name.clone(),
+            |group_prefix| format!("{group_prefix}{}", zone.metadata.name),
+        );
+
+        // Store metadata
+        let mut lock = self.state.lock().await;
+
+        lock.add(link, Resource::Zone(zone.clone()))?;
+        let link_glight = RType::GroupedLight.deterministic(group_id);
+        lock.add(
+            &link_glight,
+            Resource::GroupedLight(GroupedLight::new(*link)),
+        )?;
+        drop(lock);
+
+        z2mws
+            .send_group_add(group_id, group_friendly_name.clone())
+            .await?;
+        for member in &zone.children {
+            let friendly_name = &self.rmap[member];
+            z2mws
+                .send_group_member_add(&group_friendly_name, friendly_name)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn backend_zone_update(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        upd: &ZoneUpdate,
+    ) -> ApiResult<()> {
+        let lock = self.state.lock().await;
+
+        if let Some(children) = &upd.children
+            && let Some(topic) = self.rmap.get(link)
+        {
+            let zone = lock.get::<Zone>(link)?.clone();
+            drop(lock);
+
+            let known_existing: BTreeSet<_> = zone
                 .children
                 .iter()
                 .filter(|device| self.rmap.contains_key(device))
@@ -616,12 +698,20 @@ impl Z2mBackend {
                 self.backend_grouped_light_update(z2mws, link, upd).await
             }
 
-            BackendRequest::RoomCreate(link, room_id, room) => {
-                self.backend_room_create(z2mws, link, *room_id, room).await
+            BackendRequest::RoomCreate(link, group_id, room) => {
+                self.backend_room_create(z2mws, link, *group_id, room).await
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
                 self.backend_room_update(z2mws, link, upd).await
+            }
+
+            BackendRequest::ZoneCreate(link, group_id, zone) => {
+                self.backend_zone_create(z2mws, link, *group_id, zone).await
+            }
+
+            BackendRequest::ZoneUpdate(link, upd) => {
+                self.backend_zone_update(z2mws, link, upd).await
             }
 
             BackendRequest::Delete(link) => self.backend_delete(z2mws, link).await,

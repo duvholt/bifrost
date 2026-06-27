@@ -11,7 +11,7 @@ use hue::api::{
     Light, LightEffects, LightEffectsV2, LightMetadata, LightTimedEffect, LightTimedEffects,
     Metadata, OrderType, OrientationType, RType, Resource, ResourceLink, Room, RoomArchetype,
     RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
 };
 use hue::devicedb::gradient_product_data;
 use hue::scene_icons;
@@ -238,13 +238,19 @@ impl Z2mBackend {
 
     #[allow(clippy::too_many_lines)]
     pub async fn add_group(&mut self, grp: &z2m::api::Group) -> ApiResult<()> {
-        let link_room = RType::Room.deterministic(grp.id);
-        let link_glight = RType::GroupedLight.deterministic(link_room.rid);
+        let link_glight = RType::GroupedLight.deterministic(grp.id);
         let topic = grp.friendly_name.clone();
 
         // We want to set group light aux data for all groups since it is used to calculate the next available group id
-        let glight = GroupedLight::new(link_room);
         let mut lock = self.state.lock().await;
+        let glight = lock
+            .get::<GroupedLight>(&link_glight)
+            .cloned()
+            .unwrap_or_else(|_| {
+                let link_room = RType::Room.deterministic(link_glight.rid);
+                GroupedLight::new(link_room)
+            });
+        let owner_link = glight.owner;
         lock.add(&link_glight, Resource::GroupedLight(glight))?;
         lock.aux_set(
             &link_glight,
@@ -271,7 +277,10 @@ impl Z2mBackend {
         let children = grp
             .members
             .iter()
-            .map(|f| RType::Device.deterministic(&f.ieee_address))
+            .map(|f| match owner_link.rtype {
+                RType::Zone => RType::Light.deterministic(&f.ieee_address),
+                _ => RType::Device.deterministic(&f.ieee_address),
+            })
             .collect();
 
         let mut res = self.state.lock().await;
@@ -282,7 +291,7 @@ impl Z2mBackend {
             let scene = Scene {
                 actions: vec![],
                 auto_dynamic: false,
-                group: link_room,
+                group: owner_link,
                 metadata: SceneMetadata {
                     appdata: None,
                     image: guess_scene_icon(&scn.name),
@@ -306,7 +315,7 @@ impl Z2mBackend {
                 }),
             };
 
-            let link_scene = RType::Scene.deterministic((link_room.rid, scn.id));
+            let link_scene = RType::Scene.deterministic((owner_link.rid, scn.id));
 
             res.aux_set(
                 &link_scene,
@@ -317,15 +326,24 @@ impl Z2mBackend {
             res.add(&link_scene, Resource::Scene(scene))?;
         }
 
-        if let Ok(room) = res.get::<Room>(&link_room) {
+        let group_metadata = match res.get_resource(&owner_link) {
+            Ok(group) => match group.obj {
+                Resource::Room(room) => Some(room.metadata),
+                Resource::Zone(zone) => Some(zone.metadata),
+                _ => None,
+            },
+            Err(_) => None,
+        };
+
+        if let Some(group_metadata) = group_metadata.as_ref() {
             log::info!(
-                "[{}] {link_room:?} ({}) known, updating..",
+                "[{}] {owner_link:?} ({}) known, updating..",
                 self.name,
-                room.metadata.name
+                group_metadata.name
             );
 
             let scenes_old: HashSet<Uuid> =
-                HashSet::from_iter(res.get_scenes_for_room(&link_room.rid));
+                HashSet::from_iter(res.get_scenes_for_group(&owner_link.rid));
 
             log::trace!("[{}] old scenes: {scenes_old:?}", self.name);
             log::trace!("[{}] new scenes: {scenes_new:?}", self.name);
@@ -333,14 +351,14 @@ impl Z2mBackend {
             log::trace!("[{}]   deleted: {gone:?}", self.name);
             for uuid in gone {
                 log::debug!(
-                    "[{}] Deleting orphaned {uuid:?} in {link_room:?}",
+                    "[{}] Deleting orphaned {uuid:?} in {owner_link:?}",
                     self.name
                 );
                 let _ = res.delete(&RType::Scene.link_to(*uuid));
             }
         } else {
             log::debug!(
-                "[{}] {link_room:?} ({}) is new, adding..",
+                "[{}] {owner_link:?} ({}) is new, adding..",
                 self.name,
                 room_name
             );
@@ -356,29 +374,48 @@ impl Z2mBackend {
             }
         }
 
-        let room = Room {
-            children,
-            metadata,
-            services: btreeset![link_glight],
-        };
-
         self.map.insert(topic.clone(), link_glight);
         self.rmap.insert(link_glight, topic.clone());
-        self.rmap.insert(link_room, topic.clone());
+        self.rmap.insert(owner_link, topic.clone());
 
         for id in &res.get_resource_ids_by_type(RType::BridgeHome) {
             res.update(id, |bh: &mut BridgeHome| {
-                bh.children.insert(link_room);
+                bh.children.insert(owner_link);
             })?;
         }
 
-        if res.get::<Room>(&link_room).is_ok() {
-            res.update::<Room>(&link_room.rid, |r| {
-                r.services = room.services;
-                r.children = room.children;
-            })?;
-        } else {
-            res.add(&link_room, Resource::Room(room))?;
+        match owner_link.rtype {
+            RType::Room => {
+                let room = Room {
+                    children,
+                    metadata,
+                    services: btreeset![link_glight],
+                };
+                if res.get::<Room>(&owner_link).is_ok() {
+                    res.update::<Room>(&owner_link.rid, |r| {
+                        r.services = room.services;
+                        r.children = room.children;
+                    })?;
+                } else {
+                    res.add(&owner_link, Resource::Room(room))?;
+                }
+            }
+            RType::Zone => {
+                let zone = Zone {
+                    children,
+                    metadata,
+                    services: btreeset![link_glight],
+                };
+                if res.get::<Zone>(&owner_link).is_ok() {
+                    res.update::<Zone>(&owner_link.rid, |z| {
+                        z.services = zone.services;
+                        z.children = zone.children;
+                    })?;
+                } else {
+                    res.add(&owner_link, Resource::Zone(zone))?;
+                }
+            }
+            _ => {}
         }
 
         drop(res);
