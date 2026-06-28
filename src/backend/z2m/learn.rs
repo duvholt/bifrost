@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use hue::api::{
     ColorTemperatureUpdate, ColorUpdate, Light, LightGradientPoint, LightGradientUpdate, RType,
-    ResourceLink, Room, Scene, SceneAction, SceneActionElement,
+    Resource, ResourceLink, Scene, SceneAction, SceneActionElement,
 };
 use z2m::hexcolor::HexColor;
 use z2m::update::{DeviceColor, DeviceUpdate};
@@ -60,10 +60,19 @@ impl SceneLearn {
             return Ok(());
         }
 
-        let room: &Room = lock.get(&scene.group)?;
+        let group_children = match lock.get_resource(&scene.group)?.obj {
+            Resource::Room(room) => room.children,
+            Resource::Zone(zone) => zone.children,
+            _ => {
+                log::warn!(
+                    "Tried to learn scene for an invalid group type {:?}",
+                    scene.group
+                );
+                return Ok(());
+            }
+        };
 
-        let lights: Vec<Uuid> = room
-            .children
+        let lights: Vec<Uuid> = group_children
             .iter()
             .filter_map(|rl| lock.get(rl).ok())
             .filter_map(hue::api::Device::light_service)

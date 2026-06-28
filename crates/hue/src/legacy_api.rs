@@ -409,10 +409,10 @@ impl ApiGroup {
     pub fn from_lights_and_room(
         glight: &api::GroupedLight,
         lights: Vec<String>,
-        room: api::Room,
+        group_metadata: api::RoomMetadata,
     ) -> Self {
         Self {
-            name: room.metadata.name,
+            name: group_metadata.name,
             lights,
             action: ApiGroupAction {
                 on: glight.on.is_some_and(|on| on.on),

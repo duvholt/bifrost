@@ -6,7 +6,7 @@ use chrono::{Local, NaiveTime};
 use hue::api::{
     Action, BridgeHome, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
     DimmingDeltaUpdate, GroupedLightDynamicsUpdate, GroupedLightUpdate,
-    HueAccessoriesConfiguration, On, RType, ResourceLink, Room, SceneActive, SceneStatus,
+    HueAccessoriesConfiguration, On, RType, Resource, ResourceLink, Room, SceneActive, SceneStatus,
     SceneUpdate, TimeBasedExtendedSlot, configuration,
 };
 use hue::event::Event;
@@ -259,13 +259,12 @@ impl HueAccessoriesJob {
         let Some(where_config) = where_config else {
             return Ok(None);
         };
-        let room = self
-            .res
-            .lock()
-            .await
-            .get::<Room>(&where_config.group)?
-            .clone();
-        Ok(room.grouped_light_service().copied())
+        let resource = self.res.lock().await.get_resource(&where_config.group)?;
+        match resource.obj {
+            Resource::Room(room) => Ok(room.grouped_light_service().copied()),
+            Resource::Zone(zone) => Ok(zone.grouped_light_service().copied()),
+            _ => Ok(None),
+        }
     }
 }
 

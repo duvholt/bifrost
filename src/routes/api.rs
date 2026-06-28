@@ -18,7 +18,7 @@ use hue::api::{
     EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
     EntertainmentConfigurationType, EntertainmentConfigurationUpdate, GroupedLight,
     GroupedLightUpdate, Light, LightUpdate, RType, ResourceLink, Room, Scene, SceneActive,
-    SceneStatus, SceneUpdate, V1Reply,
+    SceneStatus, SceneUpdate, V1Reply, Zone,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
@@ -96,7 +96,28 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
 
         rooms.insert(
             res.get_id_v1(rr.id)?,
-            ApiGroup::from_lights_and_room(glight, lights, room),
+            ApiGroup::from_lights_and_room(glight, lights, room.metadata),
+        );
+    }
+
+    for rr in res.get_resources_by_type(RType::Zone) {
+        let zone: Zone = rr.obj.try_into()?;
+        let uuid = zone
+            .services
+            .iter()
+            .find(|rl| rl.rtype == RType::GroupedLight)
+            .ok_or(HueError::NotFound(rr.id))?;
+
+        let glight = res.get::<GroupedLight>(uuid)?;
+        let lights: Vec<String> = zone
+            .children
+            .iter()
+            .filter_map(|rl| res.get_id_v1(rl.rid).ok())
+            .collect();
+
+        rooms.insert(
+            res.get_id_v1(rr.id)?,
+            ApiGroup::from_lights_and_room(glight, lights, zone.metadata),
         );
     }
 
