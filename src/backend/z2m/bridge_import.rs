@@ -378,10 +378,12 @@ impl Z2mBackend {
         self.rmap.insert(link_glight, topic.clone());
         self.rmap.insert(owner_link, topic.clone());
 
-        for id in &res.get_resource_ids_by_type(RType::BridgeHome) {
-            res.update(id, |bh: &mut BridgeHome| {
-                bh.children.insert(owner_link);
-            })?;
+        if owner_link.rtype == RType::Room {
+            for id in &res.get_resource_ids_by_type(RType::BridgeHome) {
+                res.update(id, |bh: &mut BridgeHome| {
+                    bh.children.insert(owner_link);
+                })?;
+            }
         }
 
         match owner_link.rtype {

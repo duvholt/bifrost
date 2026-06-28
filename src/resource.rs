@@ -430,7 +430,7 @@ impl Resources {
         Err(HueError::Full(RType::Room))
     }
 
-    pub fn get_next_scene_id(&self, room: &ResourceLink) -> HueResult<u32> {
+    pub fn get_next_scene_id(&self, group: &ResourceLink) -> HueResult<u32> {
         let mut set: HashSet<u32> = HashSet::new();
 
         for scene in self.get_resources_by_type(RType::Scene) {
@@ -438,7 +438,7 @@ impl Resources {
                 continue;
             };
 
-            if &scn.group == room {
+            if &scn.group == group {
                 let Ok(AuxData {
                     index: Some(index), ..
                 }) = self.state.aux_get(&scene.id)

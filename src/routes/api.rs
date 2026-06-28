@@ -172,7 +172,7 @@ pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiV1Result<A
         })
         .collect::<ApiV1Result<_>>()?;
 
-    let room_id = res.get_id_v1_index(scene.group.rid)?;
+    let group_id = res.get_id_v1_index(scene.group.rid)?;
 
     Ok(ApiScene {
         name: scene.metadata.name.clone(),
@@ -184,14 +184,14 @@ pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiV1Result<A
         locked: false,
         /* Some clients (e.g. Hue Essentials) require .appdata */
         appdata: ApiSceneAppData {
-            data: Some(format!("xxxxx_r{room_id}")),
+            data: Some(format!("xxxxx_r{group_id}")),
             version: Some(1),
         },
         picture: String::new(),
         lastupdated: Utc::now(),
         version: ApiSceneVersion::V2 as u32,
         image: scene.metadata.image.map(|rl| rl.rid),
-        group: Some(room_id.to_string()),
+        group: Some(group_id.to_string()),
     })
 }
 

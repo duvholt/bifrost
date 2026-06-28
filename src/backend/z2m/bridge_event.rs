@@ -224,7 +224,8 @@ impl Z2mBackend {
 
     async fn bridge_group_remove(&mut self, grp: &GroupRemove) -> ApiResult<()> {
         let mut lock = self.state.lock().await;
-        let link_room = if let Ok(group_id) = grp.id.clone().parse::<u32>() {
+        let link_group = if let Ok(group_id) = grp.id.clone().parse::<u32>() {
+            // todo: look up grouped light
             RType::Room.deterministic(group_id)
         } else {
             let Some(glight_link) = self.map.get(&grp.id) else {
@@ -236,15 +237,15 @@ impl Z2mBackend {
             glight.owner
         };
 
-        let Some(topic) = self.rmap.get(&link_room) else {
+        let Some(topic) = self.rmap.get(&link_group) else {
             return Ok(());
         };
 
-        lock.delete(&link_room)?;
+        lock.delete(&link_group)?;
         self.map.remove(topic);
-        self.rmap.insert(link_room, topic.clone());
+        self.rmap.insert(link_group, topic.clone());
 
-        log::info!("[{}] Bridge deleted room {:?}", self.name, link_room);
+        log::info!("[{}] Bridge deleted group {:?}", self.name, link_group);
         drop(lock);
         Ok(())
     }

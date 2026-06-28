@@ -281,9 +281,9 @@ impl Z2mBackend {
             }
         } else {
             // We're not recalling the scene, so we are updating the scene
-            let room = lock.get::<Scene>(link)?.group;
+            let group = lock.get::<Scene>(link)?.group;
 
-            if let Some(topic) = self.rmap.get(&room).cloned() {
+            if let Some(topic) = self.rmap.get(&group).cloned() {
                 log::info!("[{}] Store scene: {link:?}", self.name);
 
                 let scene = lock.get::<Scene>(link)?;
@@ -497,14 +497,14 @@ impl Z2mBackend {
         match link.rtype {
             RType::Scene => {
                 let lock = self.state.lock().await;
-                let room = lock.get::<Scene>(link)?.group;
+                let group = lock.get::<Scene>(link)?.group;
                 let index = lock
                     .aux_get(link)?
                     .index
                     .ok_or(HueError::NotFound(link.rid))?;
                 drop(lock);
 
-                if let Some(topic) = self.rmap.get(&room) {
+                if let Some(topic) = self.rmap.get(&group) {
                     z2mws.send_scene_remove(topic, index).await?;
                 }
             }
@@ -527,12 +527,12 @@ impl Z2mBackend {
                 }
             }
 
-            RType::Room => {
+            RType::Room | RType::Zone => {
                 if let Some(topic) = self.rmap.get(link) {
                     log::info!("[{}] Requesting z2m removal of {}", self.name, &topic);
                     z2mws.send_group_remove(topic.clone()).await?;
                 } else {
-                    log::info!("[{}] Deleting orphaned room {:?}", self.name, link);
+                    log::info!("[{}] Deleting orphaned group {:?}", self.name, link);
                     self.state.lock().await.delete(link)?;
                 }
             }
