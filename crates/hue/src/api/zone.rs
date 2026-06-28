@@ -5,12 +5,12 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::{RType, ResourceLink, RoomMetadata, RoomMetadataUpdate};
+use crate::api::{GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Zone {
     pub children: BTreeSet<ResourceLink>,
-    pub metadata: RoomMetadata,
+    pub metadata: GroupMetadata,
     #[serde(default)]
     pub services: BTreeSet<ResourceLink>,
 }
@@ -18,7 +18,7 @@ pub struct Zone {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ZoneNew {
     pub children: BTreeSet<ResourceLink>,
-    pub metadata: RoomMetadata,
+    pub metadata: GroupMetadata,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -26,7 +26,7 @@ pub struct ZoneUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<BTreeSet<ResourceLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<RoomMetadataUpdate>,
+    pub metadata: Option<GroupMetadataUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<ResourceLink>>,
 }
@@ -47,9 +47,9 @@ impl ZoneUpdate {
     }
 
     #[must_use]
-    pub fn with_metadata(self, metadata: RoomMetadata) -> Self {
+    pub fn with_metadata(self, metadata: GroupMetadata) -> Self {
         Self {
-            metadata: Some(RoomMetadataUpdate {
+            metadata: Some(GroupMetadataUpdate {
                 name: Some(metadata.name),
                 archetype: Some(metadata.archetype),
             }),

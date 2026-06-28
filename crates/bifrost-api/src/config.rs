@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::{collections::BTreeMap, num::NonZeroU32};
 
 use camino::Utf8PathBuf;
-use hue::api::RoomArchetype;
+use hue::api::GroupArchetype;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -59,7 +59,7 @@ pub struct Memory2MqttConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct RoomConfig {
     pub name: Option<String>,
-    pub icon: Option<RoomArchetype>,
+    pub icon: Option<GroupArchetype>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -409,7 +409,7 @@ impl ApiGroup {
     pub fn from_lights_and_room(
         glight: &api::GroupedLight,
         lights: Vec<String>,
-        group_metadata: api::RoomMetadata,
+        group_metadata: api::GroupMetadata,
     ) -> Self {
         Self {
             name: group_metadata.name,

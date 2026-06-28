@@ -3,24 +3,12 @@ use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::{RType, ResourceLink};
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct RoomMetadata {
-    pub name: String,
-    pub archetype: RoomArchetype,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct RoomMetadataUpdate {
-    pub name: Option<String>,
-    pub archetype: Option<RoomArchetype>,
-}
+use crate::api::{GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Room {
     pub children: BTreeSet<ResourceLink>,
-    pub metadata: RoomMetadata,
+    pub metadata: GroupMetadata,
     #[serde(default)]
     pub services: BTreeSet<ResourceLink>,
 }
@@ -28,7 +16,7 @@ pub struct Room {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RoomNew {
     pub children: BTreeSet<ResourceLink>,
-    pub metadata: RoomMetadata,
+    pub metadata: GroupMetadata,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -36,7 +24,7 @@ pub struct RoomUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<BTreeSet<ResourceLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<RoomMetadataUpdate>,
+    pub metadata: Option<GroupMetadataUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<ResourceLink>>,
 }
@@ -57,9 +45,9 @@ impl RoomUpdate {
     }
 
     #[must_use]
-    pub fn with_metadata(self, metadata: RoomMetadata) -> Self {
+    pub fn with_metadata(self, metadata: GroupMetadata) -> Self {
         Self {
-            metadata: Some(RoomMetadataUpdate {
+            metadata: Some(GroupMetadataUpdate {
                 name: Some(metadata.name),
                 archetype: Some(metadata.archetype),
             }),
@@ -76,69 +64,6 @@ impl RoomUpdate {
     }
 }
 
-#[derive(Copy, Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum RoomArchetype {
-    LivingRoom,
-    Kitchen,
-    Dining,
-    Bedroom,
-    KidsBedroom,
-    Bathroom,
-    Nursery,
-    Office,
-    GuestRoom,
-
-    Toilet,
-    Staircase,
-    Hallway,
-    LaundryRoom,
-    Storage,
-    Closet,
-    Garage,
-    Other,
-
-    Gym,
-    Lounge,
-    Tv,
-    Computer,
-    Recreation,
-    /// Gaming Room
-    ManCave,
-    Music,
-    /// Library
-    Reading,
-    Studio,
-
-    /// Backyard
-    Garden,
-    /// Patio
-    Terrace,
-    Balcony,
-    Driveway,
-    Carport,
-    FrontDoor,
-    Porch,
-    Barbecue,
-    Pool,
-
-    Downstairs,
-    Upstairs,
-    TopFloor,
-    Attic,
-    Home,
-}
-
-impl RoomMetadata {
-    #[must_use]
-    pub fn new(archetype: RoomArchetype, name: &str) -> Self {
-        Self {
-            archetype,
-            name: name.to_string(),
-        }
-    }
-}
-
 impl AddAssign<&RoomUpdate> for Room {
     fn add_assign(&mut self, rhs: &RoomUpdate) {
         if let Some(md) = &rhs.metadata {
@@ -147,37 +72,6 @@ impl AddAssign<&RoomUpdate> for Room {
         if let Some(children) = &rhs.children {
             self.children.clone_from(children);
         }
-    }
-}
-
-impl AddAssign<&RoomMetadataUpdate> for RoomMetadata {
-    fn add_assign(&mut self, upd: &RoomMetadataUpdate) {
-        if let Some(name) = &upd.name {
-            self.name.clone_from(name);
-        }
-        if let Some(archetype) = &upd.archetype {
-            self.archetype = *archetype;
-        }
-    }
-}
-
-#[allow(clippy::if_not_else)]
-impl Sub<&RoomMetadata> for &RoomMetadata {
-    type Output = RoomMetadataUpdate;
-
-    fn sub(self, rhs: &RoomMetadata) -> Self::Output {
-        let mut upd = Self::Output::default();
-
-        if self != rhs {
-            if self.name != rhs.name {
-                upd.name = Some(rhs.name.clone());
-            }
-            if self.archetype != rhs.archetype {
-                upd.archetype = Some(rhs.archetype);
-            }
-        }
-
-        upd
     }
 }
 

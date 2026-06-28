@@ -4,6 +4,7 @@ mod button;
 mod device;
 mod entertainment;
 mod entertainment_config;
+mod group;
 mod grouped_light;
 mod light;
 mod resource;
@@ -38,6 +39,7 @@ pub use entertainment_config::{
     EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
     EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Position,
 };
+pub use group::{GroupArchetype, GroupMetadata, GroupMetadataUpdate};
 pub use grouped_light::{GroupedLight, GroupedLightDynamicsUpdate, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, ContentConfiguration,
@@ -53,7 +55,7 @@ pub use light::{
     OrientationType,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
-pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomNew, RoomUpdate};
+pub use room::{Room, RoomNew, RoomUpdate};
 pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusEnum, SceneUpdate,

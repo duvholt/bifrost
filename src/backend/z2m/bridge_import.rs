@@ -7,10 +7,10 @@ use uuid::Uuid;
 use hue::api::{
     BridgeHome, Button, ContentConfiguration, ContentConfigurationOrder,
     ContentConfigurationOrientation, ContentConfigurationStatusType, DeviceArchetype,
-    DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupedLight,
-    Light, LightEffects, LightEffectsV2, LightMetadata, LightTimedEffect, LightTimedEffects,
-    Metadata, OrderType, OrientationType, RType, Resource, ResourceLink, Room, RoomArchetype,
-    RoomMetadata, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus,
+    DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupArchetype,
+    GroupMetadata, GroupedLight, Light, LightEffects, LightEffectsV2, LightMetadata,
+    LightTimedEffect, LightTimedEffects, Metadata, OrderType, OrientationType, RType, Resource,
+    ResourceLink, Room, Scene, SceneActive, SceneMetadata, SceneRecall, SceneStatus, Stub, Taurus,
     ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
 };
 use hue::devicedb::gradient_product_data;
@@ -364,7 +364,7 @@ impl Z2mBackend {
             );
         }
 
-        let mut metadata = RoomMetadata::new(RoomArchetype::Home, room_name);
+        let mut metadata = GroupMetadata::new(GroupArchetype::Home, room_name);
         if let Some(room_conf) = self.config.rooms.get(&topic) {
             if let Some(name) = &room_conf.name {
                 metadata.name.clone_from(name);
