@@ -11,9 +11,10 @@ use uuid::Uuid;
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
-    EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffectsV2Update,
-    LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene, SceneActive, SceneStatus,
-    SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate, Zone, ZoneUpdate,
+    EntertainmentConfiguration, Group, GroupedLight, GroupedLightUpdate, Light,
+    LightEffectsV2Update, LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene,
+    SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate, Zone,
+    ZoneUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;

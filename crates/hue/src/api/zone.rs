@@ -5,7 +5,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::{GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
+use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Zone {
@@ -31,12 +31,15 @@ pub struct ZoneUpdate {
     pub services: Option<Vec<ResourceLink>>,
 }
 
-impl Zone {
-    #[must_use]
-    pub fn grouped_light_service(&self) -> Option<&ResourceLink> {
+impl Group for Zone {
+    fn grouped_light_service(&self) -> Option<&ResourceLink> {
         self.services
             .iter()
             .find(|rl| rl.rtype == RType::GroupedLight)
+    }
+
+    fn children(&self) -> impl Iterator<Item = &ResourceLink> {
+        self.children.iter()
     }
 }
 

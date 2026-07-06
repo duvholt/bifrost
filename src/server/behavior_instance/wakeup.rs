@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 use hue::api::{
-    Device, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
+    Device, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
     LightTimedEffect, LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink,
     Room, WakeupConfiguration, WakeupStyle,
 };

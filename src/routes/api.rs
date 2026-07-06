@@ -16,9 +16,9 @@ use hue::api::{
     Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
     EntertainmentConfigurationLocationsNew, EntertainmentConfigurationMetadata,
     EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
-    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, RType, ResourceLink, Room, Scene, SceneActive,
-    SceneStatus, SceneUpdate, V1Reply, Zone,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Group, GroupedLight,
+    GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
+    SceneActive, SceneStatus, SceneUpdate, V1Reply, Zone,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{

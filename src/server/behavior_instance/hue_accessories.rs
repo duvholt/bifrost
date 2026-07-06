@@ -5,8 +5,8 @@ use bifrost_api::backend::BackendRequest;
 use chrono::{Local, NaiveTime};
 use hue::api::{
     Action, BridgeHome, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
-    DimmingDeltaUpdate, GroupedLightDynamicsUpdate, GroupedLightUpdate,
-    HueAccessoriesConfiguration, On, RType, Resource, ResourceLink, Room, SceneActive, SceneStatus,
+    DimmingDeltaUpdate, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate,
+    HueAccessoriesConfiguration, On, RType, Resource, ResourceLink, SceneActive, SceneStatus,
     SceneUpdate, TimeBasedExtendedSlot, configuration,
 };
 use hue::event::Event;

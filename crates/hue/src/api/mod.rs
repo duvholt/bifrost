@@ -39,7 +39,7 @@ pub use entertainment_config::{
     EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
     EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Position,
 };
-pub use group::{GroupArchetype, GroupMetadata, GroupMetadataUpdate};
+pub use group::{Group, GroupArchetype, GroupMetadata, GroupMetadataUpdate};
 pub use grouped_light::{GroupedLight, GroupedLightDynamicsUpdate, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, ContentConfiguration,

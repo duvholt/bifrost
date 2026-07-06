@@ -3,7 +3,7 @@ use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::{GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
+use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Room {
@@ -29,12 +29,15 @@ pub struct RoomUpdate {
     pub services: Option<Vec<ResourceLink>>,
 }
 
-impl Room {
-    #[must_use]
-    pub fn grouped_light_service(&self) -> Option<&ResourceLink> {
+impl Group for Room {
+    fn grouped_light_service(&self) -> Option<&ResourceLink> {
         self.services
             .iter()
             .find(|rl| rl.rtype == RType::GroupedLight)
+    }
+
+    fn children(&self) -> impl Iterator<Item = &ResourceLink> {
+        self.children.iter()
     }
 }
 

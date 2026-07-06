@@ -2,6 +2,14 @@ use std::ops::{AddAssign, Sub};
 
 use serde::{Deserialize, Serialize};
 
+use crate::api::ResourceLink;
+
+pub trait Group {
+    fn grouped_light_service(&self) -> Option<&ResourceLink>;
+
+    fn children(&self) -> impl Iterator<Item = &ResourceLink>;
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct GroupMetadata {
     pub name: String,
