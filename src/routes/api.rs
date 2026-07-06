@@ -505,8 +505,15 @@ async fn put_api_user_resource_id_path(
             let uuid = lock.from_id_v1(id)?;
             let link = ResourceLink::new(uuid, RType::Room);
 
-            let room: &Room = lock.get(&link)?;
-            let glight = room.grouped_light_service().unwrap();
+            let group = lock.get_resource_by_id(&uuid)?;
+            let glight = match group.obj {
+                Resource::Room(room) => room.grouped_light_service().copied(),
+                Resource::Zone(zone) => zone.grouped_light_service().copied(),
+                _ => None,
+            };
+            let Some(glight) = glight else {
+                return Err(HueError::NotFound(link.rid))?;
+            };
 
             let updv1: ApiGroupActionUpdate = serde_json::from_value(req)?;
 
@@ -514,7 +521,7 @@ async fn put_api_user_resource_id_path(
                 ApiGroupActionUpdate::LightUpdate(upd) => {
                     let updv2 = GroupedLightUpdate::from(&upd);
 
-                    lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
+                    lock.backend_request(BackendRequest::GroupedLightUpdate(glight, updv2))?;
                     drop(lock);
 
                     V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?
