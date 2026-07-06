@@ -224,18 +224,13 @@ impl Z2mBackend {
 
     async fn bridge_group_remove(&mut self, grp: &GroupRemove) -> ApiResult<()> {
         let mut lock = self.state.lock().await;
-        let link_group = if let Ok(group_id) = grp.id.clone().parse::<u32>() {
-            // todo: look up grouped light
-            RType::Room.deterministic(group_id)
-        } else {
-            let Some(glight_link) = self.map.get(&grp.id) else {
-                return Ok(());
-            };
-            let Ok(glight) = lock.get::<GroupedLight>(glight_link).cloned() else {
-                return Ok(());
-            };
-            glight.owner
+        let Some(glight_link) = self.grouped_light_from_group_id(&grp.id) else {
+            return Ok(());
         };
+        let Ok(glight) = lock.get::<GroupedLight>(&glight_link).cloned() else {
+            return Ok(());
+        };
+        let link_group = glight.owner;
 
         let Some(topic) = self.rmap.get(&link_group) else {
             return Ok(());
@@ -248,6 +243,13 @@ impl Z2mBackend {
         log::info!("[{}] Bridge deleted group {:?}", self.name, link_group);
         drop(lock);
         Ok(())
+    }
+
+    fn grouped_light_from_group_id(&self, group_id: &str) -> Option<ResourceLink> {
+        group_id.parse::<u32>().map_or_else(
+            |_| self.map.get(group_id).copied(),
+            |group_id| Some(RType::GroupedLight.deterministic(group_id)),
+        )
     }
 
     async fn bridge_device_remove(&mut self, data: &DeviceRemoveResponse) -> ApiResult<()> {
@@ -283,50 +285,70 @@ impl Z2mBackend {
             let light = lock.get::<Light>(light_link)?.clone();
 
             let device_link = light.owner;
-            if let Some(group) = self.map.get(&change.group) {
-                let owner_link = lock.get::<GroupedLight>(group)?.owner;
-                match owner_link.rtype {
-                    RType::Room => {
-                        // Room uses device as children
-                        let exists = lock
-                            .get::<Room>(&owner_link)?
-                            .children
-                            .contains(&device_link);
+            let Some(glight_link) = self.grouped_light_from_group_id(&change.group) else {
+                return Ok(());
+            };
+            let owner_link = lock.get::<GroupedLight>(&glight_link)?.owner;
+            match owner_link.rtype {
+                RType::Room => {
+                    // Room uses device as children
+                    let room = lock.get::<Room>(&owner_link)?;
+                    let exists = room.children.contains(&device_link);
 
-                        if added {
-                            if !exists {
-                                lock.update(&owner_link.rid, |room: &mut Room| {
-                                    room.children.insert(device_link);
-                                })?;
-                            }
-                        } else {
-                            if exists {
-                                lock.update(&owner_link.rid, |room: &mut Room| {
-                                    room.children.remove(&device_link);
-                                })?;
-                            }
+                    if added {
+                        if !exists {
+                            log::debug!(
+                                "Adding {} to group {}",
+                                light.metadata.name,
+                                room.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |room: &mut Room| {
+                                room.children.insert(device_link);
+                            })?;
+                        }
+                    } else {
+                        if exists {
+                            log::debug!(
+                                "Removing {} from group {}",
+                                light.metadata.name,
+                                room.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |room: &mut Room| {
+                                room.children.remove(&device_link);
+                            })?;
                         }
                     }
-                    RType::Zone => {
-                        // Zone uses light as children
-                        let exists = lock.get::<Zone>(&owner_link)?.children.contains(light_link);
-
-                        if added {
-                            if !exists {
-                                lock.update(&owner_link.rid, |zone: &mut Zone| {
-                                    zone.children.insert(*light_link);
-                                })?;
-                            }
-                        } else {
-                            if exists {
-                                lock.update(&owner_link.rid, |zone: &mut Zone| {
-                                    zone.children.remove(light_link);
-                                })?;
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+                RType::Zone => {
+                    // Zone uses light as children
+                    let zone = lock.get::<Zone>(&owner_link)?;
+                    let exists = zone.children.contains(light_link);
+
+                    if added {
+                        if !exists {
+                            log::debug!(
+                                "Adding {} to zone {}",
+                                light.metadata.name,
+                                zone.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |zone: &mut Zone| {
+                                zone.children.insert(*light_link);
+                            })?;
+                        }
+                    } else {
+                        if exists {
+                            log::debug!(
+                                "Removing {} from zone {}",
+                                light.metadata.name,
+                                zone.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |zone: &mut Zone| {
+                                zone.children.remove(light_link);
+                            })?;
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
