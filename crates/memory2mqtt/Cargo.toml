@@ -1,0 +1,29 @@
+[package]
+name = "memory2mqtt"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+log = "0.4.33"
+serde = "1.0.228"
+serde_json = "1.0.150"
+z2m = { version = "0.1.0", path = "../z2m", default-features = false }
+svc = { version = "0.1.0", path = "../svc", default-features = false }
+bifrost-api = { version = "0.1.0", path = "../bifrost-api", default-features = false }
+tokio = "1.52.3"
+tungstenite = "0.30.0"
+tokio-tungstenite = "0.30.0"
+futures = "0.3.32"
+thiserror = "2.0.18"
+async-trait = "0.1.89"
+
+[lints]
+workspace = true
