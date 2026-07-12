@@ -109,8 +109,40 @@ impl Memory2Mqtt {
             .map(|payload| message(topic, payload))
     }
 
+    fn hue_light_payload(command: &Value) -> Option<Vec<u8>> {
+        command
+            .get("payload")?
+            .get("data")?
+            .as_array()?
+            .iter()
+            .map(|value| value.as_u64().and_then(|value| u8::try_from(value).ok()))
+            .collect()
+    }
+
     fn handle_set(&mut self, topic: &str, payload: &Value) -> Vec<RawMessage> {
-        self.update_state(topic, payload);
-        self.handle_get(topic).into_iter().collect()
+        if let Some(command) = payload.get("command") {
+            let cluster = command.get("cluster").and_then(Value::as_u64);
+            match cluster {
+                Some(0xFC03) => {
+                    let Some(bytes) = Self::hue_light_payload(command) else {
+                        return Vec::new();
+                    };
+
+                    self.update_state(
+                        topic,
+                        &json!(
+                            {
+                                "philips_raw": hex::encode(bytes)
+                            }
+                        ),
+                    );
+                    self.handle_get(topic).into_iter().collect()
+                }
+                _ => Vec::new(),
+            }
+        } else {
+            self.update_state(topic, payload);
+            self.handle_get(topic).into_iter().collect()
+        }
     }
 }

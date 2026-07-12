@@ -1501,6 +1501,7 @@ dependencies = [
  "async-trait",
  "bifrost-api",
  "futures",
+ "hex",
  "log",
  "serde",
  "serde_json",
