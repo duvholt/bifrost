@@ -1,12 +1,8 @@
-use eventsource_stream::Eventsource;
 use hue::api::ResourceRecord;
-use hue::event::{Event, EventBlock};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, time::Duration};
-use tokio::time::timeout;
-use tokio_stream::StreamExt;
+use std::collections::BTreeMap;
 
-use crate::common::{HueClipResponse, TestBridge, TestError, TestResult};
+use crate::common::{HueClipResponse, TestBridge, TestResult};
 
 pub mod common;
 
@@ -71,11 +67,15 @@ fn z2m_state() -> BTreeMap<String, Value> {
 
 #[tokio::test]
 async fn get_lights() -> TestResult<()> {
-    let test_bridge = TestBridge::start(z2m_state()).await?;
+    let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
-    let lights = reqwest::get(test_bridge.hue_url.join("/clip/v2/resource/light")?)
-        .await?
-        .json::<HueClipResponse<ResourceRecord>>()
+    test_bridge
+        .wait_for_event_add(hue::api::RType::Light)
+        .await?;
+
+    let lights = test_bridge
+        .hue_client
+        .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
         .await?;
 
     assert_eq!(lights.data.len(), 1);
@@ -84,61 +84,34 @@ async fn get_lights() -> TestResult<()> {
 
 #[tokio::test]
 async fn turn_on_light() -> TestResult<()> {
-    let test_bridge = TestBridge::start(z2m_state()).await?;
-    let client = reqwest::Client::new();
+    let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
-    let lights = client
-        .get(test_bridge.hue_url.join("/clip/v2/resource/light")?)
-        .send()
-        .await?
-        .json::<HueClipResponse<ResourceRecord>>()
+    test_bridge
+        .wait_for_event_add(hue::api::RType::Light)
+        .await?;
+
+    let lights = test_bridge
+        .hue_client
+        .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
         .await?;
 
     let light_id = lights.data[0].id;
 
-    let mut event_stream = reqwest::Client::new()
-        .get(test_bridge.hue_url.join("/eventstream/clip/v2")?)
-        .send()
-        .await?
-        .bytes_stream()
-        .eventsource();
+    test_bridge.clear_events();
 
-    client
+    test_bridge
+        .hue_client
         .put(
-            test_bridge
-                .hue_url
-                .join(&format!("/clip/v2/resource/light/{light_id}"))?,
-        )
-        .json(&json!({
-            "on": {
-                "on": true
-            }
-        }))
-        .send()
-        .await?
-        .error_for_status()?;
-
-    let update = timeout(Duration::from_secs(2), async {
-        while let Some(message) = event_stream.next().await {
-            let event = message?;
-            if event.data.is_empty() {
-                continue;
-            }
-
-            let blocks: Vec<EventBlock> = serde_json::from_str(&event.data)?;
-            for block in blocks {
-                let Event::Update(update) = block.event else {
-                    continue;
-                };
-
-                if let Some(object) = update.data.into_iter().find(|object| object.id == light_id) {
-                    return Ok(object);
+            &format!("/clip/v2/resource/light/{light_id}"),
+            &json!({
+                "on": {
+                    "on": true
                 }
-            }
-        }
-        Err(TestError::EventTimeout)
-    })
-    .await??;
+            }),
+        )
+        .await?;
+
+    let update = test_bridge.wait_for_event_update(light_id).await?;
 
     assert_eq!(update.data["on"], json!({"on": true}));
 

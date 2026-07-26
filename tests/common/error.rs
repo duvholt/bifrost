@@ -1,4 +1,5 @@
 use bifrost::error::ApiError;
+use hue::event::EventBlock;
 use svc::error::SvcError;
 use thiserror::Error;
 
@@ -27,6 +28,15 @@ pub enum TestError {
 
     #[error(transparent)]
     Elapsed(#[from] tokio::time::error::Elapsed),
+
+    #[error(transparent)]
+    HueEventSend(#[from] tokio::sync::broadcast::error::SendError<Vec<EventBlock>>),
+
+    #[error(transparent)]
+    BroadcastRecvError(#[from] tokio::sync::broadcast::error::RecvError),
+
+    #[error(transparent)]
+    OneshotRecvError(#[from] tokio::sync::oneshot::error::RecvError),
 
     #[error("Timed out waiting for event")]
     EventTimeout,
