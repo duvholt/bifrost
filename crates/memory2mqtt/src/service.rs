@@ -18,9 +18,9 @@ use crate::{
 };
 
 pub struct Memory2MqttService {
-    config: Memory2MqttConfig,
+    pub config: Memory2MqttConfig,
     listener: Option<TcpListener>,
-    state: Arc<Mutex<Memory2Mqtt>>,
+    pub state: Arc<Mutex<Memory2Mqtt>>,
     events: broadcast::Sender<RawMessage>,
 }
 
