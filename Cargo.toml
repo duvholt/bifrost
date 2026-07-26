@@ -118,7 +118,7 @@ sha1 = "0.10.6"
 rustls-pemfile = "2.2.0"
 termcolor = { version = "1.4.1", optional = true }
 itertools = "0.14.0"
-reqwest = { version = "0.12.12", default-features = false, features = ["json", "native-tls"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "native-tls", "stream"] }
 url = { version = "2.5.4", features = ["serde"] }
 hex = "0.4.3"
 async-trait = "0.1.86"
@@ -139,6 +139,7 @@ tokio-native-tls = "0.3.1"
 tzfile = "0.1.3"
 bifrost-api = { version = "0.1.0", path = "crates/bifrost-api", features = ["mac"] }
 nix = { version = "0.30.0", default-features = false, features = ["socket"] }
+eventsource-stream = "0.2.3"
 
 [dev-dependencies]
 clap-stdin = "0.6.0"
