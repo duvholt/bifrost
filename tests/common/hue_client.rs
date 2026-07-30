@@ -1,11 +1,11 @@
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
-use hue::event::EventBlock;
+use hue::{api::ResourceRecord, event::EventBlock};
 use reqwest::Client;
 use serde_json::Value;
 use tokio::sync::{broadcast::Sender, oneshot};
 
-use crate::common::TestResult;
+use crate::common::{HueClipResponse, TestResult};
 
 #[derive(Clone)]
 pub struct HueClient {
@@ -38,6 +38,20 @@ impl HueClient {
             .await?
             .error_for_status()?;
         Ok(())
+    }
+
+    pub async fn get_lights(&self) -> TestResult<HueClipResponse<ResourceRecord>> {
+        self.get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
+            .await
+    }
+
+    pub async fn put_light(
+        &self,
+        light_id: impl std::fmt::Display,
+        value: &Value,
+    ) -> TestResult<()> {
+        self.put(&format!("/clip/v2/resource/light/{light_id}"), value)
+            .await
     }
 
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {

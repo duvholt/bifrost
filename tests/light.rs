@@ -91,11 +91,7 @@ async fn turn_on_light() -> TestResult<()> {
         .wait_for_event_add(hue::api::RType::Light)
         .await?;
 
-    let lights = test_bridge
-        .hue_client
-        .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
-        .await?;
-
+    let lights = test_bridge.hue_client.get_lights().await?;
     let light_id = lights.data[0].id;
 
     test_bridge.clear_events();
@@ -103,8 +99,8 @@ async fn turn_on_light() -> TestResult<()> {
 
     test_bridge
         .hue_client
-        .put(
-            &format!("/clip/v2/resource/light/{light_id}"),
+        .put_light(
+            light_id,
             &json!({
                 "on": {
                     "on": true
@@ -133,10 +129,7 @@ async fn turn_on_light_with_manual_z2m() -> TestResult<()> {
         .wait_for_event_add(hue::api::RType::Light)
         .await?;
 
-    let lights = test_bridge
-        .hue_client
-        .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
-        .await?;
+    let lights = test_bridge.hue_client.get_lights().await?;
     let light_id = lights.data[0].id;
 
     test_bridge.clear_events();
@@ -144,10 +137,7 @@ async fn turn_on_light_with_manual_z2m() -> TestResult<()> {
 
     test_bridge
         .hue_client
-        .put(
-            &format!("/clip/v2/resource/light/{light_id}"),
-            &json!({"on": {"on": true}}),
-        )
+        .put_light(light_id, &json!({"on": {"on": true}}))
         .await?;
 
     test_bridge
