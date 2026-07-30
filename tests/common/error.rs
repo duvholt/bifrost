@@ -2,6 +2,7 @@ use bifrost::error::ApiError;
 use hue::event::EventBlock;
 use svc::error::SvcError;
 use thiserror::Error;
+use z2m::api::RawMessage;
 
 #[derive(Error, Debug)]
 pub enum TestError {
@@ -36,9 +37,15 @@ pub enum TestError {
     BroadcastRecvError(#[from] tokio::sync::broadcast::error::RecvError),
 
     #[error(transparent)]
+    Z2mSend(#[from] tokio::sync::broadcast::error::SendError<RawMessage>),
+
+    #[error(transparent)]
     OneshotRecvError(#[from] tokio::sync::oneshot::error::RecvError),
 
-    #[error("Timed out waiting for event")]
-    EventTimeout,
+    #[error("unexpected Z2M requests\nexpected: {expected:#?}\nactual: {actual:#?}")]
+    UnexpectedZ2mRequests {
+        expected: Vec<RawMessage>,
+        actual: Vec<RawMessage>,
+    },
 }
 pub type TestResult<T> = Result<T, TestError>;

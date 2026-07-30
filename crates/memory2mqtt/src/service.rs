@@ -4,36 +4,45 @@ use async_trait::async_trait;
 use bifrost_api::config::Memory2MqttConfig;
 use futures::{SinkExt, StreamExt};
 use svc::traits::Service;
-use tokio::{
-    net::TcpListener,
-    sync::{Mutex, broadcast},
-};
+use tokio::net::TcpListener;
+use tokio::sync::{Mutex, broadcast};
 use tokio_tungstenite::accept_async;
 use tungstenite::Message;
 use z2m::api::RawMessage;
 
-use crate::{
-    error::{M2MError, M2MResult},
-    handler::Memory2Mqtt,
-};
+use crate::error::{M2MError, M2MResult};
+use crate::handler::Memory2Mqtt;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum M2mMode {
+    #[default]
+    Automatic,
+    Manual,
+}
 
 pub struct Memory2MqttService {
     pub config: Memory2MqttConfig,
     listener: Option<TcpListener>,
     pub state: Arc<Mutex<Memory2Mqtt>>,
-    events: broadcast::Sender<RawMessage>,
+    websocket_tx: broadcast::Sender<RawMessage>,
+    requests_tx: broadcast::Sender<RawMessage>,
+    mode: M2mMode,
 }
 
 impl Memory2MqttService {
     #[must_use]
     pub fn new(config: Memory2MqttConfig) -> Self {
         let state = Memory2Mqtt::new(config.state.clone());
-        let (events, _) = broadcast::channel(128);
+        let (websocket_tx, _) = broadcast::channel(128);
+        let (requests_tx, _) = broadcast::channel(128);
+
         Self {
             config,
             listener: None,
             state: Arc::new(Mutex::new(state)),
-            events,
+            websocket_tx,
+            requests_tx,
+            mode: M2mMode::Automatic,
         }
     }
 
@@ -43,14 +52,32 @@ impl Memory2MqttService {
         self
     }
 
+    #[must_use]
+    pub const fn with_mode(mut self, mode: M2mMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    #[must_use]
+    pub fn subscribe_requests(&self) -> broadcast::Receiver<RawMessage> {
+        self.requests_tx.subscribe()
+    }
+
+    #[must_use]
+    pub fn websocket_sender(&self) -> broadcast::Sender<RawMessage> {
+        self.websocket_tx.clone()
+    }
+
     async fn client(
         socket: tokio::net::TcpStream,
         state: Arc<Mutex<Memory2Mqtt>>,
-        events: broadcast::Sender<RawMessage>,
+        websocket_tx: broadcast::Sender<RawMessage>,
+        requests_tx: broadcast::Sender<RawMessage>,
+        mode: M2mMode,
     ) -> M2MResult<()> {
         let socket = accept_async(socket).await?;
         let (mut write, mut read) = socket.split();
-        let mut updates = events.subscribe();
+        let mut websocket_rx = websocket_tx.subscribe();
 
         let startup_messages = state.lock().await.startup_messages();
         for message in startup_messages {
@@ -65,12 +92,18 @@ impl Memory2MqttService {
                     let Some(incoming) = incoming else { return Ok(()); };
                     let Message::Text(text) = incoming? else { continue; };
                     let request = serde_json::from_str::<RawMessage>(&text)?;
-                    let replies = state.lock().await.handle(request);
-                    for reply in replies {
-                        let _ = events.send(reply);
+                    let _ = requests_tx.send(request.clone());
+                    match mode {
+                        M2mMode::Automatic => {
+                            let replies = state.lock().await.handle(request);
+                            for reply in replies {
+                                let _ = websocket_tx.send(reply);
+                            }
+                        },
+                        M2mMode::Manual => {},
                     }
                 }
-                event = updates.recv() => match event {
+                event = websocket_rx.recv() => match event {
                     Ok(message) => write.send(Message::text(serde_json::to_string(&message)?)).await?,
                     Err(broadcast::error::RecvError::Lagged(count)) => {
                         log::warn!("Test Z2M client lagged by {count} events");
@@ -87,10 +120,7 @@ impl Service for Memory2MqttService {
     type Error = M2MError;
 
     async fn start(&mut self) -> M2MResult<()> {
-        log::info!(
-            "Test Zigbee2MQTT server configured on {}",
-            self.config.listen
-        );
+        log::info!("Memory2MQTT server configured on {}", self.config.listen);
         Ok(())
     }
 
@@ -99,17 +129,18 @@ impl Service for Memory2MqttService {
             Some(listener) => listener,
             None => TcpListener::bind(self.config.listen).await?,
         };
-        log::info!(
-            "Test Zigbee2MQTT server listening on {}",
-            self.config.listen
-        );
+        log::info!("Memory2MQTT server listening on {}", self.config.listen);
         loop {
             let (socket, address) = listener.accept().await?;
             let state = self.state.clone();
-            let events = self.events.clone();
+            let websocket_tx = self.websocket_tx.clone();
+            let requests_tx = self.requests_tx.clone();
+            let mode = self.mode;
             tokio::spawn(async move {
-                if let Err(error) = Self::client(socket, state, events).await {
-                    log::debug!("Test Zigbee2MQTT client {address} disconnected: {error}");
+                if let Err(error) =
+                    Self::client(socket, state, websocket_tx, requests_tx, mode).await
+                {
+                    log::debug!("Memory2MQTT client {address} disconnected: {error}");
                 }
             });
         }

@@ -1,9 +1,9 @@
 use bifrost::backend::z2m::Z2mServiceTemplate;
-use bifrost::config::{AppConfig, Memory2MqttConfig};
+use bifrost::config::AppConfig;
 use bifrost::server::{self, Protocol, appstate::AppState, http::HttpServer};
 use hue::api::{RType, ResourceRecord};
 use hue::event::{Event, EventBlock, ObjectUpdate};
-use memory2mqtt::service::Memory2MqttService;
+use memory2mqtt::service::M2mMode;
 use serde_json::Value;
 use serde_json::json;
 use std::net::Ipv4Addr;
@@ -20,7 +20,7 @@ use tokio::time::timeout;
 use url::Url;
 use uuid::Uuid;
 
-use crate::common::{HueClient, TestResult};
+use crate::common::{HueClient, TestResult, TestZ2m, create_m2m_service};
 
 pub struct TestBridge {
     pub hue_url: Url,
@@ -28,6 +28,7 @@ pub struct TestBridge {
     tasks: JoinSet<TestResult<()>>,
     workdir: PathBuf,
     pub hue_client: HueClient,
+    pub z2m: TestZ2m,
     events: Receiver<Vec<EventBlock>>,
 }
 
@@ -41,13 +42,21 @@ impl Drop for TestBridge {
 
 impl TestBridge {
     pub async fn start(z2m_state: BTreeMap<String, Value>) -> TestResult<Self> {
+        Self::start_with_z2m_mode(z2m_state, M2mMode::Automatic).await
+    }
+
+    pub async fn start_with_z2m_mode(
+        z2m_state: BTreeMap<String, Value>,
+        mode: M2mMode,
+    ) -> TestResult<Self> {
         let workdir = Self::create_workdir()?;
         let mut tasks = JoinSet::new();
 
         let http_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let http_address = http_listener.local_addr()?;
 
-        let memory2mqtt_service = Self::create_m2m_service(z2m_state).await?;
+        let memory2mqtt_service = create_m2m_service(z2m_state, mode).await?;
+        let test_z2m = TestZ2m::from_service(&memory2mqtt_service);
 
         let config =
             Self::create_appconfig(http_address, memory2mqtt_service.config.listen, &workdir)?;
@@ -84,6 +93,7 @@ impl TestBridge {
             tasks,
             workdir,
             hue_client,
+            z2m: test_z2m,
             events: events_receiver,
         })
     }
@@ -92,16 +102,6 @@ impl TestBridge {
         let path = std::env::temp_dir().join(format!("bifrost-integration-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&path)?;
         Ok(path)
-    }
-
-    async fn create_m2m_service(state: BTreeMap<String, Value>) -> TestResult<Memory2MqttService> {
-        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
-        let address = listener.local_addr()?;
-        let config = Memory2MqttConfig {
-            listen: address,
-            state,
-        };
-        Ok(Memory2MqttService::new(config).with_listener(listener))
     }
 
     async fn start_services(mgr: &mut SvmClient) -> TestResult<()> {
