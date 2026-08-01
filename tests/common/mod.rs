@@ -1,5 +1,6 @@
 mod bridge;
 mod error;
+pub mod fixture;
 mod hue_client;
 mod response;
 mod z2m;

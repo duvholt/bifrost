@@ -3,67 +3,30 @@ use memory2mqtt::service::M2mMode;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
-use crate::common::{HueClipResponse, TestBridge, TestResult};
+use crate::common::{
+    HueClipResponse, TestBridge, TestResult,
+    fixture::{self, Z2mFixture, Z2mFixtureDeviceId, Z2mGroupFixture},
+};
 
 pub mod common;
 
 fn z2m_state() -> BTreeMap<String, Value> {
-    BTreeMap::from([
-        (
-            "bridge/devices".to_string(),
-            json!([{
-                "description": null,
-                "date_code": null,
-                "definition": {
-                    "model": "LCT001",
-                    "vendor": "Test",
-                    "description": "Integration test light",
-                    "supports_ota": false,
-                    "options": [],
-                    "exposes": [{
-                        "type": "light",
-                        "features": [
-                            {"type": "binary", "name": "state", "value_off": "OFF", "value_on": "ON"},
-                            {"type": "numeric", "name": "brightness", "value_min": 0, "value_max": 254},
-                            {"type": "numeric", "name": "color_temp", "unit": "mired", "value_min": 153, "value_max": 500},
-                            {"type": "composite", "name": "color_xy"}
-                        ]
-                    }]
-                },
-                "disabled": false,
-                "endpoints": {},
-                "friendly_name": "desk",
-                "ieee_address": "0x0017880100000001",
-                "interview_completed": true,
-                "interviewing": false,
-                "manufacturer": "Test",
-                "model_id": "LCT001",
-                "network_address": 1,
-                "software_build_id": null,
-                "supported": true,
-                "type": "Router"
-            }]),
-        ),
-        (
-            "bridge/groups".to_string(),
-            json!([{
-                "id": 1,
-                "friendly_name": "office",
-                "members": [{"ieee_address": "0x0017880100000001", "endpoint": 1}],
-                "scenes": [{"id": 7, "name": "Relax"}]
-            }]),
-        ),
-        (
-            "desk".to_string(),
-            json!({
-                "state": "OFF",
-                "brightness": 10,
-                "color_temp": 300,
-                "color_mode": "color_temp",
-                "color": {"x": 0.3, "y": 0.3}
-            }),
-        ),
-    ])
+    let lamp = fixture::ikea::tradfri_warm_white(Z2mFixtureDeviceId(1), "lamp").with_state(json!({
+        "state": "OFF",
+        "brightness": 100
+    }));
+
+    let living_room = Z2mGroupFixture::new(1, "livingroom")
+        .with_member(&lamp)
+        .with_scene(1, "Relax")
+        .with_state(json!({
+            "state": "OFF",
+            "brightness": 100
+        }));
+
+    let fixture = Z2mFixture::new().with_device(lamp).with_group(living_room);
+
+    fixture.into_state()
 }
 
 #[tokio::test]
@@ -111,7 +74,7 @@ async fn turn_on_light() -> TestResult<()> {
 
     test_bridge
         .z2m
-        .expect_request("desk/set", json!({"state": "ON"}))
+        .expect_request("lamp/set", json!({"state": "ON"}))
         .await?;
 
     let update = test_bridge.wait_for_event_update(light_id).await?;
@@ -142,10 +105,10 @@ async fn turn_on_light_with_manual_z2m() -> TestResult<()> {
 
     test_bridge
         .z2m
-        .expect_request("desk/set", json!({"state": "ON"}))
+        .expect_request("lamp/set", json!({"state": "ON"}))
         .await?;
 
-    test_bridge.z2m.send("desk", json!({"state": "ON"}))?;
+    test_bridge.z2m.send("lamp", json!({"state": "ON"}))?;
 
     let update = test_bridge.wait_for_event_update(light_id).await?;
     assert_eq!(update.data["on"], json!({"on": true}));
