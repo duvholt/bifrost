@@ -1,7 +1,7 @@
 use bifrost::backend::z2m::Z2mServiceTemplate;
 use bifrost::config::AppConfig;
 use bifrost::server::{self, Protocol, appstate::AppState, http::HttpServer};
-use hue::api::{RType, ResourceRecord};
+use hue::api::{RType, Resource, ResourceLink, ResourceRecord, ZigbeeConnectivity};
 use hue::event::{Event, EventBlock, ObjectUpdate};
 use memory2mqtt::service::M2mMode;
 use serde_json::Value;
@@ -20,6 +20,7 @@ use tokio::time::timeout;
 use url::Url;
 use uuid::Uuid;
 
+use crate::common::fixture::Z2mFixtureDeviceId;
 use crate::common::{HueClient, TestResult, TestZ2m, create_m2m_service};
 
 pub struct TestBridge {
@@ -29,7 +30,8 @@ pub struct TestBridge {
     workdir: PathBuf,
     pub hue_client: HueClient,
     pub z2m: TestZ2m,
-    events: Receiver<Vec<EventBlock>>,
+    hue_events: Receiver<Vec<EventBlock>>,
+    received_hue_events: Vec<Event>,
 }
 
 impl Drop for TestBridge {
@@ -94,7 +96,8 @@ impl TestBridge {
             workdir,
             hue_client,
             z2m: test_z2m,
-            events: events_receiver,
+            hue_events: events_receiver,
+            received_hue_events: Vec::new(),
         })
     }
 
@@ -124,7 +127,6 @@ impl TestBridge {
 
         ready_rx.await?;
         for name in z2m_servers.keys() {
-            // mgr.start(ServiceId::instance("z2m", name)).await?;
             let id = mgr.start(ServiceId::instance("z2m", name)).await?;
             mgr.start(id).await?;
         }
@@ -159,25 +161,75 @@ impl TestBridge {
     }
 
     pub fn clear_events(&mut self) {
-        self.events = self.events.resubscribe();
+        self.hue_events = self.hue_events.resubscribe();
+        self.received_hue_events.clear();
+    }
+
+    async fn wait_for_resource<F>(&mut self, func: F) -> TestResult<ResourceRecord>
+    where
+        F: Fn(&[Event]) -> Option<&ResourceRecord> + Send + Sync,
+    {
+        timeout(Duration::from_secs(2), async {
+            loop {
+                if let Some(resource) = func(&self.received_hue_events) {
+                    return Ok(resource.clone());
+                }
+                self.receive_events().await?;
+            }
+        })
+        .await?
+    }
+
+    pub async fn wait_for_device(
+        &mut self,
+        fixture_id: Z2mFixtureDeviceId,
+    ) -> TestResult<ResourceRecord> {
+        let mac_address = fixture_id.mac_address();
+        self.wait_for_resource(|events| find_device(events, &mac_address))
+            .await
+    }
+
+    pub async fn wait_for_light(
+        &mut self,
+        fixture_id: Z2mFixtureDeviceId,
+    ) -> TestResult<ResourceRecord> {
+        let mac_address = fixture_id.mac_address();
+        self.wait_for_resource(|events| {
+            find_device(events, &mac_address).and_then(|device| {
+                if let Resource::Device(device) = &device.obj {
+                    let light_service = device.light_service()?;
+                    find_resource_by_link(events, *light_service)
+                } else {
+                    None
+                }
+            })
+        })
+        .await
+    }
+
+    async fn receive_events(&mut self) -> TestResult<Vec<Event>> {
+        let blocks = self.hue_events.recv().await?;
+        let mut events = Vec::new();
+        for block in blocks {
+            self.received_hue_events.push(block.event.clone());
+            events.push(block.event);
+        }
+        Ok(events)
     }
 
     pub async fn wait_for_event_add(&mut self, rtype: RType) -> TestResult<ResourceRecord> {
         timeout(Duration::from_secs(2), async {
             loop {
-                let blocks = self.events.recv().await?;
-                for block in blocks {
-                    let Event::Add(add) = block.event else {
+                for event in &self.received_hue_events {
+                    let Event::Add(add) = event else {
                         continue;
                     };
-                    if let Some(object) = add
-                        .data
-                        .into_iter()
-                        .find(|record| record.obj.rtype() == rtype)
+                    if let Some(object) = add.data.iter().find(|record| record.obj.rtype() == rtype)
                     {
-                        return Ok(object);
+                        return Ok(object.clone());
                     }
                 }
+                self.receive_events().await?;
             }
         })
         .await?
@@ -186,18 +238,50 @@ impl TestBridge {
     pub async fn wait_for_event_update(&mut self, id: Uuid) -> TestResult<ObjectUpdate> {
         timeout(Duration::from_secs(2), async {
             loop {
-                let blocks = self.events.recv().await?;
-                for block in blocks {
-                    let Event::Update(update) = block.event else {
+                for event in &self.received_hue_events {
+                    let Event::Update(update) = event else {
                         continue;
                     };
 
-                    if let Some(object) = update.data.into_iter().find(|object| object.id == id) {
-                        return Ok(object);
+                    if let Some(object) = update.data.iter().find(|object| object.id == id) {
+                        return Ok(object.clone());
                     }
                 }
+                self.receive_events().await?;
             }
         })
         .await?
     }
+}
+
+fn added_resources(events: &[Event]) -> impl Iterator<Item = &ResourceRecord> {
+    events
+        .iter()
+        .filter_map(|event| match event {
+            Event::Add(add) => Some(add.data.iter()),
+            _ => None,
+        })
+        .flatten()
+}
+
+fn find_resource_by_link(events: &[Event], link: ResourceLink) -> Option<&ResourceRecord> {
+    added_resources(events)
+        .find(|resource| resource.id == link.rid && resource.obj.rtype() == link.rtype)
+}
+
+fn find_device<'a>(events: &'a [Event], mac_address: &str) -> Option<&'a ResourceRecord> {
+    match find_zigbee_connectivity(events, mac_address) {
+        Some(zc) if zc.owner.rtype == RType::Device => find_resource_by_link(events, zc.owner),
+        _ => None,
+    }
+}
+
+fn find_zigbee_connectivity<'a>(
+    events: &'a [Event],
+    mac_address: &str,
+) -> Option<&'a ZigbeeConnectivity> {
+    added_resources(events).find_map(|resource| match &resource.obj {
+        Resource::ZigbeeConnectivity(zc) if zc.mac_address == mac_address => Some(zc),
+        _ => None,
+    })
 }

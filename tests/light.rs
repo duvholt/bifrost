@@ -10,8 +10,10 @@ use crate::common::{
 
 pub mod common;
 
+const LAMP: Z2mFixtureDeviceId = Z2mFixtureDeviceId(1);
+
 fn z2m_state() -> BTreeMap<String, Value> {
-    let lamp = fixture::ikea::tradfri_warm_white(Z2mFixtureDeviceId(1), "lamp").with_state(json!({
+    let lamp = fixture::ikea::tradfri_warm_white(LAMP, "lamp").with_state(json!({
         "state": "OFF",
         "brightness": 100
     }));
@@ -50,12 +52,7 @@ async fn get_lights() -> TestResult<()> {
 async fn turn_on_light() -> TestResult<()> {
     let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
-    test_bridge
-        .wait_for_event_add(hue::api::RType::Light)
-        .await?;
-
-    let lights = test_bridge.hue_client.get_lights().await?;
-    let light_id = lights.data[0].id;
+    let light_id = test_bridge.wait_for_light(LAMP).await?.id;
 
     test_bridge.clear_events();
     test_bridge.z2m.clear_requests();
@@ -88,12 +85,7 @@ async fn turn_on_light() -> TestResult<()> {
 async fn turn_on_light_with_manual_z2m() -> TestResult<()> {
     let mut test_bridge = TestBridge::start_with_z2m_mode(z2m_state(), M2mMode::Manual).await?;
 
-    test_bridge
-        .wait_for_event_add(hue::api::RType::Light)
-        .await?;
-
-    let lights = test_bridge.hue_client.get_lights().await?;
-    let light_id = lights.data[0].id;
+    let light_id = test_bridge.wait_for_light(LAMP).await?.id;
 
     test_bridge.clear_events();
     test_bridge.z2m.clear_requests();

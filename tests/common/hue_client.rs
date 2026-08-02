@@ -60,7 +60,8 @@ impl HueClient {
             .http_client
             .get(format!("{base_url}/eventstream/clip/v2"))
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
 
         let _ = ready_tx.send(());
         let mut event_stream = response.bytes_stream().eventsource();

@@ -175,6 +175,19 @@ impl Z2mFixtureDeviceId {
     }
 
     #[must_use]
+    pub fn mac_address(self) -> String {
+        format!(
+            "02:00:00:00:00:00:{}",
+            self.0
+                .to_be_bytes()
+                .into_iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<Vec<_>>()
+                .join(":")
+        )
+    }
+
+    #[must_use]
     pub const fn network_address(self) -> u16 {
         self.0
     }
