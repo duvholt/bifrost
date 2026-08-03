@@ -100,10 +100,14 @@ async fn turn_on_light_with_manual_z2m() -> TestResult<()> {
         .expect_request("lamp/set", json!({"state": "ON"}))
         .await?;
 
+    test_bridge.expect_no_events().await?;
+
     test_bridge.z2m.send("lamp", json!({"state": "ON"}))?;
 
     let update = test_bridge.wait_for_event_update(light_id).await?;
     assert_eq!(update.data["on"], json!({"on": true}));
+
+    test_bridge.expect_no_events().await?;
 
     Ok(())
 }

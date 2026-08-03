@@ -46,7 +46,9 @@ impl TestZ2m {
     }
 
     pub async fn next_request(&mut self) -> TestResult<RawMessage> {
-        Ok(timeout(Self::TIMEOUT, self.observed_requests_rx.recv()).await??)
+        Ok(timeout(Self::TIMEOUT, self.observed_requests_rx.recv())
+            .await
+            .map_err(|_| TestError::Z2mRequestTimeout)??)
     }
 
     pub async fn expect_request(&mut self, topic: &str, payload: Value) -> TestResult<()> {
@@ -72,7 +74,8 @@ impl TestZ2m {
             }
             Ok::<_, TestError>(requests)
         })
-        .await??;
+        .await
+        .map_err(|_| TestError::Z2mRequestTimeout)??;
 
         if unordered_eq(&expected, &actual) {
             Ok(())

@@ -21,7 +21,7 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::common::fixture::Z2mFixtureDeviceId;
-use crate::common::{HueClient, TestResult, TestZ2m, create_m2m_service};
+use crate::common::{HueClient, TestError, TestResult, TestZ2m, create_m2m_service};
 
 pub struct TestBridge {
     pub hue_url: Url,
@@ -165,6 +165,17 @@ impl TestBridge {
         self.received_hue_events.clear();
     }
 
+    pub async fn expect_no_events(&mut self) -> TestResult<()> {
+        match timeout(Duration::from_millis(100), async {
+            self.receive_events().await
+        })
+        .await
+        {
+            Ok(events) => Err(TestError::UnexpectedHueEvents(events?)),
+            Err(_) => Ok(()),
+        }
+    }
+
     async fn wait_for_resource<F>(&mut self, func: F) -> TestResult<ResourceRecord>
     where
         F: Fn(&[Event]) -> Option<&ResourceRecord> + Send + Sync,
@@ -177,7 +188,8 @@ impl TestBridge {
                 self.receive_events().await?;
             }
         })
-        .await?
+        .await
+        .map_err(|_| TestError::HueEventTimeout("resource".to_string()))?
     }
 
     pub async fn wait_for_device(
@@ -232,7 +244,8 @@ impl TestBridge {
                 self.receive_events().await?;
             }
         })
-        .await?
+        .await
+        .map_err(|_| TestError::HueEventTimeout(format!("add {rtype:?}")))?
     }
 
     pub async fn wait_for_event_update(&mut self, id: Uuid) -> TestResult<ObjectUpdate> {
@@ -250,7 +263,8 @@ impl TestBridge {
                 self.receive_events().await?;
             }
         })
-        .await?
+        .await
+        .map_err(|_| TestError::HueEventTimeout(format!("update {id:?}")))?
     }
 }
 

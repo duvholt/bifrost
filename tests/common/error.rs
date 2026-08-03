@@ -1,5 +1,5 @@
 use bifrost::error::ApiError;
-use hue::event::EventBlock;
+use hue::event::{Event, EventBlock};
 use svc::error::SvcError;
 use thiserror::Error;
 use z2m::api::RawMessage;
@@ -28,9 +28,6 @@ pub enum TestError {
     EventStreamError(#[from] eventsource_stream::EventStreamError<reqwest::Error>),
 
     #[error(transparent)]
-    Elapsed(#[from] tokio::time::error::Elapsed),
-
-    #[error(transparent)]
     HueEventSend(#[from] tokio::sync::broadcast::error::SendError<Vec<EventBlock>>),
 
     #[error(transparent)]
@@ -47,5 +44,14 @@ pub enum TestError {
         expected: Vec<RawMessage>,
         actual: Vec<RawMessage>,
     },
+
+    #[error("timeout waiting for Hue event: {0}")]
+    HueEventTimeout(String),
+
+    #[error("timeout waiting for z2m request")]
+    Z2mRequestTimeout,
+
+    #[error("unexpected Hue events: {0:?}")]
+    UnexpectedHueEvents(Vec<Event>),
 }
 pub type TestResult<T> = Result<T, TestError>;
