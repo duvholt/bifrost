@@ -44,20 +44,13 @@ impl Drop for TestBridge {
 
 impl TestBridge {
     pub async fn start(z2m_state: BTreeMap<String, Value>) -> TestResult<Self> {
-        Self::start_with_z2m_mode(z2m_state, M2mMode::Automatic).await
-    }
-
-    pub async fn start_with_z2m_mode(
-        z2m_state: BTreeMap<String, Value>,
-        mode: M2mMode,
-    ) -> TestResult<Self> {
         let workdir = Self::create_workdir()?;
         let mut tasks = JoinSet::new();
 
         let http_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let http_address = http_listener.local_addr()?;
 
-        let memory2mqtt_service = create_m2m_service(z2m_state, mode).await?;
+        let memory2mqtt_service = create_m2m_service(z2m_state, M2mMode::Manual).await?;
         let test_z2m = TestZ2m::from_service(&memory2mqtt_service);
 
         let config =

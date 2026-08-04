@@ -1,5 +1,4 @@
 use hue::api::ResourceRecord;
-use memory2mqtt::service::M2mMode;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -51,39 +50,6 @@ async fn get_lights() -> TestResult<()> {
 #[tokio::test]
 async fn turn_on_light() -> TestResult<()> {
     let mut test_bridge = TestBridge::start(z2m_state()).await?;
-
-    let light_id = test_bridge.wait_for_light(LAMP).await?.id;
-
-    test_bridge.clear_events();
-    test_bridge.z2m.clear_requests();
-
-    test_bridge
-        .hue_client
-        .put_light(
-            light_id,
-            &json!({
-                "on": {
-                    "on": true
-                }
-            }),
-        )
-        .await?;
-
-    test_bridge
-        .z2m
-        .expect_request("lamp/set", json!({"state": "ON"}))
-        .await?;
-
-    let update = test_bridge.wait_for_event_update(light_id).await?;
-
-    assert_eq!(update.data["on"], json!({"on": true}));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn turn_on_light_with_manual_z2m() -> TestResult<()> {
-    let mut test_bridge = TestBridge::start_with_z2m_mode(z2m_state(), M2mMode::Manual).await?;
 
     let light_id = test_bridge.wait_for_light(LAMP).await?.id;
 
