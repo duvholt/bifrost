@@ -1,4 +1,6 @@
-use std::{collections::BTreeMap, net::Ipv4Addr, time::Duration};
+use std::collections::BTreeMap;
+use std::net::Ipv4Addr;
+use std::time::Duration;
 
 use bifrost::config::Memory2MqttConfig;
 use memory2mqtt::service::{M2mMode, Memory2MqttService};
@@ -7,6 +9,59 @@ use tokio::{sync::broadcast, time::timeout};
 use z2m::api::RawMessage;
 
 use crate::common::{TestError, TestResult};
+
+const TIMEOUT: Duration = Duration::from_secs(2);
+
+pub struct Z2mRequests {
+    receiver: broadcast::Receiver<RawMessage>,
+}
+
+impl Z2mRequests {
+    const fn new(receiver: broadcast::Receiver<RawMessage>) -> Self {
+        Self { receiver }
+    }
+}
+
+impl Z2mRequests {
+    pub async fn next_request(&mut self) -> TestResult<RawMessage> {
+        Ok(timeout(TIMEOUT, self.receiver.recv())
+            .await
+            .map_err(|_| TestError::Z2mRequestTimeout)??)
+    }
+
+    pub async fn expect_request(&mut self, topic: &str, payload: Value) -> TestResult<()> {
+        self.expect_requests_unordered([(topic, payload)]).await
+    }
+
+    pub async fn expect_requests_unordered<I, S>(&mut self, expected: I) -> TestResult<()>
+    where
+        I: IntoIterator<Item = (S, Value)>,
+        S: Into<String>,
+    {
+        let expected: Vec<_> = expected
+            .into_iter()
+            .map(|(topic, payload)| RawMessage {
+                topic: topic.into(),
+                payload,
+            })
+            .collect();
+        let actual = timeout(TIMEOUT, async {
+            let mut requests = Vec::with_capacity(expected.len());
+            for _ in 0..expected.len() {
+                requests.push(self.next_request().await?);
+            }
+            Ok::<_, TestError>(requests)
+        })
+        .await
+        .map_err(|_| TestError::Z2mRequestTimeout)??;
+
+        if unordered_eq(&expected, &actual) {
+            Ok(())
+        } else {
+            Err(TestError::UnexpectedZ2mRequests { expected, actual })
+        }
+    }
+}
 
 pub struct TestZ2m {
     websocket_tx: broadcast::Sender<RawMessage>,
@@ -31,8 +86,6 @@ pub async fn create_m2m_service(
 }
 
 impl TestZ2m {
-    const TIMEOUT: Duration = Duration::from_secs(2);
-
     #[must_use]
     pub fn from_service(service: &Memory2MqttService) -> Self {
         Self {
@@ -41,50 +94,11 @@ impl TestZ2m {
         }
     }
 
-    pub fn clear_requests(&mut self) {
-        while self.observed_requests_rx.try_recv().is_ok() {}
+    pub fn subscribe_requests(&mut self) -> Z2mRequests {
+        Z2mRequests::new(self.observed_requests_rx.resubscribe())
     }
 
-    pub async fn next_request(&mut self) -> TestResult<RawMessage> {
-        Ok(timeout(Self::TIMEOUT, self.observed_requests_rx.recv())
-            .await
-            .map_err(|_| TestError::Z2mRequestTimeout)??)
-    }
-
-    pub async fn expect_request(&mut self, topic: &str, payload: Value) -> TestResult<()> {
-        self.expect_requests_unordered([(topic, payload)]).await
-    }
-
-    pub async fn expect_requests_unordered<I, S>(&mut self, expected: I) -> TestResult<()>
-    where
-        I: IntoIterator<Item = (S, Value)>,
-        S: Into<String>,
-    {
-        let expected: Vec<_> = expected
-            .into_iter()
-            .map(|(topic, payload)| RawMessage {
-                topic: topic.into(),
-                payload,
-            })
-            .collect();
-        let actual = timeout(Self::TIMEOUT, async {
-            let mut requests = Vec::with_capacity(expected.len());
-            for _ in 0..expected.len() {
-                requests.push(self.next_request().await?);
-            }
-            Ok::<_, TestError>(requests)
-        })
-        .await
-        .map_err(|_| TestError::Z2mRequestTimeout)??;
-
-        if unordered_eq(&expected, &actual) {
-            Ok(())
-        } else {
-            Err(TestError::UnexpectedZ2mRequests { expected, actual })
-        }
-    }
-
-    pub fn send(&self, topic: impl Into<String>, payload: Value) -> TestResult<()> {
+    pub fn publish(&self, topic: impl Into<String>, payload: Value) -> TestResult<()> {
         self.websocket_tx.send(RawMessage {
             topic: topic.into(),
             payload,

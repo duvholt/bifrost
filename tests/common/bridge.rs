@@ -2,7 +2,7 @@ use bifrost::backend::z2m::Z2mServiceTemplate;
 use bifrost::config::AppConfig;
 use bifrost::server::{self, Protocol, appstate::AppState, http::HttpServer};
 use hue::api::{RType, Resource, ResourceLink, ResourceRecord, ZigbeeConnectivity};
-use hue::event::{Event, EventBlock, ObjectUpdate};
+use hue::event::{Event, EventBlock};
 use memory2mqtt::service::M2mMode;
 use serde_json::Value;
 use serde_json::json;
@@ -153,22 +153,6 @@ impl TestBridge {
         }))?)
     }
 
-    pub fn clear_events(&mut self) {
-        self.hue_events = self.hue_events.resubscribe();
-        self.received_hue_events.clear();
-    }
-
-    pub async fn expect_no_events(&mut self) -> TestResult<()> {
-        match timeout(Duration::from_millis(100), async {
-            self.receive_events().await
-        })
-        .await
-        {
-            Ok(events) => Err(TestError::UnexpectedHueEvents(events?)),
-            Err(_) => Ok(()),
-        }
-    }
-
     async fn wait_for_resource<F>(&mut self, func: F) -> TestResult<ResourceRecord>
     where
         F: Fn(&[Event]) -> Option<&ResourceRecord> + Send + Sync,
@@ -239,25 +223,6 @@ impl TestBridge {
         })
         .await
         .map_err(|_| TestError::HueEventTimeout(format!("add {rtype:?}")))?
-    }
-
-    pub async fn wait_for_event_update(&mut self, id: Uuid) -> TestResult<ObjectUpdate> {
-        timeout(Duration::from_secs(2), async {
-            loop {
-                for event in &self.received_hue_events {
-                    let Event::Update(update) = event else {
-                        continue;
-                    };
-
-                    if let Some(object) = update.data.iter().find(|object| object.id == id) {
-                        return Ok(object.clone());
-                    }
-                }
-                self.receive_events().await?;
-            }
-        })
-        .await
-        .map_err(|_| TestError::HueEventTimeout(format!("update {id:?}")))?
     }
 }
 

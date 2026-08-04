@@ -53,27 +53,26 @@ async fn turn_on_light() -> TestResult<()> {
 
     let light_id = test_bridge.wait_for_light(LAMP).await?.id;
 
-    test_bridge.clear_events();
-    test_bridge.z2m.clear_requests();
+    let mut z2m_requests = test_bridge.z2m.subscribe_requests();
+    let mut hue_events = test_bridge.hue_client.subscribe_events();
 
     test_bridge
         .hue_client
         .put_light(light_id, &json!({"on": {"on": true}}))
         .await?;
 
-    test_bridge
-        .z2m
+    z2m_requests
         .expect_request("lamp/set", json!({"state": "ON"}))
         .await?;
 
-    test_bridge.expect_no_events().await?;
+    hue_events.expect_quiet().await?;
 
-    test_bridge.z2m.send("lamp", json!({"state": "ON"}))?;
+    test_bridge.z2m.publish("lamp", json!({"state": "ON"}))?;
 
-    let update = test_bridge.wait_for_event_update(light_id).await?;
+    let update = hue_events.expect_update(light_id).await?;
     assert_eq!(update.data["on"], json!({"on": true}));
 
-    test_bridge.expect_no_events().await?;
+    hue_events.expect_quiet().await?;
 
     Ok(())
 }

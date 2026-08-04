@@ -1,11 +1,77 @@
+use std::time::Duration;
+
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
-use hue::{api::ResourceRecord, event::EventBlock};
+use hue::{
+    api::ResourceRecord,
+    event::{Event, EventBlock, ObjectUpdate},
+};
 use reqwest::Client;
 use serde_json::Value;
-use tokio::sync::{broadcast::Sender, oneshot};
+use tokio::{
+    sync::{
+        broadcast::{self, Sender},
+        oneshot,
+    },
+    time::timeout,
+};
+use uuid::Uuid;
 
-use crate::common::{HueClipResponse, TestResult};
+use crate::common::{HueClipResponse, TestError, TestResult};
+
+pub struct HueEvents {
+    receiver: broadcast::Receiver<Vec<EventBlock>>,
+    pending: Vec<Event>,
+}
+
+impl HueEvents {
+    pub const fn new(receiver: broadcast::Receiver<Vec<EventBlock>>) -> Self {
+        Self {
+            receiver,
+            pending: Vec::new(),
+        }
+    }
+
+    pub async fn expect_quiet(&mut self) -> TestResult<()> {
+        match timeout(Duration::from_millis(100), async {
+            self.receive_events().await
+        })
+        .await
+        {
+            Ok(events) => Err(TestError::UnexpectedHueEvents(events?)),
+            Err(_) => Ok(()),
+        }
+    }
+
+    async fn receive_events(&mut self) -> TestResult<Vec<Event>> {
+        let blocks = self.receiver.recv().await?;
+        let mut events = Vec::new();
+        for block in blocks {
+            self.pending.push(block.event.clone());
+            events.push(block.event);
+        }
+        Ok(events)
+    }
+
+    pub async fn expect_update(&mut self, id: Uuid) -> TestResult<ObjectUpdate> {
+        timeout(Duration::from_secs(2), async {
+            loop {
+                for event in &self.pending {
+                    let Event::Update(update) = event else {
+                        continue;
+                    };
+
+                    if let Some(object) = update.data.iter().find(|object| object.id == id) {
+                        return Ok(object.clone());
+                    }
+                }
+                self.receive_events().await?;
+            }
+        })
+        .await
+        .map_err(|_| TestError::HueEventTimeout(format!("update {id:?}")))?
+    }
+}
 
 #[derive(Clone)]
 pub struct HueClient {
@@ -22,6 +88,11 @@ impl HueClient {
             events_sender,
             http_client: Client::new(),
         }
+    }
+
+    #[must_use]
+    pub fn subscribe_events(&self) -> HueEvents {
+        HueEvents::new(self.events_sender.subscribe())
     }
 
     pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> TestResult<T> {
