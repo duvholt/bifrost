@@ -4,24 +4,28 @@ use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use hue::{
     api::ResourceRecord,
-    event::{Event, EventBlock, ObjectUpdate},
+    event::{Event, EventBlock, ObjectDelete, ObjectUpdate},
 };
 use reqwest::Client;
 use serde_json::Value;
-use tokio::{
-    sync::{
-        broadcast::{self, Sender},
-        oneshot,
-    },
-    time::timeout,
-};
-use uuid::Uuid;
+use tokio::sync::{broadcast, oneshot};
+use tokio::time::timeout;
 
+use crate::common::bridge::{TestLight, TestResource};
 use crate::common::{HueClipResponse, TestError, TestResult};
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug)]
+pub enum TestHueEvent {
+    Add(ResourceRecord),
+    Update(ObjectUpdate),
+    Delete(ObjectDelete),
+    Error(),
+}
 
 pub struct HueEvents {
     receiver: broadcast::Receiver<Vec<EventBlock>>,
-    pending: Vec<Event>,
+    pending: Vec<TestHueEvent>,
 }
 
 impl HueEvents {
@@ -33,6 +37,9 @@ impl HueEvents {
     }
 
     pub async fn expect_quiet(&mut self) -> TestResult<()> {
+        if !self.pending.is_empty() {
+            return Err(TestError::UnexpectedHueEvents(self.pending.clone()));
+        }
         match timeout(Duration::from_millis(100), async {
             self.receive_events().await
         })
@@ -43,46 +50,65 @@ impl HueEvents {
         }
     }
 
-    async fn receive_events(&mut self) -> TestResult<Vec<Event>> {
+    async fn receive_events(&mut self) -> TestResult<Vec<TestHueEvent>> {
         let blocks = self.receiver.recv().await?;
         let mut events = Vec::new();
         for block in blocks {
-            self.pending.push(block.event.clone());
-            events.push(block.event);
+            let block_events: Vec<TestHueEvent> = match block.event {
+                Event::Add(add) => add.data.into_iter().map(TestHueEvent::Add).collect(),
+                Event::Update(update) => {
+                    update.data.into_iter().map(TestHueEvent::Update).collect()
+                }
+                Event::Delete(delete) => {
+                    delete.data.into_iter().map(TestHueEvent::Delete).collect()
+                }
+                Event::Error(_error) => vec![TestHueEvent::Error()],
+            };
+
+            events.extend(block_events);
         }
+        self.pending.extend(events.clone());
         Ok(events)
     }
 
-    pub async fn expect_update(&mut self, id: Uuid) -> TestResult<ObjectUpdate> {
+    #[allow(clippy::suspicious_operation_groupings)]
+    pub async fn expect_update(
+        &mut self,
+        resource: &(impl TestResource + Sync),
+    ) -> TestResult<ObjectUpdate> {
+        let resource_link = resource.link();
         timeout(Duration::from_secs(2), async {
             loop {
-                for event in &self.pending {
-                    let Event::Update(update) = event else {
-                        continue;
-                    };
-
-                    if let Some(object) = update.data.iter().find(|object| object.id == id) {
-                        return Ok(object.clone());
+                let position = self.pending.iter().position(|event| match event {
+                    TestHueEvent::Update(update) => {
+                        update.id == resource_link.rid && update.rtype == resource_link.rtype
                     }
+                    _ => false,
+                });
+
+                if let Some(position) = position
+                    && let TestHueEvent::Update(update) = self.pending.remove(position)
+                {
+                    return Ok(update);
                 }
                 self.receive_events().await?;
             }
         })
         .await
-        .map_err(|_| TestError::HueEventTimeout(format!("update {id:?}")))?
+        .map_err(|_| TestError::HueEventTimeout(format!("update {resource_link:?}")))?
     }
 }
 
 #[derive(Clone)]
 pub struct HueClient {
     base_url: String,
-    events_sender: Sender<Vec<EventBlock>>,
+    events_sender: broadcast::Sender<Vec<EventBlock>>,
     http_client: Client,
 }
 
 impl HueClient {
     #[must_use]
-    pub fn new(base_url: String, events_sender: Sender<Vec<EventBlock>>) -> Self {
+    pub fn new(base_url: String, events_sender: broadcast::Sender<Vec<EventBlock>>) -> Self {
         Self {
             base_url,
             events_sender,
@@ -116,13 +142,12 @@ impl HueClient {
             .await
     }
 
-    pub async fn put_light(
-        &self,
-        light_id: impl std::fmt::Display,
-        value: &Value,
-    ) -> TestResult<()> {
-        self.put(&format!("/clip/v2/resource/light/{light_id}"), value)
-            .await
+    pub async fn put_light(&self, light: &TestLight, value: &Value) -> TestResult<()> {
+        self.put(
+            &format!("/clip/v2/resource/light/{}", light.link.rid),
+            value,
+        )
+        .await
     }
 
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {

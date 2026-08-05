@@ -8,7 +8,7 @@ use serde_json::Value;
 use tokio::{sync::broadcast, time::timeout};
 use z2m::api::RawMessage;
 
-use crate::common::{TestError, TestResult};
+use crate::common::{TestError, TestResult, bridge::TestZ2mDevice};
 
 const TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -29,8 +29,13 @@ impl Z2mRequests {
             .map_err(|_| TestError::Z2mRequestTimeout)??)
     }
 
-    pub async fn expect_request(&mut self, topic: &str, payload: Value) -> TestResult<()> {
-        self.expect_requests_unordered([(topic, payload)]).await
+    pub async fn expect_set(
+        &mut self,
+        device: &(impl TestZ2mDevice + Sync),
+        payload: Value,
+    ) -> TestResult<()> {
+        self.expect_requests_unordered([(format!("{}/set", device.topic()), payload)])
+            .await
     }
 
     pub async fn expect_requests_unordered<I, S>(&mut self, expected: I) -> TestResult<()>
@@ -94,13 +99,15 @@ impl TestZ2m {
         }
     }
 
-    pub fn subscribe_requests(&mut self) -> Z2mRequests {
+    #[must_use]
+    pub fn subscribe_requests(&self) -> Z2mRequests {
         Z2mRequests::new(self.observed_requests_rx.resubscribe())
     }
 
-    pub fn publish(&self, topic: impl Into<String>, payload: Value) -> TestResult<()> {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn publish(&self, device: &impl TestZ2mDevice, payload: Value) -> TestResult<()> {
         self.websocket_tx.send(RawMessage {
-            topic: topic.into(),
+            topic: device.topic(),
             payload,
         })?;
         Ok(())

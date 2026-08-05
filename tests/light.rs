@@ -4,15 +4,18 @@ use std::collections::BTreeMap;
 
 use crate::common::{
     HueClipResponse, TestBridge, TestResult,
-    fixture::{self, Z2mFixture, Z2mFixtureDeviceId, Z2mGroupFixture},
+    fixture::{self, FixtureDevice, Z2mFixture, Z2mGroupFixture},
 };
 
 pub mod common;
 
-const LAMP: Z2mFixtureDeviceId = Z2mFixtureDeviceId(1);
+const LAMP: FixtureDevice = FixtureDevice {
+    id: 1,
+    friendly_name: "lamp",
+};
 
 fn z2m_state() -> BTreeMap<String, Value> {
-    let lamp = fixture::ikea::tradfri_warm_white(LAMP, "lamp").with_state(json!({
+    let lamp = fixture::ikea::tradfri_warm_white(&LAMP).with_state(json!({
         "state": "OFF",
         "brightness": 100
     }));
@@ -51,25 +54,25 @@ async fn get_lights() -> TestResult<()> {
 async fn turn_on_light() -> TestResult<()> {
     let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
-    let light_id = test_bridge.wait_for_light(LAMP).await?.id;
+    let light = test_bridge.wait_for_light(LAMP).await?;
 
     let mut z2m_requests = test_bridge.z2m.subscribe_requests();
     let mut hue_events = test_bridge.hue_client.subscribe_events();
 
     test_bridge
         .hue_client
-        .put_light(light_id, &json!({"on": {"on": true}}))
+        .put_light(&light, &json!({"on": {"on": true}}))
         .await?;
 
     z2m_requests
-        .expect_request("lamp/set", json!({"state": "ON"}))
+        .expect_set(&light, json!({"state": "ON"}))
         .await?;
 
     hue_events.expect_quiet().await?;
 
-    test_bridge.z2m.publish("lamp", json!({"state": "ON"}))?;
+    test_bridge.z2m.publish(&light, json!({"state": "ON"}))?;
 
-    let update = hue_events.expect_update(light_id).await?;
+    let update = hue_events.expect_update(&light).await?;
     assert_eq!(update.data["on"], json!({"on": true}));
 
     hue_events.expect_quiet().await?;

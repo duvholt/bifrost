@@ -1,8 +1,10 @@
 use bifrost::error::ApiError;
-use hue::event::{Event, EventBlock};
+use hue::event::EventBlock;
 use svc::error::SvcError;
 use thiserror::Error;
 use z2m::api::RawMessage;
+
+use crate::common::hue_client::TestHueEvent;
 
 #[derive(Error, Debug)]
 pub enum TestError {
@@ -52,6 +54,6 @@ pub enum TestError {
     Z2mRequestTimeout,
 
     #[error("unexpected Hue events: {0:?}")]
-    UnexpectedHueEvents(Vec<Event>),
+    UnexpectedHueEvents(Vec<TestHueEvent>),
 }
 pub type TestResult<T> = Result<T, TestError>;

@@ -139,7 +139,8 @@ pub struct Z2mDeviceFixture {
 
 impl Z2mDeviceFixture {
     #[must_use]
-    fn new(device_id: Z2mFixtureDeviceId, mut bridge_device: Value) -> Self {
+    fn new(device_id: &FixtureDevice, mut bridge_device: Value) -> Self {
+        bridge_device["friendly_name"] = Value::String(device_id.topic());
         bridge_device["ieee_address"] = Value::String(device_id.ieee_address());
         bridge_device["network_address"] = Value::Number(device_id.network_address().into());
         Self {
@@ -165,20 +166,23 @@ impl Z2mDeviceFixture {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Z2mFixtureDeviceId(pub u16);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixtureDevice {
+    pub id: u16,
+    pub friendly_name: &'static str,
+}
 
-impl Z2mFixtureDeviceId {
+impl FixtureDevice {
     #[must_use]
-    pub fn ieee_address(self) -> String {
-        format!("0x020000000000{:04x}", self.0)
+    pub fn ieee_address(&self) -> String {
+        format!("0x020000000000{:04x}", self.id)
     }
 
     #[must_use]
-    pub fn mac_address(self) -> String {
+    pub fn mac_address(&self) -> String {
         format!(
             "02:00:00:00:00:00:{}",
-            self.0
+            self.id
                 .to_be_bytes()
                 .into_iter()
                 .map(|b| format!("{b:02x}"))
@@ -188,8 +192,13 @@ impl Z2mFixtureDeviceId {
     }
 
     #[must_use]
-    pub const fn network_address(self) -> u16 {
-        self.0
+    pub const fn network_address(&self) -> u16 {
+        self.id
+    }
+
+    #[must_use]
+    pub fn topic(&self) -> String {
+        self.friendly_name.to_string()
     }
 }
 
@@ -199,10 +208,7 @@ pub mod ikea {
     use serde_json::json;
 
     #[must_use]
-    pub fn tradfri_warm_white(
-        device_id: Z2mFixtureDeviceId,
-        friendly_name: &str,
-    ) -> Z2mDeviceFixture {
+    pub fn tradfri_warm_white(device_id: &FixtureDevice) -> Z2mDeviceFixture {
         Z2mDeviceFixture::new(
             device_id,
             json!(
@@ -409,7 +415,7 @@ pub mod ikea {
                         "scenes": []
                     }
                 },
-                "friendly_name": friendly_name,
+                "friendly_name": "",
                 "ieee_address": "",
                 "interview_completed": true,
                 "interview_state": "SUCCESSFUL",

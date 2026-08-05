@@ -20,7 +20,7 @@ use tokio::time::timeout;
 use url::Url;
 use uuid::Uuid;
 
-use crate::common::fixture::Z2mFixtureDeviceId;
+use crate::common::fixture::FixtureDevice;
 use crate::common::{HueClient, TestError, TestResult, TestZ2m, create_m2m_service};
 
 pub struct TestBridge {
@@ -39,6 +39,32 @@ impl Drop for TestBridge {
         self.tasks.abort_all();
         self.manager_future.abort();
         let _ = std::fs::remove_dir_all(&self.workdir);
+    }
+}
+
+pub trait TestResource {
+    fn link(&self) -> ResourceLink;
+}
+
+pub trait TestZ2mDevice {
+    fn topic(&self) -> String;
+}
+
+#[derive(Clone)]
+pub struct TestLight {
+    pub link: ResourceLink,
+    pub fixture_id: FixtureDevice,
+}
+
+impl TestResource for TestLight {
+    fn link(&self) -> ResourceLink {
+        self.link
+    }
+}
+
+impl TestZ2mDevice for TestLight {
+    fn topic(&self) -> String {
+        self.fixture_id.topic()
     }
 }
 
@@ -153,14 +179,14 @@ impl TestBridge {
         }))?)
     }
 
-    async fn wait_for_resource<F>(&mut self, func: F) -> TestResult<ResourceRecord>
+    async fn wait_for_resource<F, R>(&mut self, func: F) -> TestResult<R>
     where
-        F: Fn(&[Event]) -> Option<&ResourceRecord> + Send + Sync,
+        F: Fn(&[Event]) -> Option<R> + Send + Sync,
     {
         timeout(Duration::from_secs(2), async {
             loop {
                 if let Some(resource) = func(&self.received_hue_events) {
-                    return Ok(resource.clone());
+                    return Ok(resource);
                 }
                 self.receive_events().await?;
             }
@@ -171,23 +197,23 @@ impl TestBridge {
 
     pub async fn wait_for_device(
         &mut self,
-        fixture_id: Z2mFixtureDeviceId,
+        fixture_id: FixtureDevice,
     ) -> TestResult<ResourceRecord> {
         let mac_address = fixture_id.mac_address();
-        self.wait_for_resource(|events| find_device(events, &mac_address))
+        self.wait_for_resource(|events| find_device(events, &mac_address).cloned())
             .await
     }
 
-    pub async fn wait_for_light(
-        &mut self,
-        fixture_id: Z2mFixtureDeviceId,
-    ) -> TestResult<ResourceRecord> {
+    pub async fn wait_for_light(&mut self, fixture_id: FixtureDevice) -> TestResult<TestLight> {
         let mac_address = fixture_id.mac_address();
         self.wait_for_resource(|events| {
             find_device(events, &mac_address).and_then(|device| {
                 if let Resource::Device(device) = &device.obj {
                     let light_service = device.light_service()?;
-                    find_resource_by_link(events, *light_service)
+                    find_resource_by_link(events, *light_service).map(|record| TestLight {
+                        link: ResourceLink::new(record.id, record.obj.rtype()),
+                        fixture_id: fixture_id.clone(),
+                    })
                 } else {
                     None
                 }
