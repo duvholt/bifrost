@@ -231,25 +231,6 @@ impl TestBridge {
         }
         Ok(events)
     }
-
-    pub async fn wait_for_event_add(&mut self, rtype: RType) -> TestResult<ResourceRecord> {
-        timeout(Duration::from_secs(2), async {
-            loop {
-                for event in &self.received_hue_events {
-                    let Event::Add(add) = event else {
-                        continue;
-                    };
-                    if let Some(object) = add.data.iter().find(|record| record.obj.rtype() == rtype)
-                    {
-                        return Ok(object.clone());
-                    }
-                }
-                self.receive_events().await?;
-            }
-        })
-        .await
-        .map_err(|_| TestError::HueEventTimeout(format!("add {rtype:?}")))?
-    }
 }
 
 fn added_resources(events: &[Event]) -> impl Iterator<Item = &ResourceRecord> {

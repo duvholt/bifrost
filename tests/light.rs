@@ -1,9 +1,8 @@
-use hue::api::ResourceRecord;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 use crate::common::{
-    HueClipResponse, TestBridge, TestResult,
+    TestBridge, TestResult,
     fixture::{self, FixtureDevice, Z2mFixture, Z2mGroupFixture},
 };
 
@@ -37,14 +36,9 @@ fn z2m_state() -> BTreeMap<String, Value> {
 async fn get_lights() -> TestResult<()> {
     let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
-    test_bridge
-        .wait_for_event_add(hue::api::RType::Light)
-        .await?;
+    test_bridge.wait_for_light(LAMP).await?;
 
-    let lights = test_bridge
-        .hue_client
-        .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
-        .await?;
+    let lights = test_bridge.hue_client.get_lights().await?;
 
     assert_eq!(lights.data.len(), 1);
     Ok(())
