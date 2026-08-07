@@ -3,7 +3,7 @@ use std::time::Duration;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use hue::{
-    api::ResourceRecord,
+    api::{Light, ResourceRecord},
     event::{Event, EventBlock, ObjectDelete, ObjectUpdate},
 };
 use reqwest::Client;
@@ -140,6 +140,26 @@ impl HueClient {
     pub async fn get_lights(&self) -> TestResult<HueClipResponse<ResourceRecord>> {
         self.get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
             .await
+    }
+
+    pub async fn get_light(&self, light: &TestLight) -> TestResult<Light> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/light/{}",
+                light.link.rid,
+            ))
+            .await?
+            .data;
+
+        let lights: Vec<_> = data
+            .into_iter()
+            .map(|r| match r.obj {
+                hue::api::Resource::Light(light) => light,
+                _ => panic!("expected light resource"),
+            })
+            .collect();
+        assert_eq!(lights.len(), 1);
+        Ok(*lights[0].clone())
     }
 
     pub async fn put_light(&self, light: &TestLight, value: &Value) -> TestResult<()> {

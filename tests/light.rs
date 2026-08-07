@@ -1,3 +1,4 @@
+use hue::api::On;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -46,15 +47,17 @@ async fn get_lights() -> TestResult<()> {
 
 #[tokio::test]
 async fn turn_on_light() -> TestResult<()> {
-    let mut test_bridge = TestBridge::start(z2m_state()).await?;
+    let mut test = TestBridge::start(z2m_state()).await?;
 
-    let light = test_bridge.wait_for_light(LAMP).await?;
+    let light = test.wait_for_light(LAMP).await?;
 
-    let mut z2m_requests = test_bridge.z2m.subscribe_requests();
-    let mut hue_events = test_bridge.hue_client.subscribe_events();
+    let light_response = test.hue_client.get_light(&light).await?;
+    assert_eq!(light_response.on, On::new(false));
 
-    test_bridge
-        .hue_client
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
         .put_light(&light, &json!({"on": {"on": true}}))
         .await?;
 
@@ -64,12 +67,12 @@ async fn turn_on_light() -> TestResult<()> {
 
     hue_events.expect_quiet().await?;
 
-    test_bridge.z2m.publish(&light, json!({"state": "ON"}))?;
+    test.z2m.publish(&light, json!({"state": "ON"}))?;
 
     let update = hue_events.expect_update(&light).await?;
     assert_eq!(update.data["on"], json!({"on": true}));
-
-    hue_events.expect_quiet().await?;
+    let light_response = test.hue_client.get_light(&light).await?;
+    assert_eq!(light_response.on, On::new(true));
 
     Ok(())
 }
