@@ -1,6 +1,6 @@
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fs::File, path::PathBuf};
 
 pub struct Z2mFixture {
     devices: Vec<Z2mDeviceFixture>,
@@ -132,6 +132,7 @@ pub struct Z2mSceneFixture {
     pub name: String,
 }
 
+#[derive(Debug)]
 pub struct Z2mDeviceFixture {
     pub bridge_device: Value,
     pub initial_state: Option<Value>,
@@ -202,232 +203,67 @@ impl FixtureDevice {
     }
 }
 
+fn json_file(filename: &str) -> Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("common")
+        .join("fixtures")
+        .join(filename);
+    let file = File::open(path).unwrap_or_else(|_| panic!("unable to open file {filename}"));
+    serde_json::from_reader(file).unwrap_or_else(|_| panic!("unable to parse file {filename}"))
+}
+
 #[allow(clippy::too_many_lines)]
 pub mod ikea {
     use super::*;
-    use serde_json::json;
 
     #[must_use]
     pub fn tradfri_warm_white(device_id: &FixtureDevice) -> Z2mDeviceFixture {
-        Z2mDeviceFixture::new(
-            device_id,
-            json!(
-                {
-                "date_code": "20240226",
-                "definition": {
-                    "description": "TRADFRI bulb E26/E27, warm white, globe, 806/810 lumen",
-                    "exposes": [
-                        {
-                            "features": [
-                                {
-                                    "access": 7,
-                                    "description": "On/off state of this light",
-                                    "label": "State",
-                                    "name": "state",
-                                    "property": "state",
-                                    "type": "binary",
-                                    "value_off": "OFF",
-                                    "value_on": "ON",
-                                    "value_toggle": "TOGGLE"
-                                },
-                                {
-                                    "access": 7,
-                                    "description": "Brightness of this light",
-                                    "label": "Brightness",
-                                    "name": "brightness",
-                                    "property": "brightness",
-                                    "type": "numeric",
-                                    "value_max": 254,
-                                    "value_min": 0
-                                },
-                                {
-                                    "access": 7,
-                                    "description": "Configure genLevelCtrl",
-                                    "features": [
-                                        {
-                                            "access": 7,
-                                            "description": "this setting can affect the \"on_level\", \"current_level_startup\" or \"brightness\" setting",
-                                            "label": "Execute if off",
-                                            "name": "execute_if_off",
-                                            "property": "execute_if_off",
-                                            "type": "binary",
-                                            "value_off": false,
-                                            "value_on": true
-                                        },
-                                        {
-                                            "access": 7,
-                                            "description": "Defines the desired startup level for a device when it is supplied with power",
-                                            "label": "Current level startup",
-                                            "name": "current_level_startup",
-                                            "presets": [
-                                                {
-                                                    "description": "Use minimum permitted value",
-                                                    "name": "minimum",
-                                                    "value": "minimum"
-                                                },
-                                                {
-                                                    "description": "Use previous value",
-                                                    "name": "previous",
-                                                    "value": "previous"
-                                                }
-                                            ],
-                                            "property": "current_level_startup",
-                                            "type": "numeric",
-                                            "value_max": 254,
-                                            "value_min": 1
-                                        }
-                                    ],
-                                    "label": "Level config",
-                                    "name": "level_config",
-                                    "property": "level_config",
-                                    "type": "composite"
-                                }
-                            ],
-                            "type": "light"
-                        },
-                        {
-                            "access": 2,
-                            "description": "Triggers an effect on the light (e.g. make light blink for a few seconds)",
-                            "label": "Effect",
-                            "name": "effect",
-                            "property": "effect",
-                            "type": "enum",
-                            "values": [
-                                "blink",
-                                "breathe",
-                                "okay",
-                                "channel_change",
-                                "finish_effect",
-                                "stop_effect"
-                            ]
-                        },
-                        {
-                            "access": 7,
-                            "category": "config",
-                            "description": "Controls the behavior when the device is powered on after power loss",
-                            "label": "Power-on behavior",
-                            "name": "power_on_behavior",
-                            "property": "power_on_behavior",
-                            "type": "enum",
-                            "values": [
-                                "off",
-                                "on",
-                                "toggle",
-                                "previous"
-                            ]
-                        },
-                        {
-                            "access": 2,
-                            "category": "config",
-                            "description": "Initiate device identification",
-                            "label": "Identify",
-                            "name": "identify",
-                            "property": "identify",
-                            "type": "enum",
-                            "values": [
-                                "identify"
-                            ]
-                        },
-                        {
-                            "access": 1,
-                            "category": "diagnostic",
-                            "description": "Link quality (signal strength)",
-                            "label": "Linkquality",
-                            "name": "linkquality",
-                            "property": "linkquality",
-                            "type": "numeric",
-                            "unit": "lqi",
-                            "value_max": 255,
-                            "value_min": 0
-                        }
-                    ],
-                    "model": "LED2103G5",
-                    "options": [
-                        {
-                            "access": 2,
-                            "description": "Controls the transition time (in seconds) of on/off, brightness, color temperature (if applicable) and color (if applicable) changes. Defaults to `0` (no transition).",
-                            "label": "Transition",
-                            "name": "transition",
-                            "property": "transition",
-                            "type": "numeric",
-                            "value_min": 0,
-                            "value_step": 0.1
-                        },
-                        {
-                            "access": 2,
-                            "description": "Sets the duration of the identification procedure in seconds (i.e., how long the device would flash).The value ranges from 1 to 30 seconds (default: 3).",
-                            "label": "Identify timeout",
-                            "name": "identify_timeout",
-                            "property": "identify_timeout",
-                            "type": "numeric",
-                            "value_max": 30,
-                            "value_min": 1
-                        },
-                        {
-                            "access": 2,
-                            "description": "State actions will also be published as 'action' when true (default false).",
-                            "label": "State action",
-                            "name": "state_action",
-                            "property": "state_action",
-                            "type": "binary",
-                            "value_off": false,
-                            "value_on": true
-                        }
-                    ],
-                    "source": "native",
-                    "supports_ota": true,
-                    "vendor": "IKEA",
-                    "version": "0.0.0"
-                },
-                "disabled": false,
-                "endpoints": {
-                    "1": {
-                        "bindings": [],
-                        "clusters": {
-                            "input": [
-                                "genBasic",
-                                "genIdentify",
-                                "genGroups",
-                                "genScenes",
-                                "genOnOff",
-                                "genLevelCtrl",
-                                "touchlink",
-                                "manuSpecificIkeaUnknown"
-                            ],
-                            "output": [
-                                "genOta"
-                            ]
-                        },
-                        "configured_reportings": [],
-                        "scenes": []
-                    },
-                    "242": {
-                        "bindings": [],
-                        "clusters": {
-                            "input": [
-                                "greenPower"
-                            ],
-                            "output": [
-                                "greenPower"
-                            ]
-                        },
-                        "configured_reportings": [],
-                        "scenes": []
-                    }
-                },
-                "friendly_name": "",
-                "ieee_address": "",
-                "interview_completed": true,
-                "interview_state": "SUCCESSFUL",
-                "interviewing": false,
-                "manufacturer": "IKEA of Sweden",
-                "model_id": "TRADFRI bulb E27 WW globe 806lm",
-                "network_address": 0,
-                "power_source": "Mains (single phase)",
-                "software_build_id": "1.0.42",
-                "supported": true,
-                "type": "Router"
-            }),
-        )
+        Z2mDeviceFixture::new(device_id, json_file("ikea/warm_white.json"))
+    }
+
+    #[must_use]
+    pub fn tradfri_color(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("ikea/color.json"))
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+pub mod hue {
+    use super::*;
+
+    #[must_use]
+    pub fn white_ambience(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("hue/white_ambiance.json"))
+    }
+
+    #[must_use]
+    pub fn flux_lightstrip(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("hue/flux_lightstrip.json"))
+    }
+
+    #[must_use]
+    pub fn play_gradient_lightstrip(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("hue/play_gradient_lightstrip.json"))
+    }
+
+    #[must_use]
+    pub fn dimmer_switch(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("hue/dimmer_switch_gen1.json"))
+    }
+
+    #[must_use]
+    pub fn friends_of_hue_switch(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("hue/friends_of_hue.json"))
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+pub mod misc {
+    use super::*;
+
+    #[must_use]
+    pub fn dimmer_light(device_id: &FixtureDevice) -> Z2mDeviceFixture {
+        Z2mDeviceFixture::new(device_id, json_file("dimmer_light.json"))
     }
 }

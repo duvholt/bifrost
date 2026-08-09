@@ -38,7 +38,7 @@ impl HueEventStream {
         Self {
             timestamp: Utc::now(),
             index: 0,
-            hue_updates: Sender::new(32),
+            hue_updates: Sender::new(buffer_capacity),
             buffer: VecDeque::with_capacity(buffer_capacity),
         }
     }

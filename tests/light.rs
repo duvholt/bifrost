@@ -1,47 +1,332 @@
-use hue::api::On;
-use serde_json::{Value, json};
-use std::collections::BTreeMap;
-
-use crate::common::{
-    TestBridge, TestResult,
-    fixture::{self, FixtureDevice, Z2mFixture, Z2mGroupFixture},
+use hue::api::{
+    ColorGamut, ColorTemperature, ColorTemperatureUpdate, ContentConfiguration,
+    ContentConfigurationOrder, ContentConfigurationOrientation, ContentConfigurationStatusType,
+    DeviceArchetype, Dimming, DimmingUpdate, GamutType, Identify, Light, LightAlert, LightColor,
+    LightDynamics, LightDynamicsStatus, LightEffects, LightEffectsV2, LightFunction, LightGradient,
+    LightGradientMode, LightMetadata, LightMode, LightPowerup, LightPowerupColor,
+    LightPowerupDimming, LightPowerupOn, LightPowerupPreset, LightProductData, LightSignal,
+    LightSignaling, LightTimedEffect, LightTimedEffects, MirekSchema, On, OrderType,
+    OrientationType, RType, ResourceLink, Stub,
 };
+use hue::xy::XY;
+#[cfg(test)]
+use pretty_assertions::assert_eq;
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::common::fixture::{self, FixtureDevice, Z2mFixture, Z2mGroupFixture};
+use crate::common::{TestBridge, TestResult};
 
 pub mod common;
 
-const LAMP: FixtureDevice = FixtureDevice {
+const IKEA_WARM_WHITE: FixtureDevice = FixtureDevice {
     id: 1,
-    friendly_name: "lamp",
+    friendly_name: "ikea_warm_white",
 };
 
+const IKEA_COLOR: FixtureDevice = FixtureDevice {
+    id: 2,
+    friendly_name: "ikea_color",
+};
+
+const HUE_WHITE_AMBIANCE: FixtureDevice = FixtureDevice {
+    id: 3,
+    friendly_name: "hue_white_ambiance",
+};
+
+const HUE_FLUX_LIGHTSTRIP: FixtureDevice = FixtureDevice {
+    id: 4,
+    friendly_name: "hue_flux_lightstrip",
+};
+
+const HUE_PLAY_GRADIENT_LIGHTSTRIP: FixtureDevice = FixtureDevice {
+    id: 5,
+    friendly_name: "hue_play_gradient_lightstrip",
+};
+
+const MISC_DIMMER_LIGHT: FixtureDevice = FixtureDevice {
+    id: 6,
+    friendly_name: "misc_dimmer_light",
+};
+
+fn expected_dimmable_light(
+    owner: ResourceLink,
+    fixture: &FixtureDevice,
+    archetype: DeviceArchetype,
+    on: bool,
+    brightnes: f64,
+) -> Light {
+    Light {
+        owner,
+        metadata: LightMetadata {
+            name: fixture.friendly_name.to_string(),
+            archetype,
+            function: Some(LightFunction::Decorative),
+            fixed_mired: None,
+        },
+        product_data: Some(LightProductData {
+            function: Some(LightFunction::Decorative),
+        }),
+        alert: Some(LightAlert {
+            action_values: BTreeSet::from(["breathe".to_string()]),
+        }),
+        color: None,
+        color_temperature: None,
+        color_temperature_delta: Some(Stub),
+        content_configuration: None,
+        dimming: Some(Dimming {
+            brightness: brightnes,
+            min_dim_level: Some(0.01),
+        }),
+        dimming_delta: Some(Stub),
+        dynamics: Some(LightDynamics {
+            status: LightDynamicsStatus::None,
+            status_values: vec![
+                LightDynamicsStatus::None,
+                LightDynamicsStatus::DynamicPalette,
+            ],
+            speed: 0.0,
+            speed_valid: false,
+        }),
+        effects: None,
+        effects_v2: None,
+        service_id: Some(0),
+        gradient: None,
+        identify: Identify {},
+        timed_effects: None,
+        mode: LightMode::Normal,
+        on: On::new(on),
+        powerup: Some(LightPowerup {
+            preset: LightPowerupPreset::Safety,
+            configured: true,
+            on: LightPowerupOn::On { on: On::new(true) },
+            dimming: LightPowerupDimming::Dimming {
+                dimming: DimmingUpdate { brightness: 100.0 },
+            },
+            color: LightPowerupColor::ColorTemperature {
+                color_temperature: ColorTemperatureUpdate::new(366),
+            },
+        }),
+        signaling: Some(LightSignaling {
+            signal_values: vec![
+                LightSignal::NoSignal,
+                LightSignal::OnOff,
+                LightSignal::OnOffColor,
+                LightSignal::Alternating,
+            ],
+            status: Value::Null,
+        }),
+    }
+}
+
+const fn color_temperature(mirek_minimum: u32, mirek_maximum: u32) -> ColorTemperature {
+    ColorTemperature {
+        mirek: None,
+        mirek_schema: MirekSchema {
+            mirek_minimum,
+            mirek_maximum,
+        },
+        mirek_valid: true,
+    }
+}
+
+const fn color() -> LightColor {
+    LightColor {
+        gamut: Some(ColorGamut::GAMUT_C),
+        gamut_type: GamutType::C,
+        xy: XY::D65_WHITE_POINT,
+    }
+}
+
+fn add_hue_effects(light: &mut Light) {
+    light.effects = Some(LightEffects::all());
+    light.effects_v2 = Some(LightEffectsV2::all());
+    light.timed_effects = Some(LightTimedEffects {
+        status_values: Vec::from(LightTimedEffect::ALL),
+        status: LightTimedEffect::NoEffect,
+        effect_values: Vec::from(LightTimedEffect::ALL),
+    });
+}
+
+fn add_gradient(light: &mut Light) {
+    light.content_configuration = Some(ContentConfiguration {
+        orientation: Some(ContentConfigurationOrientation {
+            configurable: true,
+            orientation: OrientationType::Horizontal,
+            status: ContentConfigurationStatusType::Set,
+        }),
+        order: Some(ContentConfigurationOrder {
+            configurable: true,
+            order: OrderType::Forward,
+            status: ContentConfigurationStatusType::Set,
+        }),
+    });
+    light.gradient = Some(LightGradient {
+        mode: LightGradientMode::InterpolatedPalette,
+        mode_values: BTreeSet::from([
+            LightGradientMode::InterpolatedPalette,
+            LightGradientMode::InterpolatedPaletteMirrored,
+            LightGradientMode::RandomPixelated,
+            LightGradientMode::SegmentedPalette,
+        ]),
+        points_capable: 5,
+        points: vec![],
+        pixel_count: 18,
+    });
+}
+
 fn z2m_state() -> BTreeMap<String, Value> {
-    let lamp = fixture::ikea::tradfri_warm_white(&LAMP).with_state(json!({
+    let ikea_warm_white = fixture::ikea::tradfri_warm_white(&IKEA_WARM_WHITE).with_state(json!({
         "state": "OFF",
-        "brightness": 100
+        "brightness": 127
+    }));
+
+    let ikea_color = fixture::ikea::tradfri_color(&IKEA_COLOR).with_state(json!({
+        "state": "OFF",
+        "brightness": 127
+    }));
+
+    let hue_white_ambiance = fixture::hue::white_ambience(&HUE_WHITE_AMBIANCE).with_state(json!({
+        "state": "OFF",
+        "brightness": 127
+    }));
+
+    let hue_flux_lightstrip =
+        fixture::hue::flux_lightstrip(&HUE_FLUX_LIGHTSTRIP).with_state(json!({
+            "state": "OFF",
+            "brightness": 127
+        }));
+
+    let hue_play_gradient_lightstrip =
+        fixture::hue::play_gradient_lightstrip(&HUE_PLAY_GRADIENT_LIGHTSTRIP).with_state(json!({
+            "state": "OFF",
+            "brightness": 127
+        }));
+
+    let misc_dimmer_light = fixture::misc::dimmer_light(&MISC_DIMMER_LIGHT).with_state(json!({
+        "state": "OFF",
+        "brightness": 127
     }));
 
     let living_room = Z2mGroupFixture::new(1, "livingroom")
-        .with_member(&lamp)
-        .with_scene(1, "Relax")
+        .with_member(&ikea_warm_white)
+        .with_member(&ikea_color)
+        .with_member(&hue_white_ambiance)
+        .with_member(&hue_flux_lightstrip)
+        .with_member(&hue_play_gradient_lightstrip)
+        .with_member(&misc_dimmer_light)
         .with_state(json!({
             "state": "OFF",
             "brightness": 100
         }));
 
-    let fixture = Z2mFixture::new().with_device(lamp).with_group(living_room);
+    let fixture = Z2mFixture::new()
+        .with_device(ikea_warm_white)
+        .with_device(ikea_color)
+        .with_device(hue_white_ambiance)
+        .with_device(hue_flux_lightstrip)
+        .with_device(hue_play_gradient_lightstrip)
+        .with_device(misc_dimmer_light)
+        .with_group(living_room);
 
     fixture.into_state()
 }
 
 #[tokio::test]
 async fn get_lights() -> TestResult<()> {
+    pretty_env_logger::formatted_builder()
+        .filter_level(log::LevelFilter::Debug)
+        .parse_default_env()
+        .init();
+
     let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
-    test_bridge.wait_for_light(LAMP).await?;
+    test_bridge.wait_for_light(IKEA_WARM_WHITE).await?;
+    test_bridge.wait_for_light(IKEA_COLOR).await?;
+    test_bridge.wait_for_light(HUE_FLUX_LIGHTSTRIP).await?;
+    test_bridge
+        .wait_for_light(HUE_PLAY_GRADIENT_LIGHTSTRIP)
+        .await?;
+    test_bridge.wait_for_light(HUE_WHITE_AMBIANCE).await?;
+    test_bridge.wait_for_light(MISC_DIMMER_LIGHT).await?;
 
-    let lights = test_bridge.hue_client.get_lights().await?;
+    let owner = ResourceLink::new(uuid::Uuid::nil(), RType::Device);
+    let mut lights: Vec<Light> = test_bridge
+        .hue_client
+        .get_lights()
+        .await?
+        .into_iter()
+        .map(|light| Light { owner, ..light })
+        .collect();
+    lights.sort_by(|a, b| a.metadata.name.cmp(&b.metadata.name));
 
-    assert_eq!(lights.data.len(), 1);
+    let mut hue_flux_lightstrip = expected_dimmable_light(
+        owner,
+        &HUE_FLUX_LIGHTSTRIP,
+        DeviceArchetype::HueLightstrip,
+        false,
+        50.0,
+    );
+    hue_flux_lightstrip.color = Some(color());
+    hue_flux_lightstrip.color_temperature = Some(color_temperature(50, 1000));
+    add_gradient(&mut hue_flux_lightstrip);
+    add_hue_effects(&mut hue_flux_lightstrip);
+
+    let mut hue_play_gradient_lightstrip = expected_dimmable_light(
+        owner,
+        &HUE_PLAY_GRADIENT_LIGHTSTRIP,
+        DeviceArchetype::HueLightstripTv,
+        false,
+        50.0,
+    );
+    hue_play_gradient_lightstrip.color = Some(color());
+    hue_play_gradient_lightstrip.color_temperature = Some(color_temperature(153, 500));
+    add_gradient(&mut hue_play_gradient_lightstrip);
+    add_hue_effects(&mut hue_play_gradient_lightstrip);
+
+    let mut hue_white_ambiance = expected_dimmable_light(
+        owner,
+        &HUE_WHITE_AMBIANCE,
+        DeviceArchetype::UnknownArchetype,
+        false,
+        50.0,
+    );
+    hue_white_ambiance.color_temperature = Some(color_temperature(153, 454));
+    add_hue_effects(&mut hue_white_ambiance);
+
+    let mut ikea_color = expected_dimmable_light(
+        owner,
+        &IKEA_COLOR,
+        DeviceArchetype::UnknownArchetype,
+        false,
+        50.0,
+    );
+    ikea_color.color = Some(color());
+    ikea_color.color_temperature = Some(color_temperature(250, 454));
+
+    let expected = vec![
+        hue_flux_lightstrip,
+        hue_play_gradient_lightstrip,
+        hue_white_ambiance,
+        ikea_color,
+        expected_dimmable_light(
+            owner,
+            &IKEA_WARM_WHITE,
+            DeviceArchetype::UnknownArchetype,
+            false,
+            50.0,
+        ),
+        expected_dimmable_light(
+            owner,
+            &MISC_DIMMER_LIGHT,
+            DeviceArchetype::UnknownArchetype,
+            false,
+            50.0,
+        ),
+    ];
+
+    assert_eq!(lights, expected);
+
     Ok(())
 }
 
@@ -49,7 +334,7 @@ async fn get_lights() -> TestResult<()> {
 async fn turn_on_light() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
 
-    let light = test.wait_for_light(LAMP).await?;
+    let light = test.wait_for_light(IKEA_WARM_WHITE).await?;
 
     let light_response = test.hue_client.get_light(&light).await?;
     assert_eq!(light_response.on, On::new(false));

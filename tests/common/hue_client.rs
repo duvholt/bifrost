@@ -137,9 +137,12 @@ impl HueClient {
         Ok(())
     }
 
-    pub async fn get_lights(&self) -> TestResult<HueClipResponse<ResourceRecord>> {
-        self.get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
-            .await
+    pub async fn get_lights(&self) -> TestResult<Vec<Light>> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
+            .await?
+            .data;
+        Ok(resource_records_to_lights(data))
     }
 
     pub async fn get_light(&self, light: &TestLight) -> TestResult<Light> {
@@ -151,15 +154,9 @@ impl HueClient {
             .await?
             .data;
 
-        let lights: Vec<_> = data
-            .into_iter()
-            .map(|r| match r.obj {
-                hue::api::Resource::Light(light) => light,
-                _ => panic!("expected light resource"),
-            })
-            .collect();
+        let lights = resource_records_to_lights(data);
         assert_eq!(lights.len(), 1);
-        Ok(*lights[0].clone())
+        Ok(lights[0].clone())
     }
 
     pub async fn put_light(&self, light: &TestLight, value: &Value) -> TestResult<()> {
@@ -195,4 +192,13 @@ impl HueClient {
 
         Ok(())
     }
+}
+
+fn resource_records_to_lights(data: Vec<ResourceRecord>) -> Vec<Light> {
+    data.into_iter()
+        .map(|r| match r.obj {
+            hue::api::Resource::Light(light) => *light,
+            _ => panic!("expected light resource"),
+        })
+        .collect()
 }

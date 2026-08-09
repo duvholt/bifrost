@@ -179,7 +179,7 @@ impl TestBridge {
         }))?)
     }
 
-    async fn wait_for_resource<F, R>(&mut self, func: F) -> TestResult<R>
+    async fn wait_for_resource<F, R>(&mut self, name: &str, func: F) -> TestResult<R>
     where
         F: Fn(&[Event]) -> Option<R> + Send + Sync,
     {
@@ -192,7 +192,7 @@ impl TestBridge {
             }
         })
         .await
-        .map_err(|_| TestError::HueEventTimeout("resource".to_string()))?
+        .map_err(|_| TestError::HueEventTimeout(format!("resource: {name}")))?
     }
 
     pub async fn wait_for_device(
@@ -200,13 +200,15 @@ impl TestBridge {
         fixture_id: FixtureDevice,
     ) -> TestResult<ResourceRecord> {
         let mac_address = fixture_id.mac_address();
-        self.wait_for_resource(|events| find_device(events, &mac_address).cloned())
-            .await
+        self.wait_for_resource(fixture_id.friendly_name, |events| {
+            find_device(events, &mac_address).cloned()
+        })
+        .await
     }
 
     pub async fn wait_for_light(&mut self, fixture_id: FixtureDevice) -> TestResult<TestLight> {
         let mac_address = fixture_id.mac_address();
-        self.wait_for_resource(|events| {
+        self.wait_for_resource(fixture_id.friendly_name, |events| {
             find_device(events, &mac_address).and_then(|device| {
                 if let Resource::Device(device) = &device.obj {
                     let light_service = device.light_service()?;

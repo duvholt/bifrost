@@ -1,0 +1,199 @@
+{
+    "date_code": "20190410",
+    "definition": {
+        "description": "Hue dimmer switch gen 1",
+        "exposes": [
+            {
+                "access": 1,
+                "category": "diagnostic",
+                "description": "Remaining battery in %, can take up to 24 hours before reported",
+                "label": "Battery",
+                "name": "battery",
+                "property": "battery",
+                "type": "numeric",
+                "unit": "%",
+                "value_max": 100,
+                "value_min": 0
+            },
+            {
+                "access": 1,
+                "category": "diagnostic",
+                "description": "Triggered action duration in seconds",
+                "label": "Action duration",
+                "name": "action_duration",
+                "property": "action_duration",
+                "type": "numeric",
+                "unit": "s"
+            },
+            {
+                "access": 1,
+                "category": "diagnostic",
+                "description": "Triggered action (e.g. a button click)",
+                "label": "Action",
+                "name": "action",
+                "property": "action",
+                "type": "enum",
+                "values": [
+                    "on_press",
+                    "on_press_release",
+                    "on_hold",
+                    "on_hold_release",
+                    "up_press",
+                    "up_press_release",
+                    "up_hold",
+                    "up_hold_release",
+                    "down_press",
+                    "down_press_release",
+                    "down_hold",
+                    "down_hold_release",
+                    "off_press",
+                    "off_press_release",
+                    "off_hold",
+                    "off_hold_release"
+                ]
+            },
+            {
+                "access": 1,
+                "category": "diagnostic",
+                "description": "Link quality (signal strength)",
+                "label": "Linkquality",
+                "name": "linkquality",
+                "property": "linkquality",
+                "type": "numeric",
+                "unit": "lqi",
+                "value_max": 255,
+                "value_min": 0
+            }
+        ],
+        "model": "324131092621",
+        "options": [
+            {
+                "access": 2,
+                "description": "Simulate a brightness value. If this device provides a brightness_move_up or brightness_move_down action it is possible to specify the update interval and delta. The action_brightness_delta indicates the delta for each interval.",
+                "features": [
+                    {
+                        "access": 2,
+                        "description": "Delta per interval, 20 by default",
+                        "label": "Delta",
+                        "name": "delta",
+                        "property": "delta",
+                        "type": "numeric",
+                        "value_min": 0
+                    },
+                    {
+                        "access": 2,
+                        "description": "Interval duration",
+                        "label": "Interval",
+                        "name": "interval",
+                        "property": "interval",
+                        "type": "numeric",
+                        "unit": "ms",
+                        "value_min": 0
+                    }
+                ],
+                "label": "Simulated brightness",
+                "name": "simulated_brightness",
+                "property": "simulated_brightness",
+                "type": "composite"
+            }
+        ],
+        "source": "native",
+        "supports_ota": true,
+        "vendor": "Philips",
+        "version": "0.0.0"
+    },
+    "disabled": false,
+    "endpoints": {
+        "1": {
+            "bindings": [
+                {
+                    "cluster": "genOnOff",
+                    "target": {
+                        "endpoint": 1,
+                        "ieee_address": "0x6c5cb1fffefa69c8",
+                        "type": "endpoint"
+                    }
+                },
+                {
+                    "cluster": "genLevelCtrl",
+                    "target": {
+                        "endpoint": 1,
+                        "ieee_address": "0x6c5cb1fffefa69c8",
+                        "type": "endpoint"
+                    }
+                }
+            ],
+            "clusters": {
+                "input": [
+                    "genBasic"
+                ],
+                "output": [
+                    "genBasic",
+                    "genIdentify",
+                    "genGroups",
+                    "genOnOff",
+                    "genLevelCtrl",
+                    "genScenes"
+                ]
+            },
+            "configured_reportings": [],
+            "name": "ep1",
+            "scenes": []
+        },
+        "2": {
+            "bindings": [
+                {
+                    "cluster": "manuSpecificPhilips",
+                    "target": {
+                        "endpoint": 1,
+                        "ieee_address": "0x6c5cb1fffefa69c8",
+                        "type": "endpoint"
+                    }
+                },
+                {
+                    "cluster": "genPowerCfg",
+                    "target": {
+                        "endpoint": 1,
+                        "ieee_address": "0x6c5cb1fffefa69c8",
+                        "type": "endpoint"
+                    }
+                }
+            ],
+            "clusters": {
+                "input": [
+                    "genBasic",
+                    "genPowerCfg",
+                    "genIdentify",
+                    "genBinaryInput",
+                    "manuSpecificPhilips"
+                ],
+                "output": [
+                    "genOta"
+                ]
+            },
+            "configured_reportings": [
+                {
+                    "attribute": "batteryPercentageRemaining",
+                    "cluster": "genPowerCfg",
+                    "maximum_report_interval": 65000,
+                    "minimum_report_interval": 3600,
+                    "reportable_change": 0
+                }
+            ],
+            "name": "ep2",
+            "scenes": []
+        }
+    },
+    "friendly_name": "",
+    "ieee_address": "",
+    "interview_completed": true,
+    "interview_state": "SUCCESSFUL",
+    "interviewing": false,
+    "manufacturer": "Philips",
+    "model_id": "RWL021",
+    "network_address": 0,
+    "power_source": "Battery",
+    "software_build_id": "6.1.1.28573",
+    "supported": true,
+    "type": "EndDevice"
+}
