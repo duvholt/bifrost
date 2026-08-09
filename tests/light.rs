@@ -350,7 +350,14 @@ async fn turn_on_light() -> TestResult<()> {
     test.z2m.publish(&light, json!({"state": "ON"}))?;
 
     let update = hue_events.expect_update(&light).await?;
-    assert_eq!(update.data["on"], json!({"on": true}));
+    assert_eq!(
+        update.data,
+        json!({
+            "owner": baseline.owner,
+            "service_id": baseline.service_id,
+            "on": {"on": true},
+        })
+    );
 
     let updated = test.hue_client.get_light(&light).await?;
     assert_eq!(
@@ -391,10 +398,14 @@ async fn change_brightness() -> TestResult<()> {
         .publish(&light, json!({"brightness": 63.5, "state":"ON"}))?;
 
     let update = hue_events.expect_update(&light).await?;
-    assert_eq!(update.data["on"], json!({"on": true}));
     assert_eq!(
-        update.data["dimming"],
-        json!({"brightness": 25.0, "min_dim_level": 0.01})
+        update.data,
+        json!({
+            "owner": baseline.owner,
+            "service_id": baseline.service_id,
+            "on": {"on": true},
+            "dimming": {"brightness": 25.0, "min_dim_level": 0.01},
+        })
     );
 
     let updated = test.hue_client.get_light(&light).await?;
