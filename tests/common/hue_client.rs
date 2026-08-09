@@ -40,7 +40,7 @@ impl HueEvents {
         if !self.pending.is_empty() {
             return Err(TestError::UnexpectedHueEvents(self.pending.clone()));
         }
-        match timeout(Duration::from_millis(100), async {
+        match timeout(Duration::from_millis(20), async {
             self.receive_events().await
         })
         .await
