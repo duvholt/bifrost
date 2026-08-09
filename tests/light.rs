@@ -530,3 +530,34 @@ async fn dimming_delta_down() -> TestResult<()> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn identify() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let light = test.wait_for_light(IKEA_COLOR).await?;
+    let baseline = test.hue_client.get_light(&light).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_light(
+            &light,
+            &json!({
+              "identify": {
+                "action": "identify"
+              }
+            }),
+        )
+        .await?;
+    z2m_requests
+        .expect_set(&light, json!({"effect": "breathe"}))
+        .await?;
+
+    hue_events.expect_quiet().await?;
+
+    // z2m doesn't report anything back for effects
+
+    let updated = test.hue_client.get_light(&light).await?;
+    assert_eq!(updated, baseline);
+    Ok(())
+}
