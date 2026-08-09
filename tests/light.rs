@@ -54,7 +54,7 @@ fn expected_dimmable_light(
     fixture: &FixtureDevice,
     archetype: DeviceArchetype,
     on: bool,
-    brightnes: f64,
+    brightness: f64,
 ) -> Light {
     Light {
         owner,
@@ -75,7 +75,7 @@ fn expected_dimmable_light(
         color_temperature_delta: Some(Stub),
         content_configuration: None,
         dimming: Some(Dimming {
-            brightness: brightnes,
+            brightness,
             min_dim_level: Some(0.01),
         }),
         dimming_delta: Some(Stub),
@@ -333,31 +333,81 @@ async fn get_lights() -> TestResult<()> {
 #[tokio::test]
 async fn turn_on_light() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
-
     let light = test.wait_for_light(IKEA_WARM_WHITE).await?;
-
-    let light_response = test.hue_client.get_light(&light).await?;
-    assert_eq!(light_response.on, On::new(false));
-
+    let baseline = test.hue_client.get_light(&light).await?;
+    assert_eq!(baseline.on, On::new(false));
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 
     test.hue_client
         .put_light(&light, &json!({"on": {"on": true}}))
         .await?;
-
     z2m_requests
         .expect_set(&light, json!({"state": "ON"}))
         .await?;
 
     hue_events.expect_quiet().await?;
-
     test.z2m.publish(&light, json!({"state": "ON"}))?;
 
     let update = hue_events.expect_update(&light).await?;
     assert_eq!(update.data["on"], json!({"on": true}));
-    let light_response = test.hue_client.get_light(&light).await?;
-    assert_eq!(light_response.on, On::new(true));
 
+    let updated = test.hue_client.get_light(&light).await?;
+    assert_eq!(
+        updated,
+        Light {
+            on: On::new(true),
+            ..baseline
+        }
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn change_brightness() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let light = test.wait_for_light(IKEA_COLOR).await?;
+    let baseline = test.hue_client.get_light(&light).await?;
+    assert_eq!(baseline.dimming.map(|d| d.brightness), Some(50.0));
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_light(
+            &light,
+            &json!({
+              "dimming": {
+                "brightness": 25
+              }
+            }),
+        )
+        .await?;
+    z2m_requests
+        .expect_set(&light, json!({"brightness": 63.5, "transition": 0.4}))
+        .await?;
+
+    hue_events.expect_quiet().await?;
+    test.z2m
+        .publish(&light, json!({"brightness": 63.5, "state":"ON"}))?;
+
+    let update = hue_events.expect_update(&light).await?;
+    assert_eq!(update.data["on"], json!({"on": true}));
+    assert_eq!(
+        update.data["dimming"],
+        json!({"brightness": 25.0, "min_dim_level": 0.01})
+    );
+
+    let updated = test.hue_client.get_light(&light).await?;
+    assert_eq!(
+        updated,
+        Light {
+            on: On::new(true),
+            dimming: Some(Dimming {
+                brightness: 25.0,
+                min_dim_level: Some(0.01),
+            }),
+            ..baseline
+        }
+    );
     Ok(())
 }
