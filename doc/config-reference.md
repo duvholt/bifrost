@@ -146,6 +146,16 @@ z2m:
     streaming_fps: 20
   ...
 
+# In-memory Zigbee2MQTT test server [optional!]
+#
+# This starts a local WebSocket server that mimics the Z2M topic/payload API.
+# Configure a regular z2m server above with `url: ws://127.0.0.1:18080/api`
+# to make Bifrost use it.
+memory2mqtt:
+  listen: 127.0.0.1:18080
+  # Optional initial state
+  state: {}
+
 # Rooms section [optional!]
 #
 # This section allows you to map zigbee2mqtt "friendly names" to

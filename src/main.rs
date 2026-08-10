@@ -7,6 +7,7 @@ use bifrost::server::appstate::AppState;
 use bifrost::server::http::HttpServer;
 use bifrost::server::mdns::MdnsService;
 use bifrost::server::{self, Protocol};
+use memory2mqtt::service::Memory2MqttService;
 use svc::manager::ServiceManager;
 use svc::manager::SvmClient;
 use svc::serviceid::ServiceId;
@@ -126,6 +127,12 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
 
     let svc = server::behavior_instance::BehaviorInstanceService::new(appstate.res.clone());
     mgr.register_service("behavior-instance", svc).await?;
+
+    // register z2m in memory emulator
+    if let Some(config) = appstate.config().memory2mqtt.clone() {
+        mgr.register_service("m2m", Memory2MqttService::new(config))
+            .await?;
+    }
 
     // register all z2m backends as services
     let template = backend::z2m::Z2mServiceTemplate::new(appstate.clone());

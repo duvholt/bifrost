@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::{collections::BTreeMap, num::NonZeroU32};
 
 use camino::Utf8PathBuf;
@@ -47,6 +47,15 @@ pub struct Z2mServer {
     pub streaming_fps: Option<NonZeroU32>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Memory2MqttConfig {
+    /// Address on which to expose the WebSocket API
+    pub listen: SocketAddr,
+    /// Initial state
+    #[serde(default)]
+    pub state: BTreeMap<String, serde_json::Value>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct RoomConfig {
     pub name: Option<String>,
@@ -60,6 +69,9 @@ pub struct AppConfig {
     pub bifrost: BifrostConfig,
     #[serde(default)]
     pub rooms: BTreeMap<String, RoomConfig>,
+    // Optional in-memory Zigbee2MQTT-compatible server for tests and local development
+    #[serde(default)]
+    pub memory2mqtt: Option<Memory2MqttConfig>,
 }
 
 impl Z2mServer {

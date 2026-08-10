@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -88,6 +88,22 @@ where
             server: None,
             svc,
             extra: (),
+            handle: Handle::new(),
+        }
+    }
+}
+
+impl<S, F> HttpServer<S, DefaultAcceptor, F, TcpListener>
+where
+    Self: Service,
+{
+    pub fn http_listener(addr: SocketAddr, listener: TcpListener, svc: S) -> Self {
+        Self {
+            addr,
+            bind: |slf| Ok(axum_server::from_tcp(slf.extra.try_clone()?)),
+            server: None,
+            svc,
+            extra: listener,
             handle: Handle::new(),
         }
     }
