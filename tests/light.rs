@@ -3,10 +3,11 @@ use hue::api::{
     ContentConfigurationOrder, ContentConfigurationOrientation, ContentConfigurationStatusType,
     DeviceArchetype, Dimming, DimmingUpdate, GamutType, Identify, Light, LightAlert, LightColor,
     LightDynamics, LightDynamicsStatus, LightEffect, LightEffectParameters, LightEffectStatus,
-    LightEffects, LightEffectsV2, LightFunction, LightGradient, LightGradientMode, LightMetadata,
-    LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
-    LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffect,
-    LightTimedEffects, MirekSchema, On, OrderType, OrientationType, RType, ResourceLink, Stub,
+    LightEffects, LightEffectsV2, LightFunction, LightGradient, LightGradientMode,
+    LightGradientPoint, LightMetadata, LightMode, LightPowerup, LightPowerupColor,
+    LightPowerupDimming, LightPowerupOn, LightPowerupPreset, LightProductData, LightSignal,
+    LightSignaling, LightTimedEffect, LightTimedEffects, MirekSchema, On, OrderType,
+    OrientationType, RType, ResourceLink, Stub,
 };
 use hue::xy::XY;
 #[cfg(test)]
@@ -731,6 +732,158 @@ async fn hue_timed_effects() -> TestResult<()> {
             timed_effects: baseline.timed_effects.map(|t| LightTimedEffects {
                 status: LightTimedEffect::Sunrise,
                 ..t
+            }),
+            ..baseline
+        }
+    );
+    Ok(())
+}
+
+#[tokio::test]
+#[allow(clippy::unreadable_literal, clippy::too_many_lines)]
+async fn gradient() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let light = test.wait_for_light(HUE_FLUX_LIGHTSTRIP).await?;
+    let baseline = test.hue_client.get_light(&light).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_light(
+            &light,
+            &json!(
+            {
+              "gradient": {
+                "mode": "interpolated_palette",
+                "points": [
+                  {
+                    "color": {
+                      "xy": {
+                        "x": 0.24830886446886452,
+                        "y": 0.10594871794871805
+                      }
+                    }
+                  },
+                  {
+                    "color": {
+                      "xy": {
+                        "x": 0.4463776541837811,
+                        "y": 0.20146154827394697
+                      }
+                    }
+                  },
+                  {
+                    "color": {
+                      "xy": {
+                        "x": 0.6616785347985349,
+                        "y": 0.3241021733821735
+                      }
+                    }
+                  },
+                  {
+                    "color": {
+                      "xy": {
+                        "x": 0.482289711059222,
+                        "y": 0.44590997007402094
+                      }
+                    }
+                  },
+                  {
+                    "color": {
+                      "xy": {
+                        "x": 0.3946169290977102,
+                        "y": 0.5072043233088303
+                      }
+                    }
+                  }
+                ]
+              },
+              "on": {
+                "on": true
+              }
+            }
+                                    ),
+        )
+        .await?;
+    z2m_requests
+        .expect_set(
+            &light,
+            json!(
+                {
+                    "command": {
+                        "cluster": 0xFC03,
+                        "command": 0,
+                        "payload": {"data": vec![81,1,1,1,0,19,80,0,0,0,104,213,32,183,105,62,104,110,100,128,26,138,151,24,157,40,0]}
+                    }
+                }
+            ),
+        )
+        .await?;
+
+    hue_events.expect_quiet().await?;
+    test.z2m.publish(
+        &light,
+        json!(
+            {
+                "philips_raw": "4b0101fe913fac1b135000000068d520b7693e686e64801a8a97189d2800"
+            }
+        ),
+    )?;
+
+    let updated = test.hue_client.get_light(&light).await?;
+    assert_eq!(
+        updated,
+        Light {
+            on: On::new(true),
+            dimming: baseline.dimming.map(|d| Dimming {
+                brightness: 100.0,
+                ..d
+            }),
+            color: baseline.color.map(|c| LightColor {
+                xy: XY::new(0.24831006332494088, 0.10809491111619746),
+                ..c
+            }),
+            effects_v2: baseline.effects_v2.map(|e| LightEffectsV2 {
+                status: LightEffectStatus {
+                    effect: LightEffect::NoEffect,
+                    parameters: Some(LightEffectParameters {
+                        color: None,
+                        color_temperature: None,
+                        speed: None,
+                    },),
+                    ..e.status
+                },
+                ..e
+            }),
+            gradient: baseline.gradient.map(|g| LightGradient {
+                points: vec![
+                    LightGradientPoint {
+                        color: ColorUpdate {
+                            xy: XY::new(0.2483088644688645, 0.10594871794871796,),
+                        },
+                    },
+                    LightGradientPoint {
+                        color: ColorUpdate {
+                            xy: XY::new(0.4462024175824176, 0.20140346764346764,),
+                        },
+                    },
+                    LightGradientPoint {
+                        color: ColorUpdate {
+                            xy: XY::new(0.6616785347985349, 0.3241021733821734,),
+                        },
+                    },
+                    LightGradientPoint {
+                        color: ColorUpdate {
+                            xy: XY::new(0.4822646153846154, 0.4457918437118437,),
+                        },
+                    },
+                    LightGradientPoint {
+                        color: ColorUpdate {
+                            xy: XY::new(0.3945312087912088, 0.5071411965811966,),
+                        },
+                    },
+                ],
+                ..g
             }),
             ..baseline
         }
