@@ -653,3 +653,87 @@ async fn hue_effects_v2() -> TestResult<()> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn hue_timed_effects() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let light = test.wait_for_light(HUE_FLUX_LIGHTSTRIP).await?;
+    let baseline = test.hue_client.get_light(&light).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_light(
+            &light,
+            &json!(
+            {
+                "on": {
+                    "on": true
+                },
+                "timed_effects": {
+                    "effect": "sunrise",
+                    "duration": 3000
+                }
+            }
+            ),
+        )
+        .await?;
+    z2m_requests
+        .expect_set(
+            &light,
+            json!(
+                {
+                    "command": {
+                        "cluster": 0xFC03,
+                        "command": 0,
+                        "payload": {"data": vec![177, 0, 1, 1, 0, 9, 249]}
+                    }
+                }
+            ),
+        )
+        .await?;
+
+    hue_events.expect_quiet().await?;
+    test.z2m.publish(
+        &light,
+        json!(
+            {
+                "philips_raw": "ab0001fe9172556809f9"
+            }
+        ),
+    )?;
+
+    let updated = test.hue_client.get_light(&light).await?;
+    assert_eq!(
+        updated,
+        Light {
+            on: On::new(true),
+            dimming: baseline.dimming.map(|d| Dimming {
+                brightness: 100.0,
+                ..d
+            }),
+            color: baseline.color.map(|c| LightColor {
+                xy: XY::new(0.447_531_853_208_209_4, 0.407_553_215_838_864_7),
+                ..c
+            }),
+            effects_v2: baseline.effects_v2.map(|e| LightEffectsV2 {
+                status: LightEffectStatus {
+                    effect: LightEffect::NoEffect,
+                    parameters: Some(LightEffectParameters {
+                        color: None,
+                        color_temperature: None,
+                        speed: None,
+                    },),
+                    ..e.status
+                },
+                ..e
+            }),
+            timed_effects: baseline.timed_effects.map(|t| LightTimedEffects {
+                status: LightTimedEffect::Sunrise,
+                ..t
+            }),
+            ..baseline
+        }
+    );
+    Ok(())
+}
