@@ -1,12 +1,12 @@
 use hue::api::{
-    ColorGamut, ColorTemperature, ColorTemperatureUpdate, ContentConfiguration,
+    ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, ContentConfiguration,
     ContentConfigurationOrder, ContentConfigurationOrientation, ContentConfigurationStatusType,
     DeviceArchetype, Dimming, DimmingUpdate, GamutType, Identify, Light, LightAlert, LightColor,
-    LightDynamics, LightDynamicsStatus, LightEffects, LightEffectsV2, LightFunction, LightGradient,
-    LightGradientMode, LightMetadata, LightMode, LightPowerup, LightPowerupColor,
-    LightPowerupDimming, LightPowerupOn, LightPowerupPreset, LightProductData, LightSignal,
-    LightSignaling, LightTimedEffect, LightTimedEffects, MirekSchema, On, OrderType,
-    OrientationType, RType, ResourceLink, Stub,
+    LightDynamics, LightDynamicsStatus, LightEffect, LightEffectParameters, LightEffectStatus,
+    LightEffects, LightEffectsV2, LightFunction, LightGradient, LightGradientMode, LightMetadata,
+    LightMode, LightPowerup, LightPowerupColor, LightPowerupDimming, LightPowerupOn,
+    LightPowerupPreset, LightProductData, LightSignal, LightSignaling, LightTimedEffect,
+    LightTimedEffects, MirekSchema, On, OrderType, OrientationType, RType, ResourceLink, Stub,
 };
 use hue::xy::XY;
 #[cfg(test)]
@@ -559,5 +559,97 @@ async fn identify() -> TestResult<()> {
 
     let updated = test.hue_client.get_light(&light).await?;
     assert_eq!(updated, baseline);
+    Ok(())
+}
+
+#[tokio::test]
+async fn hue_effects_v2() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let light = test.wait_for_light(HUE_FLUX_LIGHTSTRIP).await?;
+    let baseline = test.hue_client.get_light(&light).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_light(
+            &light,
+            &json!({
+              "effects_v2": {
+                "action": {
+                  "effect": "opal",
+                  "parameters": {
+                    "color": {
+                      "xy": {
+                        "x": 0.1,
+                        "y": 0.3
+                      }
+                    },
+                    "speed": 0.4
+                  }
+                }
+              }
+            }),
+        )
+        .await?;
+    z2m_requests
+        .expect_set(
+            &light,
+            json!(
+                {
+                    "command": {
+                        "cluster": 0xFC03,
+                        "command": 0,
+                        "payload": {"data": vec![184, 0, 153, 25, 204, 76, 1, 0, 11, 102]}
+                    }
+                }
+            ),
+        )
+        .await?;
+
+    hue_events.expect_quiet().await?;
+    test.z2m.publish(
+        &light,
+        json!(
+            {
+                "philips_raw": "ab0001fedf28674c0b66"
+            }
+        ),
+    )?;
+
+    let updated = test.hue_client.get_light(&light).await?;
+    assert_eq!(
+        updated,
+        Light {
+            on: On::new(true),
+            dimming: baseline.dimming.map(|d| Dimming {
+                brightness: 100.0,
+                ..d
+            }),
+            color: baseline.color.map(|c| LightColor {
+                xy: XY::new(0.159_655_146_105_134_65, 0.298_451_209_277_485_3),
+                ..c
+            }),
+            effects: baseline.effects.map(|e| LightEffects {
+                status: LightEffect::Opal,
+                ..e
+            }),
+            effects_v2: baseline.effects_v2.map(|e| LightEffectsV2 {
+                status: LightEffectStatus {
+                    effect: LightEffect::Opal,
+                    parameters: Some(LightEffectParameters {
+                        color: Some(ColorUpdate::new(XY::new(
+                            0.159_655_146_105_134_65,
+                            0.298_451_209_277_485_3
+                        ))),
+                        color_temperature: None,
+                        speed: Some(0.401_574_8),
+                    }),
+                    ..e.status
+                },
+                ..e
+            }),
+            ..baseline
+        }
+    );
     Ok(())
 }
