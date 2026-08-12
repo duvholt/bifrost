@@ -10,7 +10,7 @@ use crate::api::{
 use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct GroupedLight {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alert: Option<LightAlert>,

@@ -8,7 +8,7 @@ use serde_json::Value;
 use tokio::{sync::broadcast, time::timeout};
 use z2m::api::RawMessage;
 
-use crate::common::{TestError, TestResult, bridge::TestZ2mDevice};
+use crate::common::{TestError, TestResult, bridge::TestZ2mDeviceOrGroup};
 
 const TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -31,7 +31,7 @@ impl Z2mRequests {
 
     pub async fn expect_set(
         &mut self,
-        device: &(impl TestZ2mDevice + Sync),
+        device: &(impl TestZ2mDeviceOrGroup + Sync),
         payload: Value,
     ) -> TestResult<()> {
         self.expect_requests_unordered([(format!("{}/set", device.topic()), payload)])
@@ -105,7 +105,7 @@ impl TestZ2m {
     }
 
     #[allow(clippy::needless_pass_by_value)]
-    pub fn publish(&self, device: &impl TestZ2mDevice, payload: Value) -> TestResult<()> {
+    pub fn publish(&self, device: &impl TestZ2mDeviceOrGroup, payload: Value) -> TestResult<()> {
         self.websocket_tx.send(RawMessage {
             topic: device.topic(),
             payload,

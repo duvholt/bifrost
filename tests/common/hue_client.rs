@@ -3,7 +3,7 @@ use std::time::Duration;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use hue::{
-    api::{Light, ResourceRecord},
+    api::{GroupedLight, Light, ResourceRecord},
     event::{Event, EventBlock, ObjectDelete, ObjectUpdate},
 };
 use reqwest::Client;
@@ -11,7 +11,7 @@ use serde_json::Value;
 use tokio::sync::{broadcast, oneshot};
 use tokio::time::timeout;
 
-use crate::common::bridge::{TestLight, TestResource};
+use crate::common::bridge::{TestGroupedLight, TestLight, TestResource};
 use crate::common::{HueClipResponse, TestError, TestResult};
 
 #[allow(clippy::large_enum_variant)]
@@ -167,6 +167,40 @@ impl HueClient {
         .await
     }
 
+    pub async fn get_grouped_lights(&self) -> TestResult<Vec<GroupedLight>> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/grouped_light")
+            .await?
+            .data;
+        Ok(resource_records_to_grouped_lights(data))
+    }
+
+    pub async fn get_grouped_light(&self, light: &TestGroupedLight) -> TestResult<GroupedLight> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/grouped_light/{}",
+                light.link.rid,
+            ))
+            .await?
+            .data;
+
+        let lights = resource_records_to_grouped_lights(data);
+        assert_eq!(lights.len(), 1);
+        Ok(lights[0].clone())
+    }
+
+    pub async fn put_grouped_light(
+        &self,
+        light: &TestGroupedLight,
+        value: &Value,
+    ) -> TestResult<()> {
+        self.put(
+            &format!("/clip/v2/resource/grouped_light/{}", light.link.rid),
+            value,
+        )
+        .await
+    }
+
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {
         let base_url = &self.base_url;
         let response = self
@@ -199,6 +233,15 @@ fn resource_records_to_lights(data: Vec<ResourceRecord>) -> Vec<Light> {
         .map(|r| match r.obj {
             hue::api::Resource::Light(light) => *light,
             _ => panic!("expected light resource"),
+        })
+        .collect()
+}
+
+fn resource_records_to_grouped_lights(data: Vec<ResourceRecord>) -> Vec<GroupedLight> {
+    data.into_iter()
+        .map(|r| match r.obj {
+            hue::api::Resource::GroupedLight(grouped_light) => grouped_light,
+            _ => panic!("expected grouped light resource"),
         })
         .collect()
 }

@@ -1,7 +1,9 @@
 use bifrost::backend::z2m::Z2mServiceTemplate;
 use bifrost::config::AppConfig;
 use bifrost::server::{self, Protocol, appstate::AppState, http::HttpServer};
-use hue::api::{RType, Resource, ResourceLink, ResourceRecord, ZigbeeConnectivity};
+use hue::api::{
+    Group, RType, Resource, ResourceLink, ResourceRecord, Room, ZigbeeConnectivity, Zone,
+};
 use hue::event::{Event, EventBlock};
 use memory2mqtt::service::M2mMode;
 use serde_json::Value;
@@ -20,7 +22,7 @@ use tokio::time::timeout;
 use url::Url;
 use uuid::Uuid;
 
-use crate::common::fixture::FixtureDevice;
+use crate::common::fixture::{FixtureDevice, FixtureGroup};
 use crate::common::{HueClient, TestError, TestResult, TestZ2m, create_m2m_service};
 
 pub struct TestBridge {
@@ -46,7 +48,7 @@ pub trait TestResource {
     fn link(&self) -> ResourceLink;
 }
 
-pub trait TestZ2mDevice {
+pub trait TestZ2mDeviceOrGroup {
     fn topic(&self) -> String;
 }
 
@@ -62,9 +64,27 @@ impl TestResource for TestLight {
     }
 }
 
-impl TestZ2mDevice for TestLight {
+impl TestZ2mDeviceOrGroup for TestLight {
     fn topic(&self) -> String {
         self.fixture_id.topic()
+    }
+}
+
+#[derive(Clone)]
+pub struct TestGroupedLight {
+    pub link: ResourceLink,
+    pub fixture_group: FixtureGroup,
+}
+
+impl TestResource for TestGroupedLight {
+    fn link(&self) -> ResourceLink {
+        self.link
+    }
+}
+
+impl TestZ2mDeviceOrGroup for TestGroupedLight {
+    fn topic(&self) -> String {
+        self.fixture_group.topic()
     }
 }
 
@@ -224,6 +244,28 @@ impl TestBridge {
         .await
     }
 
+    pub async fn wait_for_grouped_light(
+        &mut self,
+        fixture_group: FixtureGroup,
+    ) -> TestResult<TestGroupedLight> {
+        self.wait_for_resource(fixture_group.friendly_name, |events| {
+            if let Some(room) = find_room(events, fixture_group.friendly_name) {
+                return room.grouped_light_service().map(|&link| TestGroupedLight {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            if let Some(zone) = find_zone(events, fixture_group.friendly_name) {
+                return zone.grouped_light_service().map(|&link| TestGroupedLight {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            None
+        })
+        .await
+    }
+
     async fn receive_events(&mut self) -> TestResult<Vec<Event>> {
         let blocks = self.hue_events.recv().await?;
         let mut events = Vec::new();
@@ -263,6 +305,20 @@ fn find_zigbee_connectivity<'a>(
 ) -> Option<&'a ZigbeeConnectivity> {
     added_resources(events).find_map(|resource| match &resource.obj {
         Resource::ZigbeeConnectivity(zc) if zc.mac_address == mac_address => Some(zc),
+        _ => None,
+    })
+}
+
+fn find_room<'a>(events: &'a [Event], room_name: &str) -> Option<&'a Room> {
+    added_resources(events).find_map(|resource| match &resource.obj {
+        Resource::Room(room) if room.metadata.name == room_name => Some(room),
+        _ => None,
+    })
+}
+
+fn find_zone<'a>(events: &'a [Event], zone_name: &str) -> Option<&'a Zone> {
+    added_resources(events).find_map(|resource| match &resource.obj {
+        Resource::Zone(zone) if zone.metadata.name == zone_name => Some(zone),
         _ => None,
     })
 }
