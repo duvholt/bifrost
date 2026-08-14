@@ -564,6 +564,7 @@ async fn identify() -> TestResult<()> {
 }
 
 #[tokio::test]
+#[allow(clippy::unreadable_literal)]
 async fn hue_effects_v2() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
     let light = test.wait_for_light(HUE_FLUX_LIGHTSTRIP).await?;
@@ -612,6 +613,13 @@ async fn hue_effects_v2() -> TestResult<()> {
         &light,
         json!(
             {
+                "state": "ON",
+                "brightness": 254,
+                "color_mode": "xy",
+                "color": {
+                    "x": 0.15965514610513465,
+                    "y": 0.2984512092774853
+                },
                 "philips_raw": "ab0001fedf28674c0b66"
             }
         ),
@@ -627,7 +635,7 @@ async fn hue_effects_v2() -> TestResult<()> {
                 ..d
             }),
             color: baseline.color.map(|c| LightColor {
-                xy: XY::new(0.159_655_146_105_134_65, 0.298_451_209_277_485_3),
+                xy: XY::new(0.15965514610513465, 0.2984512092774853),
                 ..c
             }),
             effects: baseline.effects.map(|e| LightEffects {
@@ -639,11 +647,11 @@ async fn hue_effects_v2() -> TestResult<()> {
                     effect: LightEffect::Opal,
                     parameters: Some(LightEffectParameters {
                         color: Some(ColorUpdate::new(XY::new(
-                            0.159_655_146_105_134_65,
-                            0.298_451_209_277_485_3
+                            0.15965514610513465,
+                            0.2984512092774853
                         ))),
                         color_temperature: None,
-                        speed: Some(0.401_574_8),
+                        speed: Some(0.4015748),
                     }),
                     ..e.status
                 },
@@ -699,6 +707,13 @@ async fn hue_timed_effects() -> TestResult<()> {
         &light,
         json!(
             {
+                "state": "ON",
+                "brightness": 254,
+                "color_mode": "xy",
+                "color": {
+                    "x": 0.447_531_853_208_209_4,
+                    "y": 0.407_553_215_838_864_7
+                },
                 "philips_raw": "ab0001fe9172556809f9"
             }
         ),
@@ -825,6 +840,13 @@ async fn gradient() -> TestResult<()> {
         &light,
         json!(
             {
+                "state": "ON",
+                "brightness": 254,
+                "color_mode": "xy",
+                "color": {
+                    "x": 0.24831006332494088,
+                    "y": 0.10809491111619746
+                },
                 "philips_raw": "4b0101fe913fac1b135000000068d520b7693e686e64801a8a97189d2800"
             }
         ),

@@ -199,28 +199,6 @@ impl ExtractDeviceProductData for DeviceProductData {
 
 impl From<&DeviceUpdate> for LightUpdate {
     fn from(value: &DeviceUpdate) -> Self {
-        if let Some(philips_raw) = &value.philips_raw {
-            match hex::decode(&philips_raw)
-                .map_err(HueError::from)
-                .and_then(|data| {
-                    let mut cur = Cursor::new(data);
-                    HueZigbeeUpdate::from_reader(&mut cur)
-                }) {
-                Ok(hz) => {
-                    let upd = hz.into();
-                    log::trace!(
-                        "Converted Philips raw update to light update {philips_raw} {upd:#?}"
-                    );
-                    return upd;
-                }
-                Err(err) => {
-                    log::error!(
-                        "Failed to parse Philips Hue raw update {philips_raw}: {err}. Falling back to using z2m data"
-                    );
-                }
-            }
-        }
-
         let mut upd = Self::new()
             .with_on(value.state.map(Into::into))
             .with_brightness(value.brightness.map(|b| b / 254.0 * 100.0))
@@ -237,6 +215,34 @@ impl From<&DeviceUpdate> for LightUpdate {
 
         if value.color_mode != Some(DeviceColorMode::ColorTemp) {
             upd = upd.with_color_xy(value.color.and_then(|col| col.xy));
+        }
+
+        if let Some(philips_raw) = &value.philips_raw {
+            match hex::decode(philips_raw)
+                .map_err(HueError::from)
+                .and_then(|data| {
+                    let mut cur = Cursor::new(data);
+                    HueZigbeeUpdate::from_reader(&mut cur)
+                }) {
+                Ok(hz) => {
+                    let mut hz_upd: Self = hz.into();
+                    log::trace!(
+                        "Converted Philips raw update to light update {philips_raw} {hz_upd:#?}"
+                    );
+                    // z2m reports the end state of light transitions more correctly than zigbee attribute reads
+                    // otherwise we can end up displaying a light as off when it has just been turned on
+                    hz_upd.on = upd.on;
+                    hz_upd.dimming = upd.dimming;
+                    hz_upd.color_temperature = upd.color_temperature;
+                    hz_upd.color = upd.color;
+                    return hz_upd;
+                }
+                Err(err) => {
+                    log::error!(
+                        "Failed to parse Philips Hue raw update {philips_raw}: {err}. Falling back to using z2m data"
+                    );
+                }
+            }
         }
 
         upd
