@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 use hue::clamp::Clamp;
 use hue::effect_duration::EffectDuration;
@@ -19,9 +20,9 @@ use hue::stream::HueStreamLightsV2;
 use z2m::api::DeviceRead;
 use z2m::update::{DeviceEffect, DeviceUpdate};
 
-use crate::backend::z2m::Z2mBackend;
 use crate::backend::z2m::entertainment::EntStream;
 use crate::backend::z2m::websocket::Z2mWebSocket;
+use crate::backend::z2m::{Z2mBackend, Z2mMessage};
 use crate::error::ApiResult;
 use crate::model::state::AuxData;
 
@@ -125,7 +126,7 @@ impl Z2mBackend {
                 sleep(Self::LIGHT_BREATHE_DURATION).await;
 
                 let upd = DeviceUpdate::new().with_effect(DeviceEffect::FinishEffect);
-                tx.send((topic, upd))
+                tx.send((topic, Z2mMessage::DeviceUpdate(upd)))
             });
         }
 
@@ -182,7 +183,20 @@ impl Z2mBackend {
                 z2mws.send_hue_effects(topic, hz).await?;
 
                 // Do an explicit attribute read since Hue specific updates do not automatically update z2m state
-                z2mws.send_read(topic, &read_payload).await?;
+                let tx = self.message_tx.clone();
+                let topic = topic.clone();
+                let transition_duration = Duration::from_millis(
+                    upd.dynamics
+                        .clone()
+                        .and_then(|d| d.duration)
+                        .unwrap_or(500)
+                        .into(),
+                );
+                let _job = tokio::spawn(async move {
+                    // wait until transition is done
+                    sleep(transition_duration).await;
+                    tx.send((topic, Z2mMessage::DeviceRead(read_payload)))
+                });
             }
         }
 
