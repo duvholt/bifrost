@@ -8,6 +8,9 @@ pub mod scene;
 pub mod zigbee_device_discovery;
 pub mod zone;
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use bifrost_api::backend::BackendRequest;
 use entertainment_configuration as ent_conf;
 
@@ -17,6 +20,8 @@ use axum::routing::{delete, get, post, put};
 use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::{Mutex, oneshot};
+use tokio::time::timeout;
 
 use crate::error::{ApiError, ApiResult};
 use crate::routes::extractor::Json;
@@ -246,9 +251,20 @@ async fn delete_resource_id(
             lock.get_resource(&rlink)?;
 
             /* request deletion from backend */
-            lock.backend_request(BackendRequest::Delete(rlink))?;
-
+            let (tx, rx) = oneshot::channel();
+            lock.backend_request(BackendRequest::Delete {
+                link: rlink,
+                claim: Some(Arc::new(Mutex::new(Some(tx)))),
+            })?;
             drop(lock);
+
+            match timeout(Duration::from_millis(100), rx).await {
+                Ok(Ok(_)) => {}
+                Ok(Err(_)) | Err(_) => {
+                    log::warn!("Deleting resource not owned by any backends: {rlink:?}");
+                    state.res.lock().await.delete(&rlink)?;
+                }
+            }
 
             V2Reply::ok(rlink)
         }

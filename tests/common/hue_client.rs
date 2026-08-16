@@ -73,7 +73,7 @@ impl HueEvents {
     #[allow(clippy::suspicious_operation_groupings)]
     async fn expect_event<P>(&mut self, name: &str, predicate: P) -> TestResult<TestHueEvent>
     where
-        P: Fn(&TestHueEvent) -> bool,
+        P: Fn(&TestHueEvent) -> bool + Sync,
     {
         timeout(Duration::from_secs(2), async {
             loop {
@@ -89,6 +89,7 @@ impl HueEvents {
         .map_err(|_| TestError::HueEventTimeout(format!("Hue event  {name}")))?
     }
 
+    #[allow(clippy::suspicious_operation_groupings)]
     pub async fn expect_update_resource(
         &mut self,
         resource_link: ResourceLink,
@@ -130,11 +131,12 @@ impl HueEvents {
         })
     }
 
+    #[allow(clippy::suspicious_operation_groupings)]
     pub async fn expect_delete_resource(
         &mut self,
         resource_link: ResourceLink,
     ) -> TestResult<ObjectDelete> {
-        self.expect_event(&format!("update {resource_link:?}"), |event| match event {
+        self.expect_event(&format!("delete {resource_link:?}"), |event| match event {
             TestHueEvent::Delete(delete) => {
                 delete.rtype == resource_link.rtype && delete.id == resource_link.rid
             }

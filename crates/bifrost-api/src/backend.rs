@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
+use tokio::sync::{Mutex, oneshot};
 use uuid::Uuid;
 
 use hue::api::{
@@ -27,7 +30,11 @@ pub enum BackendRequest {
     ZoneCreate(ResourceLink, u32, Zone),
     ZoneUpdate(ResourceLink, ZoneUpdate),
 
-    Delete(ResourceLink),
+    Delete {
+        link: ResourceLink,
+        #[serde(skip)]
+        claim: Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>,
+    },
 
     EntertainmentStart(Uuid),
     EntertainmentFrame(HueStreamLightsV2),

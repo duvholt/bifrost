@@ -5,6 +5,7 @@ use std::time::Duration;
 use hue::clamp::Clamp;
 use hue::effect_duration::EffectDuration;
 use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate, LightRecordMode};
+use tokio::sync::{Mutex, oneshot};
 use tokio::time::sleep;
 use uuid::Uuid;
 
@@ -494,7 +495,12 @@ impl Z2mBackend {
         Ok(())
     }
 
-    async fn backend_delete(&self, z2mws: &mut Z2mWebSocket, link: &ResourceLink) -> ApiResult<()> {
+    async fn backend_delete(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        claim: &Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>,
+    ) -> ApiResult<()> {
         match link.rtype {
             RType::Scene => {
                 let lock = self.state.lock().await;
@@ -506,6 +512,7 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&group) {
+                    claim_resource(claim).await;
                     z2mws.send_scene_remove(topic, index).await?;
                 }
             }
@@ -516,6 +523,7 @@ impl Z2mBackend {
                     .get(link)
                     .and_then(|topic| self.network.get(topic))
                 {
+                    claim_resource(claim).await;
                     let addr = dev.ieee_address.to_string();
                     log::info!(
                         "[{}] Requesting z2m removal of {} ({})",
@@ -530,15 +538,15 @@ impl Z2mBackend {
 
             RType::Room | RType::Zone => {
                 if let Some(topic) = self.rmap.get(link) {
+                    claim_resource(claim).await;
                     log::info!("[{}] Requesting z2m removal of {}", self.name, &topic);
                     z2mws.send_group_remove(topic.clone()).await?;
-                } else {
-                    log::info!("[{}] Deleting orphaned group {:?}", self.name, link);
-                    self.state.lock().await.delete(link)?;
                 }
             }
 
             rtype => {
+                // claim all invalid types to avoid accidentally deleting a resource
+                claim_resource(claim).await;
                 log::warn!(
                     "[{}] Deleting objects of type {rtype:?} is not supported",
                     self.name
@@ -715,7 +723,7 @@ impl Z2mBackend {
                 self.backend_zone_update(z2mws, link, upd).await
             }
 
-            BackendRequest::Delete(link) => self.backend_delete(z2mws, link).await,
+            BackendRequest::Delete { link, claim } => self.backend_delete(z2mws, link, claim).await,
 
             BackendRequest::EntertainmentStart(ent_id) => {
                 self.backend_entertainment_start(z2mws, ent_id).await
@@ -731,6 +739,14 @@ impl Z2mBackend {
                 self.backend_zigbee_device_discovery(z2mws, rlink, zbd)
                     .await
             }
+        }
+    }
+}
+
+async fn claim_resource(claim: &Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>) {
+    if let Some(claim) = claim {
+        if let Some(claim) = claim.lock().await.take() {
+            let _ = claim.send(());
         }
     }
 }

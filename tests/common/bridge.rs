@@ -44,10 +44,6 @@ impl Drop for TestBridge {
     }
 }
 
-pub trait TestResource {
-    fn link(&self) -> ResourceLink;
-}
-
 pub trait TestZ2mDeviceOrGroup {
     fn topic(&self) -> String;
 }
@@ -56,12 +52,6 @@ pub trait TestZ2mDeviceOrGroup {
 pub struct TestLight {
     pub link: ResourceLink,
     pub fixture_id: FixtureDevice,
-}
-
-impl TestResource for TestLight {
-    fn link(&self) -> ResourceLink {
-        self.link
-    }
 }
 
 impl TestZ2mDeviceOrGroup for TestLight {
@@ -76,12 +66,6 @@ pub struct TestRoom {
     pub fixture_group: FixtureGroup,
 }
 
-impl TestResource for TestRoom {
-    fn link(&self) -> ResourceLink {
-        self.link
-    }
-}
-
 impl TestZ2mDeviceOrGroup for TestRoom {
     fn topic(&self) -> String {
         self.fixture_group.topic()
@@ -92,12 +76,6 @@ impl TestZ2mDeviceOrGroup for TestRoom {
 pub struct TestGroupedLight {
     pub link: ResourceLink,
     pub fixture_group: FixtureGroup,
-}
-
-impl TestResource for TestGroupedLight {
-    fn link(&self) -> ResourceLink {
-        self.link
-    }
 }
 
 impl TestZ2mDeviceOrGroup for TestGroupedLight {

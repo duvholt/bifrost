@@ -147,6 +147,7 @@ async fn get_rooms() -> TestResult<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn create_room() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
@@ -359,6 +360,79 @@ async fn delete_room() -> TestResult<()> {
         .expect_delete_resource(grouped_light_service)
         .await?;
     assert_eq!(grouped_light_delete.id, grouped_light_service.rid);
+
+    hue_events.expect_quiet().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn delete_stale_room() -> TestResult<()> {
+    pretty_env_logger::formatted_builder()
+        .filter_level(log::LevelFilter::Debug)
+        .parse_default_env()
+        .init();
+
+    let mut test = TestBridge::start(z2m_state()).await?;
+    test.wait_for_room(KITCHEN_GROUP).await?;
+    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    let new_room_link = test
+        .hue_client
+        .post_room(RoomNew {
+            children: BTreeSet::new(),
+            metadata: GroupMetadata {
+                name: "stale".to_string(),
+                archetype: GroupArchetype::Computer,
+            },
+        })
+        .await?;
+
+    // Initial created room
+    z2m_requests
+        .expect_request(
+            "bridge/request/group/add",
+            json!({"id":3, "friendly_name":"stale"}),
+        )
+        .await?;
+    let resource_record = hue_events.expect_add(RType::Room).await?;
+    let Resource::Room(room_resource) = resource_record.obj else {
+        panic!("unexpected resource type");
+    };
+    assert_eq!(resource_record.id, new_room_link.rid);
+    assert_eq!(
+        room_resource,
+        Room {
+            children: BTreeSet::new(),
+            metadata: GroupMetadata {
+                name: "stale".to_string(),
+                archetype: GroupArchetype::Computer
+            },
+            services: BTreeSet::new()
+        }
+    );
+    let stale_room = TestRoom {
+        link: new_room_link,
+        fixture_group: FixtureGroup {
+            id: 3,
+            friendly_name: "stale",
+        },
+    };
+    let grouped_light_record = hue_events.expect_add(RType::GroupedLight).await?;
+
+    // simulate error in z2m by not sending any responses
+
+    let link = test.hue_client.delete_room(&stale_room).await?;
+    assert_eq!(link, stale_room.link);
+
+    let room_delete = hue_events.expect_delete_resource(stale_room.link).await?;
+    assert_eq!(room_delete.id, stale_room.link.rid);
+
+    hue_events
+        .expect_delete_resource(grouped_light_record.link())
+        .await?;
 
     hue_events.expect_quiet().await?;
 
