@@ -1,5 +1,5 @@
 use hue::api::{
-    DimmingUpdate, GroupArchetype, GroupMetadata, GroupedLight, LightAlert, LightSignal,
+    DimmingUpdate, Group, GroupArchetype, GroupMetadata, GroupedLight, LightAlert, LightSignal,
     LightSignaling, On, RType, Resource, Room, RoomNew, Stub,
 };
 #[cfg(test)]
@@ -302,6 +302,63 @@ async fn create_room() -> TestResult<()> {
             }
         )
     );
+
+    hue_events.expect_quiet().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn delete_room() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let kitchen_room = test.wait_for_room(KITCHEN_GROUP).await?;
+    let kitchen_room_resource = test.hue_client.get_room(&kitchen_room).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    let link = test.hue_client.delete_room(&kitchen_room).await?;
+    assert_eq!(link, kitchen_room.link);
+
+    z2m_requests
+        .expect_request(
+            "bridge/request/group/remove",
+            json!({"force":false,"id": kitchen_room.fixture_group.friendly_name}),
+        )
+        .await?;
+    // todo: this removes all groups instead of just the kitchen group
+    test.z2m
+        .publish_topic("bridge/groups".to_string(), json!([]))?;
+    test.z2m.publish_topic(
+        "bridge/response/group/remove".to_string(),
+        json!({"data":{"force":false,"id":kitchen_room.fixture_group.friendly_name},"status":"ok"}),
+    )?;
+
+    let bridge_home_update = hue_events.expect_update_type(RType::BridgeHome).await?;
+    assert_eq!(
+        bridge_home_update.data,
+        json!(
+             {
+                "children": [
+                    {
+                        "rid": "242e5082-74bc-5dc1-865b-cd0649682ec2",
+                        "rtype": "room",
+                    },
+                    {
+                        "rid": "7a16c640-6be0-583f-a3f3-5c5d941bada5",
+                        "rtype": "device",
+                    },
+                ],
+            }
+        )
+    );
+    let room_delete = hue_events.expect_delete_resource(kitchen_room.link).await?;
+    assert_eq!(room_delete.id, kitchen_room.link.rid);
+
+    let grouped_light_service = *kitchen_room_resource.grouped_light_service().unwrap();
+    let grouped_light_delete = hue_events
+        .expect_delete_resource(grouped_light_service)
+        .await?;
+    assert_eq!(grouped_light_delete.id, grouped_light_service.rid);
 
     hue_events.expect_quiet().await?;
 

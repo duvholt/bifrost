@@ -39,7 +39,7 @@ impl HueEvents {
         if !self.pending.is_empty() {
             return Err(TestError::UnexpectedHueEvents(self.pending.clone()));
         }
-        match timeout(Duration::from_millis(20), async {
+        match timeout(Duration::from_millis(100), async {
             self.receive_events().await
         })
         .await
@@ -105,6 +105,7 @@ impl HueEvents {
             _ => unreachable!("wrong event type"),
         })
     }
+
     pub async fn expect_update_type(&mut self, rtype: RType) -> TestResult<ObjectUpdate> {
         self.expect_event(&format!("update {rtype:?}"), |event| match event {
             TestHueEvent::Update(update) => update.rtype == rtype,
@@ -125,6 +126,23 @@ impl HueEvents {
         .await
         .map(|event| match event {
             TestHueEvent::Add(add) => add,
+            _ => unreachable!("wrong event type"),
+        })
+    }
+
+    pub async fn expect_delete_resource(
+        &mut self,
+        resource_link: ResourceLink,
+    ) -> TestResult<ObjectDelete> {
+        self.expect_event(&format!("update {resource_link:?}"), |event| match event {
+            TestHueEvent::Delete(delete) => {
+                delete.rtype == resource_link.rtype && delete.id == resource_link.rid
+            }
+            _ => false,
+        })
+        .await
+        .map(|event| match event {
+            TestHueEvent::Delete(delete) => delete,
             _ => unreachable!("wrong event type"),
         })
     }
@@ -174,6 +192,21 @@ impl HueClient {
             .http_client
             .post(url)
             .json(value)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<V2Reply<ResourceLink>>()
+            .await?
+            .data;
+        assert_eq!(data.len(), 1);
+        Ok(data[0])
+    }
+
+    pub async fn delete(&self, path: &str) -> TestResult<ResourceLink> {
+        let url = format!("{}/{path}", self.base_url);
+        let data = self
+            .http_client
+            .delete(url)
             .send()
             .await?
             .error_for_status()?
@@ -271,6 +304,11 @@ impl HueClient {
 
     pub async fn post_room(&self, room: RoomNew) -> TestResult<ResourceLink> {
         self.post("/clip/v2/resource/room", &serde_json::to_value(room)?)
+            .await
+    }
+
+    pub async fn delete_room(&self, room: &TestRoom) -> TestResult<ResourceLink> {
+        self.delete(&format!("/clip/v2/resource/room/{}", room.link.rid))
             .await
     }
 
