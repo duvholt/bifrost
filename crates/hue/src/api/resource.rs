@@ -155,6 +155,11 @@ impl ResourceRecord {
     pub const fn new(id: Uuid, id_v1: Option<String>, obj: Resource) -> Self {
         Self { id, id_v1, obj }
     }
+
+    #[must_use]
+    pub const fn link(&self) -> ResourceLink {
+        ResourceLink::new(self.id, self.obj.rtype())
+    }
 }
 
 #[derive(Copy, Hash, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]

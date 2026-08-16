@@ -71,6 +71,24 @@ impl TestZ2mDeviceOrGroup for TestLight {
 }
 
 #[derive(Clone)]
+pub struct TestRoom {
+    pub link: ResourceLink,
+    pub fixture_group: FixtureGroup,
+}
+
+impl TestResource for TestRoom {
+    fn link(&self) -> ResourceLink {
+        self.link
+    }
+}
+
+impl TestZ2mDeviceOrGroup for TestRoom {
+    fn topic(&self) -> String {
+        self.fixture_group.topic()
+    }
+}
+
+#[derive(Clone)]
 pub struct TestGroupedLight {
     pub link: ResourceLink,
     pub fixture_group: FixtureGroup,
@@ -98,9 +116,9 @@ impl TestBridge {
 
         let memory2mqtt_service = create_m2m_service(z2m_state, M2mMode::Manual).await?;
         let test_z2m = TestZ2m::from_service(&memory2mqtt_service);
-
         let config =
             Self::create_appconfig(http_address, memory2mqtt_service.config.listen, &workdir)?;
+
         let (svc_manager, manager_future) = ServiceManager::spawn();
         let appstate = AppState::from_config(config, svc_manager).await?;
         let mut mgr = appstate.manager();
@@ -249,14 +267,27 @@ impl TestBridge {
         fixture_group: FixtureGroup,
     ) -> TestResult<TestGroupedLight> {
         self.wait_for_resource(fixture_group.friendly_name, |events| {
-            if let Some(room) = find_room(events, fixture_group.friendly_name) {
+            if let Some((_, room)) = find_room(events, fixture_group.friendly_name) {
                 return room.grouped_light_service().map(|&link| TestGroupedLight {
                     link,
                     fixture_group: fixture_group.clone(),
                 });
             }
-            if let Some(zone) = find_zone(events, fixture_group.friendly_name) {
+            if let Some((_, zone)) = find_zone(events, fixture_group.friendly_name) {
                 return zone.grouped_light_service().map(|&link| TestGroupedLight {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            None
+        })
+        .await
+    }
+
+    pub async fn wait_for_room(&mut self, fixture_group: FixtureGroup) -> TestResult<TestRoom> {
+        self.wait_for_resource(fixture_group.friendly_name, |events| {
+            if let Some((link, _room)) = find_room(events, fixture_group.friendly_name) {
+                return Some(TestRoom {
                     link,
                     fixture_group: fixture_group.clone(),
                 });
@@ -309,16 +340,16 @@ fn find_zigbee_connectivity<'a>(
     })
 }
 
-fn find_room<'a>(events: &'a [Event], room_name: &str) -> Option<&'a Room> {
+fn find_room<'a>(events: &'a [Event], room_name: &str) -> Option<(ResourceLink, &'a Room)> {
     added_resources(events).find_map(|resource| match &resource.obj {
-        Resource::Room(room) if room.metadata.name == room_name => Some(room),
+        Resource::Room(room) if room.metadata.name == room_name => Some((resource.link(), room)),
         _ => None,
     })
 }
 
-fn find_zone<'a>(events: &'a [Event], zone_name: &str) -> Option<&'a Zone> {
+fn find_zone<'a>(events: &'a [Event], zone_name: &str) -> Option<(ResourceLink, &'a Zone)> {
     added_resources(events).find_map(|resource| match &resource.obj {
-        Resource::Zone(zone) if zone.metadata.name == zone_name => Some(zone),
+        Resource::Zone(zone) if zone.metadata.name == zone_name => Some((resource.link(), zone)),
         _ => None,
     })
 }

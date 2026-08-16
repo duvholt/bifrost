@@ -1,17 +1,16 @@
 use std::time::Duration;
 
+use bifrost::routes::clip::V2Reply;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
-use hue::{
-    api::{GroupedLight, Light, ResourceRecord},
-    event::{Event, EventBlock, ObjectDelete, ObjectUpdate},
-};
+use hue::api::{GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew};
+use hue::event::{Event, EventBlock, ObjectDelete, ObjectUpdate};
 use reqwest::Client;
 use serde_json::Value;
 use tokio::sync::{broadcast, oneshot};
 use tokio::time::timeout;
 
-use crate::common::bridge::{TestGroupedLight, TestLight, TestResource};
+use crate::common::bridge::{TestGroupedLight, TestLight, TestRoom};
 use crate::common::{HueClipResponse, TestError, TestResult};
 
 #[allow(clippy::large_enum_variant)]
@@ -72,30 +71,62 @@ impl HueEvents {
     }
 
     #[allow(clippy::suspicious_operation_groupings)]
-    pub async fn expect_update(
-        &mut self,
-        resource: &(impl TestResource + Sync),
-    ) -> TestResult<ObjectUpdate> {
-        let resource_link = resource.link();
+    async fn expect_event<P>(&mut self, name: &str, predicate: P) -> TestResult<TestHueEvent>
+    where
+        P: Fn(&TestHueEvent) -> bool,
+    {
         timeout(Duration::from_secs(2), async {
             loop {
-                let position = self.pending.iter().position(|event| match event {
-                    TestHueEvent::Update(update) => {
-                        update.id == resource_link.rid && update.rtype == resource_link.rtype
-                    }
-                    _ => false,
-                });
+                let position = self.pending.iter().position(&predicate);
 
-                if let Some(position) = position
-                    && let TestHueEvent::Update(update) = self.pending.remove(position)
-                {
-                    return Ok(update);
+                if let Some(position) = position {
+                    return Ok(self.pending.remove(position));
                 }
                 self.receive_events().await?;
             }
         })
         .await
-        .map_err(|_| TestError::HueEventTimeout(format!("update {resource_link:?}")))?
+        .map_err(|_| TestError::HueEventTimeout(format!("Hue event  {name}")))?
+    }
+
+    pub async fn expect_update_resource(
+        &mut self,
+        resource_link: ResourceLink,
+    ) -> TestResult<ObjectUpdate> {
+        self.expect_event(&format!("update {resource_link:?}"), |event| match event {
+            TestHueEvent::Update(update) => {
+                update.id == resource_link.rid && update.rtype == resource_link.rtype
+            }
+            _ => false,
+        })
+        .await
+        .map(|event| match event {
+            TestHueEvent::Update(object_update) => object_update,
+            _ => unreachable!("wrong event type"),
+        })
+    }
+    pub async fn expect_update_type(&mut self, rtype: RType) -> TestResult<ObjectUpdate> {
+        self.expect_event(&format!("update {rtype:?}"), |event| match event {
+            TestHueEvent::Update(update) => update.rtype == rtype,
+            _ => false,
+        })
+        .await
+        .map(|event| match event {
+            TestHueEvent::Update(object_update) => object_update,
+            _ => unreachable!("wrong event type"),
+        })
+    }
+
+    pub async fn expect_add(&mut self, rtype: RType) -> TestResult<ResourceRecord> {
+        self.expect_event(&format!("add {rtype:?}"), |event| match event {
+            TestHueEvent::Add(add) => add.obj.rtype() == rtype,
+            _ => false,
+        })
+        .await
+        .map(|event| match event {
+            TestHueEvent::Add(add) => add,
+            _ => unreachable!("wrong event type"),
+        })
     }
 }
 
@@ -135,6 +166,22 @@ impl HueClient {
             .await?
             .error_for_status()?;
         Ok(())
+    }
+
+    pub async fn post(&self, path: &str, value: &Value) -> TestResult<ResourceLink> {
+        let url = format!("{}/{path}", self.base_url);
+        let data = self
+            .http_client
+            .post(url)
+            .json(value)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<V2Reply<ResourceLink>>()
+            .await?
+            .data;
+        assert_eq!(data.len(), 1);
+        Ok(data[0])
     }
 
     pub async fn get_lights(&self) -> TestResult<Vec<Light>> {
@@ -201,6 +248,32 @@ impl HueClient {
         .await
     }
 
+    pub async fn get_rooms(&self) -> TestResult<Vec<Room>> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/room")
+            .await?
+            .data;
+        Ok(resource_records_to_rooms(data))
+    }
+
+    pub async fn get_room(&self, room: &TestRoom) -> TestResult<Room> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/room/{}",
+                room.link.rid
+            ))
+            .await?
+            .data;
+        let rooms = resource_records_to_rooms(data);
+        assert_eq!(rooms.len(), 1);
+        Ok(rooms[0].clone())
+    }
+
+    pub async fn post_room(&self, room: RoomNew) -> TestResult<ResourceLink> {
+        self.post("/clip/v2/resource/room", &serde_json::to_value(room)?)
+            .await
+    }
+
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {
         let base_url = &self.base_url;
         let response = self
@@ -242,6 +315,15 @@ fn resource_records_to_grouped_lights(data: Vec<ResourceRecord>) -> Vec<GroupedL
         .map(|r| match r.obj {
             hue::api::Resource::GroupedLight(grouped_light) => grouped_light,
             _ => panic!("expected grouped light resource"),
+        })
+        .collect()
+}
+
+fn resource_records_to_rooms(data: Vec<ResourceRecord>) -> Vec<Room> {
+    data.into_iter()
+        .map(|r| match r.obj {
+            hue::api::Resource::Room(room) => room,
+            _ => panic!("expected room resource"),
         })
         .collect()
 }

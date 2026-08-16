@@ -207,7 +207,9 @@ async fn turn_on_grouped_light() -> TestResult<()> {
     hue_events.expect_quiet().await?;
     test.z2m.publish(&grouped_light, json!({"state": "ON"}))?;
 
-    let update = hue_events.expect_update(&grouped_light).await?;
+    let update = hue_events
+        .expect_update_resource(grouped_light.link)
+        .await?;
     assert_eq!(
         update.data,
         json!({
@@ -254,7 +256,9 @@ async fn change_brightness() -> TestResult<()> {
     test.z2m
         .publish(&grouped_light, json!({"brightness": 63.5, "state":"ON"}))?;
 
-    let update = hue_events.expect_update(&grouped_light).await?;
+    let update = hue_events
+        .expect_update_resource(grouped_light.link)
+        .await?;
     assert_eq!(
         update.data,
         json!({
@@ -304,7 +308,9 @@ async fn dimming_delta_up() -> TestResult<()> {
     test.z2m
         .publish(&grouped_light, json!({"brightness": 190.5, "state":"ON"}))?;
 
-    let update = hue_events.expect_update(&grouped_light).await?;
+    let update = hue_events
+        .expect_update_resource(grouped_light.link)
+        .await?;
     assert_eq!(
         update.data,
         json!({
@@ -354,7 +360,9 @@ async fn dimming_delta_down() -> TestResult<()> {
     test.z2m
         .publish(&grouped_light, json!({"brightness": 127.0, "state":"ON"}))?;
 
-    let update = hue_events.expect_update(&grouped_light).await?;
+    let update = hue_events
+        .expect_update_resource(grouped_light.link)
+        .await?;
     assert_eq!(
         update.data,
         json!({
