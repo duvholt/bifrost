@@ -53,6 +53,9 @@ pub enum TestError {
     #[error("timeout waiting for z2m request")]
     Z2mRequestTimeout,
 
+    #[error("unexpected z2m event: {0:?}")]
+    UnexpectedZ2mEvent(RawMessage),
+
     #[error("unexpected Hue events: {0:?}")]
     UnexpectedHueEvents(Vec<TestHueEvent>),
 }

@@ -314,6 +314,11 @@ impl HueClient {
             .await
     }
 
+    pub async fn put_room(&self, room: &TestRoom, value: &Value) -> TestResult<()> {
+        self.put(&format!("/clip/v2/resource/room/{}", room.link.rid), value)
+            .await
+    }
+
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {
         let base_url = &self.base_url;
         let response = self

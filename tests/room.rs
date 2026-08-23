@@ -368,11 +368,6 @@ async fn delete_room() -> TestResult<()> {
 
 #[tokio::test]
 async fn delete_stale_room() -> TestResult<()> {
-    pretty_env_logger::formatted_builder()
-        .filter_level(log::LevelFilter::Debug)
-        .parse_default_env()
-        .init();
-
     let mut test = TestBridge::start(z2m_state()).await?;
     test.wait_for_room(KITCHEN_GROUP).await?;
     test.wait_for_room(LIVING_ROOM_GROUP).await?;
@@ -435,6 +430,45 @@ async fn delete_stale_room() -> TestResult<()> {
         .await?;
 
     hue_events.expect_quiet().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn update_metadata() -> TestResult<()> {
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
+    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_room(
+            &kitchen_group,
+            &json!({
+                "metadata": {
+                    "name": "kitchen2"
+                }
+            }),
+        )
+        .await?;
+
+    let update = hue_events
+        .expect_update_resource(kitchen_group.link)
+        .await?;
+
+    assert_eq!(
+        update.data,
+        json!({
+            "metadata": {
+                "name": "kitchen2",
+                "archetype": "home",
+            }
+        })
+    );
+
+    hue_events.expect_quiet().await?;
+    z2m_requests.expect_quiet().await?;
 
     Ok(())
 }

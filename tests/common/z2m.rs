@@ -29,6 +29,17 @@ impl Z2mRequests {
             .map_err(|_| TestError::Z2mRequestTimeout)??)
     }
 
+    pub async fn expect_quiet(&mut self) -> TestResult<()> {
+        match timeout(Duration::from_millis(100), async {
+            self.next_request().await
+        })
+        .await
+        {
+            Ok(event) => Err(TestError::UnexpectedZ2mEvent(event?)),
+            Err(_) => Ok(()),
+        }
+    }
+
     pub async fn expect_set(
         &mut self,
         device: &(impl TestZ2mDeviceOrGroup + Sync),
