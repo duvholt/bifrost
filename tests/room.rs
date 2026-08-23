@@ -8,10 +8,11 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::fixture::{self, FixtureDevice, FixtureGroup, Z2mFixture, Z2mGroupFixture};
-use crate::common::{TestBridge, TestResult, TestRoom};
+use crate::common::{TestBridge, TestResult, TestRoom, TestZ2mDeviceOrGroup, init};
 
 pub mod common;
 
+// Rooms
 const LIVING_ROOM_GROUP: FixtureGroup = FixtureGroup {
     id: 1,
     friendly_name: "living_room",
@@ -22,38 +23,43 @@ const KITCHEN_GROUP: FixtureGroup = FixtureGroup {
     friendly_name: "kitchen",
 };
 
+// Lights
+const IKEA_WARM_WHITE: FixtureDevice = FixtureDevice {
+    id: 1,
+    friendly_name: "ikea_warm_white",
+};
+
+const IKEA_COLOR: FixtureDevice = FixtureDevice {
+    id: 2,
+    friendly_name: "ikea_color",
+};
+
+const HUE_WHITE_AMBIANCE: FixtureDevice = FixtureDevice {
+    id: 3,
+    friendly_name: "hue_white_ambiance",
+};
+
+const HUE_FLUX_LIGHTSTRIP: FixtureDevice = FixtureDevice {
+    id: 4,
+    friendly_name: "hue_flux_lightstrip",
+};
+
+const HUE_PLAY_GRADIENT_LIGHTSTRIP: FixtureDevice = FixtureDevice {
+    id: 5,
+    friendly_name: "hue_play_gradient_lightstrip",
+};
+
+const MISC_DIMMER_LIGHT: FixtureDevice = FixtureDevice {
+    id: 6,
+    friendly_name: "misc_dimmer_light",
+};
 const IKEA_COLOR_WITHOUT_ROOM: FixtureDevice = FixtureDevice {
     id: 7,
     friendly_name: "ikea_color_without_room",
 };
 
 fn z2m_state() -> BTreeMap<String, Value> {
-    const IKEA_COLOR: FixtureDevice = FixtureDevice {
-        id: 2,
-        friendly_name: "ikea_color",
-    };
-    const HUE_WHITE_AMBIANCE: FixtureDevice = FixtureDevice {
-        id: 3,
-        friendly_name: "hue_white_ambiance",
-    };
-    const HUE_FLUX_LIGHTSTRIP: FixtureDevice = FixtureDevice {
-        id: 4,
-        friendly_name: "hue_flux_lightstrip",
-    };
-    const HUE_PLAY_GRADIENT_LIGHTSTRIP: FixtureDevice = FixtureDevice {
-        id: 5,
-        friendly_name: "hue_play_gradient_lightstrip",
-    };
-    const MISC_DIMMER_LIGHT: FixtureDevice = FixtureDevice {
-        id: 6,
-        friendly_name: "misc_dimmer_light",
-    };
-
-    let ikea_warm_white = fixture::ikea::tradfri_warm_white(&FixtureDevice {
-        id: 1,
-        friendly_name: "ikea_warm_white",
-    })
-    .with_state(json!({
+    let ikea_warm_white = fixture::ikea::tradfri_warm_white(&IKEA_WARM_WHITE).with_state(json!({
         "state": "OFF",
         "brightness": 127
     }));
@@ -125,6 +131,7 @@ fn z2m_state() -> BTreeMap<String, Value> {
 
 #[tokio::test]
 async fn get_rooms() -> TestResult<()> {
+    init();
     let mut test = TestBridge::start(z2m_state()).await?;
 
     let living_room = test.wait_for_room(LIVING_ROOM_GROUP).await?;
@@ -150,6 +157,7 @@ async fn get_rooms() -> TestResult<()> {
 #[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn create_room() -> TestResult<()> {
+    init();
     let mut test = TestBridge::start(z2m_state()).await?;
     let light_device = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
@@ -311,6 +319,7 @@ async fn create_room() -> TestResult<()> {
 
 #[tokio::test]
 async fn delete_room() -> TestResult<()> {
+    init();
     let mut test = TestBridge::start(z2m_state()).await?;
     let kitchen_room = test.wait_for_room(KITCHEN_GROUP).await?;
     let kitchen_room_resource = test.hue_client.get_room(&kitchen_room).await?;
@@ -368,6 +377,7 @@ async fn delete_room() -> TestResult<()> {
 
 #[tokio::test]
 async fn delete_stale_room() -> TestResult<()> {
+    init();
     let mut test = TestBridge::start(z2m_state()).await?;
     test.wait_for_room(KITCHEN_GROUP).await?;
     test.wait_for_room(LIVING_ROOM_GROUP).await?;
@@ -436,6 +446,7 @@ async fn delete_stale_room() -> TestResult<()> {
 
 #[tokio::test]
 async fn update_metadata() -> TestResult<()> {
+    init();
     let mut test = TestBridge::start(z2m_state()).await?;
     let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
     test.wait_for_room(LIVING_ROOM_GROUP).await?;
@@ -464,6 +475,134 @@ async fn update_metadata() -> TestResult<()> {
                 "name": "kitchen2",
                 "archetype": "home",
             }
+        })
+    );
+
+    hue_events.expect_quiet().await?;
+    z2m_requests.expect_quiet().await?;
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
+#[tokio::test]
+async fn update_room_children() -> TestResult<()> {
+    init();
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
+    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let ikea_color_without_room_device = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
+    let ikea_color_device = test.wait_for_device(IKEA_COLOR).await?;
+    let ikea_warm_white_device = test.wait_for_device(IKEA_WARM_WHITE).await?;
+    let hue_white_ambiance_device = test.wait_for_device(HUE_WHITE_AMBIANCE).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.hue_client
+        .put_room(
+            &kitchen_group,
+            &json!({
+                "children": [
+                    &&ikea_color_without_room_device.link(),
+                    &ikea_color_device.link()
+                ]
+            }),
+        )
+        .await?;
+
+    z2m_requests
+        .expect_requests_unordered(vec![
+            (
+                "bridge/request/group/members/add",
+                json!({"device":IKEA_COLOR_WITHOUT_ROOM.topic(),"group":kitchen_group.topic()}),
+            ),
+            (
+                "bridge/request/group/members/remove",
+                json!({"device":IKEA_WARM_WHITE.topic(),"group":kitchen_group.topic()}),
+            ),
+            (
+                "bridge/request/group/members/remove",
+                json!({"device":&HUE_WHITE_AMBIANCE.topic(),"group":kitchen_group.topic()}),
+            ),
+        ])
+        .await?;
+
+    test.z2m.publish_topic("bridge/response/group/members/add".to_string(), json!({"data":{"device":IKEA_COLOR_WITHOUT_ROOM.topic(),"endpoint":"default","group":kitchen_group.topic()},"status":"ok"}))?;
+    test.z2m.publish_topic(
+        "bridge/groups".to_string(),
+        json!([
+            {"friendly_name": &kitchen_group.fixture_group.friendly_name, "id":&kitchen_group.fixture_group.id, "members":[
+                {"endpoint":11,"ieee_address": IKEA_COLOR.ieee_address()},
+                {"endpoint":11,"ieee_address": IKEA_WARM_WHITE.ieee_address()},
+                {"endpoint":11,"ieee_address": HUE_WHITE_AMBIANCE.ieee_address()},
+                {"endpoint":11,"ieee_address": IKEA_COLOR_WITHOUT_ROOM.ieee_address()}
+                ],
+             "scenes":[]}
+        ]),
+    )?;
+    test.z2m.publish_topic("bridge/response/group/members/remove".to_string(), json!({"data":{"device":IKEA_WARM_WHITE.topic(),"endpoint":"default","group":kitchen_group.topic()},"status":"ok"}))?;
+    test.z2m.publish_topic(
+        "bridge/groups".to_string(),
+        json!([
+            {"friendly_name": &kitchen_group.fixture_group.friendly_name, "id":&kitchen_group.fixture_group.id, "members":[
+                {"endpoint":11,"ieee_address": IKEA_COLOR.ieee_address()},
+                {"endpoint":11,"ieee_address": HUE_WHITE_AMBIANCE.ieee_address()},
+                {"endpoint":11,"ieee_address": IKEA_COLOR_WITHOUT_ROOM.ieee_address()}
+                ],
+             "scenes":[]}
+        ]),
+    )?;
+    test.z2m.publish_topic("bridge/response/group/members/remove".to_string(), json!({"data":{"device":HUE_WHITE_AMBIANCE.topic(),"endpoint":"default","group":kitchen_group.topic()},"status":"ok"}))?;
+    test.z2m.publish_topic(
+        "bridge/groups".to_string(),
+        json!([
+            {"friendly_name": &kitchen_group.fixture_group.friendly_name, "id":&kitchen_group.fixture_group.id, "members":[
+                {"endpoint":11,"ieee_address": IKEA_COLOR.ieee_address()},
+                {"endpoint":11,"ieee_address": IKEA_COLOR_WITHOUT_ROOM.ieee_address()}
+                ],
+             "scenes":[]}
+        ]),
+    )?;
+
+    assert_eq!(
+        hue_events
+            .expect_update_resource(kitchen_group.link)
+            .await?
+            .data,
+        json!({
+           "children": [
+                ikea_color_without_room_device.link(),
+                hue_white_ambiance_device.link(),
+                ikea_color_device.link(),
+                ikea_warm_white_device.link(),
+            ],
+        })
+    );
+
+    assert_eq!(
+        hue_events
+            .expect_update_resource(kitchen_group.link)
+            .await?
+            .data,
+        json!({
+           "children": [
+                ikea_color_without_room_device.link(),
+                hue_white_ambiance_device.link(),
+                ikea_color_device.link(),
+            ],
+        })
+    );
+
+    assert_eq!(
+        hue_events
+            .expect_update_resource(kitchen_group.link)
+            .await?
+            .data,
+        json!({
+           "children": [
+                ikea_color_without_room_device.link(),
+                ikea_color_device.link(),
+            ],
         })
     );
 
