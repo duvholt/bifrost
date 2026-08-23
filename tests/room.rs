@@ -611,3 +611,112 @@ async fn update_room_children() -> TestResult<()> {
 
     Ok(())
 }
+
+#[allow(clippy::too_many_lines)]
+#[tokio::test]
+async fn handle_z2m_group_changes() -> TestResult<()> {
+    init();
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
+    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let ikea_color_without_room_device = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
+    let ikea_color_device = test.wait_for_device(IKEA_COLOR).await?;
+    let ikea_warm_white_device = test.wait_for_device(IKEA_WARM_WHITE).await?;
+    let hue_white_ambiance_device = test.wait_for_device(HUE_WHITE_AMBIANCE).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    // Simulate changing members in z2m
+
+    // Add
+    test.z2m.publish_topic(
+        "bridge/response/group/members/add".to_string(),
+        json!(
+        {
+            "data":{
+                "device":IKEA_COLOR_WITHOUT_ROOM.ieee_address(),
+                "endpoint":"default",
+                "group": kitchen_group.fixture_group.id
+            },
+            "status":"ok"
+        }),
+    )?;
+    test.z2m.publish_topic(
+        "bridge/groups".to_string(),
+        json!([
+            {
+                "friendly_name": &kitchen_group.fixture_group.friendly_name,
+                "id":&kitchen_group.fixture_group.id,
+                "members":[
+                    {"endpoint":1,"ieee_address": IKEA_COLOR.ieee_address()},
+                    {"endpoint":1,"ieee_address": IKEA_WARM_WHITE.ieee_address()},
+                    {"endpoint":11,"ieee_address": HUE_WHITE_AMBIANCE.ieee_address()},
+                    {"endpoint":1,"ieee_address": IKEA_COLOR_WITHOUT_ROOM.ieee_address()}
+                ],
+                "scenes":[]
+            }
+        ]),
+    )?;
+
+    assert_eq!(
+        hue_events
+            .expect_update_resource(kitchen_group.link)
+            .await?
+            .data,
+        json!({
+           "children": [
+                ikea_color_without_room_device.link(),
+                hue_white_ambiance_device.link(),
+                ikea_color_device.link(),
+                ikea_warm_white_device.link(),
+            ],
+        })
+    );
+
+    test.z2m.publish_topic(
+        "bridge/response/group/members/remove".to_string(),
+        json!(
+        {
+            "data":{
+                "device":IKEA_WARM_WHITE.ieee_address(),
+                "endpoint":"default",
+                "group":kitchen_group.fixture_group.id
+            },
+            "status":"ok"
+        }),
+    )?;
+    test.z2m.publish_topic(
+        "bridge/groups".to_string(),
+        json!([
+            {
+                "friendly_name": &kitchen_group.fixture_group.friendly_name,
+                "id":&kitchen_group.fixture_group.id,
+                "members":[
+                    {"endpoint":1,"ieee_address": IKEA_COLOR.ieee_address()},
+                    {"endpoint":11,"ieee_address": HUE_WHITE_AMBIANCE.ieee_address()},
+                    {"endpoint":1,"ieee_address": IKEA_COLOR_WITHOUT_ROOM.ieee_address()}
+                ],
+                "scenes":[]
+            }
+        ]),
+    )?;
+
+    assert_eq!(
+        hue_events
+            .expect_update_resource(kitchen_group.link)
+            .await?
+            .data,
+        json!({
+           "children": [
+                ikea_color_without_room_device.link(),
+                hue_white_ambiance_device.link(),
+                ikea_color_device.link(),
+            ],
+        })
+    );
+
+    hue_events.expect_quiet().await?;
+    z2m_requests.expect_quiet().await?;
+
+    Ok(())
+}
