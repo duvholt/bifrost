@@ -720,3 +720,64 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
 
     Ok(())
 }
+
+#[allow(clippy::too_many_lines)]
+#[tokio::test]
+async fn z2m_delete_group() -> TestResult<()> {
+    init();
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let living_room_group = test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let living_room_grouped_light = test.wait_for_grouped_light(LIVING_ROOM_GROUP).await?;
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
+
+    test.z2m.publish_topic(
+        "bridge/response/group/remove".to_string(),
+        json!(
+        {
+            "data":{
+                "force":false,
+                "id":LIVING_ROOM_GROUP.id.to_string(),
+            },
+            "status":"ok",
+            "transaction":"cnpmk-2"
+        }),
+    )?;
+
+    assert_eq!(
+        hue_events.expect_update_type(RType::BridgeHome).await?.data,
+        json!({
+            "children": [
+                {
+                    "rid": "5d129726-6c45-59ad-9c6f-a81ab81f7532",
+                    "rtype": "room",
+                },
+                {
+                    "rid": "7a16c640-6be0-583f-a3f3-5c5d941bada5",
+                    "rtype": "device",
+                },
+            ],
+        })
+    );
+
+    assert_eq!(
+        hue_events
+            .expect_delete_resource(living_room_grouped_light.link)
+            .await?
+            .id,
+        living_room_grouped_light.link.rid
+    );
+
+    assert_eq!(
+        hue_events
+            .expect_delete_resource(living_room_group.link)
+            .await?
+            .id,
+        living_room_group.link.rid
+    );
+
+    hue_events.expect_quiet().await?;
+    z2m_requests.expect_quiet().await?;
+
+    Ok(())
+}
