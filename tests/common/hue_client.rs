@@ -3,14 +3,16 @@ use std::time::Duration;
 use bifrost::routes::clip::V2Reply;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
-use hue::api::{GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew};
+use hue::api::{
+    GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew, Zone, ZoneNew,
+};
 use hue::event::{Event, EventBlock, ObjectDelete, ObjectUpdate};
 use reqwest::Client;
 use serde_json::Value;
 use tokio::sync::{broadcast, oneshot};
 use tokio::time::timeout;
 
-use crate::common::bridge::{TestGroupedLight, TestLight, TestRoom};
+use crate::common::bridge::{TestGroupedLight, TestLight, TestRoom, TestZone};
 use crate::common::{HueClipResponse, TestError, TestResult};
 
 #[allow(clippy::large_enum_variant)]
@@ -257,7 +259,10 @@ impl HueClient {
         Ok(resource_records_to_grouped_lights(data))
     }
 
-    pub async fn get_grouped_light(&self, light: &TestGroupedLight) -> TestResult<GroupedLight> {
+    pub async fn get_grouped_light(
+        &self,
+        light: &TestGroupedLight<'_>,
+    ) -> TestResult<GroupedLight> {
         let data = self
             .get::<HueClipResponse<ResourceRecord>>(&format!(
                 "/clip/v2/resource/grouped_light/{}",
@@ -273,7 +278,7 @@ impl HueClient {
 
     pub async fn put_grouped_light(
         &self,
-        light: &TestGroupedLight,
+        light: &TestGroupedLight<'_>,
         value: &Value,
     ) -> TestResult<()> {
         self.put(
@@ -291,7 +296,7 @@ impl HueClient {
         Ok(resource_records_to_rooms(data))
     }
 
-    pub async fn get_room(&self, room: &TestRoom) -> TestResult<Room> {
+    pub async fn get_room(&self, room: &TestRoom<'_>) -> TestResult<Room> {
         let data = self
             .get::<HueClipResponse<ResourceRecord>>(&format!(
                 "/clip/v2/resource/room/{}",
@@ -309,13 +314,49 @@ impl HueClient {
             .await
     }
 
-    pub async fn delete_room(&self, room: &TestRoom) -> TestResult<ResourceLink> {
+    pub async fn delete_room(&self, room: &TestRoom<'_>) -> TestResult<ResourceLink> {
         self.delete(&format!("/clip/v2/resource/room/{}", room.link.rid))
             .await
     }
 
-    pub async fn put_room(&self, room: &TestRoom, value: &Value) -> TestResult<()> {
+    pub async fn put_room(&self, room: &TestRoom<'_>, value: &Value) -> TestResult<()> {
         self.put(&format!("/clip/v2/resource/room/{}", room.link.rid), value)
+            .await
+    }
+
+    pub async fn get_zones(&self) -> TestResult<Vec<Zone>> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/room")
+            .await?
+            .data;
+        Ok(resource_records_to_zones(data))
+    }
+
+    pub async fn get_zone(&self, zone: &TestZone<'_>) -> TestResult<Zone> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/zone/{}",
+                zone.link.rid
+            ))
+            .await?
+            .data;
+        let zones = resource_records_to_zones(data);
+        assert_eq!(zones.len(), 1);
+        Ok(zones[0].clone())
+    }
+
+    pub async fn post_zone(&self, zone: ZoneNew) -> TestResult<ResourceLink> {
+        self.post("/clip/v2/resource/zone", &serde_json::to_value(zone)?)
+            .await
+    }
+
+    pub async fn delete_zone(&self, zone: &TestZone<'_>) -> TestResult<ResourceLink> {
+        self.delete(&format!("/clip/v2/resource/zone/{}", zone.link.rid))
+            .await
+    }
+
+    pub async fn put_zone(&self, zone: &TestZone<'_>, value: &Value) -> TestResult<()> {
+        self.put(&format!("/clip/v2/resource/zone/{}", zone.link.rid), value)
             .await
     }
 
@@ -369,6 +410,15 @@ fn resource_records_to_rooms(data: Vec<ResourceRecord>) -> Vec<Room> {
         .map(|r| match r.obj {
             hue::api::Resource::Room(room) => room,
             _ => panic!("expected room resource"),
+        })
+        .collect()
+}
+
+fn resource_records_to_zones(data: Vec<ResourceRecord>) -> Vec<Zone> {
+    data.into_iter()
+        .map(|r| match r.obj {
+            hue::api::Resource::Zone(zone) => zone,
+            _ => panic!("expected zone resource"),
         })
         .collect()
 }

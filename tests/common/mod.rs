@@ -5,7 +5,7 @@ mod hue_client;
 mod response;
 mod z2m;
 
-pub use bridge::{TestBridge, TestRoom, TestZ2mDeviceOrGroup};
+pub use bridge::{TestBridge, TestLight, TestRoom, TestZ2mDeviceOrGroup, TestZone};
 pub use error::{TestError, TestResult};
 pub use hue_client::HueClient;
 pub use response::HueClipResponse;

@@ -205,12 +205,12 @@ impl FixtureDevice {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct FixtureGroup {
+pub struct FixtureGroup<'a> {
     pub id: u32,
-    pub friendly_name: &'static str,
+    pub friendly_name: &'a str,
 }
 
-impl FixtureGroup {
+impl FixtureGroup<'_> {
     #[must_use]
     pub fn topic(&self) -> String {
         self.friendly_name.to_string()

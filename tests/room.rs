@@ -134,8 +134,8 @@ async fn get_rooms() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
 
-    let living_room = test.wait_for_room(LIVING_ROOM_GROUP).await?;
-    let kitchen = test.wait_for_room(KITCHEN_GROUP).await?;
+    let living_room = test.wait_for_room(&LIVING_ROOM_GROUP).await?;
+    let kitchen = test.wait_for_room(&KITCHEN_GROUP).await?;
 
     let mut rooms = test.hue_client.get_rooms().await?;
     rooms.sort_by_key(|r| r.metadata.name.clone());
@@ -321,7 +321,7 @@ async fn create_room() -> TestResult<()> {
 async fn delete_room() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
-    let kitchen_room = test.wait_for_room(KITCHEN_GROUP).await?;
+    let kitchen_room = test.wait_for_room(&KITCHEN_GROUP).await?;
     let kitchen_room_resource = test.hue_client.get_room(&kitchen_room).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
@@ -379,8 +379,8 @@ async fn delete_room() -> TestResult<()> {
 async fn delete_stale_room() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
-    test.wait_for_room(KITCHEN_GROUP).await?;
-    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    test.wait_for_room(&KITCHEN_GROUP).await?;
+    test.wait_for_room(&LIVING_ROOM_GROUP).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 
@@ -448,8 +448,8 @@ async fn delete_stale_room() -> TestResult<()> {
 async fn update_metadata() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
-    let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
-    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let kitchen_group = test.wait_for_room(&KITCHEN_GROUP).await?;
+    test.wait_for_room(&LIVING_ROOM_GROUP).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 
@@ -489,8 +489,8 @@ async fn update_metadata() -> TestResult<()> {
 async fn update_room_children() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
-    let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
-    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let kitchen_group = test.wait_for_room(&KITCHEN_GROUP).await?;
+    test.wait_for_room(&LIVING_ROOM_GROUP).await?;
     let ikea_color_without_room_device = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
     let ikea_color_device = test.wait_for_device(IKEA_COLOR).await?;
     let ikea_warm_white_device = test.wait_for_device(IKEA_WARM_WHITE).await?;
@@ -617,8 +617,8 @@ async fn update_room_children() -> TestResult<()> {
 async fn handle_z2m_group_changes() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
-    let kitchen_group = test.wait_for_room(KITCHEN_GROUP).await?;
-    test.wait_for_room(LIVING_ROOM_GROUP).await?;
+    let kitchen_group = test.wait_for_room(&KITCHEN_GROUP).await?;
+    test.wait_for_room(&LIVING_ROOM_GROUP).await?;
     let ikea_color_without_room_device = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
     let ikea_color_device = test.wait_for_device(IKEA_COLOR).await?;
     let ikea_warm_white_device = test.wait_for_device(IKEA_WARM_WHITE).await?;
@@ -726,8 +726,8 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
 async fn z2m_delete_group() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
-    let living_room_group = test.wait_for_room(LIVING_ROOM_GROUP).await?;
-    let living_room_grouped_light = test.wait_for_grouped_light(LIVING_ROOM_GROUP).await?;
+    let living_room_group = test.wait_for_room(&LIVING_ROOM_GROUP).await?;
+    let living_room_grouped_light = test.wait_for_grouped_light(&LIVING_ROOM_GROUP).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 

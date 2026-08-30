@@ -157,9 +157,9 @@ fn z2m_state() -> BTreeMap<String, Value> {
 async fn get_grouped_lights() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
 
-    let living_room = test.wait_for_grouped_light(LIVING_ROOM_GROUP).await?;
-    let kitchen = test.wait_for_grouped_light(KITCHEN_GROUP).await?;
-    let all = test.wait_for_grouped_light(ALL_GROUP).await?;
+    let living_room = test.wait_for_grouped_light(&LIVING_ROOM_GROUP).await?;
+    let kitchen = test.wait_for_grouped_light(&KITCHEN_GROUP).await?;
+    let all = test.wait_for_grouped_light(&ALL_GROUP).await?;
 
     {
         let grouped_light = test.hue_client.get_grouped_light(&living_room).await?;
@@ -191,7 +191,7 @@ async fn get_grouped_lights() -> TestResult<()> {
 #[tokio::test]
 async fn turn_on_grouped_light() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
-    let grouped_light = test.wait_for_grouped_light(LIVING_ROOM_GROUP).await?;
+    let grouped_light = test.wait_for_grouped_light(&LIVING_ROOM_GROUP).await?;
     let baseline = test.hue_client.get_grouped_light(&grouped_light).await?;
     assert_eq!(baseline.on, Some(On::new(false)));
     let mut z2m_requests = test.z2m.subscribe_requests();
@@ -232,7 +232,7 @@ async fn turn_on_grouped_light() -> TestResult<()> {
 #[tokio::test]
 async fn change_brightness() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
-    let grouped_light = test.wait_for_grouped_light(LIVING_ROOM_GROUP).await?;
+    let grouped_light = test.wait_for_grouped_light(&LIVING_ROOM_GROUP).await?;
     let baseline = test.hue_client.get_grouped_light(&grouped_light).await?;
     assert_eq!(baseline.dimming.map(|d| d.brightness), Some(0.0));
     let mut z2m_requests = test.z2m.subscribe_requests();
@@ -283,7 +283,7 @@ async fn change_brightness() -> TestResult<()> {
 #[tokio::test]
 async fn dimming_delta_up() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
-    let grouped_light = test.wait_for_grouped_light(LIVING_ROOM_GROUP).await?;
+    let grouped_light = test.wait_for_grouped_light(&LIVING_ROOM_GROUP).await?;
     let baseline = test.hue_client.get_grouped_light(&grouped_light).await?;
     assert_eq!(baseline.dimming.map(|d| d.brightness), Some(0.0));
     let mut z2m_requests = test.z2m.subscribe_requests();
@@ -335,7 +335,7 @@ async fn dimming_delta_up() -> TestResult<()> {
 #[tokio::test]
 async fn dimming_delta_down() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
-    let grouped_light = test.wait_for_grouped_light(KITCHEN_GROUP).await?;
+    let grouped_light = test.wait_for_grouped_light(&KITCHEN_GROUP).await?;
     let baseline = test.hue_client.get_grouped_light(&grouped_light).await?;
     assert_eq!(baseline.dimming.map(|d| d.brightness), Some(100.0));
     let mut z2m_requests = test.z2m.subscribe_requests();

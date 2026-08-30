@@ -61,24 +61,36 @@ impl TestZ2mDeviceOrGroup for TestLight {
 }
 
 #[derive(Clone)]
-pub struct TestRoom {
+pub struct TestRoom<'a> {
     pub link: ResourceLink,
-    pub fixture_group: FixtureGroup,
+    pub fixture_group: FixtureGroup<'a>,
 }
 
-impl TestZ2mDeviceOrGroup for TestRoom {
+impl TestZ2mDeviceOrGroup for TestRoom<'_> {
     fn topic(&self) -> String {
         self.fixture_group.topic()
     }
 }
 
 #[derive(Clone)]
-pub struct TestGroupedLight {
+pub struct TestZone<'a> {
     pub link: ResourceLink,
-    pub fixture_group: FixtureGroup,
+    pub fixture_group: FixtureGroup<'a>,
 }
 
-impl TestZ2mDeviceOrGroup for TestGroupedLight {
+impl TestZ2mDeviceOrGroup for TestZone<'_> {
+    fn topic(&self) -> String {
+        self.fixture_group.topic()
+    }
+}
+
+#[derive(Clone)]
+pub struct TestGroupedLight<'a> {
+    pub link: ResourceLink,
+    pub fixture_group: FixtureGroup<'a>,
+}
+
+impl TestZ2mDeviceOrGroup for TestGroupedLight<'_> {
     fn topic(&self) -> String {
         self.fixture_group.topic()
     }
@@ -240,10 +252,10 @@ impl TestBridge {
         .await
     }
 
-    pub async fn wait_for_grouped_light(
+    pub async fn wait_for_grouped_light<'a>(
         &mut self,
-        fixture_group: FixtureGroup,
-    ) -> TestResult<TestGroupedLight> {
+        fixture_group: &FixtureGroup<'a>,
+    ) -> TestResult<TestGroupedLight<'a>> {
         self.wait_for_resource(fixture_group.friendly_name, |events| {
             if let Some((_, room)) = find_room(events, fixture_group.friendly_name) {
                 return room.grouped_light_service().map(|&link| TestGroupedLight {
@@ -262,10 +274,29 @@ impl TestBridge {
         .await
     }
 
-    pub async fn wait_for_room(&mut self, fixture_group: FixtureGroup) -> TestResult<TestRoom> {
+    pub async fn wait_for_room<'a>(
+        &mut self,
+        fixture_group: &FixtureGroup<'a>,
+    ) -> TestResult<TestRoom<'a>> {
         self.wait_for_resource(fixture_group.friendly_name, |events| {
             if let Some((link, _room)) = find_room(events, fixture_group.friendly_name) {
                 return Some(TestRoom {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            None
+        })
+        .await
+    }
+
+    pub async fn wait_for_zone<'a>(
+        &mut self,
+        fixture_group: &FixtureGroup<'a>,
+    ) -> TestResult<TestZone<'a>> {
+        self.wait_for_resource(fixture_group.friendly_name, |events| {
+            if let Some((link, _zone)) = find_zone(events, fixture_group.friendly_name) {
+                return Some(TestZone {
                     link,
                     fixture_group: fixture_group.clone(),
                 });
