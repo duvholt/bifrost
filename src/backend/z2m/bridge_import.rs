@@ -157,7 +157,10 @@ impl Z2mBackend {
         };
 
         let mut res = self.state.lock().await;
-        res.aux_set(&link_light, AuxData::new().with_topic(name));
+        res.aux_set(
+            &link_light,
+            AuxData::new().with_topic(name).with_backend(&self.name),
+        );
         res.add(&link_device, Resource::Device(dev))?;
         res.add(&link_light, Resource::Light(Box::new(light)))?;
         res.add(&link_enttm, Resource::Entertainment(enttm))?;
@@ -222,10 +225,12 @@ impl Z2mBackend {
             status: ZigbeeConnectivityStatus::Connected,
         };
 
+        let mut aux_data = AuxData::new().with_topic(name).with_backend(&self.name);
         if let Some(model_id) = &apidev.model_id {
             // needed to look up button mappings when handling actions
-            res.aux_set(&link_device, AuxData::new().with_model_id(model_id));
+            aux_data = aux_data.with_model_id(model_id);
         }
+        res.aux_set(&link_device, aux_data);
         res.add(&link_device, Resource::Device(dev))?;
         for (link_button, button) in buttons {
             res.add(&link_button, Resource::Button(button))?;
@@ -254,7 +259,10 @@ impl Z2mBackend {
         lock.add(&link_glight, Resource::GroupedLight(glight))?;
         lock.aux_set(
             &link_glight,
-            AuxData::new().with_topic(&topic).with_index(grp.id),
+            AuxData::new()
+                .with_topic(&topic)
+                .with_index(grp.id)
+                .with_backend(&self.name),
         );
         drop(lock);
 
@@ -319,7 +327,10 @@ impl Z2mBackend {
 
             res.aux_set(
                 &link_scene,
-                AuxData::new().with_topic(&topic).with_index(scn.id),
+                AuxData::new()
+                    .with_topic(&topic)
+                    .with_backend(&self.name)
+                    .with_index(scn.id),
             );
 
             scenes_new.insert(link_scene.rid);

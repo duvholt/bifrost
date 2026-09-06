@@ -17,6 +17,8 @@ pub struct AuxData {
     pub index: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backend: Option<String>,
 }
 
 impl AuxData {
@@ -45,6 +47,14 @@ impl AuxData {
     pub fn with_model_id(self, model_id: &str) -> Self {
         Self {
             model_id: Some(model_id.to_string()),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_backend(self, backend: &str) -> Self {
+        Self {
+            backend: Some(backend.to_string()),
             ..self
         }
     }
