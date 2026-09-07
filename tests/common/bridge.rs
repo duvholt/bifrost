@@ -1,5 +1,6 @@
 use bifrost::backend::z2m::Z2mServiceTemplate;
 use bifrost::config::AppConfig;
+use bifrost::resource::Resources;
 use bifrost::server::{self, Protocol, appstate::AppState, http::HttpServer};
 use hue::api::{
     Group, RType, Resource, ResourceLink, ResourceRecord, Room, ZigbeeConnectivity, Zone,
@@ -98,6 +99,13 @@ impl TestZ2mDeviceOrGroup for TestGroupedLight<'_> {
 
 impl TestBridge {
     pub async fn start(z2m_state: BTreeMap<String, Value>) -> TestResult<Self> {
+        Self::start_with_seed(z2m_state, |_| Ok(())).await
+    }
+
+    pub async fn start_with_seed(
+        z2m_state: BTreeMap<String, Value>,
+        seed: impl FnOnce(&mut Resources) -> TestResult<()>,
+    ) -> TestResult<Self> {
         let workdir = Self::create_workdir()?;
         let mut tasks = JoinSet::new();
 
@@ -111,6 +119,10 @@ impl TestBridge {
 
         let (svc_manager, manager_future) = ServiceManager::spawn();
         let appstate = AppState::from_config(config, svc_manager).await?;
+        {
+            let mut resources = appstate.res.lock().await;
+            seed(&mut resources)?;
+        }
         let mut mgr = appstate.manager();
 
         // memory2mqtt

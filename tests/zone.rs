@@ -596,7 +596,7 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
         json!(
         {
             "data":{
-                "device":IKEA_COLOR_WITHOUT_ZONE.ieee_address(),
+                "device":IKEA_COLOR_WITHOUT_ZONE.topic(),
                 "endpoint":"default",
                 "group": zone.fixture_group.id
             },
@@ -637,7 +637,7 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
         json!(
         {
             "data":{
-                "device":IKEA_WARM_WHITE.ieee_address(),
+                "device":IKEA_WARM_WHITE.topic(),
                 "endpoint":"default",
                 "group":zone.fixture_group.id
             },

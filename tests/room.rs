@@ -634,7 +634,7 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
         json!(
         {
             "data":{
-                "device":IKEA_COLOR_WITHOUT_ROOM.ieee_address(),
+                "device":IKEA_COLOR_WITHOUT_ROOM.topic(),
                 "endpoint":"default",
                 "group": kitchen_group.fixture_group.id
             },
@@ -678,7 +678,7 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
         json!(
         {
             "data":{
-                "device":IKEA_WARM_WHITE.ieee_address(),
+                "device":IKEA_WARM_WHITE.topic(),
                 "endpoint":"default",
                 "group":kitchen_group.fixture_group.id
             },
@@ -717,6 +717,71 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
 
     hue_events.expect_quiet().await?;
     z2m_requests.expect_quiet().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn handle_z2m_group_change_for_legacy_room() -> TestResult<()> {
+    init();
+
+    let legacy_room_link = RType::Room.deterministic(KITCHEN_GROUP.friendly_name);
+    let legacy_grouped_light_link =
+        RType::GroupedLight.deterministic((legacy_room_link.rid, KITCHEN_GROUP.id));
+
+    let mut test = TestBridge::start_with_seed(z2m_state(), |resources| {
+        resources.add(
+            &legacy_room_link,
+            Resource::Room(Room {
+                children: BTreeSet::new(),
+                metadata: GroupMetadata {
+                    name: KITCHEN_GROUP.friendly_name.to_string(),
+                    archetype: GroupArchetype::Home,
+                },
+                services: BTreeSet::from([legacy_grouped_light_link]),
+            }),
+        )?;
+        resources.add(
+            &legacy_grouped_light_link,
+            Resource::GroupedLight(GroupedLight::new(legacy_room_link)),
+        )?;
+        Ok(())
+    })
+    .await?;
+
+    let new_device = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
+    test.wait_for_room(&LIVING_ROOM_GROUP).await?;
+    let legacy_room = test
+        .hue_client
+        .get_room(&TestRoom {
+            link: legacy_room_link,
+            fixture_group: KITCHEN_GROUP,
+        })
+        .await?;
+    assert_eq!(
+        legacy_room.grouped_light_service(),
+        Some(&legacy_grouped_light_link)
+    );
+
+    let mut hue_events = test.hue_client.subscribe_events();
+    test.z2m.publish_topic(
+        "bridge/response/group/members/add".to_string(),
+        json!({
+            "data": {
+                "device": IKEA_COLOR_WITHOUT_ROOM.topic(),
+                "endpoint": "default",
+                "group": KITCHEN_GROUP.id.to_string()
+            },
+            "status": "ok"
+        }),
+    )?;
+
+    let update = hue_events.expect_update_resource(legacy_room_link).await?;
+    assert!(
+        update.data["children"]
+            .as_array()
+            .is_some_and(|children| children.contains(&json!(new_device.link())))
+    );
 
     Ok(())
 }

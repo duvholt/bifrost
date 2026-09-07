@@ -19,6 +19,7 @@ use z2m::update::DeviceUpdate;
 use crate::backend::z2m::Z2mBackend;
 use crate::backend::z2m::button::Z2mButtonHandler;
 use crate::error::{ApiError, ApiResult};
+use crate::resource::Resources;
 
 impl Z2mBackend {
     async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
@@ -224,7 +225,7 @@ impl Z2mBackend {
 
     async fn bridge_group_remove(&mut self, grp: &GroupRemove) -> ApiResult<()> {
         let mut lock = self.state.lock().await;
-        let Some(glight_link) = self.grouped_light_from_group_id(&grp.id) else {
+        let Some(glight_link) = self.grouped_light_from_group_id(&lock, &grp.id) else {
             return Ok(());
         };
         let Ok(glight) = lock.get::<GroupedLight>(&glight_link).cloned() else {
@@ -245,11 +246,25 @@ impl Z2mBackend {
         Ok(())
     }
 
-    fn grouped_light_from_group_id(&self, group_id: &str) -> Option<ResourceLink> {
-        group_id.parse::<u32>().map_or_else(
-            |_| self.map.get(group_id).copied(),
-            |group_id| Some(RType::GroupedLight.deterministic((&self.name, group_id))),
-        )
+    fn grouped_light_from_group_id(
+        &self,
+        resources: &Resources,
+        group_id: &str,
+    ) -> Option<ResourceLink> {
+        let Ok(group_id) = group_id.parse::<u32>() else {
+            return self.map.get(group_id).copied();
+        };
+        for grouped_light in resources.get_resources_by_type(RType::GroupedLight) {
+            let link = grouped_light.link();
+            let Ok(aux) = resources.aux_get(&link) else {
+                continue;
+            };
+
+            if aux.backend.as_deref() == Some(&self.name) && aux.index == Some(group_id) {
+                return Some(link);
+            }
+        }
+        None
     }
 
     async fn bridge_device_remove(&mut self, data: &DeviceRemoveResponse) -> ApiResult<()> {
@@ -285,7 +300,7 @@ impl Z2mBackend {
             let light = lock.get::<Light>(light_link)?.clone();
 
             let device_link = light.owner;
-            let Some(glight_link) = self.grouped_light_from_group_id(&change.group) else {
+            let Some(glight_link) = self.grouped_light_from_group_id(&lock, &change.group) else {
                 return Ok(());
             };
             let owner_link = lock.get::<GroupedLight>(&glight_link)?.owner;
@@ -459,9 +474,10 @@ impl Z2mBackend {
                     }
                     topic => {
                         log::error!(
-                            "[{}] Failed to parse (non-critical) z2m bridge message on [{}]:",
+                            "[{}] Failed to parse (non-critical) z2m bridge message on [{}]: {:?}",
                             self.name,
-                            topic
+                            topic,
+                            err
                         );
                         log::error!("{}", serde_json::to_string(&msg.payload)?);
 
