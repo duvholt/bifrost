@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use serde_json::Value;
 
 use bifrost_api::backend::BackendRequest;
-use hue::api::{RType, ResourceLink, Room, RoomNew, RoomUpdate};
+use hue::api::{Device, RType, ResourceLink, Room, RoomNew, RoomUpdate};
 
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
@@ -31,6 +31,16 @@ pub async fn post_room(state: &AppState, post: Value) -> ApiV2Result {
     let lock = state.res.lock().await;
 
     let new: RoomNew = serde_json::from_value(post)?;
+    let backend = new
+        .children
+        .iter()
+        .find_map(|link| {
+            let device = lock.get::<Device>(link).ok()?;
+            let light_link = device.light_service()?;
+            lock.aux_get(light_link)
+                .map_or(None, |aux| aux.backend.clone())
+        })
+        .unwrap_or(String::new());
     let room = Room {
         children: new.children,
         metadata: new.metadata,
@@ -38,10 +48,11 @@ pub async fn post_room(state: &AppState, post: Value) -> ApiV2Result {
     };
 
     let group_id = lock.get_next_group_id()?;
-    let rlink = RType::Room.deterministic(group_id);
-    lock.backend_request(BackendRequest::RoomCreate(rlink, group_id, room))?;
+    let link_glight = RType::GroupedLight.deterministic((backend, group_id));
+    let room_link = RType::Room.deterministic(link_glight.rid);
+    lock.backend_request(BackendRequest::RoomCreate(room_link, group_id, room))?;
 
     drop(lock);
 
-    V2Reply::ok(rlink)
+    V2Reply::ok(room_link)
 }

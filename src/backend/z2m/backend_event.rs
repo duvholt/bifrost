@@ -363,7 +363,7 @@ impl Z2mBackend {
         let mut lock = self.state.lock().await;
 
         lock.add(link, Resource::Room(room.clone()))?;
-        let link_glight = RType::GroupedLight.deterministic(group_id);
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
         lock.add(
             &link_glight,
             Resource::GroupedLight(GroupedLight::new(*link)),
@@ -437,7 +437,7 @@ impl Z2mBackend {
         let mut lock = self.state.lock().await;
 
         lock.add(link, Resource::Zone(zone.clone()))?;
-        let link_glight = RType::GroupedLight.deterministic(group_id);
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
         lock.add(
             &link_glight,
             Resource::GroupedLight(GroupedLight::new(*link)),

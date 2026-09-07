@@ -248,7 +248,7 @@ impl Z2mBackend {
     fn grouped_light_from_group_id(&self, group_id: &str) -> Option<ResourceLink> {
         group_id.parse::<u32>().map_or_else(
             |_| self.map.get(group_id).copied(),
-            |group_id| Some(RType::GroupedLight.deterministic(group_id)),
+            |group_id| Some(RType::GroupedLight.deterministic((&self.name, group_id))),
         )
     }
 

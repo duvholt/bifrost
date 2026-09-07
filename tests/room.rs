@@ -292,19 +292,19 @@ async fn create_room() -> TestResult<()> {
              {
                 "children": [
                     {
-                        "rid": "242e5082-74bc-5dc1-865b-cd0649682ec2",
-                        "rtype": "room",
-                    },
-                    {
-                        "rid": "5d129726-6c45-59ad-9c6f-a81ab81f7532",
-                        "rtype": "room",
-                    },
-                    {
                         "rid": "7a16c640-6be0-583f-a3f3-5c5d941bada5",
                         "rtype": "device",
                     },
                     {
+                        "rid": "89b19254-b2e0-557a-b19c-d4a6d64715e3",
+                        "rtype": "room",
+                    },
+                    {
                         "rid": new_room_link.rid,
+                        "rtype": "room",
+                    },
+                    {
+                        "rid": "cd560bfe-d970-5a89-82a8-77ec0f2a4e27",
                         "rtype": "room",
                     },
                 ],
@@ -350,12 +350,12 @@ async fn delete_room() -> TestResult<()> {
              {
                 "children": [
                     {
-                        "rid": "242e5082-74bc-5dc1-865b-cd0649682ec2",
-                        "rtype": "room",
-                    },
-                    {
                         "rid": "7a16c640-6be0-583f-a3f3-5c5d941bada5",
                         "rtype": "device",
+                    },
+                    {
+                        "rid": "89b19254-b2e0-557a-b19c-d4a6d64715e3",
+                        "rtype": "room",
                     },
                 ],
             }
@@ -749,12 +749,12 @@ async fn z2m_delete_group() -> TestResult<()> {
         json!({
             "children": [
                 {
-                    "rid": "5d129726-6c45-59ad-9c6f-a81ab81f7532",
-                    "rtype": "room",
-                },
-                {
                     "rid": "7a16c640-6be0-583f-a3f3-5c5d941bada5",
                     "rtype": "device",
+                },
+                {
+                    "rid": "cd560bfe-d970-5a89-82a8-77ec0f2a4e27",
+                    "rtype": "room",
                 },
             ],
         })

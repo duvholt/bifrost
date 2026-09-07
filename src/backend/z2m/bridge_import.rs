@@ -23,8 +23,9 @@ use z2m::convert::{
 
 use crate::backend::z2m::Z2mBackend;
 use crate::backend::z2m::button::Z2mButtonData;
-use crate::error::ApiResult;
+use crate::error::{ApiError, ApiResult};
 use crate::model::state::AuxData;
+use crate::resource::Resources;
 
 impl Z2mBackend {
     pub async fn add_light(
@@ -243,11 +244,13 @@ impl Z2mBackend {
 
     #[allow(clippy::too_many_lines)]
     pub async fn add_group(&mut self, grp: &z2m::api::Group) -> ApiResult<()> {
-        let link_glight = RType::GroupedLight.deterministic(grp.id);
         let topic = grp.friendly_name.clone();
 
-        // We want to set group light aux data for all groups since it is used to calculate the next available group id
         let mut lock = self.state.lock().await;
+        let link_glight = self
+            .find_grouped_light(&lock, grp.id, &topic)?
+            .unwrap_or_else(|| RType::GroupedLight.deterministic((&self.name, grp.id)));
+
         let glight = lock
             .get::<GroupedLight>(&link_glight)
             .cloned()
@@ -257,6 +260,7 @@ impl Z2mBackend {
             });
         let owner_link = glight.owner;
         lock.add(&link_glight, Resource::GroupedLight(glight))?;
+        // We want to set group light aux data for all groups since it is used to calculate the next available group id
         lock.aux_set(
             &link_glight,
             AuxData::new()
@@ -434,6 +438,39 @@ impl Z2mBackend {
         drop(res);
 
         Ok(())
+    }
+
+    fn find_grouped_light(
+        &self,
+        resources: &Resources,
+        group_id: u32,
+        friendly_name: &str,
+    ) -> ApiResult<Option<ResourceLink>> {
+        for grouped_light in resources.get_resources_by_type(RType::GroupedLight) {
+            let link = grouped_light.link();
+            match resources.aux_get(&link) {
+                Ok(aux) => {
+                    if let Some(aux_backend) = &aux.backend
+                        && aux_backend == &self.name
+                        && aux.index == Some(group_id)
+                    {
+                        return Ok(Some(link));
+                    }
+                }
+                Err(ApiError::AuxNotFound(_)) => {
+                    // match rooms that haven't been migrated yet
+                    let link_room = RType::Room.deterministic(friendly_name);
+                    let link_glight = RType::GroupedLight.deterministic((link_room.rid, group_id));
+                    if link_glight == link {
+                        return Ok(Some(link_glight));
+                    }
+                }
+                Err(err) => {
+                    return Err(err);
+                }
+            }
+        }
+        Ok(None)
     }
 }
 
