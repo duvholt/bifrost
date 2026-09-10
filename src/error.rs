@@ -186,6 +186,9 @@ pub enum ApiError {
 
     #[error("No next weekday occurence {0:?} {0:?}")]
     NoNextWeekdayOccurence(NaiveTime, HashSet<Weekday>),
+
+    #[error("Backend request timeout")]
+    BackendRequestTimeout,
 }
 
 impl From<SvcError> for ApiError {

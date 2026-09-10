@@ -1,10 +1,13 @@
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use serde_json::Value;
 
-use bifrost_api::backend::BackendRequest;
-use hue::api::{Light, RType, ResourceLink, Zone, ZoneNew, ZoneUpdate};
+use bifrost_api::backend::{BackendRequest, request_reply_channel};
+use hue::api::{RType, Resource, ResourceLink, Zone, ZoneNew, ZoneUpdate};
+use tokio::time::timeout;
 
+use crate::error::ApiError;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
@@ -28,30 +31,42 @@ pub async fn put_zone(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
 }
 
 pub async fn post_zone(state: &AppState, post: Value) -> ApiV2Result {
-    let lock = state.res.lock().await;
+    let mut lock = state.res.lock().await;
 
-    let new: ZoneNew = serde_json::from_value(post)?;
-    let backend = new
-        .children
-        .iter()
-        .find_map(|light_link| {
-            lock.aux_get(light_link)
-                .map_or(None, |aux| aux.backend.clone())
-        })
-        .unwrap_or(String::new());
+    let zone_new: ZoneNew = serde_json::from_value(post)?;
+    let backend = zone_new.children.iter().find_map(|light_link| {
+        lock.aux_get(light_link)
+            .map_or(None, |aux| aux.backend.clone())
+    });
 
-    let zone = Zone {
-        children: new.children,
-        metadata: new.metadata,
-        services: BTreeSet::new(),
+    let zone_link = if let Some(backend) = backend {
+        let (tx, rx) = request_reply_channel::<ResourceLink>();
+        lock.backend_request(BackendRequest::ZoneCreate {
+            backend,
+            zone_new,
+            link_reply: tx,
+        })?;
+
+        drop(lock);
+
+        let Ok(Ok(zone_link)) = timeout(Duration::from_millis(500), rx).await else {
+            return Err(ApiError::BackendRequestTimeout);
+        };
+
+        zone_link
+    } else {
+        let link = RType::Zone.random();
+        lock.add(
+            &link,
+            Resource::Zone(Zone {
+                children: zone_new.children,
+                metadata: zone_new.metadata,
+                services: BTreeSet::new(),
+            }),
+        )?;
+        drop(lock);
+        link
     };
-
-    let group_id = lock.get_next_group_id()?;
-    let link_glight = RType::GroupedLight.deterministic((backend, group_id));
-    let zone_link = RType::Zone.deterministic(link_glight.rid);
-    lock.backend_request(BackendRequest::ZoneCreate(zone_link, group_id, zone))?;
-
-    drop(lock);
 
     V2Reply::ok(zone_link)
 }

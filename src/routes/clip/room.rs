@@ -1,10 +1,13 @@
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use serde_json::Value;
 
-use bifrost_api::backend::BackendRequest;
-use hue::api::{Device, RType, ResourceLink, Room, RoomNew, RoomUpdate};
+use bifrost_api::backend::{BackendRequest, request_reply_channel};
+use hue::api::{BridgeHome, Device, RType, Resource, ResourceLink, Room, RoomNew, RoomUpdate};
+use tokio::time::timeout;
 
+use crate::error::ApiError;
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
 
@@ -28,31 +31,48 @@ pub async fn put_room(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
 }
 
 pub async fn post_room(state: &AppState, post: Value) -> ApiV2Result {
-    let lock = state.res.lock().await;
+    let mut lock = state.res.lock().await;
 
-    let new: RoomNew = serde_json::from_value(post)?;
-    let backend = new
-        .children
-        .iter()
-        .find_map(|link| {
-            let device = lock.get::<Device>(link).ok()?;
-            let light_link = device.light_service()?;
-            lock.aux_get(light_link)
-                .map_or(None, |aux| aux.backend.clone())
-        })
-        .unwrap_or(String::new());
-    let room = Room {
-        children: new.children,
-        metadata: new.metadata,
-        services: BTreeSet::new(),
+    let room_new: RoomNew = serde_json::from_value(post)?;
+    let backend = room_new.children.iter().find_map(|link| {
+        let device = lock.get::<Device>(link).ok()?;
+        let light_link = device.light_service()?;
+        lock.aux_get(light_link)
+            .map_or(None, |aux| aux.backend.clone())
+    });
+
+    let room_link = if let Some(backend) = backend {
+        let (tx, rx) = request_reply_channel::<ResourceLink>();
+        lock.backend_request(BackendRequest::RoomCreate {
+            backend,
+            room_new,
+            link_reply: tx,
+        })?;
+
+        drop(lock);
+
+        let Ok(Ok(room_link)) = timeout(Duration::from_millis(500), rx).await else {
+            return Err(ApiError::BackendRequestTimeout);
+        };
+        room_link
+    } else {
+        let link = RType::Room.random();
+        lock.add(
+            &link,
+            Resource::Room(Room {
+                children: room_new.children,
+                metadata: room_new.metadata,
+                services: BTreeSet::new(),
+            }),
+        )?;
+        for id in &lock.get_resource_ids_by_type(RType::BridgeHome) {
+            lock.update(id, |bh: &mut BridgeHome| {
+                bh.children.insert(link);
+            })?;
+        }
+        drop(lock);
+        link
     };
-
-    let group_id = lock.get_next_group_id()?;
-    let link_glight = RType::GroupedLight.deterministic((backend, group_id));
-    let room_link = RType::Room.deterministic(link_glight.rid);
-    lock.backend_request(BackendRequest::RoomCreate(room_link, group_id, room))?;
-
-    drop(lock);
 
     V2Reply::ok(room_link)
 }

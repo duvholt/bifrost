@@ -3,6 +3,7 @@ mod bridge_event;
 mod bridge_import;
 mod button;
 pub mod entertainment;
+mod group;
 pub mod learn;
 pub mod websocket;
 pub mod zclcommand;

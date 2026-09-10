@@ -325,7 +325,6 @@ async fn delete_stale_zone() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
     test.wait_for_light(IKEA_COLOR_WITHOUT_ZONE).await?;
-    let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
     let new_zone_link = test
         .hue_client
@@ -345,13 +344,6 @@ async fn delete_stale_zone() -> TestResult<()> {
         },
     };
 
-    // Initial created zone
-    z2m_requests
-        .expect_request(
-            "bridge/request/group/add",
-            json!({"id":stale_zone.fixture_group.id, "friendly_name":stale_zone.fixture_group.friendly_name}),
-        )
-        .await?;
     let resource_record = hue_events.expect_add(RType::Zone).await?;
     let Resource::Zone(zone_resource) = resource_record.obj else {
         panic!("unexpected resource type");
@@ -369,19 +361,11 @@ async fn delete_stale_zone() -> TestResult<()> {
         }
     );
 
-    let grouped_light_record = hue_events.expect_add(RType::GroupedLight).await?;
-
-    // simulate error in z2m by not sending any responses
-
     let link = test.hue_client.delete_zone(&stale_zone).await?;
     assert_eq!(link, stale_zone.link);
 
     let zone_delete = hue_events.expect_delete_resource(stale_zone.link).await?;
     assert_eq!(zone_delete.id, stale_zone.link.rid);
-
-    hue_events
-        .expect_delete_resource(grouped_light_record.link())
-        .await?;
 
     hue_events.expect_quiet().await?;
 

@@ -5,17 +5,16 @@ use std::time::Duration;
 use hue::clamp::Clamp;
 use hue::effect_duration::EffectDuration;
 use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate, LightRecordMode};
-use tokio::sync::{Mutex, oneshot};
 use tokio::time::sleep;
 use uuid::Uuid;
 
-use bifrost_api::backend::BackendRequest;
+use bifrost_api::backend::{BackendRequest, RequestReply};
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
     EntertainmentConfiguration, Group, GroupedLight, GroupedLightUpdate, Light,
-    LightEffectsV2Update, LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene,
-    SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate, Zone,
-    ZoneUpdate,
+    LightEffectsV2Update, LightUpdate, RType, Resource, ResourceLink, Room, RoomNew, RoomUpdate,
+    Scene, SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
+    Zone, ZoneNew, ZoneUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
@@ -347,27 +346,36 @@ impl Z2mBackend {
         Ok(())
     }
 
+    #[allow(clippy::ref_option)]
     async fn backend_room_create(
         &self,
         z2mws: &mut Z2mWebSocket,
-        link: &ResourceLink,
-        group_id: u32,
-        room: &Room,
+        room_new: &RoomNew,
+        link_reply: &RequestReply<ResourceLink>,
     ) -> ApiResult<()> {
         let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
-            || room.metadata.name.clone(),
-            |group_prefix| format!("{group_prefix}{}", room.metadata.name),
+            || room_new.metadata.name.clone(),
+            |group_prefix| format!("{group_prefix}{}", room_new.metadata.name),
         );
 
         // Store metadata
         let mut lock = self.state.lock().await;
+        let room = Room {
+            children: room_new.children.clone(),
+            metadata: room_new.metadata.clone(),
+            services: BTreeSet::new(),
+        };
+        let group_id = lock.get_next_group_id()?;
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        let link = RType::Room.deterministic(link_glight.rid);
 
-        lock.add(link, Resource::Room(room.clone()))?;
+        lock.add(&link, Resource::Room(room.clone()))?;
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
         lock.add(
             &link_glight,
-            Resource::GroupedLight(GroupedLight::new(*link)),
+            Resource::GroupedLight(GroupedLight::new(link)),
         )?;
+        self.set_group_aux(&mut lock, link_glight, group_id, Some(&group_friendly_name));
         drop(lock);
 
         z2mws
@@ -379,6 +387,13 @@ impl Z2mBackend {
                 .send_group_member_add(&group_friendly_name, friendly_name)
                 .await?;
         }
+
+        if let Some(reply) = link_reply
+            && let Some(reply) = reply.lock().await.take()
+        {
+            let _ = reply.send(link);
+        }
+
         Ok(())
     }
 
@@ -421,27 +436,36 @@ impl Z2mBackend {
         Ok(())
     }
 
+    #[allow(clippy::ref_option)]
     async fn backend_zone_create(
         &self,
         z2mws: &mut Z2mWebSocket,
-        link: &ResourceLink,
-        group_id: u32,
-        zone: &Zone,
+        zone_new: &ZoneNew,
+        link_reply: &RequestReply<ResourceLink>,
     ) -> ApiResult<()> {
         let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
-            || zone.metadata.name.clone(),
-            |group_prefix| format!("{group_prefix}{}", zone.metadata.name),
+            || zone_new.metadata.name.clone(),
+            |group_prefix| format!("{group_prefix}{}", zone_new.metadata.name),
         );
 
         // Store metadata
         let mut lock = self.state.lock().await;
+        let zone = Zone {
+            children: zone_new.children.clone(),
+            metadata: zone_new.metadata.clone(),
+            services: BTreeSet::new(),
+        };
+        let group_id = lock.get_next_group_id()?;
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        let link = RType::Zone.deterministic(link_glight.rid);
 
-        lock.add(link, Resource::Zone(zone.clone()))?;
+        lock.add(&link, Resource::Zone(zone.clone()))?;
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
         lock.add(
             &link_glight,
-            Resource::GroupedLight(GroupedLight::new(*link)),
+            Resource::GroupedLight(GroupedLight::new(link)),
         )?;
+        self.set_group_aux(&mut lock, link_glight, group_id, Some(&group_friendly_name));
         drop(lock);
 
         z2mws
@@ -453,6 +477,13 @@ impl Z2mBackend {
                 .send_group_member_add(&group_friendly_name, friendly_name)
                 .await?;
         }
+
+        if let Some(reply) = link_reply
+            && let Some(reply) = reply.lock().await.take()
+        {
+            let _ = reply.send(link);
+        }
+
         Ok(())
     }
 
@@ -499,7 +530,7 @@ impl Z2mBackend {
         &self,
         z2mws: &mut Z2mWebSocket,
         link: &ResourceLink,
-        claim: &Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>,
+        claim: &RequestReply<()>,
     ) -> ApiResult<()> {
         match link.rtype {
             RType::Scene => {
@@ -707,16 +738,32 @@ impl Z2mBackend {
                 self.backend_grouped_light_update(z2mws, link, upd).await
             }
 
-            BackendRequest::RoomCreate(link, group_id, room) => {
-                self.backend_room_create(z2mws, link, *group_id, room).await
+            BackendRequest::RoomCreate {
+                backend,
+                room_new,
+                link_reply,
+            } => {
+                if backend == &self.name {
+                    self.backend_room_create(z2mws, room_new, link_reply).await
+                } else {
+                    Ok(())
+                }
             }
 
             BackendRequest::RoomUpdate(link, upd) => {
                 self.backend_room_update(z2mws, link, upd).await
             }
 
-            BackendRequest::ZoneCreate(link, group_id, zone) => {
-                self.backend_zone_create(z2mws, link, *group_id, zone).await
+            BackendRequest::ZoneCreate {
+                backend,
+                zone_new,
+                link_reply,
+            } => {
+                if backend == &self.name {
+                    self.backend_zone_create(z2mws, zone_new, link_reply).await
+                } else {
+                    Ok(())
+                }
             }
 
             BackendRequest::ZoneUpdate(link, upd) => {
@@ -743,7 +790,7 @@ impl Z2mBackend {
     }
 }
 
-async fn claim_resource(claim: &Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>) {
+async fn claim_resource(claim: &RequestReply<()>) {
     if let Some(claim) = claim {
         if let Some(claim) = claim.lock().await.take() {
             let _ = claim.send(());

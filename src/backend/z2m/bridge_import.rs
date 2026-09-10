@@ -261,13 +261,7 @@ impl Z2mBackend {
         let owner_link = glight.owner;
         lock.add(&link_glight, Resource::GroupedLight(glight))?;
         // We want to set group light aux data for all groups since it is used to calculate the next available group id
-        lock.aux_set(
-            &link_glight,
-            AuxData::new()
-                .with_topic(&topic)
-                .with_index(grp.id)
-                .with_backend(&self.name),
-        );
+        self.set_group_aux(&mut lock, link_glight, grp.id, Some(&topic));
         drop(lock);
 
         let room_name;

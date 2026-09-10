@@ -381,7 +381,6 @@ async fn delete_stale_room() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
     test.wait_for_room(&KITCHEN_GROUP).await?;
     test.wait_for_room(&LIVING_ROOM_GROUP).await?;
-    let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 
     let new_room_link = test
@@ -396,12 +395,6 @@ async fn delete_stale_room() -> TestResult<()> {
         .await?;
 
     // Initial created room
-    z2m_requests
-        .expect_request(
-            "bridge/request/group/add",
-            json!({"id":3, "friendly_name":"stale"}),
-        )
-        .await?;
     let resource_record = hue_events.expect_add(RType::Room).await?;
     let Resource::Room(room_resource) = resource_record.obj else {
         panic!("unexpected resource type");
@@ -418,6 +411,12 @@ async fn delete_stale_room() -> TestResult<()> {
             services: BTreeSet::new()
         }
     );
+    assert!(
+        hue_events.expect_update_type(RType::BridgeHome).await?.data["children"]
+            .as_array()
+            .is_some_and(|children| children.contains(&json!(new_room_link)))
+    );
+
     let stale_room = TestRoom {
         link: new_room_link,
         fixture_group: FixtureGroup {
@@ -425,19 +424,17 @@ async fn delete_stale_room() -> TestResult<()> {
             friendly_name: "stale",
         },
     };
-    let grouped_light_record = hue_events.expect_add(RType::GroupedLight).await?;
-
-    // simulate error in z2m by not sending any responses
 
     let link = test.hue_client.delete_room(&stale_room).await?;
     assert_eq!(link, stale_room.link);
 
     let room_delete = hue_events.expect_delete_resource(stale_room.link).await?;
     assert_eq!(room_delete.id, stale_room.link.rid);
-
-    hue_events
-        .expect_delete_resource(grouped_light_record.link())
-        .await?;
+    assert!(
+        hue_events.expect_update_type(RType::BridgeHome).await?.data["children"]
+            .as_array()
+            .is_some_and(|children| !children.contains(&json!(new_room_link)))
+    );
 
     hue_events.expect_quiet().await?;
 

@@ -139,6 +139,11 @@ impl RType {
 
         self.link_to(rid)
     }
+
+    #[must_use]
+    pub fn random(self) -> ResourceLink {
+        self.link_to(Uuid::new_v4())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
