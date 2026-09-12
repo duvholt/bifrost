@@ -8,7 +8,9 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::fixture::{self, FixtureDevice, FixtureGroup, Z2mFixture};
-use crate::common::{TestBridge, TestLight, TestResult, TestZ2mDeviceOrGroup, TestZone, init};
+use crate::common::{
+    TestBridge, TestLight, TestResult, TestZ2mBackend, TestZ2mDeviceOrGroup, TestZone, init,
+};
 
 pub mod common;
 
@@ -101,10 +103,11 @@ fn z2m_state() -> BTreeMap<String, Value> {
 #[allow(clippy::too_many_lines)]
 async fn create_zone_and_assert<'a>(
     test: &TestBridge,
+    z2m: &TestZ2mBackend,
     metadata: &'a GroupMetadata,
     lights: &[&TestLight],
 ) -> TestResult<TestZone<'a>> {
-    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut z2m_requests = z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 
     let children: BTreeSet<_> = lights.iter().map(|light| light.link).collect();
@@ -148,10 +151,10 @@ async fn create_zone_and_assert<'a>(
 
     // todo: we need to append the group instead of overwriting all groups with just the new one
     // this should likely be handled in the z2m emulator
-    test.z2m.publish_topic("bridge/groups".to_string(), json!([
+    z2m.publish_topic("bridge/groups".to_string(), json!([
         {"friendly_name": &test_zone.fixture_group.friendly_name, "id":&test_zone.fixture_group.id, "members":[], "scenes":[]}
     ]))?;
-    test.z2m.publish_topic("bridge/response/group/add".to_string(), json!(
+    z2m.publish_topic("bridge/response/group/add".to_string(), json!(
         {"data":{"friendly_name": &test_zone.fixture_group.friendly_name,"id": &test_zone.fixture_group.id},"status":"ok"}
     ))?;
 
@@ -202,10 +205,10 @@ async fn create_zone_and_assert<'a>(
     for i in 0..lights.len() {
         let light = &lights[i];
         let iter_lights = lights.iter().take(i + 1).collect::<Vec<_>>();
-        test.z2m.publish_topic("bridge/response/group/members/add".to_string(), json!(
+        z2m.publish_topic("bridge/response/group/members/add".to_string(), json!(
             {"data":{"device": light.fixture_id.friendly_name,"endpoint":"default","group": &test_zone.fixture_group.friendly_name},"status":"ok"}
         ))?;
-        test.z2m.publish_topic(
+        z2m.publish_topic(
             "bridge/groups".to_string(),
             json!([
                 {
@@ -264,6 +267,7 @@ async fn create_zone() -> TestResult<()> {
 
     create_zone_and_assert(
         &test,
+        test.z2m.only_backend(),
         &GroupMetadata {
             name: "new1".to_string(),
             archetype: GroupArchetype::Barbecue,
@@ -276,7 +280,7 @@ async fn create_zone() -> TestResult<()> {
 }
 
 #[tokio::test]
-async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
+async fn zone_rejects_lights_from_different_backends() -> TestResult<()> {
     let backend_states = {
         let first = fixture::ikea::tradfri_warm_white(&IKEA_WARM_WHITE).with_state(json!({
             "state": "OFF",
@@ -302,7 +306,18 @@ async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
     let mut test = TestBridge::start_backends(backend_states).await?;
     let first = test.wait_for_light(IKEA_WARM_WHITE).await?;
     let second = test.wait_for_light(IKEA_COLOR_WITHOUT_ZONE).await?;
-    let rooms_before = test.hue_client.get_rooms().await?;
+    let group_metadata = GroupMetadata {
+        name: "first-zone".to_string(),
+        archetype: GroupArchetype::Home,
+    };
+    let zone = create_zone_and_assert(
+        &test,
+        test.z2m.backend("first")?,
+        &group_metadata,
+        &[&first],
+    )
+    .await?;
+    let zones_before = test.hue_client.get_zones().await?;
     let mut first_requests = test.z2m.backend("first")?.subscribe_requests();
     let mut second_requests = test.z2m.backend("second")?.subscribe_requests();
 
@@ -318,8 +333,14 @@ async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
             .await
             .is_err()
     );
+    assert!(
+        test.hue_client
+            .put_zone(&zone, &json!({"children": [second.link]}))
+            .await
+            .is_err()
+    );
 
-    assert_eq!(test.hue_client.get_rooms().await?, rooms_before);
+    assert_eq!(test.hue_client.get_zones().await?, zones_before);
     first_requests.expect_quiet().await?;
     second_requests.expect_quiet().await?;
     Ok(())
@@ -334,7 +355,8 @@ async fn delete_zone() -> TestResult<()> {
         name: "new1".to_string(),
         archetype: GroupArchetype::Barbecue,
     };
-    let zone = create_zone_and_assert(&test, &group_metadata, &[&light]).await?;
+    let zone =
+        create_zone_and_assert(&test, test.z2m.only_backend(), &group_metadata, &[&light]).await?;
     let zone_resource = test.hue_client.get_zone(&zone).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
@@ -432,7 +454,13 @@ async fn update_metadata() -> TestResult<()> {
         name: "kitchen1".to_string(),
         archetype: GroupArchetype::Home,
     };
-    let zone = create_zone_and_assert(&test, &group_metadata, &[&light1, &light2]).await?;
+    let zone = create_zone_and_assert(
+        &test,
+        test.z2m.only_backend(),
+        &group_metadata,
+        &[&light1, &light2],
+    )
+    .await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
 
@@ -480,6 +508,7 @@ async fn update_zone_children() -> TestResult<()> {
     };
     let zone = create_zone_and_assert(
         &test,
+        test.z2m.only_backend(),
         &group_metadata,
         &[
             &ikea_color_light,
@@ -611,6 +640,7 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
     };
     let zone = create_zone_and_assert(
         &test,
+        test.z2m.only_backend(),
         &group_metadata,
         &[
             &ikea_color_light,
@@ -721,7 +751,8 @@ async fn z2m_delete_group() -> TestResult<()> {
         name: "z2m-group-changes".to_string(),
         archetype: GroupArchetype::Carport,
     };
-    let zone = create_zone_and_assert(&test, &group_metadata, &[&light]).await?;
+    let zone =
+        create_zone_and_assert(&test, test.z2m.only_backend(), &group_metadata, &[&light]).await?;
     let zone_grouped_light = test.hue_client.get_zone(&zone).await?;
     let grouped_light_link = *zone_grouped_light.grouped_light_service().unwrap();
 

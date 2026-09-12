@@ -154,26 +154,27 @@ impl TestZ2m {
             .ok_or_else(|| TestError::Z2mBackendNotFound(name.to_string()))
     }
 
-    fn only(&self) -> &TestZ2mBackend {
+    #[must_use]
+    pub fn only_backend(&self) -> &TestZ2mBackend {
         assert_eq!(
             self.backends.len(),
             1,
-            "only requires a single backend to be configured"
+            "only_backend requires a single backend to be configured"
         );
         self.backends.first_key_value().unwrap().1
     }
 
     #[must_use]
     pub fn subscribe_requests(&self) -> Z2mRequests {
-        self.only().subscribe_requests()
+        self.only_backend().subscribe_requests()
     }
 
     pub fn publish(&self, device: &impl TestZ2mDeviceOrGroup, payload: Value) -> TestResult<()> {
-        self.only().publish(device, payload)
+        self.only_backend().publish(device, payload)
     }
 
     pub fn publish_topic(&self, topic: String, payload: Value) -> TestResult<()> {
-        self.only().publish_topic(topic, payload)
+        self.only_backend().publish_topic(topic, payload)
     }
 }
 

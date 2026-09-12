@@ -13,8 +13,8 @@ use uuid::{Uuid, uuid};
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BehaviorScript, Bridge, BridgeHome, Clip, Device, DeviceArchetype, DeviceProductData,
-    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, RType, Resource,
-    ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
+    Entertainment, EntertainmentConfiguration, Group, GroupedLight, Light, Metadata, RType,
+    Resource, ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction,
     ZigbeeDeviceDiscoveryStatus, Zone,
 };
@@ -102,6 +102,39 @@ impl Resources {
 
     pub fn aux_set(&mut self, link: &ResourceLink, aux: AuxData) {
         self.state.aux_set(link.rid, aux);
+    }
+
+    pub fn light_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        self.get::<Light>(link)?;
+        self.aux_get(link).map(|aux| aux.backend.clone())
+    }
+
+    pub fn device_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        let device = self.get::<Device>(link)?;
+        let Some(light_link) = device.light_service() else {
+            return Ok(None);
+        };
+        self.light_backend(light_link)
+    }
+
+    pub fn grouped_light_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        self.aux_get(link).map(|aux| aux.backend.clone())
+    }
+
+    pub fn room_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        let room = self.get::<Room>(link)?;
+        let Some(glight_link) = room.grouped_light_service() else {
+            return Ok(None);
+        };
+        self.grouped_light_backend(glight_link)
+    }
+
+    pub fn zone_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        let room = self.get::<Zone>(link)?;
+        let Some(glight_link) = room.grouped_light_service() else {
+            return Ok(None);
+        };
+        self.grouped_light_backend(glight_link)
     }
 
     pub fn try_update<T: Serialize>(

@@ -318,12 +318,13 @@ async fn create_room() -> TestResult<()> {
 }
 
 #[tokio::test]
-async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
+async fn room_rejects_lights_from_different_backends() -> TestResult<()> {
     let backend_states = {
         let first = fixture::ikea::tradfri_warm_white(&IKEA_WARM_WHITE).with_state(json!({
             "state": "OFF",
             "brightness": 127
         }));
+        let first_group = Z2mGroupFixture::new(&KITCHEN_GROUP).with_member(&first);
         let second = fixture::ikea::tradfri_color(&IKEA_COLOR_WITHOUT_ROOM).with_state(json!({
             "state": "OFF",
             "brightness": 127
@@ -332,7 +333,10 @@ async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
         BTreeMap::from([
             (
                 "first".to_string(),
-                Z2mFixture::new().with_device(first).into_state(),
+                Z2mFixture::new()
+                    .with_device(first)
+                    .with_group(first_group)
+                    .into_state(),
             ),
             (
                 "second".to_string(),
@@ -344,6 +348,7 @@ async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
     let mut test = TestBridge::start_backends(backend_states).await?;
     let first = test.wait_for_device(IKEA_WARM_WHITE).await?;
     let second = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
+    let room = test.wait_for_room(&KITCHEN_GROUP).await?;
     let rooms_before = test.hue_client.get_rooms().await?;
     let mut first_requests = test.z2m.backend("first")?.subscribe_requests();
     let mut second_requests = test.z2m.backend("second")?.subscribe_requests();
@@ -357,6 +362,12 @@ async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
                     archetype: GroupArchetype::Home,
                 },
             })
+            .await
+            .is_err()
+    );
+    assert!(
+        test.hue_client
+            .put_room(&room, &json!({"children": [second.link()]}))
             .await
             .is_err()
     );

@@ -195,6 +195,9 @@ pub enum ApiError {
 
     #[error("Children must belong to the same backend")]
     MixedBackendChildren,
+
+    #[error("Missing backend data resource {0:?}")]
+    BackendNotFound(uuid::Uuid),
 }
 
 impl From<SvcError> for ApiError {
