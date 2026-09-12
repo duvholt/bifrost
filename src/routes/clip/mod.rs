@@ -221,7 +221,12 @@ async fn delete_resource_id(
 
     match rlink.rtype {
         /* Allowed (delete from state) */
-        RType::BehaviorInstance => {
+        RType::BehaviorInstance
+        | RType::EntertainmentConfiguration
+        | RType::GeofenceClient
+        | RType::MatterFabric
+        | RType::ServiceGroup
+        | RType::SmartScene => {
             let mut lock = state.res.lock().await;
 
             /* check that the resource exists, otherwise we should return 404 */
@@ -234,15 +239,7 @@ async fn delete_resource_id(
             V2Reply::ok(rlink)
         }
         /* Allowed (send request to backend) */
-        RType::Device
-        | RType::EntertainmentConfiguration
-        | RType::GeofenceClient
-        | RType::MatterFabric
-        | RType::Room
-        | RType::Scene
-        | RType::ServiceGroup
-        | RType::SmartScene
-        | RType::Zone => {
+        RType::Device | RType::Room | RType::Scene | RType::Zone => {
             let lock = state.res.lock().await;
 
             /* check that the resource exists, otherwise we should return 404 */
