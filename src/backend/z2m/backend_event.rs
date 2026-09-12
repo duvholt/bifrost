@@ -383,7 +383,10 @@ impl Z2mBackend {
             .send_group_add(group_id, group_friendly_name.clone())
             .await?;
         for member in &room.children {
-            let friendly_name = &self.rmap[member];
+            let Some(friendly_name) = &self.rmap.get(member) else {
+                log::warn!("Unable to find friendly name for room member {member:?}. Skipping");
+                continue;
+            };
             z2mws
                 .send_group_member_add(&group_friendly_name, friendly_name)
                 .await?;
@@ -424,12 +427,22 @@ impl Z2mBackend {
                 .collect();
 
             for add in known_new.difference(&known_existing) {
-                let friendly_name = &self.rmap[add];
+                let Some(friendly_name) = &self.rmap.get(add) else {
+                    log::warn!(
+                        "Unable to find friendly name for room member when adding {add:?}. Skipping"
+                    );
+                    continue;
+                };
                 z2mws.send_group_member_add(topic, friendly_name).await?;
             }
 
             for remove in known_existing.difference(&known_new) {
-                let friendly_name = &self.rmap[remove];
+                let Some(friendly_name) = &self.rmap.get(remove) else {
+                    log::warn!(
+                        "Unable to find friendly name for room member when removing {remove:?}. Skipping"
+                    );
+                    continue;
+                };
                 z2mws.send_group_member_remove(topic, friendly_name).await?;
             }
         }
@@ -474,7 +487,10 @@ impl Z2mBackend {
             .send_group_add(group_id, group_friendly_name.clone())
             .await?;
         for member in &zone.children {
-            let friendly_name = &self.rmap[member];
+            let Some(friendly_name) = &self.rmap.get(member) else {
+                log::warn!("Unable to find friendly name for zone member {member:?}. Skipping");
+                continue;
+            };
             z2mws
                 .send_group_member_add(&group_friendly_name, friendly_name)
                 .await?;
@@ -515,12 +531,22 @@ impl Z2mBackend {
                 .collect();
 
             for add in known_new.difference(&known_existing) {
-                let friendly_name = &self.rmap[add];
+                let Some(friendly_name) = &self.rmap.get(add) else {
+                    log::warn!(
+                        "Unable to find friendly name for zone member when adding {add:?}. Skipping"
+                    );
+                    continue;
+                };
                 z2mws.send_group_member_add(topic, friendly_name).await?;
             }
 
             for remove in known_existing.difference(&known_new) {
-                let friendly_name = &self.rmap[remove];
+                let Some(friendly_name) = &self.rmap.get(remove) else {
+                    log::warn!(
+                        "Unable to find friendly name for zone member when removing {remove:?}. Skipping"
+                    );
+                    continue;
+                };
                 z2mws.send_group_member_remove(topic, friendly_name).await?;
             }
         }
