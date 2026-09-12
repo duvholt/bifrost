@@ -351,6 +351,7 @@ impl Z2mBackend {
         &mut self,
         z2mws: &mut Z2mWebSocket,
         room_new: &RoomNew,
+        existing_link: &Option<ResourceLink>,
         link_reply: &RequestReply<ResourceLink>,
     ) -> ApiResult<()> {
         let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
@@ -367,7 +368,7 @@ impl Z2mBackend {
         };
         let group_id = self.get_next_group_id();
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
-        let link = RType::Room.deterministic(link_glight.rid);
+        let link = existing_link.unwrap_or_else(|| RType::Room.deterministic(link_glight.rid));
 
         lock.add(&link, Resource::Room(room.clone()))?;
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
@@ -455,6 +456,7 @@ impl Z2mBackend {
         &mut self,
         z2mws: &mut Z2mWebSocket,
         zone_new: &ZoneNew,
+        existing_link: &Option<ResourceLink>,
         link_reply: &RequestReply<ResourceLink>,
     ) -> ApiResult<()> {
         let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
@@ -471,7 +473,7 @@ impl Z2mBackend {
         };
         let group_id = self.get_next_group_id();
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
-        let link = RType::Zone.deterministic(link_glight.rid);
+        let link = existing_link.unwrap_or_else(|| RType::Zone.deterministic(link_glight.rid));
 
         lock.add(&link, Resource::Zone(zone.clone()))?;
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
@@ -782,10 +784,12 @@ impl Z2mBackend {
             BackendRequest::RoomCreate {
                 backend,
                 room_new,
+                existing_link,
                 link_reply,
             } => {
                 if backend == &self.name {
-                    self.backend_room_create(z2mws, room_new, link_reply).await
+                    self.backend_room_create(z2mws, room_new, existing_link, link_reply)
+                        .await
                 } else {
                     Ok(())
                 }
@@ -798,10 +802,12 @@ impl Z2mBackend {
             BackendRequest::ZoneCreate {
                 backend,
                 zone_new,
+                existing_link,
                 link_reply,
             } => {
                 if backend == &self.name {
-                    self.backend_zone_create(z2mws, zone_new, link_reply).await
+                    self.backend_zone_create(z2mws, zone_new, existing_link, link_reply)
+                        .await
                 } else {
                     Ok(())
                 }

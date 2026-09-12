@@ -367,10 +367,47 @@ async fn empty_zone_can_acquire_first_child() -> TestResult<()> {
             friendly_name: "empty",
         },
     };
+    let mut z2m_requests = test.z2m.subscribe_requests();
+    let mut hue_events = test.hue_client.subscribe_events();
 
     test.hue_client
         .put_zone(&zone, &json!({ "children": [child.link] }))
         .await?;
+
+    z2m_requests
+        .expect_requests_unordered([
+            (
+                "bridge/request/group/add",
+                json!({"id":zone.fixture_group.id,"friendly_name":zone.fixture_group.friendly_name}),
+            ),
+            (
+                "bridge/request/group/members/add",
+                json!({"device":IKEA_COLOR_WITHOUT_ZONE.topic(),"group":zone.topic()}),
+            ),
+        ])
+        .await?;
+
+    test.z2m.publish_topic("bridge/response/group/members/add".to_string(), json!({"data":{"device":IKEA_COLOR_WITHOUT_ZONE.topic(),"endpoint":"default","group":zone.topic()},"status":"ok"}))?;
+    test.z2m.publish_topic(
+        "bridge/groups".to_string(),
+        json!([
+            {"friendly_name": &zone.fixture_group.friendly_name, "id":&zone.fixture_group.id, "members":[
+                {"endpoint":11,"ieee_address": IKEA_COLOR_WITHOUT_ZONE.ieee_address()}
+                ],
+             "scenes":[]}
+        ]),
+    )?;
+
+    let grouped_light = hue_events.expect_add(RType::GroupedLight).await?;
+    assert_eq!(
+        hue_events.expect_update_resource(zone.link).await?.data,
+        json!({
+           "children": [child.link],
+           "services": [grouped_light.link()],
+        })
+    );
+
+    hue_events.expect_quiet().await?;
 
     Ok(())
 }

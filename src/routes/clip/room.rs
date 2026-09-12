@@ -17,17 +17,17 @@ pub async fn put_room(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
     lock.get::<Room>(&rlink)?;
 
     let mut upd: RoomUpdate = serde_json::from_value(put)?;
+    let room_backend = lock.room_backend(&rlink)?;
 
-    if let Some(children) = &upd.children
-        && let Some(children_backend) = backend_for_children(&lock, children)?
+    let children_backend = match &upd.children {
+        Some(children) => backend_for_children(&lock, children)?,
+        None => None,
+    };
+
+    if let (Some(room_backend), Some(children_backend)) = (&room_backend, &children_backend)
+        && room_backend != children_backend
     {
-        let room_backend = lock.room_backend(&rlink)?;
-
-        if let Some(room_backend) = room_backend
-            && room_backend != children_backend
-        {
-            return Err(ApiError::MixedBackendChildren);
-        }
+        return Err(ApiError::MixedBackendChildren);
     }
 
     if let Some(metadata) = upd.metadata.take() {
@@ -36,7 +36,23 @@ pub async fn put_room(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
         })?;
     }
 
-    lock.backend_request(BackendRequest::RoomUpdate(rlink, upd))?;
+    if room_backend.is_none()
+        && let Some(backend) = children_backend
+        && let Some(children) = upd.children.take()
+    {
+        let room = lock.get::<Room>(&rlink)?;
+        lock.backend_request(BackendRequest::RoomCreate {
+            backend,
+            room_new: RoomNew {
+                children,
+                metadata: room.metadata.clone(),
+            },
+            existing_link: Some(rlink),
+            link_reply: None,
+        })?;
+    } else {
+        lock.backend_request(BackendRequest::RoomUpdate(rlink, upd))?;
+    }
 
     drop(lock);
 
@@ -55,6 +71,7 @@ pub async fn post_room(state: &AppState, post: Value) -> ApiV2Result {
         lock.backend_request(BackendRequest::RoomCreate {
             backend,
             room_new,
+            existing_link: None,
             link_reply: tx,
         })?;
 

@@ -41,6 +41,7 @@ pub enum BackendRequest {
     RoomCreate {
         backend: String,
         room_new: RoomNew,
+        existing_link: Option<ResourceLink>,
         #[serde(skip)]
         link_reply: RequestReply<ResourceLink>,
     },
@@ -49,6 +50,7 @@ pub enum BackendRequest {
     ZoneCreate {
         backend: String,
         zone_new: ZoneNew,
+        existing_link: Option<ResourceLink>,
         #[serde(skip)]
         link_reply: RequestReply<ResourceLink>,
     },

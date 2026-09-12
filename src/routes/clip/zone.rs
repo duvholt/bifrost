@@ -17,17 +17,17 @@ pub async fn put_zone(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
     lock.get::<Zone>(&rlink)?;
 
     let mut upd: ZoneUpdate = serde_json::from_value(put)?;
+    let zone_backend = lock.zone_backend(&rlink)?;
 
-    if let Some(children) = &upd.children
-        && let Some(children_backend) = backend_for_children(&lock, children)?
+    let children_backend = match &upd.children {
+        Some(children) => backend_for_children(&lock, children)?,
+        None => None,
+    };
+
+    if let (Some(zone_backend), Some(children_backend)) = (&zone_backend, &children_backend)
+        && zone_backend != children_backend
     {
-        let zone_backend = lock.zone_backend(&rlink)?;
-
-        if let Some(zone_backend) = zone_backend
-            && zone_backend != children_backend
-        {
-            return Err(ApiError::MixedBackendChildren);
-        }
+        return Err(ApiError::MixedBackendChildren);
     }
 
     if let Some(metadata) = upd.metadata.take() {
@@ -36,7 +36,24 @@ pub async fn put_zone(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
         })?;
     }
 
-    lock.backend_request(BackendRequest::ZoneUpdate(rlink, upd))?;
+    if zone_backend.is_none()
+        && let Some(backend) = children_backend
+        && let Some(children) = upd.children.take()
+    {
+        let zone = lock.get::<Zone>(&rlink)?;
+        let zone_new = ZoneNew {
+            children,
+            metadata: zone.metadata.clone(),
+        };
+        lock.backend_request(BackendRequest::ZoneCreate {
+            backend,
+            zone_new,
+            existing_link: Some(rlink),
+            link_reply: None,
+        })?;
+    } else {
+        lock.backend_request(BackendRequest::ZoneUpdate(rlink, upd))?;
+    }
 
     drop(lock);
 
@@ -54,6 +71,7 @@ pub async fn post_zone(state: &AppState, post: Value) -> ApiV2Result {
         lock.backend_request(BackendRequest::ZoneCreate {
             backend,
             zone_new,
+            existing_link: None,
             link_reply: tx,
         })?;
 
