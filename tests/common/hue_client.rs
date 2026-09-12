@@ -326,7 +326,7 @@ impl HueClient {
 
     pub async fn get_zones(&self) -> TestResult<Vec<Zone>> {
         let data = self
-            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/room")
+            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/zone")
             .await?
             .data;
         Ok(resource_records_to_zones(data))

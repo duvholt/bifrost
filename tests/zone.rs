@@ -265,16 +265,21 @@ async fn create_zone() -> TestResult<()> {
     let mut test = TestBridge::start(z2m_state()).await?;
     let light = test.wait_for_light(IKEA_COLOR_WITHOUT_ZONE).await?;
 
-    create_zone_and_assert(
-        &test,
-        test.z2m.only_backend(),
-        &GroupMetadata {
-            name: "new1".to_string(),
-            archetype: GroupArchetype::Barbecue,
-        },
-        &[&light],
-    )
-    .await?;
+    let metadata = GroupMetadata {
+        name: "new1".to_string(),
+        archetype: GroupArchetype::Barbecue,
+    };
+    let test_zone =
+        create_zone_and_assert(&test, test.z2m.only_backend(), &metadata, &[&light]).await?;
+    let zone = test.hue_client.get_zone(&test_zone).await?;
+
+    let zones = test.hue_client.get_zones().await?;
+    let expected_zones: Vec<Zone> = vec![Zone {
+        children: BTreeSet::from([light.link]),
+        metadata: metadata.clone(),
+        services: BTreeSet::from([*zone.grouped_light_service().unwrap()]),
+    }];
+    assert_eq!(expected_zones, zones);
 
     Ok(())
 }
