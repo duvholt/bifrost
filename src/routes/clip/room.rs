@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::time::Duration;
 
 use serde_json::Value;
@@ -34,14 +34,26 @@ pub async fn post_room(state: &AppState, post: Value) -> ApiV2Result {
     let mut lock = state.res.lock().await;
 
     let room_new: RoomNew = serde_json::from_value(post)?;
-    let backend = room_new.children.iter().find_map(|link| {
-        let device = lock.get::<Device>(link).ok()?;
-        let light_link = device.light_service()?;
-        lock.aux_get(light_link)
-            .map_or(None, |aux| aux.backend.clone())
-    });
 
-    let room_link = if let Some(backend) = backend {
+    let backends: HashSet<_> = room_new
+        .children
+        .iter()
+        .filter_map(|link| {
+            let device = lock.get::<Device>(link).ok()?;
+            let light_link = device.light_service()?;
+            lock.aux_get(light_link)
+                .map_or(None, |aux| aux.backend.clone())
+        })
+        .collect();
+
+    if backends.len() > 1 {
+        log::error!(
+            "Tried adding children from different backends into the same room {backends:?}"
+        );
+        return Err(ApiError::MixedBackendChildren);
+    }
+
+    let room_link = if let Some(backend) = backends.into_iter().next() {
         let (tx, rx) = request_reply_channel::<ResourceLink>();
         lock.backend_request(BackendRequest::RoomCreate {
             backend,

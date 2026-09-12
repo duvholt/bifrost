@@ -83,9 +83,13 @@ impl Z2mRequests {
     }
 }
 
-pub struct TestZ2m {
+pub struct TestZ2mBackend {
     websocket_tx: broadcast::Sender<RawMessage>,
     observed_requests_rx: broadcast::Receiver<RawMessage>,
+}
+
+pub struct TestZ2m {
+    backends: BTreeMap<String, TestZ2mBackend>,
 }
 
 pub async fn create_m2m_service(
@@ -105,7 +109,7 @@ pub async fn create_m2m_service(
     Ok(service)
 }
 
-impl TestZ2m {
+impl TestZ2mBackend {
     #[must_use]
     pub fn from_service(service: &Memory2MqttService) -> Self {
         Self {
@@ -128,6 +132,48 @@ impl TestZ2m {
     pub fn publish_topic(&self, topic: String, payload: Value) -> TestResult<()> {
         self.websocket_tx.send(RawMessage { topic, payload })?;
         Ok(())
+    }
+}
+
+impl TestZ2m {
+    #[must_use]
+    pub fn from_services<'a>(
+        services: impl IntoIterator<Item = (&'a String, &'a Memory2MqttService)>,
+    ) -> Self {
+        Self {
+            backends: services
+                .into_iter()
+                .map(|(name, service)| (name.clone(), TestZ2mBackend::from_service(service)))
+                .collect(),
+        }
+    }
+
+    pub fn backend(&self, name: &str) -> TestResult<&TestZ2mBackend> {
+        self.backends
+            .get(name)
+            .ok_or_else(|| TestError::Z2mBackendNotFound(name.to_string()))
+    }
+
+    fn only(&self) -> &TestZ2mBackend {
+        assert_eq!(
+            self.backends.len(),
+            1,
+            "only requires a single backend to be configured"
+        );
+        self.backends.first_key_value().unwrap().1
+    }
+
+    #[must_use]
+    pub fn subscribe_requests(&self) -> Z2mRequests {
+        self.only().subscribe_requests()
+    }
+
+    pub fn publish(&self, device: &impl TestZ2mDeviceOrGroup, payload: Value) -> TestResult<()> {
+        self.only().publish(device, payload)
+    }
+
+    pub fn publish_topic(&self, topic: String, payload: Value) -> TestResult<()> {
+        self.only().publish_topic(topic, payload)
     }
 }
 

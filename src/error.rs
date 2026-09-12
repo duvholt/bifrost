@@ -189,6 +189,9 @@ pub enum ApiError {
 
     #[error("Backend request timeout")]
     BackendRequestTimeout,
+
+    #[error("Children must belong to the same backend")]
+    MixedBackendChildren,
 }
 
 impl From<SvcError> for ApiError {

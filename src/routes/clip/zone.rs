@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::time::Duration;
 
 use serde_json::Value;
@@ -34,12 +34,23 @@ pub async fn post_zone(state: &AppState, post: Value) -> ApiV2Result {
     let mut lock = state.res.lock().await;
 
     let zone_new: ZoneNew = serde_json::from_value(post)?;
-    let backend = zone_new.children.iter().find_map(|light_link| {
-        lock.aux_get(light_link)
-            .map_or(None, |aux| aux.backend.clone())
-    });
+    let backends: HashSet<_> = zone_new
+        .children
+        .iter()
+        .filter_map(|light_link| {
+            lock.aux_get(light_link)
+                .map_or(None, |aux| aux.backend.clone())
+        })
+        .collect();
 
-    let zone_link = if let Some(backend) = backend {
+    if backends.len() > 1 {
+        log::error!(
+            "Tried adding children from different backends into the same zone {backends:?}"
+        );
+        return Err(ApiError::MixedBackendChildren);
+    }
+
+    let zone_link = if let Some(backend) = backends.into_iter().next() {
         let (tx, rx) = request_reply_channel::<ResourceLink>();
         lock.backend_request(BackendRequest::ZoneCreate {
             backend,

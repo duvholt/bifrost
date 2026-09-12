@@ -276,6 +276,56 @@ async fn create_zone() -> TestResult<()> {
 }
 
 #[tokio::test]
+async fn create_room_with_lights_from_different_backends() -> TestResult<()> {
+    let backend_states = {
+        let first = fixture::ikea::tradfri_warm_white(&IKEA_WARM_WHITE).with_state(json!({
+            "state": "OFF",
+            "brightness": 127
+        }));
+        let second = fixture::ikea::tradfri_color(&IKEA_COLOR_WITHOUT_ZONE).with_state(json!({
+            "state": "OFF",
+            "brightness": 127
+        }));
+
+        BTreeMap::from([
+            (
+                "first".to_string(),
+                Z2mFixture::new().with_device(first).into_state(),
+            ),
+            (
+                "second".to_string(),
+                Z2mFixture::new().with_device(second).into_state(),
+            ),
+        ])
+    };
+    init();
+    let mut test = TestBridge::start_backends(backend_states).await?;
+    let first = test.wait_for_light(IKEA_WARM_WHITE).await?;
+    let second = test.wait_for_light(IKEA_COLOR_WITHOUT_ZONE).await?;
+    let rooms_before = test.hue_client.get_rooms().await?;
+    let mut first_requests = test.z2m.backend("first")?.subscribe_requests();
+    let mut second_requests = test.z2m.backend("second")?.subscribe_requests();
+
+    assert!(
+        test.hue_client
+            .post_zone(ZoneNew {
+                children: BTreeSet::from([first.link, second.link]),
+                metadata: GroupMetadata {
+                    name: "mixed".to_string(),
+                    archetype: GroupArchetype::Home,
+                },
+            })
+            .await
+            .is_err()
+    );
+
+    assert_eq!(test.hue_client.get_rooms().await?, rooms_before);
+    first_requests.expect_quiet().await?;
+    second_requests.expect_quiet().await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn delete_zone() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;

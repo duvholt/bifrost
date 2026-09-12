@@ -106,16 +106,35 @@ impl TestBridge {
         z2m_state: BTreeMap<String, Value>,
         seed: impl FnOnce(&mut Resources) -> TestResult<()>,
     ) -> TestResult<Self> {
+        Self::start_interal(BTreeMap::from([("test".to_string(), z2m_state)]), seed).await
+    }
+
+    pub async fn start_backends(
+        z2m_states: BTreeMap<String, BTreeMap<String, Value>>,
+    ) -> TestResult<Self> {
+        Self::start_interal(z2m_states, |_| Ok(())).await
+    }
+
+    async fn start_interal(
+        z2m_states: BTreeMap<String, BTreeMap<String, Value>>,
+        seed: impl FnOnce(&mut Resources) -> TestResult<()>,
+    ) -> TestResult<Self> {
         let workdir = Self::create_workdir()?;
         let mut tasks = JoinSet::new();
 
         let http_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let http_address = http_listener.local_addr()?;
 
-        let memory2mqtt_service = create_m2m_service(z2m_state, M2mMode::Manual).await?;
-        let test_z2m = TestZ2m::from_service(&memory2mqtt_service);
-        let config =
-            Self::create_appconfig(http_address, memory2mqtt_service.config.listen, &workdir)?;
+        let mut memory2mqtt_services = BTreeMap::new();
+        for (name, state) in z2m_states {
+            memory2mqtt_services.insert(name, create_m2m_service(state, M2mMode::Manual).await?);
+        }
+        let test_z2m = TestZ2m::from_services(memory2mqtt_services.iter());
+        let z2m_addresses = memory2mqtt_services
+            .iter()
+            .map(|(name, service)| (name.clone(), service.config.listen))
+            .collect();
+        let config = Self::create_appconfig(http_address, z2m_addresses, &workdir)?;
 
         let (svc_manager, manager_future) = ServiceManager::spawn();
         let appstate = AppState::from_config(config, svc_manager).await?;
@@ -126,7 +145,9 @@ impl TestBridge {
         let mut mgr = appstate.manager();
 
         // memory2mqtt
-        mgr.register_service("m2m", memory2mqtt_service).await?;
+        for (name, service) in memory2mqtt_services {
+            mgr.register_service(format!("m2m-{name}"), service).await?;
+        }
 
         // bifrost http
         let http_service = HttpServer::http_listener(
@@ -194,9 +215,14 @@ impl TestBridge {
 
     fn create_appconfig(
         http_address: SocketAddr,
-        z2m_address: SocketAddr,
+        z2m_addresses: BTreeMap<String, SocketAddr>,
         workdir: &std::path::Path,
     ) -> TestResult<AppConfig> {
+        let z2m = z2m_addresses
+            .into_iter()
+            .map(|(name, address)| (name, json!({"url": format!("ws://{address}/api")})))
+            .collect::<BTreeMap<_, _>>();
+
         Ok(serde_json::from_value(json!({
             "bridge": {
                 "name": "Bifrost integration test",
@@ -209,9 +235,7 @@ impl TestBridge {
                 "gateway": http_address.ip(),
                 "timezone": "Etc/UTC"
             },
-            "z2m": {
-                "test": {"url": format!("ws://{z2m_address}/api")}
-            },
+            "z2m": z2m,
             "bifrost": {
                 "state_file": workdir.join("state.yaml"),
                 "cert_file": workdir.join("cert.pem")
