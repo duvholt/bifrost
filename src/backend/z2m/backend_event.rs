@@ -8,7 +8,7 @@ use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate, LightRecordMod
 use tokio::time::sleep;
 use uuid::Uuid;
 
-use bifrost_api::backend::{BackendRequest, RequestReply};
+use bifrost_api::backend::{BackendRequest, DeleteReply, RequestReply};
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
     EntertainmentConfiguration, Group, GroupedLight, GroupedLightUpdate, Light,
@@ -526,11 +526,12 @@ impl Z2mBackend {
         Ok(())
     }
 
+    #[allow(clippy::ref_option)]
     async fn backend_delete(
         &self,
         z2mws: &mut Z2mWebSocket,
         link: &ResourceLink,
-        claim: &RequestReply<()>,
+        reply: &RequestReply<DeleteReply>,
     ) -> ApiResult<()> {
         match link.rtype {
             RType::Scene => {
@@ -543,7 +544,9 @@ impl Z2mBackend {
                 drop(lock);
 
                 if let Some(topic) = self.rmap.get(&group) {
-                    claim_resource(claim).await;
+                    if !reply_delete(reply, DeleteReply::Claimed).await {
+                        return Ok(());
+                    }
                     z2mws.send_scene_remove(topic, index).await?;
                 }
             }
@@ -554,7 +557,9 @@ impl Z2mBackend {
                     .get(link)
                     .and_then(|topic| self.network.get(topic))
                 {
-                    claim_resource(claim).await;
+                    if !reply_delete(reply, DeleteReply::Claimed).await {
+                        return Ok(());
+                    }
                     let addr = dev.ieee_address.to_string();
                     log::info!(
                         "[{}] Requesting z2m removal of {} ({})",
@@ -569,15 +574,23 @@ impl Z2mBackend {
 
             RType::Room | RType::Zone => {
                 if let Some(topic) = self.rmap.get(link) {
-                    claim_resource(claim).await;
+                    if !reply_delete(reply, DeleteReply::Claimed).await {
+                        return Ok(());
+                    }
                     log::info!("[{}] Requesting z2m removal of {}", self.name, &topic);
                     z2mws.send_group_remove(topic.clone()).await?;
                 }
             }
 
             rtype => {
-                // claim all invalid types to avoid accidentally deleting a resource
-                claim_resource(claim).await;
+                if !reply_delete(
+                    reply,
+                    DeleteReply::Failed(format!("Deleting type {rtype:?} is not supported")),
+                )
+                .await
+                {
+                    return Ok(());
+                }
                 log::warn!(
                     "[{}] Deleting objects of type {rtype:?} is not supported",
                     self.name
@@ -770,7 +783,7 @@ impl Z2mBackend {
                 self.backend_zone_update(z2mws, link, upd).await
             }
 
-            BackendRequest::Delete { link, claim } => self.backend_delete(z2mws, link, claim).await,
+            BackendRequest::Delete { link, reply } => self.backend_delete(z2mws, link, reply).await,
 
             BackendRequest::EntertainmentStart(ent_id) => {
                 self.backend_entertainment_start(z2mws, ent_id).await
@@ -790,10 +803,19 @@ impl Z2mBackend {
     }
 }
 
-async fn claim_resource(claim: &RequestReply<()>) {
-    if let Some(claim) = claim {
-        if let Some(claim) = claim.lock().await.take() {
-            let _ = claim.send(());
+#[allow(clippy::ref_option)]
+async fn reply_delete(claim: &RequestReply<DeleteReply>, claimed: DeleteReply) -> bool {
+    if let Some(claim) = claim
+        && let Some(claim) = claim.lock().await.take()
+    {
+        match claim.send(claimed) {
+            Ok(()) => {
+                return true;
+            }
+            Err(err) => {
+                log::error!("Failed to send delete reply: {err:?}");
+            }
         }
     }
+    false
 }

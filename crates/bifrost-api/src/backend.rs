@@ -22,6 +22,12 @@ pub fn request_reply_channel<T>() -> (RequestReply<T>, oneshot::Receiver<T>) {
     (Some(Arc::new(Mutex::new(Some(tx)))), rx)
 }
 
+#[derive(Debug)]
+pub enum DeleteReply {
+    Claimed,
+    Failed(String),
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BackendRequest {
@@ -51,7 +57,7 @@ pub enum BackendRequest {
     Delete {
         link: ResourceLink,
         #[serde(skip)]
-        claim: RequestReply<()>,
+        reply: RequestReply<DeleteReply>,
     },
 
     EntertainmentStart(Uuid),

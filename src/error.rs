@@ -190,6 +190,9 @@ pub enum ApiError {
     #[error("Backend request timeout")]
     BackendRequestTimeout,
 
+    #[error("Backend request failed: {0}")]
+    BackendRequestFailed(String),
+
     #[error("Children must belong to the same backend")]
     MixedBackendChildren,
 }

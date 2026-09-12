@@ -8,10 +8,9 @@ pub mod scene;
 pub mod zigbee_device_discovery;
 pub mod zone;
 
-use std::sync::Arc;
 use std::time::Duration;
 
-use bifrost_api::backend::BackendRequest;
+use bifrost_api::backend::{BackendRequest, DeleteReply, request_reply_channel};
 use entertainment_configuration as ent_conf;
 
 use axum::Router;
@@ -20,7 +19,6 @@ use axum::routing::{delete, get, post, put};
 use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::{Mutex, oneshot};
 use tokio::time::timeout;
 
 use crate::error::{ApiError, ApiResult};
@@ -251,18 +249,26 @@ async fn delete_resource_id(
             lock.get_resource(&rlink)?;
 
             /* request deletion from backend */
-            let (tx, rx) = oneshot::channel();
+            let (tx, rx) = request_reply_channel::<DeleteReply>();
             lock.backend_request(BackendRequest::Delete {
                 link: rlink,
-                claim: Some(Arc::new(Mutex::new(Some(tx)))),
+                reply: tx,
             })?;
             drop(lock);
 
             match timeout(Duration::from_millis(100), rx).await {
-                Ok(Ok(_)) => {}
-                Ok(Err(_)) | Err(_) => {
+                Ok(Ok(DeleteReply::Claimed)) => {}
+                Ok(Ok(DeleteReply::Failed(reason))) => {
+                    return Err(ApiError::BackendRequestFailed(reason));
+                }
+                Ok(Err(_recv_error)) => {
+                    // all requests are dropped without anyone claiming the resource
                     log::warn!("Deleting resource not owned by any backends: {rlink:?}");
                     state.res.lock().await.delete(&rlink)?;
+                }
+                Err(_elapsed) => {
+                    log::warn!("Delete request timed out for: {rlink:?}");
+                    return Err(ApiError::BackendRequestTimeout);
                 }
             }
 
