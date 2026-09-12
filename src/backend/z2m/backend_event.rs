@@ -348,7 +348,7 @@ impl Z2mBackend {
 
     #[allow(clippy::ref_option)]
     async fn backend_room_create(
-        &self,
+        &mut self,
         z2mws: &mut Z2mWebSocket,
         room_new: &RoomNew,
         link_reply: &RequestReply<ResourceLink>,
@@ -365,7 +365,7 @@ impl Z2mBackend {
             metadata: room_new.metadata.clone(),
             services: BTreeSet::new(),
         };
-        let group_id = lock.get_next_group_id()?;
+        let group_id = self.get_next_group_id();
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
         let link = RType::Room.deterministic(link_glight.rid);
 
@@ -377,6 +377,7 @@ impl Z2mBackend {
         )?;
         self.set_group_aux(&mut lock, link_glight, group_id, Some(&group_friendly_name));
         drop(lock);
+        self.reserve_group_id(group_id);
 
         z2mws
             .send_group_add(group_id, group_friendly_name.clone())
@@ -438,7 +439,7 @@ impl Z2mBackend {
 
     #[allow(clippy::ref_option)]
     async fn backend_zone_create(
-        &self,
+        &mut self,
         z2mws: &mut Z2mWebSocket,
         zone_new: &ZoneNew,
         link_reply: &RequestReply<ResourceLink>,
@@ -455,7 +456,7 @@ impl Z2mBackend {
             metadata: zone_new.metadata.clone(),
             services: BTreeSet::new(),
         };
-        let group_id = lock.get_next_group_id()?;
+        let group_id = self.get_next_group_id();
         let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
         let link = RType::Zone.deterministic(link_glight.rid);
 
@@ -467,6 +468,7 @@ impl Z2mBackend {
         )?;
         self.set_group_aux(&mut lock, link_glight, group_id, Some(&group_friendly_name));
         drop(lock);
+        self.reserve_group_id(group_id);
 
         z2mws
             .send_group_add(group_id, group_friendly_name.clone())

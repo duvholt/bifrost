@@ -245,25 +245,6 @@ impl Z2mBackend {
     #[allow(clippy::too_many_lines)]
     pub async fn add_group(&mut self, grp: &z2m::api::Group) -> ApiResult<()> {
         let topic = grp.friendly_name.clone();
-
-        let mut lock = self.state.lock().await;
-        let link_glight = self
-            .find_grouped_light(&lock, grp.id, &topic)?
-            .unwrap_or_else(|| RType::GroupedLight.deterministic((&self.name, grp.id)));
-
-        let glight = lock
-            .get::<GroupedLight>(&link_glight)
-            .cloned()
-            .unwrap_or_else(|_| {
-                let link_room = RType::Room.deterministic(link_glight.rid);
-                GroupedLight::new(link_room)
-            });
-        let owner_link = glight.owner;
-        lock.add(&link_glight, Resource::GroupedLight(glight))?;
-        // We want to set group light aux data for all groups since it is used to calculate the next available group id
-        self.set_group_aux(&mut lock, link_glight, grp.id, Some(&topic));
-        drop(lock);
-
         let room_name;
         if let Some(ref prefix) = self.server.group_prefix {
             if let Some(name) = grp.friendly_name.strip_prefix(prefix) {
@@ -279,6 +260,23 @@ impl Z2mBackend {
         } else {
             room_name = &grp.friendly_name;
         }
+
+        let mut lock = self.state.lock().await;
+        let link_glight = self
+            .find_grouped_light(&lock, grp.id, &topic)?
+            .unwrap_or_else(|| RType::GroupedLight.deterministic((&self.name, grp.id)));
+
+        let glight = if let Ok(glight) = lock.get::<GroupedLight>(&link_glight).cloned() {
+            glight
+        } else {
+            let link_room = RType::Room.deterministic(link_glight.rid);
+            let glight = GroupedLight::new(link_room);
+            lock.add(&link_glight, Resource::GroupedLight(glight.clone()))?;
+            glight
+        };
+        let owner_link = glight.owner;
+        self.set_group_aux(&mut lock, link_glight, grp.id, Some(&topic));
+        drop(lock);
 
         let children = grp
             .members

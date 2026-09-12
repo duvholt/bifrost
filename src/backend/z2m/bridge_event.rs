@@ -405,6 +405,7 @@ impl Z2mBackend {
 
             Message::BridgeGroups(obj) => {
                 /* println!("{obj:#?}"); */
+                self.set_used_group_ids(obj);
                 for grp in obj {
                     self.add_group(grp).await?;
                 }

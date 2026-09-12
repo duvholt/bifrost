@@ -17,4 +17,21 @@ impl Z2mBackend {
 
         res.aux_set(&link_glight, aux);
     }
+
+    pub fn set_used_group_ids(&mut self, groups: &[z2m::api::Group]) {
+        self.used_group_ids = groups.iter().map(|g| g.id).collect();
+    }
+
+    pub fn reserve_group_id(&mut self, group_id: u32) {
+        self.used_group_ids.insert(group_id);
+    }
+
+    pub fn get_next_group_id(&self) -> u32 {
+        for x in 1.. {
+            if !self.used_group_ids.contains(&x) {
+                return x;
+            }
+        }
+        unreachable!()
+    }
 }
