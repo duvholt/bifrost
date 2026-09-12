@@ -79,20 +79,21 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
 
     for rr in res.get_resources_by_type(RType::Room) {
         let room: Room = rr.obj.try_into()?;
-        let uuid = room
-            .services
-            .iter()
-            .find(|rl| rl.rtype == RType::GroupedLight)
-            .ok_or(HueError::NotFound(rr.id))?;
+        let glight_link = room.grouped_light_service();
 
-        let glight = res.get::<GroupedLight>(uuid)?;
-        let lights: Vec<String> = room
-            .children
-            .iter()
-            .filter_map(|rl| res.get(rl).ok())
-            .filter_map(Device::light_service)
-            .filter_map(|rl| res.get_id_v1(rl.rid).ok())
-            .collect();
+        let (glight, lights) = if let Some(glight_link) = glight_link {
+            let glight = res.get::<GroupedLight>(glight_link)?;
+            let lights: Vec<String> = room
+                .children
+                .iter()
+                .filter_map(|rl| res.get(rl).ok())
+                .filter_map(Device::light_service)
+                .filter_map(|rl| res.get_id_v1(rl.rid).ok())
+                .collect();
+            (Some(glight), lights)
+        } else {
+            (None, Vec::new())
+        };
 
         rooms.insert(
             res.get_id_v1(rr.id)?,
@@ -102,18 +103,19 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
 
     for rr in res.get_resources_by_type(RType::Zone) {
         let zone: Zone = rr.obj.try_into()?;
-        let uuid = zone
-            .services
-            .iter()
-            .find(|rl| rl.rtype == RType::GroupedLight)
-            .ok_or(HueError::NotFound(rr.id))?;
+        let glight_link = zone.grouped_light_service();
 
-        let glight = res.get::<GroupedLight>(uuid)?;
-        let lights: Vec<String> = zone
-            .children
-            .iter()
-            .filter_map(|rl| res.get_id_v1(rl.rid).ok())
-            .collect();
+        let (glight, lights) = if let Some(glight_link) = glight_link {
+            let glight = res.get::<GroupedLight>(glight_link)?;
+            let lights: Vec<String> = zone
+                .children
+                .iter()
+                .filter_map(|rl| res.get_id_v1(rl.rid).ok())
+                .collect();
+            (Some(glight), lights)
+        } else {
+            (None, Vec::new())
+        };
 
         rooms.insert(
             res.get_id_v1(rr.id)?,
