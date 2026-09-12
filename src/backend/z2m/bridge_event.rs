@@ -239,7 +239,8 @@ impl Z2mBackend {
 
         lock.delete(&link_group)?;
         self.map.remove(topic);
-        self.rmap.insert(link_group, topic.clone());
+        self.rmap.remove(&glight_link);
+        self.rmap.remove(&link_group);
 
         log::info!("[{}] Bridge deleted group {:?}", self.name, link_group);
         drop(lock);
