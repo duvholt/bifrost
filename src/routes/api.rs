@@ -96,7 +96,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
 
         rooms.insert(
             res.get_id_v1(rr.id)?,
-            ApiGroup::from_lights_and_room(glight, lights, room.metadata),
+            ApiGroup::from_lights_and_group(glight, lights, room.metadata, ApiGroupType::Room),
         );
     }
 
@@ -117,7 +117,7 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
 
         rooms.insert(
             res.get_id_v1(rr.id)?,
-            ApiGroup::from_lights_and_room(glight, lights, zone.metadata),
+            ApiGroup::from_lights_and_group(glight, lights, zone.metadata, ApiGroupType::Zone),
         );
     }
 

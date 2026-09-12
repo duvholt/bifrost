@@ -406,10 +406,11 @@ impl ApiGroup {
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
-    pub fn from_lights_and_room(
+    pub fn from_lights_and_group(
         glight: &api::GroupedLight,
         lights: Vec<String>,
         group_metadata: api::GroupMetadata,
+        group_type: ApiGroupType,
     ) -> Self {
         Self {
             name: group_metadata.name,
@@ -426,7 +427,7 @@ impl ApiGroup {
                 colormode: None,
             },
             class: ApiGroupClass::default(),
-            group_type: ApiGroupType::Room,
+            group_type,
             recycle: false,
             sensors: vec![],
             state: ApiGroupState::default(),
