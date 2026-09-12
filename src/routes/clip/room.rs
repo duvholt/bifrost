@@ -21,11 +21,11 @@ pub async fn put_room(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
     if let Some(children) = &upd.children
         && let Some(children_backend) = backend_for_children(&lock, children)?
     {
-        let room_backend = lock
-            .room_backend(&rlink)?
-            .ok_or(ApiError::BackendNotFound(rlink.rid))?;
+        let room_backend = lock.room_backend(&rlink)?;
 
-        if room_backend != children_backend {
+        if let Some(room_backend) = room_backend
+            && room_backend != children_backend
+        {
             return Err(ApiError::MixedBackendChildren);
         }
     }

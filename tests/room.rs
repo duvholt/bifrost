@@ -379,6 +379,35 @@ async fn room_rejects_lights_from_different_backends() -> TestResult<()> {
 }
 
 #[tokio::test]
+async fn empty_room_can_acquire_first_child() -> TestResult<()> {
+    init();
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let child = test.wait_for_device(IKEA_COLOR_WITHOUT_ROOM).await?;
+    let room = TestRoom {
+        link: test
+            .hue_client
+            .post_room(RoomNew {
+                children: BTreeSet::new(),
+                metadata: GroupMetadata {
+                    name: "empty".to_string(),
+                    archetype: GroupArchetype::Home,
+                },
+            })
+            .await?,
+        fixture_group: FixtureGroup {
+            id: 3,
+            friendly_name: "empty",
+        },
+    };
+
+    test.hue_client
+        .put_room(&room, &json!({ "children": [child.link()] }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn delete_room() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;

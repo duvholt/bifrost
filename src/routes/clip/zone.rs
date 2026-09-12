@@ -21,11 +21,11 @@ pub async fn put_zone(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV
     if let Some(children) = &upd.children
         && let Some(children_backend) = backend_for_children(&lock, children)?
     {
-        let zone_backend = lock
-            .zone_backend(&rlink)?
-            .ok_or(ApiError::BackendNotFound(rlink.rid))?;
+        let zone_backend = lock.zone_backend(&rlink)?;
 
-        if zone_backend != children_backend {
+        if let Some(zone_backend) = zone_backend
+            && zone_backend != children_backend
+        {
             return Err(ApiError::MixedBackendChildren);
         }
     }

@@ -347,6 +347,35 @@ async fn zone_rejects_lights_from_different_backends() -> TestResult<()> {
 }
 
 #[tokio::test]
+async fn empty_zone_can_acquire_first_child() -> TestResult<()> {
+    init();
+    let mut test = TestBridge::start(z2m_state()).await?;
+    let child = test.wait_for_light(IKEA_COLOR_WITHOUT_ZONE).await?;
+    let zone = TestZone {
+        link: test
+            .hue_client
+            .post_zone(ZoneNew {
+                children: BTreeSet::new(),
+                metadata: GroupMetadata {
+                    name: "empty".to_string(),
+                    archetype: GroupArchetype::Home,
+                },
+            })
+            .await?,
+        fixture_group: FixtureGroup {
+            id: 1,
+            friendly_name: "empty",
+        },
+    };
+
+    test.hue_client
+        .put_zone(&zone, &json!({ "children": [child.link] }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn delete_zone() -> TestResult<()> {
     init();
     let mut test = TestBridge::start(z2m_state()).await?;
