@@ -220,7 +220,7 @@ impl Resource {
             Self::PublicImage(_) => None,
             Self::RelativeRotary(obj) => Some(obj.owner),
             Self::Room(_) => None,
-            Self::Scene(_) => None,
+            Self::Scene(obj) => Some(obj.group),
             Self::SmartScene(_) => None,
             Self::Taurus(obj) => Some(obj.owner),
             Self::Temperature(obj) => Some(obj.owner),

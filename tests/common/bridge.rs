@@ -55,6 +55,11 @@ pub struct TestLight {
     pub fixture_id: FixtureDevice,
 }
 
+#[derive(Clone)]
+pub struct TestScene {
+    pub link: ResourceLink,
+}
+
 impl TestZ2mDeviceOrGroup for TestLight {
     fn topic(&self) -> String {
         self.fixture_id.topic()
@@ -322,6 +327,24 @@ impl TestBridge {
                 });
             }
             None
+        })
+        .await
+    }
+
+    pub async fn wait_for_scene(
+        &mut self,
+        group: ResourceLink,
+        name: &str,
+    ) -> TestResult<TestScene> {
+        self.wait_for_resource(name, |events| {
+            added_resources(events).find_map(|resource| match &resource.obj {
+                Resource::Scene(scene) if scene.group == group && scene.metadata.name == name => {
+                    Some(TestScene {
+                        link: resource.link(),
+                    })
+                }
+                _ => None,
+            })
         })
         .await
     }

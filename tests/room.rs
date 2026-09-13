@@ -59,6 +59,10 @@ const IKEA_COLOR_WITHOUT_ROOM: FixtureDevice = FixtureDevice {
 };
 
 fn z2m_state() -> BTreeMap<String, Value> {
+    z2m_state_with_scenes(&[])
+}
+
+fn z2m_state_with_scenes(scenes: &[(u32, &str)]) -> BTreeMap<String, Value> {
     let ikea_warm_white = fixture::ikea::tradfri_warm_white(&IKEA_WARM_WHITE).with_state(json!({
         "state": "OFF",
         "brightness": 127
@@ -97,7 +101,7 @@ fn z2m_state() -> BTreeMap<String, Value> {
             "brightness": 127
         }));
 
-    let living_room = Z2mGroupFixture::new(&LIVING_ROOM_GROUP)
+    let mut living_room = Z2mGroupFixture::new(&LIVING_ROOM_GROUP)
         .with_member(&hue_flux_lightstrip)
         .with_member(&hue_play_gradient_lightstrip)
         .with_member(&misc_dimmer_light)
@@ -106,7 +110,7 @@ fn z2m_state() -> BTreeMap<String, Value> {
             "brightness": 0
         }));
 
-    let kitchen = Z2mGroupFixture::new(&KITCHEN_GROUP)
+    let mut kitchen = Z2mGroupFixture::new(&KITCHEN_GROUP)
         .with_member(&ikea_warm_white)
         .with_member(&ikea_color)
         .with_member(&hue_white_ambiance)
@@ -114,6 +118,11 @@ fn z2m_state() -> BTreeMap<String, Value> {
             "state": "ON",
             "brightness": 254
         }));
+
+    for &(id, name) in scenes {
+        living_room = living_room.with_scene(id, name);
+        kitchen = kitchen.with_scene(id, name);
+    }
 
     let fixture = Z2mFixture::new()
         .with_device(ikea_warm_white)
@@ -445,8 +454,13 @@ async fn empty_room_can_acquire_first_child() -> TestResult<()> {
 #[tokio::test]
 async fn delete_room() -> TestResult<()> {
     init();
-    let mut test = TestBridge::start(z2m_state()).await?;
+    let mut test = TestBridge::start(z2m_state_with_scenes(&[(1, "Relax")])).await?;
     let kitchen_room = test.wait_for_room(&KITCHEN_GROUP).await?;
+    let living_room = test.wait_for_room(&LIVING_ROOM_GROUP).await?;
+    let kitchen_scene = test.wait_for_scene(kitchen_room.link, "Relax").await?;
+    let living_room_scene = test.wait_for_scene(living_room.link, "Relax").await?;
+    let scenes_before = test.hue_client.get_scenes().await?;
+    assert_eq!(scenes_before.len(), 2);
     let kitchen_room_resource = test.hue_client.get_room(&kitchen_room).await?;
     let mut z2m_requests = test.z2m.subscribe_requests();
     let mut hue_events = test.hue_client.subscribe_events();
@@ -488,6 +502,17 @@ async fn delete_room() -> TestResult<()> {
     );
     let room_delete = hue_events.expect_delete_resource(kitchen_room.link).await?;
     assert_eq!(room_delete.id, kitchen_room.link.rid);
+
+    hue_events
+        .expect_delete_resource(kitchen_scene.link)
+        .await?;
+    let scenes_after = test.hue_client.get_scenes().await?;
+    assert_eq!(scenes_after.len(), 1);
+    assert_eq!(scenes_after[0].group, living_room.link);
+    assert_eq!(scenes_after[0].metadata.name, "Relax");
+    let surviving_scene = test.hue_client.get_scene(&living_room_scene).await?;
+    assert_eq!(surviving_scene.group, living_room.link);
+    assert_eq!(surviving_scene.metadata.name, "Relax");
 
     let grouped_light_service = *kitchen_room_resource.grouped_light_service().unwrap();
     let grouped_light_delete = hue_events

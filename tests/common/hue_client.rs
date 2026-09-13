@@ -4,7 +4,7 @@ use bifrost::routes::clip::V2Reply;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use hue::api::{
-    GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew, Zone, ZoneNew,
+    GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew, Scene, Zone, ZoneNew,
 };
 use hue::event::{Event, EventBlock, ObjectDelete, ObjectUpdate};
 use reqwest::Client;
@@ -12,7 +12,7 @@ use serde_json::Value;
 use tokio::sync::{broadcast, oneshot};
 use tokio::time::timeout;
 
-use crate::common::bridge::{TestGroupedLight, TestLight, TestRoom, TestZone};
+use crate::common::bridge::{TestGroupedLight, TestLight, TestRoom, TestScene, TestZone};
 use crate::common::{HueClipResponse, TestError, TestResult};
 
 #[allow(clippy::large_enum_variant)]
@@ -288,6 +288,27 @@ impl HueClient {
         .await
     }
 
+    pub async fn get_scene(&self, scene: &TestScene) -> TestResult<Scene> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/scene/{}",
+                scene.link.rid
+            ))
+            .await?
+            .data;
+        let scenes = resource_records_to_scenes(data);
+        assert_eq!(scenes.len(), 1);
+        Ok(scenes[0].clone())
+    }
+
+    pub async fn get_scenes(&self) -> TestResult<Vec<Scene>> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/scene")
+            .await?
+            .data;
+        Ok(resource_records_to_scenes(data))
+    }
+
     pub async fn get_rooms(&self) -> TestResult<Vec<Room>> {
         let data = self
             .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/room")
@@ -401,6 +422,15 @@ fn resource_records_to_grouped_lights(data: Vec<ResourceRecord>) -> Vec<GroupedL
         .map(|r| match r.obj {
             hue::api::Resource::GroupedLight(grouped_light) => grouped_light,
             _ => panic!("expected grouped light resource"),
+        })
+        .collect()
+}
+
+fn resource_records_to_scenes(data: Vec<ResourceRecord>) -> Vec<Scene> {
+    data.into_iter()
+        .map(|r| match r.obj {
+            hue::api::Resource::Scene(scene) => scene,
+            _ => panic!("expected scene resource"),
         })
         .collect()
 }
