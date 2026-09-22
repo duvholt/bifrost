@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bifrost_api::backend::BackendRequest;
-use chrono::{Local, NaiveTime};
+use chrono::NaiveTime;
 use hue::api::{
     Action, BridgeHome, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
     DimmingDeltaUpdate, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate,
@@ -15,20 +15,27 @@ use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::resource::Resources;
+use crate::server::behavior_instance::BehaviorClock;
 
 pub struct HueAccessoriesJob {
     pub configuration: HueAccessoriesConfiguration,
     pub res: Arc<Mutex<Resources>>,
+    clock: Arc<dyn BehaviorClock>,
     next_scene_slots: HashMap<Uuid, usize>,
 }
 
 impl HueAccessoriesJob {
     const BRIGHTNESS_DELTA: f64 = 20.0;
 
-    pub fn new(configuration: HueAccessoriesConfiguration, res: Arc<Mutex<Resources>>) -> Self {
+    pub fn new(
+        configuration: HueAccessoriesConfiguration,
+        res: Arc<Mutex<Resources>>,
+        clock: Arc<dyn BehaviorClock>,
+    ) -> Self {
         Self {
             configuration,
             res,
+            clock,
             next_scene_slots: HashMap::new(),
         }
     }
@@ -127,7 +134,7 @@ impl HueAccessoriesJob {
         let actions: Vec<&Action> = match button_action {
             ButtonAction::TimeBasedExtended(time_based_extended) => {
                 // todo: implement WithOff
-                let current_time = Local::now().time();
+                let current_time = self.clock.local_now().time();
 
                 let Some(current_slot) =
                     find_current_time_slot(&time_based_extended.slots, current_time)

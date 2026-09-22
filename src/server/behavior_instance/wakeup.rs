@@ -7,7 +7,6 @@ use chrono::{DateTime, Datelike, Days, Local, NaiveTime, TimeZone, Weekday};
 use itertools::Itertools;
 use tokio::spawn;
 use tokio::sync::Mutex;
-use tokio::time::sleep;
 
 use hue::api::{
     Device, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
@@ -17,6 +16,7 @@ use hue::api::{
 use uuid::Uuid;
 
 use crate::error::ApiError;
+use crate::server::behavior_instance::BehaviorClock;
 use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
 use crate::{error::ApiResult, resource::Resources};
 
@@ -25,6 +25,7 @@ pub struct WakeupJob {
     pub schedule_type: ScheduleType,
     pub configuration: WakeupConfiguration,
     pub res: Arc<Mutex<Resources>>,
+    pub clock: Arc<dyn BehaviorClock>,
 }
 
 impl WakeupJob {
@@ -92,7 +93,7 @@ impl WakeupJob {
     }
 
     pub async fn create(self) {
-        let now = Local::now();
+        let now = self.clock.local_now();
         let config = self.configuration.clone();
         let result = match &self.schedule_type {
             ScheduleType::Recurring(weekdays) => self.create_recurring(weekdays.clone()).await,
@@ -110,7 +111,7 @@ impl WakeupJob {
     async fn create_recurring(&self, weekdays: HashSet<Weekday>) -> ApiResult<()> {
         let fade_in_start = self.start_time()?;
         loop {
-            let now = Local::now();
+            let now = self.clock.local_now();
             let fade_in_datetime = Self::next_weekday_occurrence(&weekdays, fade_in_start, &now)?;
             log::debug!(
                 "Recurring wakeup task for {:?}, {} will run at {}",
@@ -119,8 +120,13 @@ impl WakeupJob {
                 &fade_in_datetime
             );
             let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-            sleep(time_until_fade_in).await;
-            run_wake_up(self.configuration.clone(), self.res.clone()).await;
+            self.clock.sleep(time_until_fade_in).await;
+            run_wake_up(
+                self.configuration.clone(),
+                self.res.clone(),
+                self.clock.clone(),
+            )
+            .await;
         }
     }
 
@@ -135,8 +141,13 @@ impl WakeupJob {
                 fade_in_datetime
             );
 
-            sleep(time_until_fade_in).await;
-            run_wake_up(self.configuration.clone(), self.res.clone()).await;
+            self.clock.sleep(time_until_fade_in).await;
+            run_wake_up(
+                self.configuration.clone(),
+                self.res.clone(),
+                self.clock.clone(),
+            )
+            .await;
             disable_behavior_instance(self.rid, self.res.clone()).await;
         });
 
@@ -183,7 +194,11 @@ fn wakeup_requests_for_group(
     }
 }
 
-async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
+async fn run_wake_up(
+    config: WakeupConfiguration,
+    res: Arc<Mutex<Resources>>,
+    clock: Arc<dyn BehaviorClock>,
+) {
     log::debug!("Running scheduled behavior instance:, {:#?}", config);
     #[allow(clippy::option_if_let_else)]
     let resource_links = config.where_field.iter().flat_map(|room| {
@@ -243,10 +258,10 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
 
     // wait until fade in has completed
     // otherwise the behavior instance can be disabled before it has actually finished
-    sleep(config.fade_in_duration.to_std()).await;
+    clock.sleep(config.fade_in_duration.to_std()).await;
 
     if let Some(duration) = config.turn_lights_off_after {
-        sleep(duration.to_std()).await;
+        clock.sleep(duration.to_std()).await;
 
         for request in &requests {
             if let Err(err) = request.off(res.clone()).await {
