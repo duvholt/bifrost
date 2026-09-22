@@ -4,7 +4,8 @@ use bifrost::routes::clip::V2Reply;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use hue::api::{
-    GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew, Scene, Zone, ZoneNew,
+    BehaviorInstance, GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew,
+    Scene, Zone, ZoneNew,
 };
 use hue::event::{Event, EventBlock, ObjectDelete, ObjectUpdate};
 use reqwest::Client;
@@ -381,6 +382,20 @@ impl HueClient {
             .await
     }
 
+    pub async fn get_behavior_instance(&self, link: ResourceLink) -> TestResult<BehaviorInstance> {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/behavior_instance/{}",
+                link.rid,
+            ))
+            .await?
+            .data;
+
+        let instances = resource_records_to_behavior_instances(data);
+        assert_eq!(instances.len(), 1);
+        Ok(instances[0].clone())
+    }
+
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {
         let base_url = &self.base_url;
         let response = self
@@ -449,6 +464,14 @@ fn resource_records_to_zones(data: Vec<ResourceRecord>) -> Vec<Zone> {
         .map(|r| match r.obj {
             hue::api::Resource::Zone(zone) => zone,
             _ => panic!("expected zone resource"),
+        })
+        .collect()
+}
+fn resource_records_to_behavior_instances(data: Vec<ResourceRecord>) -> Vec<BehaviorInstance> {
+    data.into_iter()
+        .map(|r| match r.obj {
+            hue::api::Resource::BehaviorInstance(bi) => bi,
+            _ => panic!("expected behavior instance resource"),
         })
         .collect()
 }

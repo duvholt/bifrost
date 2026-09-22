@@ -53,6 +53,9 @@ pub enum TestError {
     #[error("timeout waiting for z2m request")]
     Z2mRequestTimeout,
 
+    #[error("timeout waiting for behavior sleep")]
+    BehaviorSleepTimeout,
+
     #[error("unexpected z2m event: {0:?}")]
     UnexpectedZ2mEvent(RawMessage),
 

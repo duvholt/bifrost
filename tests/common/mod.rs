@@ -1,4 +1,5 @@
 mod bridge;
+mod clock;
 mod error;
 pub mod fixture;
 mod hue_client;

@@ -23,6 +23,7 @@ use tokio::time::timeout;
 use url::Url;
 use uuid::Uuid;
 
+use crate::common::clock::TestClock;
 use crate::common::fixture::{FixtureDevice, FixtureGroup};
 use crate::common::{HueClient, TestError, TestResult, TestZ2m, create_m2m_service};
 
@@ -33,6 +34,7 @@ pub struct TestBridge {
     workdir: PathBuf,
     pub hue_client: HueClient,
     pub z2m: TestZ2m,
+    pub clock: TestClock,
     hue_events: Receiver<Vec<EventBlock>>,
     received_hue_events: Vec<Event>,
 }
@@ -149,6 +151,14 @@ impl TestBridge {
         }
         let mut mgr = appstate.manager();
 
+        // behavior instances
+        let clock = TestClock::new();
+        let svc = server::behavior_instance::BehaviorInstanceService::with_clock(
+            appstate.res.clone(),
+            clock.behavior_clock(),
+        );
+        mgr.register_service("behavior-instance", svc).await?;
+
         // memory2mqtt
         for (name, service) in memory2mqtt_services {
             mgr.register_service(format!("m2m-{name}"), service).await?;
@@ -181,6 +191,7 @@ impl TestBridge {
             workdir,
             hue_client,
             z2m: test_z2m,
+            clock,
             hue_events: events_receiver,
             received_hue_events: Vec::new(),
         })
