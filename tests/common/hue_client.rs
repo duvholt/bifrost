@@ -4,9 +4,10 @@ use bifrost::routes::clip::V2Reply;
 use eventsource_stream::Eventsource;
 use futures::StreamExt;
 use hue::api::{
-    BehaviorInstance, GroupedLight, Light, RType, ResourceLink, ResourceRecord, Room, RoomNew,
-    Scene, Zone, ZoneNew,
+    BehaviorInstance, GroupedLight, Light, RType, Resource, ResourceLink, ResourceRecord, Room,
+    RoomNew, Scene, Zone, ZoneNew,
 };
+use hue::error::{HueError, HueResult};
 use hue::event::{Event, EventBlock, ObjectDelete, ObjectUpdate};
 use reqwest::Client;
 use serde_json::Value;
@@ -177,7 +178,57 @@ impl HueClient {
 
     pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> TestResult<T> {
         let url = format!("{}/{path}", self.base_url);
-        Ok(self.http_client.get(url).send().await?.json::<T>().await?)
+        Ok(self
+            .http_client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<T>()
+            .await?)
+    }
+
+    pub async fn get_resource<T>(&self, link: ResourceLink) -> TestResult<T>
+    where
+        T: TryFrom<Resource, Error = HueError>,
+    {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/{}/{}",
+                serde_json::to_value(link.rtype)
+                    .unwrap()
+                    .as_str()
+                    .expect("RType serializes as a string"),
+                link.rid,
+            ))
+            .await?
+            .data;
+
+        assert_eq!(data.len(), 1);
+        Ok(data[0].obj.clone().try_into()?)
+    }
+
+    pub async fn get_resources<T>(&self, rtype: RType) -> TestResult<Vec<T>>
+    where
+        T: TryFrom<Resource, Error = HueError>,
+    {
+        let data = self
+            .get::<HueClipResponse<ResourceRecord>>(&format!(
+                "/clip/v2/resource/{}/",
+                serde_json::to_value(rtype)
+                    .unwrap()
+                    .as_str()
+                    .expect("RType serializes as a string"),
+            ))
+            .await?
+            .data;
+
+        let resources: HueResult<Vec<T>> = data
+            .into_iter()
+            .map(|resource| resource.obj.try_into())
+            .collect();
+
+        Ok(resources?)
     }
 
     pub async fn put(&self, path: &str, value: &Value) -> TestResult<()> {
@@ -223,25 +274,16 @@ impl HueClient {
     }
 
     pub async fn get_lights(&self) -> TestResult<Vec<Light>> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/light")
+        Ok(self
+            .get_resources::<Box<Light>>(RType::Light)
             .await?
-            .data;
-        Ok(resource_records_to_lights(data))
+            .into_iter()
+            .map(|l| *l)
+            .collect())
     }
 
-    pub async fn get_light(&self, light: &TestLight) -> TestResult<Light> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>(&format!(
-                "/clip/v2/resource/light/{}",
-                light.link.rid,
-            ))
-            .await?
-            .data;
-
-        let lights = resource_records_to_lights(data);
-        assert_eq!(lights.len(), 1);
-        Ok(lights[0].clone())
+    pub async fn get_light(&self, test_light: &TestLight) -> TestResult<Light> {
+        Ok(*self.get_resource::<Box<Light>>(test_light.link).await?)
     }
 
     pub async fn put_light(&self, light: &TestLight, value: &Value) -> TestResult<()> {
@@ -253,28 +295,15 @@ impl HueClient {
     }
 
     pub async fn get_grouped_lights(&self) -> TestResult<Vec<GroupedLight>> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/grouped_light")
-            .await?
-            .data;
-        Ok(resource_records_to_grouped_lights(data))
+        self.get_resources::<GroupedLight>(RType::GroupedLight)
+            .await
     }
 
     pub async fn get_grouped_light(
         &self,
         light: &TestGroupedLight<'_>,
     ) -> TestResult<GroupedLight> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>(&format!(
-                "/clip/v2/resource/grouped_light/{}",
-                light.link.rid,
-            ))
-            .await?
-            .data;
-
-        let lights = resource_records_to_grouped_lights(data);
-        assert_eq!(lights.len(), 1);
-        Ok(lights[0].clone())
+        self.get_resource::<GroupedLight>(light.link).await
     }
 
     pub async fn put_grouped_light(
@@ -290,45 +319,19 @@ impl HueClient {
     }
 
     pub async fn get_scene(&self, scene: &TestScene) -> TestResult<Scene> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>(&format!(
-                "/clip/v2/resource/scene/{}",
-                scene.link.rid
-            ))
-            .await?
-            .data;
-        let scenes = resource_records_to_scenes(data);
-        assert_eq!(scenes.len(), 1);
-        Ok(scenes[0].clone())
+        self.get_resource::<Scene>(scene.link).await
     }
 
     pub async fn get_scenes(&self) -> TestResult<Vec<Scene>> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/scene")
-            .await?
-            .data;
-        Ok(resource_records_to_scenes(data))
+        self.get_resources::<Scene>(RType::Scene).await
     }
 
     pub async fn get_rooms(&self) -> TestResult<Vec<Room>> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/room")
-            .await?
-            .data;
-        Ok(resource_records_to_rooms(data))
+        self.get_resources::<Room>(RType::Room).await
     }
 
     pub async fn get_room(&self, room: &TestRoom<'_>) -> TestResult<Room> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>(&format!(
-                "/clip/v2/resource/room/{}",
-                room.link.rid
-            ))
-            .await?
-            .data;
-        let rooms = resource_records_to_rooms(data);
-        assert_eq!(rooms.len(), 1);
-        Ok(rooms[0].clone())
+        self.get_resource::<Room>(room.link).await
     }
 
     pub async fn post_room(&self, room: RoomNew) -> TestResult<ResourceLink> {
@@ -347,24 +350,11 @@ impl HueClient {
     }
 
     pub async fn get_zones(&self) -> TestResult<Vec<Zone>> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>("/clip/v2/resource/zone")
-            .await?
-            .data;
-        Ok(resource_records_to_zones(data))
+        self.get_resources::<Zone>(RType::Zone).await
     }
 
     pub async fn get_zone(&self, zone: &TestZone<'_>) -> TestResult<Zone> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>(&format!(
-                "/clip/v2/resource/zone/{}",
-                zone.link.rid
-            ))
-            .await?
-            .data;
-        let zones = resource_records_to_zones(data);
-        assert_eq!(zones.len(), 1);
-        Ok(zones[0].clone())
+        self.get_resource::<Zone>(zone.link).await
     }
 
     pub async fn post_zone(&self, zone: ZoneNew) -> TestResult<ResourceLink> {
@@ -383,17 +373,7 @@ impl HueClient {
     }
 
     pub async fn get_behavior_instance(&self, link: ResourceLink) -> TestResult<BehaviorInstance> {
-        let data = self
-            .get::<HueClipResponse<ResourceRecord>>(&format!(
-                "/clip/v2/resource/behavior_instance/{}",
-                link.rid,
-            ))
-            .await?
-            .data;
-
-        let instances = resource_records_to_behavior_instances(data);
-        assert_eq!(instances.len(), 1);
-        Ok(instances[0].clone())
+        self.get_resource::<BehaviorInstance>(link).await
     }
 
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {
@@ -421,57 +401,4 @@ impl HueClient {
 
         Ok(())
     }
-}
-
-fn resource_records_to_lights(data: Vec<ResourceRecord>) -> Vec<Light> {
-    data.into_iter()
-        .map(|r| match r.obj {
-            hue::api::Resource::Light(light) => *light,
-            _ => panic!("expected light resource"),
-        })
-        .collect()
-}
-
-fn resource_records_to_grouped_lights(data: Vec<ResourceRecord>) -> Vec<GroupedLight> {
-    data.into_iter()
-        .map(|r| match r.obj {
-            hue::api::Resource::GroupedLight(grouped_light) => grouped_light,
-            _ => panic!("expected grouped light resource"),
-        })
-        .collect()
-}
-
-fn resource_records_to_scenes(data: Vec<ResourceRecord>) -> Vec<Scene> {
-    data.into_iter()
-        .map(|r| match r.obj {
-            hue::api::Resource::Scene(scene) => scene,
-            _ => panic!("expected scene resource"),
-        })
-        .collect()
-}
-
-fn resource_records_to_rooms(data: Vec<ResourceRecord>) -> Vec<Room> {
-    data.into_iter()
-        .map(|r| match r.obj {
-            hue::api::Resource::Room(room) => room,
-            _ => panic!("expected room resource"),
-        })
-        .collect()
-}
-
-fn resource_records_to_zones(data: Vec<ResourceRecord>) -> Vec<Zone> {
-    data.into_iter()
-        .map(|r| match r.obj {
-            hue::api::Resource::Zone(zone) => zone,
-            _ => panic!("expected zone resource"),
-        })
-        .collect()
-}
-fn resource_records_to_behavior_instances(data: Vec<ResourceRecord>) -> Vec<BehaviorInstance> {
-    data.into_iter()
-        .map(|r| match r.obj {
-            hue::api::Resource::BehaviorInstance(bi) => bi,
-            _ => panic!("expected behavior instance resource"),
-        })
-        .collect()
 }
