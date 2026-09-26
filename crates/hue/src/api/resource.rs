@@ -139,6 +139,11 @@ impl RType {
 
         self.link_to(rid)
     }
+
+    #[must_use]
+    pub fn random(self) -> ResourceLink {
+        self.link_to(Uuid::new_v4())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -154,6 +159,11 @@ impl ResourceRecord {
     #[must_use]
     pub const fn new(id: Uuid, id_v1: Option<String>, obj: Resource) -> Self {
         Self { id, id_v1, obj }
+    }
+
+    #[must_use]
+    pub const fn link(&self) -> ResourceLink {
+        ResourceLink::new(self.id, self.obj.rtype())
     }
 }
 

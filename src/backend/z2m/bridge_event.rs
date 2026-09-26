@@ -8,15 +8,18 @@ use uuid::Uuid;
 
 use hue::api::{
     Device, DimmingUpdate, GroupedLight, Light, LightUpdate, RType, Resource, ResourceLink, Room,
+    Zone,
 };
 use z2m::api::{
-    BridgeDevices, DeviceRemoveResponse, GroupMemberChange, Message, RawMessage, Response,
+    BridgeDevices, DeviceRemoveResponse, GroupMemberChange, GroupRemove, Message, RawMessage,
+    Response,
 };
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::Z2mBackend;
 use crate::backend::z2m::button::Z2mButtonHandler;
 use crate::error::{ApiError, ApiResult};
+use crate::resource::Resources;
 
 impl Z2mBackend {
     async fn handle_update_light(&mut self, uuid: &Uuid, devupd: &DeviceUpdate) -> ApiResult<()> {
@@ -48,11 +51,11 @@ impl Z2mBackend {
     }
 
     async fn handle_update(&mut self, rid: &Uuid, payload: &Value) -> ApiResult<()> {
-        if let Value::String(string) = payload {
-            if string.is_empty() {
-                log::debug!("Ignoring empty payload for {rid}");
-                return Ok(());
-            }
+        if let Value::String(string) = payload
+            && string.is_empty()
+        {
+            log::debug!("Ignoring empty payload for {rid}");
+            return Ok(());
         }
 
         let upd = DeviceUpdate::deserialize(payload)?;
@@ -135,8 +138,8 @@ impl Z2mBackend {
     ) -> Result<(), ApiError> {
         let lock = self.state.lock().await;
 
-        let device = lock.get_id::<Device>(link.rid.clone())?.clone();
-        let model_id: String = if let Ok(aux) = lock.aux_get(&link) {
+        let device = lock.get_id::<Device>(link.rid)?.clone();
+        let model_id: String = if let Ok(aux) = lock.aux_get(link) {
             aux.model_id
                 .as_ref()
                 .unwrap_or(&device.product_data.model_id)
@@ -160,7 +163,7 @@ impl Z2mBackend {
             .handle_action(&device, action)
             .await?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn get_button_handler(
@@ -169,15 +172,13 @@ impl Z2mBackend {
         model_id: &str,
     ) -> Option<Arc<Mutex<Z2mButtonHandler>>> {
         let handler = self.button_handlers.get(resource_link);
-        match handler {
-            Some(handler) => Some(handler.clone()),
-            None => {
-                let handler = Z2mButtonHandler::from_model_id(self.state.clone(), model_id)?;
-                let handler = Arc::new(Mutex::new(handler));
-                self.button_handlers
-                    .insert(resource_link.clone(), handler.clone());
-                Some(handler.clone())
-            }
+        if let Some(handler) = handler {
+            Some(handler.clone())
+        } else {
+            let handler = Z2mButtonHandler::from_model_id(self.state.clone(), model_id)?;
+            let handler = Arc::new(Mutex::new(handler));
+            self.button_handlers.insert(*resource_link, handler.clone());
+            Some(handler)
         }
     }
 
@@ -207,7 +208,7 @@ impl Z2mBackend {
                         self.name,
                         dev.friendly_name
                     );
-                    self.ignore.insert(dev.friendly_name.to_string());
+                    self.ignore.insert(dev.friendly_name.clone());
                 }
             } else {
                 log::debug!(
@@ -220,6 +221,51 @@ impl Z2mBackend {
         }
 
         Ok(())
+    }
+
+    async fn bridge_group_remove(&mut self, grp: &GroupRemove) -> ApiResult<()> {
+        let mut lock = self.state.lock().await;
+        let Some(glight_link) = self.grouped_light_from_group_id(&lock, &grp.id) else {
+            return Ok(());
+        };
+        let Ok(glight) = lock.get::<GroupedLight>(&glight_link).cloned() else {
+            return Ok(());
+        };
+        let link_group = glight.owner;
+
+        let Some(topic) = self.rmap.get(&link_group) else {
+            return Ok(());
+        };
+
+        lock.delete(&link_group)?;
+        self.map.remove(topic);
+        self.rmap.remove(&glight_link);
+        self.rmap.remove(&link_group);
+
+        log::info!("[{}] Bridge deleted group {:?}", self.name, link_group);
+        drop(lock);
+        Ok(())
+    }
+
+    fn grouped_light_from_group_id(
+        &self,
+        resources: &Resources,
+        group_id: &str,
+    ) -> Option<ResourceLink> {
+        let Ok(group_id) = group_id.parse::<u32>() else {
+            return self.map.get(group_id).copied();
+        };
+        for grouped_light in resources.get_resources_by_type(RType::GroupedLight) {
+            let link = grouped_light.link();
+            let Ok(aux) = resources.aux_get(&link) else {
+                continue;
+            };
+
+            if aux.backend.as_deref() == Some(&self.name) && aux.index == Some(group_id) {
+                return Some(link);
+            }
+        }
+        None
     }
 
     async fn bridge_device_remove(&mut self, data: &DeviceRemoveResponse) -> ApiResult<()> {
@@ -250,31 +296,75 @@ impl Z2mBackend {
         change: &GroupMemberChange,
         added: bool,
     ) -> ApiResult<()> {
-        if let Some(light) = self.map.get(&change.device) {
+        if let Some(light_link) = self.map.get(&change.device) {
             let mut lock = self.state.lock().await;
-            let device = lock.get::<Light>(light)?.clone();
+            let light = lock.get::<Light>(light_link)?.clone();
 
-            let device_link = device.owner;
-            if let Some(room) = self.map.get(&change.group) {
-                let room_link = lock.get::<GroupedLight>(room)?.owner;
-                let exists = lock
-                    .get::<Room>(&room_link)?
-                    .children
-                    .contains(&device_link);
+            let device_link = light.owner;
+            let Some(glight_link) = self.grouped_light_from_group_id(&lock, &change.group) else {
+                return Ok(());
+            };
+            let owner_link = lock.get::<GroupedLight>(&glight_link)?.owner;
+            match owner_link.rtype {
+                RType::Room => {
+                    // Room uses device as children
+                    let room = lock.get::<Room>(&owner_link)?;
+                    let exists = room.children.contains(&device_link);
 
-                if added {
-                    if !exists {
-                        lock.update(&room_link.rid, |room: &mut Room| {
-                            room.children.insert(device_link);
-                        })?;
-                    }
-                } else {
-                    if exists {
-                        lock.update(&room_link.rid, |room: &mut Room| {
-                            room.children.remove(&device_link);
-                        })?;
+                    if added {
+                        if !exists {
+                            log::debug!(
+                                "Adding {} to group {}",
+                                light.metadata.name,
+                                room.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |room: &mut Room| {
+                                room.children.insert(device_link);
+                            })?;
+                        }
+                    } else {
+                        if exists {
+                            log::debug!(
+                                "Removing {} from group {}",
+                                light.metadata.name,
+                                room.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |room: &mut Room| {
+                                room.children.remove(&device_link);
+                            })?;
+                        }
                     }
                 }
+                RType::Zone => {
+                    // Zone uses light as children
+                    let zone = lock.get::<Zone>(&owner_link)?;
+                    let exists = zone.children.contains(light_link);
+
+                    if added {
+                        if !exists {
+                            log::debug!(
+                                "Adding {} to zone {}",
+                                light.metadata.name,
+                                zone.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |zone: &mut Zone| {
+                                zone.children.insert(*light_link);
+                            })?;
+                        }
+                    } else {
+                        if exists {
+                            log::debug!(
+                                "Removing {} from zone {}",
+                                light.metadata.name,
+                                zone.metadata.name
+                            );
+                            lock.update(&owner_link.rid, |zone: &mut Zone| {
+                                zone.children.remove(light_link);
+                            })?;
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -300,7 +390,13 @@ impl Z2mBackend {
             Message::BridgeDeviceConfigureReporting(obj) => {}
             Message::BridgeConfig(obj) => {}
             Message::BridgeResponseGroupAdd(obj) => {}
-            Message::BridgeResponseGroupRemove(obj) => {}
+            Message::BridgeResponseGroupRemove(obj) => {
+                let Response::Ok { data: remove, .. } = obj else {
+                    log::warn!("[{}] Error reported from z2m: {obj:?}", self.name);
+                    return Ok(());
+                };
+                self.bridge_group_remove(remove).await?;
+            }
             Message::BridgeResponseGroupRename(obj) => {}
             Message::BridgeResponseGroupOptions(obj) => {}
 
@@ -310,6 +406,7 @@ impl Z2mBackend {
 
             Message::BridgeGroups(obj) => {
                 /* println!("{obj:#?}"); */
+                self.set_used_group_ids(obj);
                 for grp in obj {
                     self.add_group(grp).await?;
                 }
@@ -379,9 +476,10 @@ impl Z2mBackend {
                     }
                     topic => {
                         log::error!(
-                            "[{}] Failed to parse (non-critical) z2m bridge message on [{}]:",
+                            "[{}] Failed to parse (non-critical) z2m bridge message on [{}]: {:?}",
                             self.name,
-                            topic
+                            topic,
+                            err
                         );
                         log::error!("{}", serde_json::to_string(&msg.payload)?);
 

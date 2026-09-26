@@ -15,7 +15,7 @@ use pretty_assertions::assert_eq;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::common::fixture::{self, FixtureDevice, Z2mFixture, Z2mGroupFixture};
+use crate::common::fixture::{self, FixtureDevice, FixtureGroup, Z2mFixture, Z2mGroupFixture};
 use crate::common::{TestBridge, TestResult};
 
 pub mod common;
@@ -48,6 +48,11 @@ const HUE_PLAY_GRADIENT_LIGHTSTRIP: FixtureDevice = FixtureDevice {
 const MISC_DIMMER_LIGHT: FixtureDevice = FixtureDevice {
     id: 6,
     friendly_name: "misc_dimmer_light",
+};
+
+const LIVING_ROOM_GROUP: FixtureGroup = FixtureGroup {
+    id: 1,
+    friendly_name: "living_room",
 };
 
 fn expected_dimmable_light(
@@ -209,7 +214,7 @@ fn z2m_state() -> BTreeMap<String, Value> {
         "brightness": 127
     }));
 
-    let living_room = Z2mGroupFixture::new(1, "livingroom")
+    let living_room = Z2mGroupFixture::new(&LIVING_ROOM_GROUP)
         .with_member(&ikea_warm_white)
         .with_member(&ikea_color)
         .with_member(&hue_white_ambiance)
@@ -235,11 +240,6 @@ fn z2m_state() -> BTreeMap<String, Value> {
 
 #[tokio::test]
 async fn get_lights() -> TestResult<()> {
-    pretty_env_logger::formatted_builder()
-        .filter_level(log::LevelFilter::Debug)
-        .parse_default_env()
-        .init();
-
     let mut test_bridge = TestBridge::start(z2m_state()).await?;
 
     test_bridge.wait_for_light(IKEA_WARM_WHITE).await?;
@@ -350,7 +350,7 @@ async fn turn_on_light() -> TestResult<()> {
     hue_events.expect_quiet().await?;
     test.z2m.publish(&light, json!({"state": "ON"}))?;
 
-    let update = hue_events.expect_update(&light).await?;
+    let update = hue_events.expect_update_resource(light.link).await?;
     assert_eq!(
         update.data,
         json!({
@@ -398,7 +398,7 @@ async fn change_brightness() -> TestResult<()> {
     test.z2m
         .publish(&light, json!({"brightness": 63.5, "state":"ON"}))?;
 
-    let update = hue_events.expect_update(&light).await?;
+    let update = hue_events.expect_update_resource(light.link).await?;
     assert_eq!(
         update.data,
         json!({
@@ -452,7 +452,7 @@ async fn dimming_delta_up() -> TestResult<()> {
     test.z2m
         .publish(&light, json!({"brightness": 190.5, "state":"ON"}))?;
 
-    let update = hue_events.expect_update(&light).await?;
+    let update = hue_events.expect_update_resource(light.link).await?;
     assert_eq!(
         update.data,
         json!({
@@ -506,7 +506,7 @@ async fn dimming_delta_down() -> TestResult<()> {
     test.z2m
         .publish(&light, json!({"brightness": 63.5, "state":"ON"}))?;
 
-    let update = hue_events.expect_update(&light).await?;
+    let update = hue_events.expect_update_resource(light.link).await?;
     assert_eq!(
         update.data,
         json!({

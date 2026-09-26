@@ -1,7 +1,10 @@
 use bifrost::backend::z2m::Z2mServiceTemplate;
 use bifrost::config::AppConfig;
+use bifrost::resource::Resources;
 use bifrost::server::{self, Protocol, appstate::AppState, http::HttpServer};
-use hue::api::{RType, Resource, ResourceLink, ResourceRecord, ZigbeeConnectivity};
+use hue::api::{
+    Group, RType, Resource, ResourceLink, ResourceRecord, Room, ZigbeeConnectivity, Zone,
+};
 use hue::event::{Event, EventBlock};
 use memory2mqtt::service::M2mMode;
 use serde_json::Value;
@@ -20,7 +23,7 @@ use tokio::time::timeout;
 use url::Url;
 use uuid::Uuid;
 
-use crate::common::fixture::FixtureDevice;
+use crate::common::fixture::{FixtureDevice, FixtureGroup};
 use crate::common::{HueClient, TestError, TestResult, TestZ2m, create_m2m_service};
 
 pub struct TestBridge {
@@ -42,11 +45,7 @@ impl Drop for TestBridge {
     }
 }
 
-pub trait TestResource {
-    fn link(&self) -> ResourceLink;
-}
-
-pub trait TestZ2mDevice {
+pub trait TestZ2mDeviceOrGroup {
     fn topic(&self) -> String;
 }
 
@@ -56,37 +55,104 @@ pub struct TestLight {
     pub fixture_id: FixtureDevice,
 }
 
-impl TestResource for TestLight {
-    fn link(&self) -> ResourceLink {
-        self.link
-    }
+#[derive(Clone)]
+pub struct TestScene {
+    pub link: ResourceLink,
 }
 
-impl TestZ2mDevice for TestLight {
+impl TestZ2mDeviceOrGroup for TestLight {
     fn topic(&self) -> String {
         self.fixture_id.topic()
     }
 }
 
+#[derive(Clone)]
+pub struct TestRoom<'a> {
+    pub link: ResourceLink,
+    pub fixture_group: FixtureGroup<'a>,
+}
+
+impl TestZ2mDeviceOrGroup for TestRoom<'_> {
+    fn topic(&self) -> String {
+        self.fixture_group.topic()
+    }
+}
+
+#[derive(Clone)]
+pub struct TestZone<'a> {
+    pub link: ResourceLink,
+    pub fixture_group: FixtureGroup<'a>,
+}
+
+impl TestZ2mDeviceOrGroup for TestZone<'_> {
+    fn topic(&self) -> String {
+        self.fixture_group.topic()
+    }
+}
+
+#[derive(Clone)]
+pub struct TestGroupedLight<'a> {
+    pub link: ResourceLink,
+    pub fixture_group: FixtureGroup<'a>,
+}
+
+impl TestZ2mDeviceOrGroup for TestGroupedLight<'_> {
+    fn topic(&self) -> String {
+        self.fixture_group.topic()
+    }
+}
+
 impl TestBridge {
     pub async fn start(z2m_state: BTreeMap<String, Value>) -> TestResult<Self> {
+        Self::start_with_seed(z2m_state, |_| Ok(())).await
+    }
+
+    pub async fn start_with_seed(
+        z2m_state: BTreeMap<String, Value>,
+        seed: impl FnOnce(&mut Resources) -> TestResult<()>,
+    ) -> TestResult<Self> {
+        Self::start_interal(BTreeMap::from([("test".to_string(), z2m_state)]), seed).await
+    }
+
+    pub async fn start_backends(
+        z2m_states: BTreeMap<String, BTreeMap<String, Value>>,
+    ) -> TestResult<Self> {
+        Self::start_interal(z2m_states, |_| Ok(())).await
+    }
+
+    async fn start_interal(
+        z2m_states: BTreeMap<String, BTreeMap<String, Value>>,
+        seed: impl FnOnce(&mut Resources) -> TestResult<()>,
+    ) -> TestResult<Self> {
         let workdir = Self::create_workdir()?;
         let mut tasks = JoinSet::new();
 
         let http_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let http_address = http_listener.local_addr()?;
 
-        let memory2mqtt_service = create_m2m_service(z2m_state, M2mMode::Manual).await?;
-        let test_z2m = TestZ2m::from_service(&memory2mqtt_service);
+        let mut memory2mqtt_services = BTreeMap::new();
+        for (name, state) in z2m_states {
+            memory2mqtt_services.insert(name, create_m2m_service(state, M2mMode::Manual).await?);
+        }
+        let test_z2m = TestZ2m::from_services(memory2mqtt_services.iter());
+        let z2m_addresses = memory2mqtt_services
+            .iter()
+            .map(|(name, service)| (name.clone(), service.config.listen))
+            .collect();
+        let config = Self::create_appconfig(http_address, z2m_addresses, &workdir)?;
 
-        let config =
-            Self::create_appconfig(http_address, memory2mqtt_service.config.listen, &workdir)?;
         let (svc_manager, manager_future) = ServiceManager::spawn();
         let appstate = AppState::from_config(config, svc_manager).await?;
+        {
+            let mut resources = appstate.res.lock().await;
+            seed(&mut resources)?;
+        }
         let mut mgr = appstate.manager();
 
         // memory2mqtt
-        mgr.register_service("m2m", memory2mqtt_service).await?;
+        for (name, service) in memory2mqtt_services {
+            mgr.register_service(format!("m2m-{name}"), service).await?;
+        }
 
         // bifrost http
         let http_service = HttpServer::http_listener(
@@ -154,9 +220,14 @@ impl TestBridge {
 
     fn create_appconfig(
         http_address: SocketAddr,
-        z2m_address: SocketAddr,
+        z2m_addresses: BTreeMap<String, SocketAddr>,
         workdir: &std::path::Path,
     ) -> TestResult<AppConfig> {
+        let z2m = z2m_addresses
+            .into_iter()
+            .map(|(name, address)| (name, json!({"url": format!("ws://{address}/api")})))
+            .collect::<BTreeMap<_, _>>();
+
         Ok(serde_json::from_value(json!({
             "bridge": {
                 "name": "Bifrost integration test",
@@ -169,9 +240,7 @@ impl TestBridge {
                 "gateway": http_address.ip(),
                 "timezone": "Etc/UTC"
             },
-            "z2m": {
-                "test": {"url": format!("ws://{z2m_address}/api")}
-            },
+            "z2m": z2m,
             "bifrost": {
                 "state_file": workdir.join("state.yaml"),
                 "cert_file": workdir.join("cert.pem")
@@ -224,6 +293,78 @@ impl TestBridge {
         .await
     }
 
+    pub async fn wait_for_grouped_light<'a>(
+        &mut self,
+        fixture_group: &FixtureGroup<'a>,
+    ) -> TestResult<TestGroupedLight<'a>> {
+        self.wait_for_resource(fixture_group.friendly_name, |events| {
+            if let Some((_, room)) = find_room(events, fixture_group.friendly_name) {
+                return room.grouped_light_service().map(|&link| TestGroupedLight {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            if let Some((_, zone)) = find_zone(events, fixture_group.friendly_name) {
+                return zone.grouped_light_service().map(|&link| TestGroupedLight {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            None
+        })
+        .await
+    }
+
+    pub async fn wait_for_room<'a>(
+        &mut self,
+        fixture_group: &FixtureGroup<'a>,
+    ) -> TestResult<TestRoom<'a>> {
+        self.wait_for_resource(fixture_group.friendly_name, |events| {
+            if let Some((link, _room)) = find_room(events, fixture_group.friendly_name) {
+                return Some(TestRoom {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            None
+        })
+        .await
+    }
+
+    pub async fn wait_for_scene(
+        &mut self,
+        group: ResourceLink,
+        name: &str,
+    ) -> TestResult<TestScene> {
+        self.wait_for_resource(name, |events| {
+            added_resources(events).find_map(|resource| match &resource.obj {
+                Resource::Scene(scene) if scene.group == group && scene.metadata.name == name => {
+                    Some(TestScene {
+                        link: resource.link(),
+                    })
+                }
+                _ => None,
+            })
+        })
+        .await
+    }
+
+    pub async fn wait_for_zone<'a>(
+        &mut self,
+        fixture_group: &FixtureGroup<'a>,
+    ) -> TestResult<TestZone<'a>> {
+        self.wait_for_resource(fixture_group.friendly_name, |events| {
+            if let Some((link, _zone)) = find_zone(events, fixture_group.friendly_name) {
+                return Some(TestZone {
+                    link,
+                    fixture_group: fixture_group.clone(),
+                });
+            }
+            None
+        })
+        .await
+    }
+
     async fn receive_events(&mut self) -> TestResult<Vec<Event>> {
         let blocks = self.hue_events.recv().await?;
         let mut events = Vec::new();
@@ -263,6 +404,20 @@ fn find_zigbee_connectivity<'a>(
 ) -> Option<&'a ZigbeeConnectivity> {
     added_resources(events).find_map(|resource| match &resource.obj {
         Resource::ZigbeeConnectivity(zc) if zc.mac_address == mac_address => Some(zc),
+        _ => None,
+    })
+}
+
+fn find_room<'a>(events: &'a [Event], room_name: &str) -> Option<(ResourceLink, &'a Room)> {
+    added_resources(events).find_map(|resource| match &resource.obj {
+        Resource::Room(room) if room.metadata.name == room_name => Some((resource.link(), room)),
+        _ => None,
+    })
+}
+
+fn find_zone<'a>(events: &'a [Event], zone_name: &str) -> Option<(ResourceLink, &'a Zone)> {
+    added_resources(events).find_map(|resource| match &resource.obj {
+        Resource::Zone(zone) if zone.metadata.name == zone_name => Some((resource.link(), zone)),
         _ => None,
     })
 }

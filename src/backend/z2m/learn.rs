@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use hue::api::{
     ColorTemperatureUpdate, ColorUpdate, Light, LightGradientPoint, LightGradientUpdate, RType,
-    ResourceLink, Room, Scene, SceneAction, SceneActionElement,
+    Resource, ResourceLink, Scene, SceneAction, SceneActionElement,
 };
 use z2m::hexcolor::HexColor;
 use z2m::update::{DeviceColor, DeviceUpdate};
@@ -60,15 +60,27 @@ impl SceneLearn {
             return Ok(());
         }
 
-        let room: &Room = lock.get(&scene.group)?;
-
-        let lights: Vec<Uuid> = room
-            .children
-            .iter()
-            .filter_map(|rl| lock.get(rl).ok())
-            .filter_map(hue::api::Device::light_service)
-            .map(|rl| rl.rid)
-            .collect();
+        let lights: Vec<Uuid> = match lock.get_resource(&scene.group)?.obj {
+            Resource::Room(room) => room
+                .children
+                .iter()
+                .filter_map(|rl| lock.get(rl).ok())
+                .filter_map(hue::api::Device::light_service)
+                .map(|rl| rl.rid)
+                .collect(),
+            Resource::Zone(zone) => zone
+                .children
+                .iter()
+                .filter_map(|rl| lock.get::<Light>(rl).ok().map(|_| rl.rid))
+                .collect(),
+            _ => {
+                log::warn!(
+                    "Tried to learn scene for an invalid group type {:?}",
+                    scene.group
+                );
+                return Ok(());
+            }
+        };
 
         let learn = SceneInfo {
             expire: Utc::now() + Duration::seconds(5),
@@ -150,6 +162,125 @@ impl SceneLearn {
             }
         }
 
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeSet, HashSet};
+
+    use hue::api::{
+        Device, DeviceArchetype, DeviceProductData, GroupArchetype, GroupMetadata, LightMetadata,
+        Metadata, Resource, Room, SceneMetadata, SceneRecall, Zone,
+    };
+    use hue::version::SwVersion;
+
+    use super::*;
+    use crate::model::state::State;
+
+    #[test]
+    fn learns_lights_from_zone_children() -> ApiResult<()> {
+        let mut resources = Resources::new(SwVersion::default(), State::new());
+        let device_link = RType::Device.random();
+        let light_link = RType::Light.random();
+        let zone_link = RType::Zone.random();
+        let scene_link = RType::Scene.random();
+
+        resources.add(
+            &light_link,
+            Resource::Light(Box::new(Light::new(
+                device_link,
+                LightMetadata::new(DeviceArchetype::ClassicBulb, "light"),
+            ))),
+        )?;
+        resources.add(
+            &zone_link,
+            Resource::Zone(Zone {
+                children: BTreeSet::from([light_link]),
+                metadata: GroupMetadata::new(GroupArchetype::Home, "zone"),
+                services: BTreeSet::new(),
+            }),
+        )?;
+        resources.add(
+            &scene_link,
+            Resource::Scene(Scene {
+                actions: Vec::new(),
+                auto_dynamic: false,
+                group: zone_link,
+                metadata: SceneMetadata {
+                    appdata: None,
+                    image: None,
+                    name: "scene".to_string(),
+                },
+                palette: serde_json::Value::Null,
+                speed: 0.5,
+                status: None,
+                recall: SceneRecall::default(),
+            }),
+        )?;
+
+        let mut learner = SceneLearn::new("test".to_string());
+        learner.learn_scene_recall(&scene_link, &mut resources)?;
+
+        assert_eq!(
+            learner.scenes[&scene_link.rid].missing,
+            HashSet::from([light_link.rid])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn learns_lights_from_room_children() -> ApiResult<()> {
+        let mut resources = Resources::new(SwVersion::default(), State::new());
+        let device_link = RType::Device.random();
+        let light_link = RType::Light.random();
+        let room_link = RType::Room.random();
+        let scene_link = RType::Scene.random();
+
+        resources.add(
+            &device_link,
+            Resource::Device(Device {
+                product_data: DeviceProductData::hue_bridge_v2(&SwVersion::default()),
+                metadata: Metadata::new(DeviceArchetype::ClassicBulb, "light"),
+                services: BTreeSet::from([light_link]),
+                usertest: None,
+                identify: None,
+            }),
+        )?;
+        resources.add(
+            &room_link,
+            Resource::Room(Room {
+                children: BTreeSet::from([device_link]),
+                metadata: GroupMetadata::new(GroupArchetype::Home, "room"),
+                services: BTreeSet::new(),
+            }),
+        )?;
+        resources.add(
+            &scene_link,
+            Resource::Scene(Scene {
+                actions: Vec::new(),
+                auto_dynamic: false,
+                group: room_link,
+                metadata: SceneMetadata {
+                    appdata: None,
+                    image: None,
+                    name: "scene".to_string(),
+                },
+                palette: serde_json::Value::Null,
+                speed: 0.5,
+                status: None,
+                recall: SceneRecall::default(),
+            }),
+        )?;
+
+        let mut learner = SceneLearn::new("test".to_string());
+        learner.learn_scene_recall(&scene_link, &mut resources)?;
+
+        assert_eq!(
+            learner.scenes[&scene_link.rid].missing,
+            HashSet::from([light_link.rid])
+        );
         Ok(())
     }
 }

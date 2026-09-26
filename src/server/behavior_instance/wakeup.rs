@@ -10,9 +10,9 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 use hue::api::{
-    Device, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
+    Device, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
     LightTimedEffect, LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink,
-    Room, WakeupConfiguration, WakeupStyle,
+    WakeupConfiguration, WakeupStyle,
 };
 use uuid::Uuid;
 
@@ -144,6 +144,45 @@ impl WakeupJob {
     }
 }
 
+fn wakeup_requests_for_group(
+    config: &WakeupConfiguration,
+    lock: &Resources,
+    group: &impl Group,
+) -> Vec<WakeupRequest> {
+    let lights_in_room: Vec<_> = group
+        .children()
+        .filter_map(|rl| match rl.rtype {
+            RType::Device => lock.get::<Device>(rl).ok().and_then(Device::light_service),
+            RType::Light => Some(rl),
+            _ => None,
+        })
+        .filter_map(|light_rl| lock.get::<Light>(light_rl).ok().map(|l| (light_rl, l)))
+        .collect();
+    if config.style == Some(WakeupStyle::Sunrise)
+        && lights_in_room
+            .iter()
+            .any(|(_, light)| light.effects.is_some())
+    {
+        // Hue effects do not support grouped lights so we need to send indivial requests to each light
+        lights_in_room
+            .into_iter()
+            .filter_map(|(resource_link, light)| {
+                if light.on.on {
+                    None
+                } else {
+                    Some(WakeupRequest::Light(*resource_link))
+                }
+            })
+            .collect()
+    } else {
+        group
+            .grouped_light_service()
+            .map_or_else(Vec::new, |grouped_light| {
+                vec![WakeupRequest::Group(*grouped_light)]
+            })
+    }
+}
+
 async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
     log::debug!("Running scheduled behavior instance:, {:#?}", config);
     #[allow(clippy::option_if_let_else)]
@@ -157,37 +196,6 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
 
     let requests = {
         let lock = res.lock().await;
-        let room_requests = |room: &Room| {
-            let lights_in_room: Vec<_> = room
-                .children
-                .iter()
-                .filter_map(|rl| lock.get::<Device>(rl).ok())
-                .filter_map(Device::light_service)
-                .filter_map(|light_rl| lock.get::<Light>(light_rl).ok().map(|l| (light_rl, l)))
-                .collect();
-            if config.style == Some(WakeupStyle::Sunrise)
-                && lights_in_room
-                    .iter()
-                    .any(|(_, light)| light.effects.is_some())
-            {
-                // Hue effects do not support grouped lights so we need to send indivial requests to each light
-                lights_in_room
-                    .into_iter()
-                    .filter_map(|(resource_link, light)| {
-                        if light.on.on {
-                            None
-                        } else {
-                            Some(WakeupRequest::Light(*resource_link))
-                        }
-                    })
-                    .collect()
-            } else {
-                room.grouped_light_service()
-                    .map_or_else(Vec::new, |grouped_light| {
-                        vec![WakeupRequest::Group(*grouped_light)]
-                    })
-            }
-        };
         resource_links
             .into_iter()
             .filter_map(|resource_link| {
@@ -201,7 +209,8 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                 }
             })
             .flat_map(|(resource_link, resource)| match resource.obj {
-                Resource::Room(room) => room_requests(&room),
+                Resource::Room(room) => wakeup_requests_for_group(&config, &lock, &room),
+                Resource::Zone(zone) => wakeup_requests_for_group(&config, &lock, &zone),
                 Resource::Light(light) => {
                     if light.on.on {
                         vec![]
@@ -214,7 +223,9 @@ async fn run_wake_up(config: WakeupConfiguration, res: Arc<Mutex<Resources>>) {
                     all_rooms
                         .into_iter()
                         .filter_map(|room_resource| match room_resource.obj {
-                            Resource::Room(room) => Some(room_requests(&room)),
+                            Resource::Room(room) => {
+                                Some(wakeup_requests_for_group(&config, &lock, &room))
+                            }
                             _ => None,
                         })
                         .concat()

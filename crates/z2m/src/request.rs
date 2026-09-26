@@ -1,7 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::api::{DeviceRead, DeviceRemove, GroupMemberChange, PermitJoin};
+use crate::api::{DeviceRead, DeviceRemove, GroupAdd, GroupMemberChange, GroupRemove, PermitJoin};
 use crate::update::DeviceUpdate;
 
 #[derive(Clone, Debug, Serialize)]
@@ -32,6 +32,12 @@ pub enum Z2mRequest<'a> {
         command: u16,
         payload: Z2mPayload,
     },
+
+    #[serde(untagged)]
+    GroupAdd(GroupAdd),
+
+    #[serde(untagged)]
+    GroupRemove(GroupRemove),
 
     #[serde(untagged)]
     GroupMemberAdd(GroupMemberChange),

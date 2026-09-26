@@ -43,8 +43,17 @@ impl Memory2Mqtt {
 
     #[must_use]
     pub fn startup_messages(&self) -> Vec<RawMessage> {
-        self.state
-            .keys()
+        let mut keys: Vec<_> = self.state.keys().collect();
+        keys.sort_by_key(|&key| {
+            if key.starts_with("bridge/") {
+                // announce devices, groups and other bridge state before device/group state
+                1
+            } else {
+                2
+            }
+        });
+
+        keys.into_iter()
             .filter_map(|topic| self.handle_get(topic))
             .collect()
     }

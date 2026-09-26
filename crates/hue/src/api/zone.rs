@@ -1,12 +1,14 @@
-use std::collections::BTreeSet;
-use std::ops::{AddAssign, Sub};
+use std::{
+    collections::BTreeSet,
+    ops::{AddAssign, Sub},
+};
 
 use serde::{Deserialize, Serialize};
 
 use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct Room {
+pub struct Zone {
     pub children: BTreeSet<ResourceLink>,
     pub metadata: GroupMetadata,
     #[serde(default)]
@@ -14,13 +16,13 @@ pub struct Room {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RoomNew {
+pub struct ZoneNew {
     pub children: BTreeSet<ResourceLink>,
     pub metadata: GroupMetadata,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct RoomUpdate {
+pub struct ZoneUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<BTreeSet<ResourceLink>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -29,7 +31,7 @@ pub struct RoomUpdate {
     pub services: Option<Vec<ResourceLink>>,
 }
 
-impl Group for Room {
+impl Group for Zone {
     fn grouped_light_service(&self) -> Option<&ResourceLink> {
         self.services
             .iter()
@@ -41,7 +43,7 @@ impl Group for Room {
     }
 }
 
-impl RoomUpdate {
+impl ZoneUpdate {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -67,8 +69,8 @@ impl RoomUpdate {
     }
 }
 
-impl AddAssign<&RoomUpdate> for Room {
-    fn add_assign(&mut self, rhs: &RoomUpdate) {
+impl AddAssign<&ZoneUpdate> for Zone {
+    fn add_assign(&mut self, rhs: &ZoneUpdate) {
         if let Some(md) = &rhs.metadata {
             self.metadata += md;
         }
@@ -77,12 +79,11 @@ impl AddAssign<&RoomUpdate> for Room {
         }
     }
 }
-
 #[allow(clippy::if_not_else)]
-impl Sub<&Room> for &Room {
-    type Output = RoomUpdate;
+impl Sub<&Zone> for &Zone {
+    type Output = ZoneUpdate;
 
-    fn sub(self, rhs: &Room) -> Self::Output {
+    fn sub(self, rhs: &Zone) -> Self::Output {
         let mut upd = Self::Output::default();
 
         if self != rhs {

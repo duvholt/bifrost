@@ -406,17 +406,20 @@ impl ApiGroup {
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[must_use]
-    pub fn from_lights_and_room(
-        glight: &api::GroupedLight,
+    pub fn from_lights_and_group(
+        glight: Option<&api::GroupedLight>,
         lights: Vec<String>,
-        room: api::Room,
+        group_metadata: api::GroupMetadata,
+        group_type: ApiGroupType,
     ) -> Self {
         Self {
-            name: room.metadata.name,
+            name: group_metadata.name,
             lights,
             action: ApiGroupAction {
-                on: glight.on.is_some_and(|on| on.on),
-                bri: glight.dimming.map(|dim| (dim.brightness * 2.54) as u32),
+                on: glight.and_then(|g| g.on).is_some_and(|on| on.on),
+                bri: glight
+                    .and_then(|g| g.dimming)
+                    .map(|dim| (dim.brightness * 2.54) as u32),
                 hue: None,
                 sat: None,
                 effect: None,
@@ -426,7 +429,7 @@ impl ApiGroup {
                 colormode: None,
             },
             class: ApiGroupClass::default(),
-            group_type: ApiGroupType::Room,
+            group_type,
             recycle: false,
             sensors: vec![],
             state: ApiGroupState::default(),

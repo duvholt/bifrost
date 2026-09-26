@@ -8,7 +8,7 @@ use serde_json::Value;
 use tokio::{sync::broadcast, time::timeout};
 use z2m::api::RawMessage;
 
-use crate::common::{TestError, TestResult, bridge::TestZ2mDevice};
+use crate::common::{TestError, TestResult, bridge::TestZ2mDeviceOrGroup};
 
 const TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -29,13 +29,28 @@ impl Z2mRequests {
             .map_err(|_| TestError::Z2mRequestTimeout)??)
     }
 
+    pub async fn expect_quiet(&mut self) -> TestResult<()> {
+        match timeout(Duration::from_millis(100), async {
+            self.next_request().await
+        })
+        .await
+        {
+            Ok(event) => Err(TestError::UnexpectedZ2mEvent(event?)),
+            Err(_) => Ok(()),
+        }
+    }
+
     pub async fn expect_set(
         &mut self,
-        device: &(impl TestZ2mDevice + Sync),
+        device: &(impl TestZ2mDeviceOrGroup + Sync),
         payload: Value,
     ) -> TestResult<()> {
-        self.expect_requests_unordered([(format!("{}/set", device.topic()), payload)])
+        self.expect_request(&format!("{}/set", device.topic()), payload)
             .await
+    }
+
+    pub async fn expect_request(&mut self, topic: &str, payload: Value) -> TestResult<()> {
+        self.expect_requests_unordered([(topic, payload)]).await
     }
 
     pub async fn expect_requests_unordered<I, S>(&mut self, expected: I) -> TestResult<()>
@@ -68,9 +83,13 @@ impl Z2mRequests {
     }
 }
 
-pub struct TestZ2m {
+pub struct TestZ2mBackend {
     websocket_tx: broadcast::Sender<RawMessage>,
     observed_requests_rx: broadcast::Receiver<RawMessage>,
+}
+
+pub struct TestZ2m {
+    backends: BTreeMap<String, TestZ2mBackend>,
 }
 
 pub async fn create_m2m_service(
@@ -90,7 +109,7 @@ pub async fn create_m2m_service(
     Ok(service)
 }
 
-impl TestZ2m {
+impl TestZ2mBackend {
     #[must_use]
     pub fn from_service(service: &Memory2MqttService) -> Self {
         Self {
@@ -105,12 +124,57 @@ impl TestZ2m {
     }
 
     #[allow(clippy::needless_pass_by_value)]
-    pub fn publish(&self, device: &impl TestZ2mDevice, payload: Value) -> TestResult<()> {
-        self.websocket_tx.send(RawMessage {
-            topic: device.topic(),
-            payload,
-        })?;
+    pub fn publish(&self, device: &impl TestZ2mDeviceOrGroup, payload: Value) -> TestResult<()> {
+        self.publish_topic(device.topic(), payload)
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn publish_topic(&self, topic: String, payload: Value) -> TestResult<()> {
+        self.websocket_tx.send(RawMessage { topic, payload })?;
         Ok(())
+    }
+}
+
+impl TestZ2m {
+    #[must_use]
+    pub fn from_services<'a>(
+        services: impl IntoIterator<Item = (&'a String, &'a Memory2MqttService)>,
+    ) -> Self {
+        Self {
+            backends: services
+                .into_iter()
+                .map(|(name, service)| (name.clone(), TestZ2mBackend::from_service(service)))
+                .collect(),
+        }
+    }
+
+    pub fn backend(&self, name: &str) -> TestResult<&TestZ2mBackend> {
+        self.backends
+            .get(name)
+            .ok_or_else(|| TestError::Z2mBackendNotFound(name.to_string()))
+    }
+
+    #[must_use]
+    pub fn only_backend(&self) -> &TestZ2mBackend {
+        assert_eq!(
+            self.backends.len(),
+            1,
+            "only_backend requires a single backend to be configured"
+        );
+        self.backends.first_key_value().unwrap().1
+    }
+
+    #[must_use]
+    pub fn subscribe_requests(&self) -> Z2mRequests {
+        self.only_backend().subscribe_requests()
+    }
+
+    pub fn publish(&self, device: &impl TestZ2mDeviceOrGroup, payload: Value) -> TestResult<()> {
+        self.only_backend().publish(device, payload)
+    }
+
+    pub fn publish_topic(&self, topic: String, payload: Value) -> TestResult<()> {
+        self.only_backend().publish_topic(topic, payload)
     }
 }
 

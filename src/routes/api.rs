@@ -16,9 +16,9 @@ use hue::api::{
     Device, Entertainment, EntertainmentConfiguration, EntertainmentConfigurationAction,
     EntertainmentConfigurationLocationsNew, EntertainmentConfigurationMetadata,
     EntertainmentConfigurationNew, EntertainmentConfigurationServiceLocationsNew,
-    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, GroupedLight,
-    GroupedLightUpdate, Light, LightUpdate, RType, ResourceLink, Room, Scene, SceneActive,
-    SceneStatus, SceneUpdate, V1Reply,
+    EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Group, GroupedLight,
+    GroupedLightUpdate, Light, LightUpdate, RType, Resource, ResourceLink, Room, Scene,
+    SceneActive, SceneStatus, SceneUpdate, V1Reply, Zone,
 };
 use hue::error::{HueApiV1Error, HueError, HueResult};
 use hue::legacy_api::{
@@ -79,24 +79,47 @@ fn get_groups(res: &MutexGuard<Resources>, group_0: bool) -> ApiResult<HashMap<S
 
     for rr in res.get_resources_by_type(RType::Room) {
         let room: Room = rr.obj.try_into()?;
-        let uuid = room
-            .services
-            .iter()
-            .find(|rl| rl.rtype == RType::GroupedLight)
-            .ok_or(HueError::NotFound(rr.id))?;
+        let glight_link = room.grouped_light_service();
 
-        let glight = res.get::<GroupedLight>(uuid)?;
-        let lights: Vec<String> = room
-            .children
-            .iter()
-            .filter_map(|rl| res.get(rl).ok())
-            .filter_map(Device::light_service)
-            .filter_map(|rl| res.get_id_v1(rl.rid).ok())
-            .collect();
+        let (glight, lights) = if let Some(glight_link) = glight_link {
+            let glight = res.get::<GroupedLight>(glight_link)?;
+            let lights: Vec<String> = room
+                .children
+                .iter()
+                .filter_map(|rl| res.get(rl).ok())
+                .filter_map(Device::light_service)
+                .filter_map(|rl| res.get_id_v1(rl.rid).ok())
+                .collect();
+            (Some(glight), lights)
+        } else {
+            (None, Vec::new())
+        };
 
         rooms.insert(
             res.get_id_v1(rr.id)?,
-            ApiGroup::from_lights_and_room(glight, lights, room),
+            ApiGroup::from_lights_and_group(glight, lights, room.metadata, ApiGroupType::Room),
+        );
+    }
+
+    for rr in res.get_resources_by_type(RType::Zone) {
+        let zone: Zone = rr.obj.try_into()?;
+        let glight_link = zone.grouped_light_service();
+
+        let (glight, lights) = if let Some(glight_link) = glight_link {
+            let glight = res.get::<GroupedLight>(glight_link)?;
+            let lights: Vec<String> = zone
+                .children
+                .iter()
+                .filter_map(|rl| res.get_id_v1(rl.rid).ok())
+                .collect();
+            (Some(glight), lights)
+        } else {
+            (None, Vec::new())
+        };
+
+        rooms.insert(
+            res.get_id_v1(rr.id)?,
+            ApiGroup::from_lights_and_group(glight, lights, zone.metadata, ApiGroupType::Zone),
         );
     }
 
@@ -172,7 +195,7 @@ pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiV1Result<A
         })
         .collect::<ApiV1Result<_>>()?;
 
-    let room_id = res.get_id_v1_index(scene.group.rid)?;
+    let group_id = res.get_id_v1_index(scene.group.rid)?;
 
     Ok(ApiScene {
         name: scene.metadata.name.clone(),
@@ -184,14 +207,14 @@ pub fn get_scene(res: &Resources, owner: String, scene: &Scene) -> ApiV1Result<A
         locked: false,
         /* Some clients (e.g. Hue Essentials) require .appdata */
         appdata: ApiSceneAppData {
-            data: Some(format!("xxxxx_r{room_id}")),
+            data: Some(format!("xxxxx_r{group_id}")),
             version: Some(1),
         },
         picture: String::new(),
         lastupdated: Utc::now(),
         version: ApiSceneVersion::V2 as u32,
         image: scene.metadata.image.map(|rl| rl.rid),
-        group: Some(room_id.to_string()),
+        group: Some(group_id.to_string()),
     })
 }
 
@@ -484,8 +507,15 @@ async fn put_api_user_resource_id_path(
             let uuid = lock.from_id_v1(id)?;
             let link = ResourceLink::new(uuid, RType::Room);
 
-            let room: &Room = lock.get(&link)?;
-            let glight = room.grouped_light_service().unwrap();
+            let group = lock.get_resource_by_id(&uuid)?;
+            let glight = match group.obj {
+                Resource::Room(room) => room.grouped_light_service().copied(),
+                Resource::Zone(zone) => zone.grouped_light_service().copied(),
+                _ => None,
+            };
+            let Some(glight) = glight else {
+                return Err(HueError::NotFound(link.rid))?;
+            };
 
             let updv1: ApiGroupActionUpdate = serde_json::from_value(req)?;
 
@@ -493,7 +523,7 @@ async fn put_api_user_resource_id_path(
                 ApiGroupActionUpdate::LightUpdate(upd) => {
                     let updv2 = GroupedLightUpdate::from(&upd);
 
-                    lock.backend_request(BackendRequest::GroupedLightUpdate(*glight, updv2))?;
+                    lock.backend_request(BackendRequest::GroupedLightUpdate(glight, updv2))?;
                     drop(lock);
 
                     V1Reply::for_group_path(id, &path).with_light_state_update(&upd)?

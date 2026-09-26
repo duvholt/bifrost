@@ -186,6 +186,18 @@ pub enum ApiError {
 
     #[error("No next weekday occurence {0:?} {0:?}")]
     NoNextWeekdayOccurence(NaiveTime, HashSet<Weekday>),
+
+    #[error("Backend request timeout")]
+    BackendRequestTimeout,
+
+    #[error("Backend request failed: {0}")]
+    BackendRequestFailed(String),
+
+    #[error("Children must belong to the same backend")]
+    MixedBackendChildren,
+
+    #[error("Missing backend data resource {0:?}")]
+    BackendNotFound(uuid::Uuid),
 }
 
 impl From<SvcError> for ApiError {

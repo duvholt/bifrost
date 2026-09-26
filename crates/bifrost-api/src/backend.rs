@@ -1,15 +1,32 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
+use tokio::sync::{Mutex, oneshot};
 use uuid::Uuid;
 
 use hue::api::{
-    GroupedLightUpdate, LightUpdate, ResourceLink, RoomUpdate, Scene, SceneUpdate,
-    ZigbeeDeviceDiscoveryUpdate,
+    GroupedLightUpdate, LightUpdate, ResourceLink, RoomNew, RoomUpdate, Scene, SceneUpdate,
+    ZigbeeDeviceDiscoveryUpdate, ZoneNew, ZoneUpdate,
 };
 use hue::stream::HueStreamLightsV2;
 
 use crate::Client;
 use crate::config::Z2mServer;
 use crate::error::BifrostResult;
+
+pub type RequestReply<T> = Option<Arc<Mutex<Option<oneshot::Sender<T>>>>>;
+
+#[must_use]
+pub fn request_reply_channel<T>() -> (RequestReply<T>, oneshot::Receiver<T>) {
+    let (tx, rx) = oneshot::channel();
+    (Some(Arc::new(Mutex::new(Some(tx)))), rx)
+}
+
+#[derive(Debug)]
+pub enum DeleteReply {
+    Claimed,
+    Failed(String),
+}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -21,9 +38,29 @@ pub enum BackendRequest {
 
     GroupedLightUpdate(ResourceLink, GroupedLightUpdate),
 
+    RoomCreate {
+        backend: String,
+        room_new: RoomNew,
+        existing_link: Option<ResourceLink>,
+        #[serde(skip)]
+        link_reply: RequestReply<ResourceLink>,
+    },
     RoomUpdate(ResourceLink, RoomUpdate),
 
-    Delete(ResourceLink),
+    ZoneCreate {
+        backend: String,
+        zone_new: ZoneNew,
+        existing_link: Option<ResourceLink>,
+        #[serde(skip)]
+        link_reply: RequestReply<ResourceLink>,
+    },
+    ZoneUpdate(ResourceLink, ZoneUpdate),
+
+    Delete {
+        link: ResourceLink,
+        #[serde(skip)]
+        reply: RequestReply<DeleteReply>,
+    },
 
     EntertainmentStart(Uuid),
     EntertainmentFrame(HueStreamLightsV2),

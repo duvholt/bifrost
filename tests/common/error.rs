@@ -53,6 +53,12 @@ pub enum TestError {
     #[error("timeout waiting for z2m request")]
     Z2mRequestTimeout,
 
+    #[error("unexpected z2m event: {0:?}")]
+    UnexpectedZ2mEvent(RawMessage),
+
+    #[error("z2m backend not found: {0}")]
+    Z2mBackendNotFound(String),
+
     #[error("unexpected Hue events: {0:?}")]
     UnexpectedHueEvents(Vec<TestHueEvent>),
 }

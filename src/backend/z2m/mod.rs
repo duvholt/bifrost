@@ -3,6 +3,7 @@ mod bridge_event;
 mod bridge_import;
 mod button;
 pub mod entertainment;
+mod group;
 pub mod learn;
 pub mod websocket;
 pub mod zclcommand;
@@ -83,6 +84,7 @@ pub struct Z2mBackend {
     state: Arc<Mutex<Resources>>,
     map: HashMap<String, ResourceLink>,
     rmap: HashMap<ResourceLink, String>,
+    used_group_ids: HashSet<u32>,
     learner: SceneLearn,
     ignore: HashSet<String>,
     network: HashMap<String, z2m::api::Device>,
@@ -117,6 +119,7 @@ impl Z2mBackend {
         let entstream = None;
         let throttle = Throttle::from_fps(fps);
         let button_handlers = HashMap::new();
+        let used_group_ids = HashSet::new();
         let (message_tx, message_rx) = mpsc::unbounded_channel();
         Ok(Self {
             name,
@@ -125,6 +128,7 @@ impl Z2mBackend {
             state,
             map,
             rmap,
+            used_group_ids,
             learner,
             ignore,
             network,

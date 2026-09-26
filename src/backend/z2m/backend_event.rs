@@ -8,12 +8,13 @@ use hue::zigbee::{GradientParams, GradientStyle, HueZigbeeUpdate, LightRecordMod
 use tokio::time::sleep;
 use uuid::Uuid;
 
-use bifrost_api::backend::BackendRequest;
+use bifrost_api::backend::{BackendRequest, DeleteReply, RequestReply};
 use hue::api::{
     BridgeHome, ColorTemperatureUpdate, DimmingDeltaAction, Entertainment,
-    EntertainmentConfiguration, GroupedLight, GroupedLightUpdate, Light, LightEffectsV2Update,
-    LightUpdate, RType, Resource, ResourceLink, Room, RoomUpdate, Scene, SceneActive, SceneStatus,
-    SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
+    EntertainmentConfiguration, Group, GroupedLight, GroupedLightUpdate, Light,
+    LightEffectsV2Update, LightUpdate, RType, Resource, ResourceLink, Room, RoomNew, RoomUpdate,
+    Scene, SceneActive, SceneStatus, SceneStatusEnum, SceneUpdate, ZigbeeDeviceDiscoveryUpdate,
+    Zone, ZoneNew, ZoneUpdate,
 };
 use hue::error::HueError;
 use hue::stream::HueStreamLightsV2;
@@ -251,7 +252,7 @@ impl Z2mBackend {
 
         if let Some(recall) = &upd.recall {
             if recall.action == Some(SceneStatusEnum::Active) {
-                let scenes = lock.get_scenes_for_room(&scene.group.rid);
+                let scenes = lock.get_scenes_for_group(&scene.group.rid);
                 for rid in scenes {
                     lock.update::<Scene>(&rid, |scn| {
                         scn.status = Some(SceneStatus {
@@ -265,10 +266,10 @@ impl Z2mBackend {
                     })?;
                 }
 
-                let room = lock.get::<Scene>(link)?.group;
+                let group = lock.get::<Scene>(link)?.group;
                 drop(lock);
 
-                if let Some(topic) = self.rmap.get(&room).cloned() {
+                if let Some(topic) = self.rmap.get(&group).cloned() {
                     log::info!("[{}] Recall scene: {link:?}", self.name);
 
                     let mut lock = self.state.lock().await;
@@ -281,9 +282,9 @@ impl Z2mBackend {
             }
         } else {
             // We're not recalling the scene, so we are updating the scene
-            let room = lock.get::<Scene>(link)?.group;
+            let group = lock.get::<Scene>(link)?.group;
 
-            if let Some(topic) = self.rmap.get(&room).cloned() {
+            if let Some(topic) = self.rmap.get(&group).cloned() {
                 log::info!("[{}] Store scene: {link:?}", self.name);
 
                 let scene = lock.get::<Scene>(link)?;
@@ -345,6 +346,62 @@ impl Z2mBackend {
         Ok(())
     }
 
+    #[allow(clippy::ref_option)]
+    async fn backend_room_create(
+        &mut self,
+        z2mws: &mut Z2mWebSocket,
+        room_new: &RoomNew,
+        existing_link: &Option<ResourceLink>,
+        link_reply: &RequestReply<ResourceLink>,
+    ) -> ApiResult<()> {
+        let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
+            || room_new.metadata.name.clone(),
+            |group_prefix| format!("{group_prefix}{}", room_new.metadata.name),
+        );
+
+        // Store metadata
+        let mut lock = self.state.lock().await;
+        let room = Room {
+            children: room_new.children.clone(),
+            metadata: room_new.metadata.clone(),
+            services: BTreeSet::new(),
+        };
+        let group_id = self.get_next_group_id();
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        let link = existing_link.unwrap_or_else(|| RType::Room.deterministic(link_glight.rid));
+
+        lock.add(&link, Resource::Room(room.clone()))?;
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        lock.add(
+            &link_glight,
+            Resource::GroupedLight(GroupedLight::new(link)),
+        )?;
+        self.set_group_aux(&mut lock, link_glight, group_id, Some(&group_friendly_name));
+        drop(lock);
+        self.reserve_group_id(group_id);
+
+        z2mws
+            .send_group_add(group_id, group_friendly_name.clone())
+            .await?;
+        for member in &room.children {
+            let Some(friendly_name) = &self.rmap.get(member) else {
+                log::warn!("Unable to find friendly name for room member {member:?}. Skipping");
+                continue;
+            };
+            z2mws
+                .send_group_member_add(&group_friendly_name, friendly_name)
+                .await?;
+        }
+
+        if let Some(reply) = link_reply
+            && let Some(reply) = reply.lock().await.take()
+        {
+            let _ = reply.send(link);
+        }
+
+        Ok(())
+    }
+
     async fn backend_room_update(
         &self,
         z2mws: &mut Z2mWebSocket,
@@ -353,49 +410,173 @@ impl Z2mBackend {
     ) -> ApiResult<()> {
         let lock = self.state.lock().await;
 
-        if let Some(children) = &upd.children {
-            if let Some(topic) = self.rmap.get(link) {
-                let room = lock.get::<Room>(link)?.clone();
-                drop(lock);
+        if let Some(children) = &upd.children
+            && let Some(topic) = self.rmap.get(link)
+        {
+            let room = lock.get::<Room>(link)?.clone();
+            drop(lock);
 
-                let known_existing: BTreeSet<_> = room
-                    .children
-                    .iter()
-                    .filter(|device| self.rmap.contains_key(device))
-                    .collect();
+            let known_existing: BTreeSet<_> = room
+                .children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
 
-                let known_new: BTreeSet<_> = children
-                    .iter()
-                    .filter(|device| self.rmap.contains_key(device))
-                    .collect();
+            let known_new: BTreeSet<_> = children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
 
-                for add in known_new.difference(&known_existing) {
-                    let friendly_name = &self.rmap[add];
-                    z2mws.send_group_member_add(topic, friendly_name).await?;
-                }
+            for add in known_new.difference(&known_existing) {
+                let Some(friendly_name) = &self.rmap.get(add) else {
+                    log::warn!(
+                        "Unable to find friendly name for room member when adding {add:?}. Skipping"
+                    );
+                    continue;
+                };
+                z2mws.send_group_member_add(topic, friendly_name).await?;
+            }
 
-                for remove in known_existing.difference(&known_new) {
-                    let friendly_name = &self.rmap[remove];
-                    z2mws.send_group_member_remove(topic, friendly_name).await?;
-                }
+            for remove in known_existing.difference(&known_new) {
+                let Some(friendly_name) = &self.rmap.get(remove) else {
+                    log::warn!(
+                        "Unable to find friendly name for room member when removing {remove:?}. Skipping"
+                    );
+                    continue;
+                };
+                z2mws.send_group_member_remove(topic, friendly_name).await?;
             }
         }
 
         Ok(())
     }
 
-    async fn backend_delete(&self, z2mws: &mut Z2mWebSocket, link: &ResourceLink) -> ApiResult<()> {
+    #[allow(clippy::ref_option)]
+    async fn backend_zone_create(
+        &mut self,
+        z2mws: &mut Z2mWebSocket,
+        zone_new: &ZoneNew,
+        existing_link: &Option<ResourceLink>,
+        link_reply: &RequestReply<ResourceLink>,
+    ) -> ApiResult<()> {
+        let group_friendly_name = self.server.group_prefix.as_ref().map_or_else(
+            || zone_new.metadata.name.clone(),
+            |group_prefix| format!("{group_prefix}{}", zone_new.metadata.name),
+        );
+
+        // Store metadata
+        let mut lock = self.state.lock().await;
+        let zone = Zone {
+            children: zone_new.children.clone(),
+            metadata: zone_new.metadata.clone(),
+            services: BTreeSet::new(),
+        };
+        let group_id = self.get_next_group_id();
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        let link = existing_link.unwrap_or_else(|| RType::Zone.deterministic(link_glight.rid));
+
+        lock.add(&link, Resource::Zone(zone.clone()))?;
+        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        lock.add(
+            &link_glight,
+            Resource::GroupedLight(GroupedLight::new(link)),
+        )?;
+        self.set_group_aux(&mut lock, link_glight, group_id, Some(&group_friendly_name));
+        drop(lock);
+        self.reserve_group_id(group_id);
+
+        z2mws
+            .send_group_add(group_id, group_friendly_name.clone())
+            .await?;
+        for member in &zone.children {
+            let Some(friendly_name) = &self.rmap.get(member) else {
+                log::warn!("Unable to find friendly name for zone member {member:?}. Skipping");
+                continue;
+            };
+            z2mws
+                .send_group_member_add(&group_friendly_name, friendly_name)
+                .await?;
+        }
+
+        if let Some(reply) = link_reply
+            && let Some(reply) = reply.lock().await.take()
+        {
+            let _ = reply.send(link);
+        }
+
+        Ok(())
+    }
+
+    async fn backend_zone_update(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        upd: &ZoneUpdate,
+    ) -> ApiResult<()> {
+        let lock = self.state.lock().await;
+
+        if let Some(children) = &upd.children
+            && let Some(topic) = self.rmap.get(link)
+        {
+            let zone = lock.get::<Zone>(link)?.clone();
+            drop(lock);
+
+            let known_existing: BTreeSet<_> = zone
+                .children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
+
+            let known_new: BTreeSet<_> = children
+                .iter()
+                .filter(|device| self.rmap.contains_key(device))
+                .collect();
+
+            for add in known_new.difference(&known_existing) {
+                let Some(friendly_name) = &self.rmap.get(add) else {
+                    log::warn!(
+                        "Unable to find friendly name for zone member when adding {add:?}. Skipping"
+                    );
+                    continue;
+                };
+                z2mws.send_group_member_add(topic, friendly_name).await?;
+            }
+
+            for remove in known_existing.difference(&known_new) {
+                let Some(friendly_name) = &self.rmap.get(remove) else {
+                    log::warn!(
+                        "Unable to find friendly name for zone member when removing {remove:?}. Skipping"
+                    );
+                    continue;
+                };
+                z2mws.send_group_member_remove(topic, friendly_name).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::ref_option)]
+    async fn backend_delete(
+        &self,
+        z2mws: &mut Z2mWebSocket,
+        link: &ResourceLink,
+        reply: &RequestReply<DeleteReply>,
+    ) -> ApiResult<()> {
         match link.rtype {
             RType::Scene => {
                 let lock = self.state.lock().await;
-                let room = lock.get::<Scene>(link)?.group;
+                let group = lock.get::<Scene>(link)?.group;
                 let index = lock
                     .aux_get(link)?
                     .index
                     .ok_or(HueError::NotFound(link.rid))?;
                 drop(lock);
 
-                if let Some(topic) = self.rmap.get(&room) {
+                if let Some(topic) = self.rmap.get(&group) {
+                    if !reply_delete(reply, DeleteReply::Claimed).await {
+                        return Ok(());
+                    }
                     z2mws.send_scene_remove(topic, index).await?;
                 }
             }
@@ -406,6 +587,9 @@ impl Z2mBackend {
                     .get(link)
                     .and_then(|topic| self.network.get(topic))
                 {
+                    if !reply_delete(reply, DeleteReply::Claimed).await {
+                        return Ok(());
+                    }
                     let addr = dev.ieee_address.to_string();
                     log::info!(
                         "[{}] Requesting z2m removal of {} ({})",
@@ -418,7 +602,25 @@ impl Z2mBackend {
                 }
             }
 
+            RType::Room | RType::Zone => {
+                if let Some(topic) = self.rmap.get(link) {
+                    if !reply_delete(reply, DeleteReply::Claimed).await {
+                        return Ok(());
+                    }
+                    log::info!("[{}] Requesting z2m removal of {}", self.name, &topic);
+                    z2mws.send_group_remove(topic.clone()).await?;
+                }
+            }
+
             rtype => {
+                if !reply_delete(
+                    reply,
+                    DeleteReply::Failed(format!("Deleting type {rtype:?} is not supported")),
+                )
+                .await
+                {
+                    return Ok(());
+                }
                 log::warn!(
                     "[{}] Deleting objects of type {rtype:?} is not supported",
                     self.name
@@ -473,7 +675,7 @@ impl Z2mBackend {
                 } else {
                     LightRecordMode::Device
                 };
-                channels.insert(chan.channel_id as u8, (segment_addr, mode));
+                channels.insert(u8::try_from(chan.channel_id)?, (segment_addr, mode));
 
                 targets.push(topic);
             }
@@ -509,10 +711,10 @@ impl Z2mBackend {
         z2mws: &mut Z2mWebSocket,
         frame: &HueStreamLightsV2,
     ) -> ApiResult<()> {
-        if let Some(es) = &mut self.entstream {
-            if self.throttle.tick() {
-                es.frame(z2mws, frame).await?;
-            }
+        if let Some(es) = &mut self.entstream
+            && self.throttle.tick()
+        {
+            es.frame(z2mws, frame).await?;
         }
 
         Ok(())
@@ -579,11 +781,43 @@ impl Z2mBackend {
                 self.backend_grouped_light_update(z2mws, link, upd).await
             }
 
+            BackendRequest::RoomCreate {
+                backend,
+                room_new,
+                existing_link,
+                link_reply,
+            } => {
+                if backend == &self.name {
+                    self.backend_room_create(z2mws, room_new, existing_link, link_reply)
+                        .await
+                } else {
+                    Ok(())
+                }
+            }
+
             BackendRequest::RoomUpdate(link, upd) => {
                 self.backend_room_update(z2mws, link, upd).await
             }
 
-            BackendRequest::Delete(link) => self.backend_delete(z2mws, link).await,
+            BackendRequest::ZoneCreate {
+                backend,
+                zone_new,
+                existing_link,
+                link_reply,
+            } => {
+                if backend == &self.name {
+                    self.backend_zone_create(z2mws, zone_new, existing_link, link_reply)
+                        .await
+                } else {
+                    Ok(())
+                }
+            }
+
+            BackendRequest::ZoneUpdate(link, upd) => {
+                self.backend_zone_update(z2mws, link, upd).await
+            }
+
+            BackendRequest::Delete { link, reply } => self.backend_delete(z2mws, link, reply).await,
 
             BackendRequest::EntertainmentStart(ent_id) => {
                 self.backend_entertainment_start(z2mws, ent_id).await
@@ -601,4 +835,21 @@ impl Z2mBackend {
             }
         }
     }
+}
+
+#[allow(clippy::ref_option)]
+async fn reply_delete(claim: &RequestReply<DeleteReply>, claimed: DeleteReply) -> bool {
+    if let Some(claim) = claim
+        && let Some(claim) = claim.lock().await.take()
+    {
+        match claim.send(claimed) {
+            Ok(()) => {
+                return true;
+            }
+            Err(err) => {
+                log::error!("Failed to send delete reply: {err:?}");
+            }
+        }
+    }
+    false
 }

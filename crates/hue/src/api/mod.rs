@@ -4,6 +4,7 @@ mod button;
 mod device;
 mod entertainment;
 mod entertainment_config;
+mod group;
 mod grouped_light;
 mod light;
 mod resource;
@@ -13,6 +14,7 @@ mod stream;
 mod stubs;
 mod update;
 mod zigbee_device_discovery;
+mod zone;
 
 pub use behavior::{
     Action, BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
@@ -37,6 +39,7 @@ pub use entertainment_config::{
     EntertainmentConfigurationStreamProxyMode, EntertainmentConfigurationStreamProxyUpdate,
     EntertainmentConfigurationType, EntertainmentConfigurationUpdate, Position,
 };
+pub use group::{Group, GroupArchetype, GroupMetadata, GroupMetadataUpdate};
 pub use grouped_light::{GroupedLight, GroupedLightDynamicsUpdate, GroupedLightUpdate};
 pub use light::{
     ColorGamut, ColorTemperature, ColorTemperatureUpdate, ColorUpdate, ContentConfiguration,
@@ -52,7 +55,7 @@ pub use light::{
     OrientationType,
 };
 pub use resource::{RType, ResourceLink, ResourceRecord};
-pub use room::{Room, RoomArchetype, RoomMetadata, RoomMetadataUpdate, RoomUpdate};
+pub use room::{Room, RoomNew, RoomUpdate};
 pub use scene::{
     Scene, SceneAction, SceneActionElement, SceneActive, SceneMetadata, SceneRecall, SceneStatus,
     SceneStatusEnum, SceneUpdate,
@@ -63,7 +66,7 @@ pub use stubs::{
     Bridge, Clip, DevicePower, DeviceSoftwareUpdate, DollarRef, GeofenceClient, Geolocation,
     GroupedLightLevel, GroupedMotion, Homekit, LightLevel, Matter, Metadata, MetadataUpdate,
     Motion, PrivateGroup, PublicImage, RelativeRotary, SmartScene, Taurus, Temperature, TimeZone,
-    ZigbeeConnectivity, ZigbeeConnectivityStatus, Zone,
+    ZigbeeConnectivity, ZigbeeConnectivityStatus,
 };
 pub use update::Update;
 pub use zigbee_device_discovery::{
@@ -71,6 +74,7 @@ pub use zigbee_device_discovery::{
     ZigbeeDeviceDiscoveryStatus, ZigbeeDeviceDiscoveryUpdate, ZigbeeDeviceDiscoveryUpdateAction,
     ZigbeeDeviceDiscoveryUpdateActionType,
 };
+pub use zone::{Zone, ZoneNew, ZoneUpdate};
 
 use std::fmt::Debug;
 
@@ -216,7 +220,7 @@ impl Resource {
             Self::PublicImage(_) => None,
             Self::RelativeRotary(obj) => Some(obj.owner),
             Self::Room(_) => None,
-            Self::Scene(_) => None,
+            Self::Scene(obj) => Some(obj.group),
             Self::SmartScene(_) => None,
             Self::Taurus(obj) => Some(obj.owner),
             Self::Temperature(obj) => Some(obj.owner),

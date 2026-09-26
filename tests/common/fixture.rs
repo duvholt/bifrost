@@ -78,10 +78,11 @@ pub struct Z2mGroupFixture {
     pub initial_state: Option<Value>,
 }
 impl Z2mGroupFixture {
-    pub fn new(id: u32, friendly_name: impl Into<String>) -> Self {
+    #[must_use]
+    pub fn new(fixture_group: &FixtureGroup) -> Self {
         Self {
-            id,
-            friendly_name: friendly_name.into(),
+            id: fixture_group.id,
+            friendly_name: fixture_group.friendly_name.to_string(),
             members: Vec::new(),
             scenes: Vec::new(),
             initial_state: None,
@@ -197,6 +198,19 @@ impl FixtureDevice {
         self.id
     }
 
+    #[must_use]
+    pub fn topic(&self) -> String {
+        self.friendly_name.to_string()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FixtureGroup<'a> {
+    pub id: u32,
+    pub friendly_name: &'a str,
+}
+
+impl FixtureGroup<'_> {
     #[must_use]
     pub fn topic(&self) -> String {
         self.friendly_name.to_string()

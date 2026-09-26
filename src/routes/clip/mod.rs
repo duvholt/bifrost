@@ -6,8 +6,11 @@ pub mod light;
 pub mod room;
 pub mod scene;
 pub mod zigbee_device_discovery;
+pub mod zone;
 
-use bifrost_api::backend::BackendRequest;
+use std::time::Duration;
+
+use bifrost_api::backend::{BackendRequest, DeleteReply, request_reply_channel};
 use entertainment_configuration as ent_conf;
 
 use axum::Router;
@@ -16,6 +19,7 @@ use axum::routing::{delete, get, post, put};
 use hue::api::{RType, ResourceLink};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::time::timeout;
 
 use crate::error::{ApiError, ApiResult};
 use crate::routes::extractor::Json;
@@ -82,13 +86,11 @@ async fn post_resource(
         RType::EntertainmentConfiguration => ent_conf::post_resource(&state, req).await,
         RType::Scene => scene::post_scene(&state, req).await,
         RType::BehaviorInstance => behavior_instance::post_behavior_instance(&state, req).await,
+        RType::Room => room::post_room(&state, req).await,
+        RType::Zone => zone::post_zone(&state, req).await,
 
         /* Not supported yet by Bifrost */
-        RType::GeofenceClient
-        | RType::Room
-        | RType::ServiceGroup
-        | RType::SmartScene
-        | RType::Zone => {
+        RType::GeofenceClient | RType::ServiceGroup | RType::SmartScene => {
             let err = ApiError::CreateNotYetSupported(rtype);
             log::warn!("{err}");
             Err(err)
@@ -156,6 +158,7 @@ async fn put_resource_id(
         RType::Light => light::put_light(&state, rlink, put).await,
         RType::Scene => scene::put_scene(&state, rlink, put).await,
         RType::Room => room::put_room(&state, rlink, put).await,
+        RType::Zone => zone::put_zone(&state, rlink, put).await,
         RType::ZigbeeDeviceDiscovery => {
             zigbee_device_discovery::put_zigbee_device_discovery(&state, rlink, put).await
         }
@@ -185,8 +188,7 @@ async fn put_resource_id(
         | RType::SmartScene
         | RType::Temperature
         | RType::ZgpConnectivity
-        | RType::ZigbeeConnectivity
-        | RType::Zone => {
+        | RType::ZigbeeConnectivity => {
             /* check that the resource exists, otherwise we should return 404 */
             state.res.lock().await.get_resource(&rlink)?;
 
@@ -219,7 +221,12 @@ async fn delete_resource_id(
 
     match rlink.rtype {
         /* Allowed (delete from state) */
-        RType::BehaviorInstance => {
+        RType::BehaviorInstance
+        | RType::EntertainmentConfiguration
+        | RType::GeofenceClient
+        | RType::MatterFabric
+        | RType::ServiceGroup
+        | RType::SmartScene => {
             let mut lock = state.res.lock().await;
 
             /* check that the resource exists, otherwise we should return 404 */
@@ -232,24 +239,35 @@ async fn delete_resource_id(
             V2Reply::ok(rlink)
         }
         /* Allowed (send request to backend) */
-        RType::Device
-        | RType::EntertainmentConfiguration
-        | RType::GeofenceClient
-        | RType::MatterFabric
-        | RType::Room
-        | RType::Scene
-        | RType::ServiceGroup
-        | RType::SmartScene
-        | RType::Zone => {
+        RType::Device | RType::Room | RType::Scene | RType::Zone => {
             let lock = state.res.lock().await;
 
             /* check that the resource exists, otherwise we should return 404 */
             lock.get_resource(&rlink)?;
 
             /* request deletion from backend */
-            lock.backend_request(BackendRequest::Delete(rlink))?;
-
+            let (tx, rx) = request_reply_channel::<DeleteReply>();
+            lock.backend_request(BackendRequest::Delete {
+                link: rlink,
+                reply: tx,
+            })?;
             drop(lock);
+
+            match timeout(Duration::from_millis(100), rx).await {
+                Ok(Ok(DeleteReply::Claimed)) => {}
+                Ok(Ok(DeleteReply::Failed(reason))) => {
+                    return Err(ApiError::BackendRequestFailed(reason));
+                }
+                Ok(Err(_recv_error)) => {
+                    // all requests are dropped without anyone claiming the resource
+                    log::warn!("Deleting resource not owned by any backends: {rlink:?}");
+                    state.res.lock().await.delete(&rlink)?;
+                }
+                Err(_elapsed) => {
+                    log::warn!("Delete request timed out for: {rlink:?}");
+                    return Err(ApiError::BackendRequestTimeout);
+                }
+            }
 
             V2Reply::ok(rlink)
         }

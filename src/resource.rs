@@ -13,8 +13,8 @@ use uuid::{Uuid, uuid};
 use bifrost_api::backend::BackendRequest;
 use hue::api::{
     BehaviorScript, Bridge, BridgeHome, Clip, Device, DeviceArchetype, DeviceProductData,
-    Entertainment, EntertainmentConfiguration, GroupedLight, Light, Metadata, RType, Resource,
-    ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
+    Entertainment, EntertainmentConfiguration, Group, GroupedLight, Light, Metadata, RType,
+    Resource, ResourceLink, ResourceRecord, Room, Stub, TimeZone, ZigbeeConnectivity,
     ZigbeeConnectivityStatus, ZigbeeDeviceDiscovery, ZigbeeDeviceDiscoveryAction,
     ZigbeeDeviceDiscoveryStatus, Zone,
 };
@@ -104,6 +104,39 @@ impl Resources {
         self.state.aux_set(link.rid, aux);
     }
 
+    pub fn light_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        self.get::<Light>(link)?;
+        self.aux_get(link).map(|aux| aux.backend.clone())
+    }
+
+    pub fn device_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        let device = self.get::<Device>(link)?;
+        let Some(light_link) = device.light_service() else {
+            return Ok(None);
+        };
+        self.light_backend(light_link)
+    }
+
+    pub fn grouped_light_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        self.aux_get(link).map(|aux| aux.backend.clone())
+    }
+
+    pub fn room_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        let room = self.get::<Room>(link)?;
+        let Some(glight_link) = room.grouped_light_service() else {
+            return Ok(None);
+        };
+        self.grouped_light_backend(glight_link)
+    }
+
+    pub fn zone_backend(&self, link: &ResourceLink) -> ApiResult<Option<String>> {
+        let room = self.get::<Zone>(link)?;
+        let Some(glight_link) = room.grouped_light_service() else {
+            return Ok(None);
+        };
+        self.grouped_light_backend(glight_link)
+    }
+
     pub fn try_update<T: Serialize>(
         &mut self,
         id: &Uuid,
@@ -167,7 +200,7 @@ impl Resources {
     }
 
     #[must_use]
-    pub fn get_scenes_for_room(&self, id: &Uuid) -> Vec<Uuid> {
+    pub fn get_scenes_for_group(&self, id: &Uuid) -> Vec<Uuid> {
         self.state
             .res
             .iter()
@@ -407,7 +440,7 @@ impl Resources {
         Ok(())
     }
 
-    pub fn get_next_scene_id(&self, room: &ResourceLink) -> HueResult<u32> {
+    pub fn get_next_scene_id(&self, group: &ResourceLink) -> HueResult<u32> {
         let mut set: HashSet<u32> = HashSet::new();
 
         for scene in self.get_resources_by_type(RType::Scene) {
@@ -415,7 +448,7 @@ impl Resources {
                 continue;
             };
 
-            if &scn.group == room {
+            if &scn.group == group {
                 let Ok(AuxData {
                     index: Some(index), ..
                 }) = self.state.aux_get(&scene.id)
@@ -467,6 +500,7 @@ impl Resources {
     zigbee_connectivity       /lights/{id}
     zigbee_connectivity       null
     zigbee_device_discovery   null
+    zone                      /groups/{id}
      */
 
     #[must_use]
@@ -483,7 +517,7 @@ impl Resources {
             }
 
             /* Rooms are mapped directly */
-            Resource::Room(_) => Some(format!("/groups/{id}")),
+            Resource::Room(_) | Resource::Zone(_) => Some(format!("/groups/{id}")),
 
             /* Devices (that are lights) map to the light service's id_v1 */
             Resource::Device(dev) => {
@@ -541,8 +575,7 @@ impl Resources {
             | Resource::Temperature(_)
             | Resource::ZgpConnectivity(_)
             | Resource::ZigbeeConnectivity(_)
-            | Resource::ZigbeeDeviceDiscovery(_)
-            | Resource::Zone(_) => None,
+            | Resource::ZigbeeDeviceDiscovery(_) => None,
         }
     }
 
