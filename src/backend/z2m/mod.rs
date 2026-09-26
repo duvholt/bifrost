@@ -28,6 +28,7 @@ use tokio_tungstenite::{
 
 use bifrost_api::backend::BackendRequest;
 use hue::api::ResourceLink;
+use z2m::api::DeviceRead;
 use z2m::update::DeviceUpdate;
 
 use crate::backend::z2m::button::Z2mButtonHandler;
@@ -70,6 +71,11 @@ impl ServiceTemplate for Z2mServiceTemplate {
     }
 }
 
+enum Z2mMessage {
+    DeviceUpdate(DeviceUpdate),
+    DeviceRead(DeviceRead),
+}
+
 pub struct Z2mBackend {
     name: String,
     server: Z2mServer,
@@ -88,8 +94,8 @@ pub struct Z2mBackend {
     button_handlers: HashMap<ResourceLink, Arc<Mutex<Z2mButtonHandler>>>,
 
     // for sending delayed messages over the websocket
-    message_rx: mpsc::UnboundedReceiver<(String, DeviceUpdate)>,
-    message_tx: mpsc::UnboundedSender<(String, DeviceUpdate)>,
+    message_rx: mpsc::UnboundedReceiver<(String, Z2mMessage)>,
+    message_tx: mpsc::UnboundedSender<(String, Z2mMessage)>,
 }
 
 impl Z2mBackend {
@@ -153,8 +159,15 @@ impl Z2mBackend {
                     self.handle_bridge_event(pkt.ok_or(ApiError::UnexpectedZ2mEof)??).await?;
                 },
 
-                Some((topic, upd)) = self.message_rx.recv() => {
-                    socket.send_update(&topic, &upd).await?;
+                Some((topic, message)) = self.message_rx.recv() => {
+                    match message {
+                        Z2mMessage::DeviceUpdate(device_update) => {
+                            socket.send_update(&topic, &device_update).await?;
+                        },
+                        Z2mMessage::DeviceRead(device_read) => {
+                            socket.send_read(&topic, &device_read).await?;
+                        },
+                    }
                 }
             };
         }
