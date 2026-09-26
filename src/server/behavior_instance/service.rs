@@ -19,18 +19,25 @@ use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
 use crate::server::behavior_instance::wakeup::WakeupJob;
+use crate::server::behavior_instance::{BehaviorClock, SystemClock};
 
 #[derive(Debug)]
 pub struct BehaviorInstanceService {
     res: Arc<Mutex<Resources>>,
     jobs: HashMap<Uuid, BehaviorInstanceJob>,
+    clock: Arc<dyn BehaviorClock>,
 }
 
 impl BehaviorInstanceService {
     pub fn new(res: Arc<Mutex<Resources>>) -> Self {
+        Self::with_clock(res, Arc::new(SystemClock))
+    }
+
+    pub fn with_clock(res: Arc<Mutex<Resources>>, clock: Arc<dyn BehaviorClock>) -> Self {
         Self {
             jobs: HashMap::new(),
             res,
+            clock,
         }
     }
 
@@ -79,7 +86,7 @@ impl BehaviorInstanceService {
         if let Some(configuration) = self.get_behavior_configuration(rid).await? {
             self.jobs.insert(
                 rid,
-                BehaviorInstanceJob::new(rid, configuration, self.res.clone()),
+                BehaviorInstanceJob::new(rid, configuration, self.res.clone(), self.clock.clone()),
             );
         }
         Ok(())
@@ -177,6 +184,7 @@ struct BehaviorInstanceJob {
     rid: Uuid,
     configuration: BehaviorInstanceConfiguration,
     res: Arc<Mutex<Resources>>,
+    clock: Arc<dyn BehaviorClock>,
     task: Option<JoinHandle<()>>,
 }
 
@@ -185,11 +193,13 @@ impl BehaviorInstanceJob {
         rid: Uuid,
         configuration: BehaviorInstanceConfiguration,
         res: Arc<Mutex<Resources>>,
+        clock: Arc<dyn BehaviorClock>,
     ) -> Self {
         let mut job = Self {
             rid,
             configuration,
             res,
+            clock,
             task: None,
         };
         job.update_task();
@@ -233,6 +243,7 @@ impl BehaviorInstanceJob {
             schedule_type,
             configuration: configuration.clone(),
             res: self.res.clone(),
+            clock: self.clock.clone(),
         }
     }
 
@@ -240,7 +251,7 @@ impl BehaviorInstanceJob {
         &self,
         configuration: &HueAccessoriesConfiguration,
     ) -> HueAccessoriesJob {
-        HueAccessoriesJob::new(configuration.clone(), self.res.clone())
+        HueAccessoriesJob::new(configuration.clone(), self.res.clone(), self.clock.clone())
     }
 }
 

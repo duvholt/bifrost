@@ -1,5 +1,5 @@
 use bifrost::error::ApiError;
-use hue::event::EventBlock;
+use hue::{error::HueError, event::EventBlock};
 use svc::error::SvcError;
 use thiserror::Error;
 use z2m::api::RawMessage;
@@ -13,6 +13,9 @@ pub enum TestError {
 
     #[error(transparent)]
     Api(#[from] ApiError),
+
+    #[error(transparent)]
+    Hue(#[from] HueError),
 
     #[error(transparent)]
     IO(#[from] std::io::Error),
@@ -52,6 +55,9 @@ pub enum TestError {
 
     #[error("timeout waiting for z2m request")]
     Z2mRequestTimeout,
+
+    #[error("timeout waiting for behavior sleep")]
+    BehaviorSleepTimeout,
 
     #[error("unexpected z2m event: {0:?}")]
     UnexpectedZ2mEvent(RawMessage),
