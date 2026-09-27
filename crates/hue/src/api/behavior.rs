@@ -216,6 +216,7 @@ pub mod configuration {
     }
 
     impl Duration {
+        #[must_use]
         pub fn to_std(&self) -> StdDuration {
             StdDuration::from_secs(self.seconds.into())
         }
@@ -234,6 +235,7 @@ pub mod configuration {
     }
 
     impl TimePoint {
+        #[must_use]
         pub const fn time(&self) -> &Time {
             match self {
                 Self::Time { time } => time,
