@@ -172,7 +172,7 @@ impl Service for BehaviorInstanceService {
                     Event::Error(_error) => {}
                 },
                 Err(err) => {
-                    log::error!("Failed to read event {}", err);
+                    log::error!("Failed to read event {err}");
                 }
             }
         }
@@ -270,7 +270,7 @@ pub async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
         .await
         .update::<BehaviorInstance>(&id, |bi| *bi += upd);
     if let Err(err) = upd_result {
-        log::error!("Failed to disable behavior instance {:?}", err);
+        log::error!("Failed to disable behavior instance {err:?}");
     }
 }
 

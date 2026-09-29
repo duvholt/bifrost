@@ -376,6 +376,19 @@ impl HueClient {
         self.get_resource::<BehaviorInstance>(link).await
     }
 
+    pub async fn expect_behavior_enabled(
+        &self,
+        link: ResourceLink,
+        enabled: bool,
+    ) -> TestResult<()> {
+        let behavior = self.get_behavior_instance(link).await?;
+        assert_eq!(
+            behavior.enabled, enabled,
+            "unexpected enabled state for {link:?}"
+        );
+        Ok(())
+    }
+
     pub async fn run_evenstream(&self, ready_tx: oneshot::Sender<()>) -> TestResult<()> {
         let base_url = &self.base_url;
         let response = self

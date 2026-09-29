@@ -20,6 +20,12 @@ pub struct TestSleep {
 }
 
 impl TestSleep {
+    pub async fn expect_cancelled(mut self) {
+        timeout(Duration::from_secs(2), self.release.closed())
+            .await
+            .expect("behavior sleep should be cancelled");
+    }
+
     pub fn release(self) {
         self.release.send(()).expect("behavior sleep was cancelled");
     }
@@ -50,11 +56,25 @@ impl TestClock {
         *self.clock.now.lock().unwrap() = now;
     }
 
+    pub fn advance(&self, duration: Duration) {
+        let mut now = self.clock.now.lock().unwrap();
+        *now += chrono::Duration::from_std(duration).expect("test duration fits chrono");
+    }
+
     pub async fn next_sleep(&mut self) -> TestResult<TestSleep> {
         timeout(Duration::from_secs(2), self.sleeps.recv())
             .await
             .map_err(|_| TestError::BehaviorSleepTimeout)?
             .ok_or(TestError::BehaviorSleepTimeout)
+    }
+
+    pub async fn expect_sleep(&mut self, duration: Duration) -> TestResult<TestSleep> {
+        let sleep = self.next_sleep().await?;
+        assert_eq!(
+            sleep.duration, duration,
+            "unexpected behavior sleep duration"
+        );
+        Ok(sleep)
     }
 }
 

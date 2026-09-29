@@ -97,14 +97,10 @@ impl WakeupJob {
         let config = self.configuration.clone();
         let result = match &self.schedule_type {
             ScheduleType::Recurring(weekdays) => self.create_recurring(weekdays.clone()).await,
-            ScheduleType::Once() => self.run_once(now),
+            ScheduleType::Once() => self.run_once(now).await,
         };
         if let Err(err) = result {
-            log::error!(
-                "Failed to create wake up job: {}, using configuration {:?}",
-                err,
-                config
-            );
+            log::error!("Failed to create wake up job: {err}, using configuration {config:?}");
         }
     }
 
@@ -130,18 +126,14 @@ impl WakeupJob {
         }
     }
 
-    fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
+    async fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
         let start_time = self.start_time()?;
         let fade_in_datetime = self.start_datetime(now)?;
         let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-        spawn(async move {
-            log::debug!(
-                "Wakeup once task for {} will run at {}",
-                start_time,
-                fade_in_datetime
-            );
+        log::debug!("Wakeup once task for {start_time} will run at {fade_in_datetime}");
 
-            self.clock.sleep(time_until_fade_in).await;
+        self.clock.sleep(time_until_fade_in).await;
+        spawn(async move {
             run_wake_up(
                 self.configuration.clone(),
                 self.res.clone(),
@@ -199,7 +191,7 @@ async fn run_wake_up(
     res: Arc<Mutex<Resources>>,
     clock: Arc<dyn BehaviorClock>,
 ) {
-    log::debug!("Running scheduled behavior instance:, {:#?}", config);
+    log::debug!("Running scheduled behavior instance:, {config:#?}");
     #[allow(clippy::option_if_let_else)]
     let resource_links = config.where_field.iter().flat_map(|room| {
         if let Some(items) = &room.items {
@@ -218,7 +210,7 @@ async fn run_wake_up(
                 match resource {
                     Ok(resource) => Some((resource_link, resource)),
                     Err(err) => {
-                        log::warn!("Failed to get resource: {}", err);
+                        log::warn!("Failed to get resource: {err}");
                         None
                     }
                 }
@@ -252,7 +244,7 @@ async fn run_wake_up(
 
     for request in &requests {
         if let Err(err) = request.on(res.clone(), config.clone()).await {
-            log::warn!("Failed to turn on wake up light: {}", err);
+            log::warn!("Failed to turn on wake up light: {err}");
         }
     }
 
@@ -265,7 +257,7 @@ async fn run_wake_up(
 
         for request in &requests {
             if let Err(err) = request.off(res.clone()).await {
-                log::warn!("Failed to turn off wake up light: {}", err);
+                log::warn!("Failed to turn off wake up light: {err}");
             }
         }
     }

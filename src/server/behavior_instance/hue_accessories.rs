@@ -53,13 +53,11 @@ impl HueAccessoriesJob {
                             if RType::Button == obj.rtype
                                 && let Some(button_configuration) =
                                     self.configuration.buttons.get(&obj.id)
-                            {
-                                if let Err(err) = self
+                                && let Err(err) = self
                                     .handle_button_update(obj.id, button_configuration.clone())
                                     .await
-                                {
-                                    log::error!("Error while handling button update {}", err);
-                                }
+                            {
+                                log::error!("Error while handling button update {err}");
                             }
                         }
                     }
@@ -67,7 +65,7 @@ impl HueAccessoriesJob {
                     Event::Error(_error) => {}
                 },
                 Err(err) => {
-                    log::error!("Failed to read event {}", err);
+                    log::error!("Failed to read event {err}");
                 }
             }
         }
@@ -83,14 +81,13 @@ impl HueAccessoriesJob {
             return Ok(());
         };
         let action = match button_report.event {
-            ButtonEvent::InitialPress => None,
             ButtonEvent::Repeat => {
-                if let Some(repeat_action) = &button_configuration.on_repeat {
-                    log::debug!("Repeat button! {repeat_action:?}");
-                    Some(repeat_action)
-                } else {
-                    None
-                }
+                button_configuration
+                    .on_repeat
+                    .as_ref()
+                    .inspect(|&repeat_action| {
+                        log::debug!("Repeat button! {repeat_action:?}");
+                    })
             }
             ButtonEvent::ShortRelease => {
                 if let Some(short_release_action) = &button_configuration.on_short_release {
@@ -103,8 +100,6 @@ impl HueAccessoriesJob {
                     None
                 }
             }
-            ButtonEvent::LongRelease => None,
-            ButtonEvent::DoubleShortRelease => None,
             ButtonEvent::LongPress => {
                 if let Some(long_press_action) = &button_configuration.on_long_press {
                     log::debug!("Long pressed button! {long_press_action:?}");
@@ -116,6 +111,9 @@ impl HueAccessoriesJob {
                     None
                 }
             }
+            ButtonEvent::InitialPress
+            | ButtonEvent::LongRelease
+            | ButtonEvent::DoubleShortRelease => None,
         };
 
         if let Some(action) = action {
@@ -161,7 +159,7 @@ impl HueAccessoriesJob {
 
                 actions.iter().map(|aw| &aw.action).collect()
             }
-            ButtonAction::Action(action) => vec![action].repeat(where_field.len()),
+            ButtonAction::Action(action) => [action].repeat(where_field.len()),
         };
         self.run_action(&actions, where_field).await
     }
@@ -181,7 +179,7 @@ impl HueAccessoriesJob {
                         let bridge_home: BridgeHome = bridge_home.obj.try_into()?;
                         if let Some(grouped_light_link) = bridge_home.grouped_light_service() {
                             let request = BackendRequest::GroupedLightUpdate(
-                                grouped_light_link.clone(),
+                                *grouped_light_link,
                                 GroupedLightUpdate::new().with_on(On::new(false)),
                             );
                             lock.backend_request(request)?;
@@ -224,7 +222,7 @@ impl HueAccessoriesJob {
                 }
                 Action::Recall(resource_link) => {
                     let request = BackendRequest::SceneUpdate(
-                        resource_link.clone(),
+                        *resource_link,
                         SceneUpdate::new().with_recall_action(Some(SceneStatus {
                             active: SceneActive::Static,
                             last_recall: None,
@@ -282,20 +280,20 @@ fn find_current_time_slot(
     slots
         .windows(2)
         .find_map(|slots| match slots {
-            [slot1, slot2] => {
+            [slot_1, slot_2] => {
                 let time1 =
-                    NaiveTime::from_hms_opt(slot1.start_time.hour, slot1.start_time.minute, 0)?;
+                    NaiveTime::from_hms_opt(slot_1.start_time.hour, slot_1.start_time.minute, 0)?;
                 let time2 =
-                    NaiveTime::from_hms_opt(slot2.start_time.hour, slot2.start_time.minute, 0)?;
+                    NaiveTime::from_hms_opt(slot_2.start_time.hour, slot_2.start_time.minute, 0)?;
                 if time1 <= current_time && current_time < time2 {
-                    Some(slot1)
+                    Some(slot_1)
                 } else {
                     None
                 }
             }
             _ => None,
         })
-        .or(slots.last())
+        .or_else(|| slots.last())
 }
 
 #[cfg(test)]
