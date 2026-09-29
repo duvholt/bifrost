@@ -97,7 +97,7 @@ impl WakeupJob {
         let config = self.configuration.clone();
         let result = match &self.schedule_type {
             ScheduleType::Recurring(weekdays) => self.create_recurring(weekdays.clone()).await,
-            ScheduleType::Once() => self.run_once(now),
+            ScheduleType::Once() => self.run_once(now).await,
         };
         if let Err(err) = result {
             log::error!("Failed to create wake up job: {err}, using configuration {config:?}");
@@ -126,14 +126,14 @@ impl WakeupJob {
         }
     }
 
-    fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
+    async fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
         let start_time = self.start_time()?;
         let fade_in_datetime = self.start_datetime(now)?;
         let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-        spawn(async move {
-            log::debug!("Wakeup once task for {start_time} will run at {fade_in_datetime}");
+        log::debug!("Wakeup once task for {start_time} will run at {fade_in_datetime}");
 
-            self.clock.sleep(time_until_fade_in).await;
+        self.clock.sleep(time_until_fade_in).await;
+        spawn(async move {
             run_wake_up(
                 self.configuration.clone(),
                 self.res.clone(),

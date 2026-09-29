@@ -496,3 +496,64 @@ async fn sunrise_wakeup_uses_individual_effect_and_basic_fallback_in_mixed_room(
     requests.expect_quiet().await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn disabling_wakeup_before_start_cancels_pending_sleep() -> TestResult<()> {
+    let WakeupFixture { mut test, room, .. } = wakeup_fixture(wednesday_at_six()).await?;
+    let mut requests = test.z2m.subscribe_requests();
+    let config = one_time_basic_wakeup_configuration(
+        80.0,
+        configuration::Duration { seconds: 600 },
+        configuration::Time { hour: 7, minute: 0 },
+        vec![configuration::Where {
+            group: room.link,
+            items: None,
+        }],
+    );
+    let instance = test
+        .hue_client
+        .post("/clip/v2/resource/behavior_instance", &wakeup_body(&config))
+        .await?;
+    let start = test.clock.next_sleep().await?;
+    test.hue_client
+        .put(
+            &format!("/clip/v2/resource/behavior_instance/{}", instance.rid),
+            &json!({"enabled": false}),
+        )
+        .await?;
+    start.expect_cancelled().await;
+    requests.expect_quiet().await?;
+    test.hue_client
+        .expect_behavior_enabled(instance, false)
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn deleting_wakeup_before_start_cancels_pending_sleep() -> TestResult<()> {
+    let WakeupFixture { mut test, room, .. } = wakeup_fixture(wednesday_at_six()).await?;
+    let mut requests = test.z2m.subscribe_requests();
+    let config = one_time_basic_wakeup_configuration(
+        80.0,
+        configuration::Duration { seconds: 600 },
+        configuration::Time { hour: 7, minute: 0 },
+        vec![configuration::Where {
+            group: room.link,
+            items: None,
+        }],
+    );
+    let instance = test
+        .hue_client
+        .post("/clip/v2/resource/behavior_instance", &wakeup_body(&config))
+        .await?;
+    let start = test.clock.next_sleep().await?;
+    test.hue_client
+        .delete(&format!(
+            "/clip/v2/resource/behavior_instance/{}",
+            instance.rid
+        ))
+        .await?;
+    start.expect_cancelled().await;
+    requests.expect_quiet().await?;
+    Ok(())
+}

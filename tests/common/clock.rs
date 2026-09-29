@@ -20,6 +20,12 @@ pub struct TestSleep {
 }
 
 impl TestSleep {
+    pub async fn expect_cancelled(mut self) {
+        timeout(Duration::from_secs(2), self.release.closed())
+            .await
+            .expect("behavior sleep should be cancelled");
+    }
+
     pub fn release(self) {
         self.release.send(()).expect("behavior sleep was cancelled");
     }
