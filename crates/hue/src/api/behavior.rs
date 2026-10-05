@@ -205,7 +205,7 @@ pub struct SceneCycleExtended {
 pub mod configuration {
     use std::time::Duration as StdDuration;
 
-    use chrono::Weekday;
+    use chrono::{TimeDelta, Weekday};
     use serde::{Deserialize, Serialize};
 
     use crate::api::ResourceLink;

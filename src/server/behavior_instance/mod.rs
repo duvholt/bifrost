@@ -1,13 +1,17 @@
 mod hue_accessories;
+mod schedule;
 mod service;
 mod wakeup;
 
-use std::fmt::Debug;
 use std::time::Duration;
+use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Local, Utc};
 pub use service::BehaviorInstanceService;
+use tokio::sync::Mutex;
+
+use crate::resource::Resources;
 
 #[async_trait]
 pub trait BehaviorClock: Debug + Send + Sync {
@@ -31,5 +35,16 @@ impl BehaviorClock for SystemClock {
 
     async fn sleep(&self, duration: Duration) {
         tokio::time::sleep(duration).await;
+    }
+}
+
+struct BehaviorContext {
+    res: Arc<Mutex<Resources>>,
+    clock: Arc<dyn BehaviorClock>,
+}
+
+impl BehaviorContext {
+    pub fn new(res: Arc<Mutex<Resources>>, clock: Arc<dyn BehaviorClock>) -> Self {
+        Self { res, clock }
     }
 }

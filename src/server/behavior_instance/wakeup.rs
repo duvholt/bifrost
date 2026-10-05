@@ -1,11 +1,9 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
-use chrono::offset::LocalResult;
-use chrono::{DateTime, Datelike, Days, Local, NaiveTime, TimeZone, Weekday};
+use chrono::NaiveTime;
 use itertools::Itertools;
-use tokio::spawn;
 use tokio::sync::Mutex;
 
 use hue::api::{
@@ -13,137 +11,48 @@ use hue::api::{
     LightTimedEffect, LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink,
     WakeupConfiguration, WakeupStyle,
 };
-use uuid::Uuid;
 
 use crate::error::ApiError;
-use crate::server::behavior_instance::BehaviorClock;
-use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
+use crate::server::behavior_instance::schedule::{Schedule, ScheduledBehavior};
+use crate::server::behavior_instance::service::ScheduleType;
+use crate::server::behavior_instance::{BehaviorClock, BehaviorContext};
 use crate::{error::ApiResult, resource::Resources};
 
 pub struct WakeupJob {
-    pub rid: Uuid,
-    pub schedule_type: ScheduleType,
     pub configuration: WakeupConfiguration,
-    pub res: Arc<Mutex<Resources>>,
-    pub clock: Arc<dyn BehaviorClock>,
 }
 
-impl WakeupJob {
-    fn start_datetime(&self, now: DateTime<Local>) -> ApiResult<DateTime<Local>> {
-        let start_time = self.start_time()?;
-        let next = match now.with_time(start_time) {
-            LocalResult::Single(time) => time,
-            LocalResult::Ambiguous(_, latest) => latest,
-            LocalResult::None => {
-                return Err(ApiError::InvalidDateTimeConversion(now));
-            }
-        };
-        let wakeup_datetime = if next < now {
-            next.checked_add_days(Days::new(1))
-                .ok_or(ApiError::InvalidDateTimeConversion(next))?
-        } else {
-            next
-        };
-        Ok(wakeup_datetime)
-    }
+#[async_trait]
+impl ScheduledBehavior for WakeupJob {
+    fn schedule(&self) -> ApiResult<Schedule> {
+        let weekdays = self.configuration.when.recurrence_days.as_ref();
 
-    fn start_time(&self) -> ApiResult<NaiveTime> {
+        #[allow(clippy::option_if_let_else)]
+        let schedule_type = match weekdays {
+            Some(weekdays) => ScheduleType::Recurring(weekdays.iter().copied().collect()),
+            None => ScheduleType::Once(),
+        };
+
         let job_time = self.configuration.when.time_point.time();
         let scheduled_wakeup_time = NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0)
             .ok_or(ApiError::InvalidNaiveTime)?;
-        // although the scheduled time in the Hue app is the time when lights are at full brightness
-        // the job start time is considered to be when the fade in effects starts
+
         let fade_in_duration = self.configuration.fade_in_duration.to_std();
-        Ok(scheduled_wakeup_time - fade_in_duration)
+
+        Ok(Schedule {
+            recurrence: schedule_type,
+            scheduled_time: scheduled_wakeup_time,
+            lead_time: fade_in_duration,
+        })
     }
 
-    #[allow(clippy::needless_continue)]
-    fn next_weekday_occurrence(
-        weekdays: &HashSet<Weekday>,
-        time: NaiveTime,
-        now: &DateTime<Local>,
-    ) -> ApiResult<DateTime<Local>> {
-        let now_date = now.date_naive();
-
-        // In most cases we shouldn't need to iterate more than 7 days,
-        // but in edge cases like leap years we might have to check further into the future.
-        // In case of any bugs we don't want to loop forever so it should be safe to just check the next 3 weeks
-        for days_to_add in 0..21 {
-            let Some(next_date) = now_date.checked_add_days(Days::new(days_to_add)) else {
-                // unlikely to happen as we're dealing with a naive date, but let's skip if something weird happens
-                continue;
-            };
-            if !weekdays.contains(&next_date.weekday()) {
-                continue;
-            }
-            let datetime = next_date.and_time(time);
-            match Local.from_local_datetime(&datetime) {
-                LocalResult::Single(candidate) | LocalResult::Ambiguous(_, candidate) => {
-                    if &candidate >= now {
-                        return Ok(candidate);
-                    }
-                }
-                LocalResult::None => {
-                    // Time does not exist on this day (e.g. DST jump forward).
-                    continue;
-                }
-            }
-        }
-        Err(ApiError::NoNextWeekdayOccurence(time, weekdays.clone()))
-    }
-
-    pub async fn create(self) {
-        let now = self.clock.local_now();
-        let config = self.configuration.clone();
-        let result = match &self.schedule_type {
-            ScheduleType::Recurring(weekdays) => self.create_recurring(weekdays.clone()).await,
-            ScheduleType::Once() => self.run_once(now).await,
-        };
-        if let Err(err) = result {
-            log::error!("Failed to create wake up job: {err}, using configuration {config:?}");
-        }
-    }
-
-    async fn create_recurring(&self, weekdays: HashSet<Weekday>) -> ApiResult<()> {
-        let fade_in_start = self.start_time()?;
-        loop {
-            let now = self.clock.local_now();
-            let fade_in_datetime = Self::next_weekday_occurrence(&weekdays, fade_in_start, &now)?;
-            log::debug!(
-                "Recurring wakeup task for {:?}, {} will run at {}",
-                &weekdays,
-                &fade_in_start,
-                &fade_in_datetime
-            );
-            let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-            self.clock.sleep(time_until_fade_in).await;
-            run_wake_up(
-                self.configuration.clone(),
-                self.res.clone(),
-                self.clock.clone(),
-            )
-            .await;
-        }
-    }
-
-    async fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
-        let start_time = self.start_time()?;
-        let fade_in_datetime = self.start_datetime(now)?;
-        let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-        log::debug!("Wakeup once task for {start_time} will run at {fade_in_datetime}");
-
-        self.clock.sleep(time_until_fade_in).await;
-        spawn(async move {
-            run_wake_up(
-                self.configuration.clone(),
-                self.res.clone(),
-                self.clock.clone(),
-            )
-            .await;
-            disable_behavior_instance(self.rid, self.res.clone()).await;
-        });
-
-        Ok(())
+    async fn execute(&self, ctx: &BehaviorContext) -> ApiResult<()> {
+        run_wake_up(
+            self.configuration.clone(),
+            ctx.res.clone(),
+            ctx.clock.clone(),
+        )
+        .await
     }
 }
 
@@ -190,7 +99,7 @@ async fn run_wake_up(
     config: WakeupConfiguration,
     res: Arc<Mutex<Resources>>,
     clock: Arc<dyn BehaviorClock>,
-) {
+) -> ApiResult<()> {
     log::debug!("Running scheduled behavior instance:, {config:#?}");
     #[allow(clippy::option_if_let_else)]
     let resource_links = config.where_field.iter().flat_map(|room| {
@@ -243,9 +152,12 @@ async fn run_wake_up(
     };
 
     for request in &requests {
-        if let Err(err) = request.on(res.clone(), config.clone()).await {
-            log::warn!("Failed to turn on wake up light: {err}");
-        }
+        request
+            .on(res.clone(), config.clone())
+            .await
+            .inspect_err(|err| {
+                log::warn!("Failed to turn on wake up light: {err}");
+            })?;
     }
 
     // wait until fade in has completed
@@ -256,11 +168,12 @@ async fn run_wake_up(
         clock.sleep(duration.to_std()).await;
 
         for request in &requests {
-            if let Err(err) = request.off(res.clone()).await {
+            request.off(res.clone()).await.inspect_err(|err| {
                 log::warn!("Failed to turn off wake up light: {err}");
-            }
+            })?;
         }
     }
+    Ok(())
 }
 
 enum WakeupRequest {

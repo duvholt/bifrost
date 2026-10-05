@@ -18,8 +18,9 @@ use uuid::Uuid;
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
+use crate::server::behavior_instance::schedule::ScheduledJob;
 use crate::server::behavior_instance::wakeup::WakeupJob;
-use crate::server::behavior_instance::{BehaviorClock, SystemClock};
+use crate::server::behavior_instance::{BehaviorClock, BehaviorContext, SystemClock};
 
 #[derive(Debug)]
 pub struct BehaviorInstanceService {
@@ -230,21 +231,12 @@ impl BehaviorInstanceJob {
         self.task = Some(task);
     }
 
-    fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> WakeupJob {
-        let weekdays = configuration.when.recurrence_days.as_ref();
-
-        #[allow(clippy::option_if_let_else)]
-        let schedule_type = match weekdays {
-            Some(weekdays) => ScheduleType::Recurring(weekdays.iter().copied().collect()),
-            None => ScheduleType::Once(),
-        };
-        WakeupJob {
-            rid: self.rid,
-            schedule_type,
+    fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> ScheduledJob<WakeupJob> {
+        let context = BehaviorContext::new(self.res.clone(), self.clock.clone());
+        let wakeup = WakeupJob {
             configuration: configuration.clone(),
-            res: self.res.clone(),
-            clock: self.clock.clone(),
-        }
+        };
+        ScheduledJob::new(context, wakeup, self.rid)
     }
 
     fn create_hue_accessories_task(
@@ -274,7 +266,7 @@ pub async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ScheduleType {
     Recurring(HashSet<Weekday>),
     Once(),

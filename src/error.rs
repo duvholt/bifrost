@@ -187,6 +187,9 @@ pub enum ApiError {
     #[error("No next weekday occurence {0:?} {0:?}")]
     NoNextWeekdayOccurence(NaiveTime, HashSet<Weekday>),
 
+    #[error("No start time found for the {0} alarm in the next 21 days")]
+    NoNextScheduleStart(NaiveTime),
+
     #[error("Backend request timeout")]
     BackendRequestTimeout,
 
