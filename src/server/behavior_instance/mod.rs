@@ -1,6 +1,7 @@
 mod hue_accessories;
 mod schedule;
 mod service;
+mod target;
 mod wakeup;
 
 use std::time::Duration;
