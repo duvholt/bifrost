@@ -3,17 +3,17 @@ use itertools::Itertools;
 
 use crate::resource::Resources;
 
-struct ResolvedLight {
-    link: ResourceLink,
-    state: Light,
+pub struct ResolvedLight {
+    pub link: ResourceLink,
+    pub state: Box<Light>,
 }
 
-struct ResolvedGroup {
+pub struct ResolvedGroup {
     grouped_light: ResourceLink,
     lights: Vec<ResolvedLight>,
 }
 
-enum ResolvedResource {
+pub enum ResolvedResource {
     Light(ResolvedLight),
     Group(ResolvedGroup),
 }
@@ -29,7 +29,7 @@ fn resolve_group(res: &Resources, group: &impl Group) -> Option<Vec<ResolvedReso
         .filter_map(|light_link| {
             res.get::<Light>(light_link).ok().map(|l| ResolvedLight {
                 link: *light_link,
-                state: l.clone(),
+                state: Box::new(l.clone()),
             })
         })
         .collect();
@@ -42,7 +42,10 @@ fn resolve_group(res: &Resources, group: &impl Group) -> Option<Vec<ResolvedReso
     })
 }
 
-fn resolve_resources(res: &Resources, locations: &[configuration::Where]) -> Vec<ResolvedResource> {
+pub fn resolve_resources(
+    res: &Resources,
+    locations: &[configuration::Where],
+) -> Vec<ResolvedResource> {
     let resource_links = locations.iter().flat_map(|location| {
         location
             .items
@@ -67,7 +70,7 @@ fn resolve_resources(res: &Resources, locations: &[configuration::Where]) -> Vec
             Resource::Zone(zone) => resolve_group(res, &zone),
             Resource::Light(light) => Some(vec![ResolvedResource::Light(ResolvedLight {
                 link: resource_link,
-                state: *light,
+                state: Box::new(*light),
             })]),
             Resource::BridgeHome(_bridge_home) => {
                 let all_rooms = res.get_resources_by_type(RType::Room);
@@ -86,24 +89,24 @@ fn resolve_resources(res: &Resources, locations: &[configuration::Where]) -> Vec
         .concat()
 }
 
-enum TargetResource {
+pub enum TargetResource {
     Light(ResourceLink),
     GroupedLight(ResourceLink),
 }
 
-trait SelectionPolicy {
+pub trait SelectionPolicy {
     type Effect: Clone + Eq;
 
     fn effect_for_light(&self, light: &ResolvedLight) -> Option<Self::Effect>;
     fn supports_grouped_light(&self, effect: &Self::Effect) -> bool;
 }
 
-struct ExecutionTarget<E> {
-    resource: TargetResource,
-    effect: E,
+pub struct ExecutionTarget<E> {
+    pub resource: TargetResource,
+    pub effect: E,
 }
 
-fn select_targets<P: SelectionPolicy>(
+pub fn select_targets<P: SelectionPolicy>(
     resources: &[ResolvedResource],
     policy: &P,
 ) -> Vec<ExecutionTarget<P::Effect>> {
@@ -262,7 +265,7 @@ mod tests {
     fn assert_light(fixture: &Fixture, resolved_light: &ResolvedLight, expected: ResourceLink) {
         assert_eq!(resolved_light.link, expected);
         assert_eq!(
-            &resolved_light.state,
+            &*resolved_light.state,
             fixture.resources.get::<Light>(&expected).unwrap()
         );
     }
