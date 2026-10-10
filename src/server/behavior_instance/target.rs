@@ -1,5 +1,4 @@
 use hue::api::{Device, Group, Light, RType, Resource, ResourceLink, configuration};
-use itertools::Itertools;
 
 use crate::resource::Resources;
 
@@ -18,8 +17,68 @@ pub enum ResolvedResource {
     Group(ResolvedGroup),
 }
 
-fn resolve_group(res: &Resources, group: &impl Group) -> Option<Vec<ResolvedResource>> {
-    let lights_in_group: Vec<_> = group
+pub fn resolve_resources(
+    res: &Resources,
+    locations: &[configuration::Where],
+) -> Vec<ResolvedResource> {
+    let mut resolved_resources = Vec::new();
+
+    for location in locations {
+        #[allow(clippy::option_if_let_else)]
+        let resource_links = match &location.items {
+            Some(items) => items.as_slice(),
+            None => std::slice::from_ref(&location.group),
+        };
+
+        for resource_link in resource_links {
+            let resource = res.get_resource(resource_link);
+            let resource = match resource {
+                Ok(resource) => resource,
+                Err(err) => {
+                    log::warn!("Failed to get resource: {err}");
+                    continue;
+                }
+            };
+            match resource.obj {
+                Resource::Room(room) => {
+                    if let Some(group) = resolve_group(res, &room) {
+                        resolved_resources.push(ResolvedResource::Group(group));
+                    }
+                }
+                Resource::Zone(zone) => {
+                    if let Some(group) = resolve_group(res, &zone) {
+                        resolved_resources.push(ResolvedResource::Group(group));
+                    }
+                }
+                Resource::Light(light) => {
+                    resolved_resources.push(ResolvedResource::Light(ResolvedLight {
+                        link: *resource_link,
+                        state: light,
+                    }));
+                }
+                Resource::BridgeHome(_bridge_home) => {
+                    let all_rooms = res.get_resources_by_type(RType::Room);
+                    resolved_resources.extend(all_rooms.into_iter().filter_map(|room_resource| {
+                        match room_resource.obj {
+                            Resource::Room(room) => {
+                                resolve_group(res, &room).map(ResolvedResource::Group)
+                            }
+                            _ => None,
+                        }
+                    }));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    resolved_resources
+}
+
+fn resolve_group(res: &Resources, group: &impl Group) -> Option<ResolvedGroup> {
+    let grouped_light = *group.grouped_light_service()?;
+
+    let lights: Vec<_> = group
         .children()
         .filter_map(|rl| match rl.rtype {
             RType::Device => res.get::<Device>(rl).ok().and_then(Device::light_service),
@@ -34,59 +93,10 @@ fn resolve_group(res: &Resources, group: &impl Group) -> Option<Vec<ResolvedReso
         })
         .collect();
 
-    group.grouped_light_service().map(|grouped_light| {
-        vec![ResolvedResource::Group(ResolvedGroup {
-            grouped_light: *grouped_light,
-            lights: lights_in_group,
-        })]
+    Some(ResolvedGroup {
+        grouped_light,
+        lights,
     })
-}
-
-pub fn resolve_resources(
-    res: &Resources,
-    locations: &[configuration::Where],
-) -> Vec<ResolvedResource> {
-    let resource_links = locations.iter().flat_map(|location| {
-        location
-            .items
-            .as_ref()
-            .map_or_else(|| vec![location.group], Clone::clone)
-    });
-
-    resource_links
-        .into_iter()
-        .filter_map(|resource_link| {
-            let resource = res.get_resource(&resource_link);
-            match resource {
-                Ok(resource) => Some((resource_link, resource)),
-                Err(err) => {
-                    log::warn!("Failed to get resource: {err}");
-                    None
-                }
-            }
-        })
-        .filter_map(|(resource_link, resource)| match resource.obj {
-            Resource::Room(room) => resolve_group(res, &room),
-            Resource::Zone(zone) => resolve_group(res, &zone),
-            Resource::Light(light) => Some(vec![ResolvedResource::Light(ResolvedLight {
-                link: resource_link,
-                state: Box::new(*light),
-            })]),
-            Resource::BridgeHome(_bridge_home) => {
-                let all_rooms = res.get_resources_by_type(RType::Room);
-                Some(
-                    all_rooms
-                        .into_iter()
-                        .filter_map(|room_resource| match room_resource.obj {
-                            Resource::Room(room) => resolve_group(res, &room),
-                            _ => None,
-                        })
-                        .concat(),
-                )
-            }
-            _ => Some(Vec::new()),
-        })
-        .concat()
 }
 
 pub enum TargetResource {
@@ -97,7 +107,9 @@ pub enum TargetResource {
 pub trait SelectionPolicy {
     type Effect: Clone + Eq;
 
+    /// None means skip the light
     fn effect_for_light(&self, light: &ResolvedLight) -> Option<Self::Effect>;
+    /// If all lights in a group share the same effect we can issue a grouped light request instead of indivial light requests
     fn supports_grouped_light(&self, effect: &Self::Effect) -> bool;
 }
 
@@ -110,51 +122,60 @@ pub fn select_targets<P: SelectionPolicy>(
     resources: &[ResolvedResource],
     policy: &P,
 ) -> Vec<ExecutionTarget<P::Effect>> {
-    resources
-        .iter()
-        .filter_map(|resource| match resource {
+    let mut targets = Vec::new();
+    for resource in resources {
+        match resource {
             ResolvedResource::Light(light) => {
-                let effect = policy.effect_for_light(light);
-                effect.map(|effect| {
-                    vec![ExecutionTarget {
+                if let Some(effect) = policy.effect_for_light(light) {
+                    targets.push(ExecutionTarget {
                         resource: TargetResource::Light(light.link),
                         effect,
-                    }]
-                })
-            }
-            ResolvedResource::Group(group) => {
-                let light_effects: Vec<_> = group
-                    .lights
-                    .iter()
-                    .map(|light| policy.effect_for_light(light))
-                    .collect();
-                let same_effect = light_effects.windows(2).all(|w| w[0] == w[1]);
-                let group_effect = light_effects.first().cloned().flatten();
-                if same_effect
-                    && let Some(group_effect) = group_effect
-                    && policy.supports_grouped_light(&group_effect)
-                {
-                    Some(vec![ExecutionTarget {
-                        resource: TargetResource::GroupedLight(group.grouped_light),
-                        effect: group_effect,
-                    }])
-                } else {
-                    Some(
-                        light_effects
-                            .into_iter()
-                            .zip(&group.lights)
-                            .filter_map(|(effect, light)| {
-                                effect.map(|effect| ExecutionTarget {
-                                    resource: TargetResource::Light(light.link),
-                                    effect,
-                                })
-                            })
-                            .collect(),
-                    )
+                    });
                 }
             }
+            ResolvedResource::Group(group) => {
+                targets.extend(select_group_targets(group, policy));
+            }
+        }
+    }
+    targets
+}
+
+fn select_group_targets<P: SelectionPolicy>(
+    group: &ResolvedGroup,
+    policy: &P,
+) -> Vec<ExecutionTarget<P::Effect>> {
+    let light_effects: Vec<_> = group
+        .lights
+        .iter()
+        .map(|light| policy.effect_for_light(light))
+        .collect();
+    if let Some(effect) = common_effect(&light_effects)
+        && policy.supports_grouped_light(effect)
+    {
+        return vec![ExecutionTarget {
+            resource: TargetResource::GroupedLight(group.grouped_light),
+            effect: effect.clone(),
+        }];
+    }
+    light_effects
+        .into_iter()
+        .zip(&group.lights)
+        .filter_map(|(effect, light)| {
+            effect.map(|effect| ExecutionTarget {
+                resource: TargetResource::Light(light.link),
+                effect,
+            })
         })
-        .concat()
+        .collect()
+}
+
+fn common_effect<E: Eq>(effects: &[Option<E>]) -> Option<&E> {
+    let first = effects.first()?.as_ref()?;
+    effects
+        .iter()
+        .all(|e| e.as_ref() == Some(first))
+        .then_some(first)
 }
 
 #[cfg(test)]

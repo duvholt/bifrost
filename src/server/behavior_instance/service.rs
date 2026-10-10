@@ -19,7 +19,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
 use crate::server::behavior_instance::schedule::ScheduledJob;
-use crate::server::behavior_instance::wakeup::WakeupJob;
+use crate::server::behavior_instance::wakeup::WakeupBehavior;
 use crate::server::behavior_instance::{BehaviorClock, BehaviorContext, SystemClock};
 
 #[derive(Debug)]
@@ -231,9 +231,12 @@ impl BehaviorInstanceJob {
         self.task = Some(task);
     }
 
-    fn create_wake_up_task(&self, configuration: &WakeupConfiguration) -> ScheduledJob<WakeupJob> {
+    fn create_wake_up_task(
+        &self,
+        configuration: &WakeupConfiguration,
+    ) -> ScheduledJob<WakeupBehavior> {
         let context = BehaviorContext::new(self.res.clone(), self.clock.clone());
-        let wakeup = WakeupJob {
+        let wakeup = WakeupBehavior {
             configuration: configuration.clone(),
         };
         ScheduledJob::new(context, wakeup, self.rid)
