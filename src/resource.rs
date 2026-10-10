@@ -92,7 +92,6 @@ impl Resources {
 
     pub fn init(&mut self, bridge_id: &str) -> ApiResult<()> {
         self.add_bridge(bridge_id.to_owned())?;
-        self.add_behavior_scripts()?;
         Ok(())
     }
 
@@ -382,6 +381,10 @@ impl Resources {
         self.add(
             &ResourceLink::new(BehaviorScript::WAKE_UP_ID, RType::BehaviorScript),
             Resource::BehaviorScript(BehaviorScript::wake_up()),
+        )?;
+        self.add(
+            &ResourceLink::new(BehaviorScript::GO_TO_SLEEP_ID, RType::BehaviorScript),
+            Resource::BehaviorScript(BehaviorScript::go_to_sleep()),
         )?;
         self.add(
             &ResourceLink::new(BehaviorScript::HUE_ACCESSORIES_ID, RType::BehaviorScript),

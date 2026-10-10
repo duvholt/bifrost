@@ -24,6 +24,10 @@ pub struct WakeupBehavior {
 
 #[async_trait]
 impl ScheduledBehavior for WakeupBehavior {
+    fn name(&self) -> &'static str {
+        "wake up"
+    }
+
     fn schedule(&self) -> ApiResult<Schedule> {
         let weekdays = self.configuration.when.recurrence_days.as_ref();
 

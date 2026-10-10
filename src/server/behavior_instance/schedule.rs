@@ -9,6 +9,7 @@ use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_i
 
 #[async_trait]
 pub trait ScheduledBehavior: Send + Sync + 'static {
+    fn name(&self) -> &str;
     fn schedule(&self) -> ApiResult<Schedule>;
     async fn execute(&self, ctx: &BehaviorContext) -> ApiResult<()>;
 }
@@ -107,7 +108,8 @@ impl<B: ScheduledBehavior> ScheduledJob<B> {
         let start_at = schedule.next_start(&now)?;
         let time_until_start = (start_at - now).to_std()?;
         log::debug!(
-            "Scheduled behavior {} ({:?}, alarm at {}) will run at {}",
+            "Scheduled behavior {} {} ({:?}, alarm at {}) will run at {}",
+            self.behavior.name(),
             self.rid,
             schedule.recurrence,
             schedule.scheduled_time,

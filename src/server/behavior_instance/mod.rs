@@ -1,6 +1,7 @@
 mod hue_accessories;
 mod schedule;
 mod service;
+mod sleep;
 mod target;
 mod wakeup;
 

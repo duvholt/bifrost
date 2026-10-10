@@ -11,7 +11,7 @@ use tokio::task::JoinHandle;
 
 use hue::api::{
     BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
-    HueAccessoriesConfiguration, RType, Resource, WakeupConfiguration,
+    GoToSleepConfiguration, HueAccessoriesConfiguration, RType, Resource, WakeupConfiguration,
 };
 use uuid::Uuid;
 
@@ -19,6 +19,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
 use crate::server::behavior_instance::schedule::ScheduledJob;
+use crate::server::behavior_instance::sleep::GoToSleepBehavior;
 use crate::server::behavior_instance::wakeup::WakeupBehavior;
 use crate::server::behavior_instance::{BehaviorClock, BehaviorContext, SystemClock};
 
@@ -73,6 +74,10 @@ impl BehaviorInstanceService {
             BehaviorScript::WAKE_UP_ID => {
                 let config = serde_json::from_value::<WakeupConfiguration>(bi.configuration)?;
                 Ok(Some(BehaviorInstanceConfiguration::Wakeup(config)))
+            }
+            BehaviorScript::GO_TO_SLEEP_ID => {
+                let config = serde_json::from_value::<GoToSleepConfiguration>(bi.configuration)?;
+                Ok(Some(BehaviorInstanceConfiguration::GoToSleep(config)))
             }
             BehaviorScript::HUE_ACCESSORIES_ID => {
                 let config =
@@ -223,6 +228,10 @@ impl BehaviorInstanceJob {
                 let job = self.create_wake_up_task(wakeup_configuration);
                 spawn(job.create())
             }
+            BehaviorInstanceConfiguration::GoToSleep(go_to_sleep_configuration) => {
+                let job = self.create_go_to_sleep_task(go_to_sleep_configuration);
+                spawn(job.create())
+            }
             BehaviorInstanceConfiguration::HueAccessories(hue_accessories_configuration) => {
                 let job = self.create_hue_accessories_task(hue_accessories_configuration);
                 spawn(job.create())
@@ -247,6 +256,17 @@ impl BehaviorInstanceJob {
         configuration: &HueAccessoriesConfiguration,
     ) -> HueAccessoriesJob {
         HueAccessoriesJob::new(configuration.clone(), self.res.clone(), self.clock.clone())
+    }
+
+    fn create_go_to_sleep_task(
+        &self,
+        configuration: &GoToSleepConfiguration,
+    ) -> ScheduledJob<GoToSleepBehavior> {
+        let context = BehaviorContext::new(self.res.clone(), self.clock.clone());
+        let go_to_sleep = GoToSleepBehavior {
+            configuration: configuration.clone(),
+        };
+        ScheduledJob::new(context, go_to_sleep, self.rid)
     }
 }
 

@@ -19,8 +19,8 @@ mod zone;
 pub use behavior::{
     Action, BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceMetadata,
     BehaviorInstanceNew, BehaviorInstanceUpdate, BehaviorScript, BehaviorScriptMetadata,
-    ButtonAction, ButtonConfiguration, HueAccessoriesConfiguration, TimeBasedExtended,
-    TimeBasedExtendedSlot, WakeupConfiguration, WakeupStyle, configuration,
+    ButtonAction, ButtonConfiguration, GoToSleepConfiguration, HueAccessoriesConfiguration,
+    TimeBasedExtended, TimeBasedExtendedSlot, WakeupConfiguration, WakeupStyle, configuration,
 };
 pub use bridge_home::BridgeHome;
 pub use button::{
