@@ -92,8 +92,13 @@ impl ScheduledBehavior for GoToSleepBehavior {
                 GoToSleepEndState::TurnOff => target.off(ctx).await,
                 GoToSleepEndState::MinimumBrightness | GoToSleepEndState::Nightlight => Ok(()),
             },
-            GoToSleepStyle::Sunset | GoToSleepStyle::HueSunset => match config.end_state {
+            GoToSleepStyle::Sunset => match config.end_state {
                 GoToSleepEndState::TurnOff => target.off(ctx).await,
+                GoToSleepEndState::MinimumBrightness => target.minimum_brightness(ctx).await,
+                GoToSleepEndState::Nightlight => target.nightlight(ctx).await,
+            },
+            GoToSleepStyle::HueSunset => match config.end_state {
+                GoToSleepEndState::TurnOff => Ok(()),
                 GoToSleepEndState::MinimumBrightness => target.minimum_brightness(ctx).await,
                 GoToSleepEndState::Nightlight => target.nightlight(ctx).await,
             },
