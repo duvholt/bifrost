@@ -477,7 +477,7 @@ async fn sunrise_wakeup_uses_individual_effect_and_basic_fallback_in_mixed_room(
                     0xB3, 0x00, // Flags: on/off, brightness, fade speed, effect, effect speed
                     0x01,       // On
                     203,        // 80% brightness
-                    0x01, 0x00, // Fade speed
+                    0x04, 0x00, // 400 ms fade
                     0x09,       // Sunrise effect
                     125         // Ten-minute effect duration
                 ]}
@@ -502,7 +502,7 @@ async fn sunrise_wakeup_uses_individual_effect_and_basic_fallback_in_mixed_room(
                 format!("{}/set", hue.topic()),
                 json!({"command": {
                     "cluster": 0xFC03, "command": 0,
-                    "payload": {"data": [0x11, 0x00, 0x00, 0x01, 0x00]}
+                    "payload": {"data": [0x11, 0x00, 0x00, 0x04, 0x00]}
                 }}),
             ),
             (format!("{}/get", hue.topic()), json!({"state": ""})),

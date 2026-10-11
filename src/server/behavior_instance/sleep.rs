@@ -234,7 +234,9 @@ impl ExecutionTarget<GoToSleepStyle> {
     async fn sunset_hue_effect(&self, ctx: &BehaviorContext, duration: Duration) -> ApiResult<()> {
         match self.resource {
             TargetResource::Light(resource_link) => {
-                let mut payload = LightUpdate::default().with_on(Some(On::new(true)));
+                let mut payload = LightUpdate::default()
+                    .with_on(Some(On::new(true)))
+                    .with_dynamics(Self::light_dynamics_duration(Duration::from_secs(2)));
                 payload.timed_effects = Some(LightTimedEffectsUpdate {
                     effect: Some(LightTimedEffect::Sunset),
                     duration: Some(u32::try_from(duration.as_millis())?),
