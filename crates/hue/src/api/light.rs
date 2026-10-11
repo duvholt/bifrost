@@ -813,6 +813,7 @@ impl LightUpdate {
         Self { dynamics, ..self }
     }
 
+    #[must_use]
     pub fn with_dimming_delta(self, dimming_delta: Option<DimmingDeltaUpdate>) -> Self {
         Self {
             dimming_delta,
