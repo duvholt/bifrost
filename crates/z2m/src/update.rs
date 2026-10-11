@@ -151,10 +151,12 @@ pub struct DeviceColor {
     #[serde(skip_serializing)]
     s: Option<f64>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hue: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub saturation: Option<f64>,
 
-    #[serde(flatten)]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub xy: Option<XY>,
 }
 

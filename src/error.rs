@@ -184,6 +184,9 @@ pub enum ApiError {
     #[error("Invalid naive time")]
     InvalidNaiveTime,
 
+    #[error("Invalid duration")]
+    InvalidDuration,
+
     #[error("No next weekday occurence {0:?} {0:?}")]
     NoNextWeekdayOccurence(NaiveTime, HashSet<Weekday>),
 
