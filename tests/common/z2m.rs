@@ -78,6 +78,7 @@ impl Z2mRequests {
         if unordered_eq(&expected, &actual) {
             Ok(())
         } else {
+            assert_eq!(expected, actual);
             Err(TestError::UnexpectedZ2mRequests { expected, actual })
         }
     }
