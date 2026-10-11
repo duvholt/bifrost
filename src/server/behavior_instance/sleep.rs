@@ -6,7 +6,8 @@ use chrono::NaiveTime;
 use futures::future::try_join_all;
 use hue::api::{
     DimmingDeltaUpdate, GoToSleepConfiguration, GoToSleepEndState, GroupedLightDynamicsUpdate,
-    GroupedLightUpdate, LightDynamicsUpdate, LightUpdate, On,
+    GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect, LightTimedEffectsUpdate,
+    LightUpdate, On,
 };
 use hue::xy::XY;
 
@@ -65,6 +66,7 @@ impl ScheduledBehavior for GoToSleepBehavior {
         drop(lock);
         let targets = select_targets(&resolved_resources, self);
 
+        let duration = config.fade_out_duration.to_std();
         try_join_all(
             targets
                 .iter()
@@ -76,16 +78,10 @@ impl ScheduledBehavior for GoToSleepBehavior {
                                 | GoToSleepEndState::TurnOff => (MINIMUM_LIGHT_COLOR, 447),
                                 GoToSleepEndState::Nightlight => (NIGHTLIGHT_COLOR, 454),
                             };
-                            target
-                                .basic_transition(ctx, config.fade_out_duration.to_std(), xy, mirek)
-                                .await
+                            target.basic_transition(ctx, duration, xy, mirek).await
                         }
-                        GoToSleepStyle::Sunset => {
-                            target
-                                .sunset_transition(ctx, config.fade_out_duration.to_std())
-                                .await
-                        }
-                        GoToSleepStyle::HueSunset => todo!(),
+                        GoToSleepStyle::Sunset => target.sunset_transition(ctx, duration).await,
+                        GoToSleepStyle::HueSunset => target.sunset_hue_effect(ctx, duration).await,
                     },
                 ),
         )
@@ -193,11 +189,7 @@ impl ExecutionTarget<GoToSleepStyle> {
         ]
     }
 
-    async fn sunset_transition(
-        &self,
-        ctx: &BehaviorContext,
-        _fade_out_duration: Duration,
-    ) -> ApiResult<()> {
+    async fn sunset_transition(&self, ctx: &BehaviorContext, _duration: Duration) -> ApiResult<()> {
         let preparation_duration = Duration::from_secs(2);
 
         let preparation_requests = vec![
@@ -235,6 +227,27 @@ impl ExecutionTarget<GoToSleepStyle> {
             .await
             .backend_request(self.brightness_request(100.0 * 4.0 / 254.0, final_duration))?;
         ctx.clock.sleep(stage_duration).await;
+
+        Ok(())
+    }
+
+    async fn sunset_hue_effect(&self, ctx: &BehaviorContext, duration: Duration) -> ApiResult<()> {
+        match self.resource {
+            TargetResource::Light(resource_link) => {
+                let mut payload = LightUpdate::default().with_on(Some(On::new(true)));
+                payload.timed_effects = Some(LightTimedEffectsUpdate {
+                    effect: Some(LightTimedEffect::Sunset),
+                    duration: Some(u32::try_from(duration.as_millis())?),
+                });
+                let request = BackendRequest::LightUpdate(resource_link, payload);
+
+                ctx.res.lock().await.backend_request(request)?;
+                ctx.clock.sleep(duration).await;
+            }
+            TargetResource::GroupedLight(_) => {
+                // The sunset effect does not support grouped light requests
+            }
+        }
 
         Ok(())
     }

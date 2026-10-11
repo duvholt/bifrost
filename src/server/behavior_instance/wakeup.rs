@@ -199,7 +199,7 @@ impl ExecutionTarget<WakeupStyle> {
                     .backend_request(BackendRequest::LightUpdate(resource_link, payload))?;
             }
             TargetResource::GroupedLight(_resource_link) => {
-                // The sunrise effect do not support grouped light requests
+                // The sunrise effect does not support grouped light requests
             }
         }
         Ok(())
