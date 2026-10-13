@@ -194,7 +194,7 @@ impl ExecutionTarget<GoToSleepStyle> {
         ]
     }
 
-    async fn sunset_transition(&self, ctx: &BehaviorContext, _duration: Duration) -> ApiResult<()> {
+    async fn sunset_transition(&self, ctx: &BehaviorContext, duration: Duration) -> ApiResult<()> {
         let TargetResource::Light {
             initial_brightness, ..
         } = self.resource
@@ -221,7 +221,10 @@ impl ExecutionTarget<GoToSleepStyle> {
         }
         ctx.clock.sleep(preparation_duration).await;
 
-        let stage_duration = Duration::from_millis(74_500);
+        let stage_duration = duration
+            .checked_sub(preparation_duration)
+            .ok_or(ApiError::InvalidDuration)?
+            / 4;
 
         let brightness_stages = sunset_stages(initial_brightness);
 
