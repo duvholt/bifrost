@@ -100,7 +100,10 @@ fn resolve_group(res: &Resources, group: &impl Group) -> Option<ResolvedGroup> {
 }
 
 pub enum TargetResource {
-    Light(ResourceLink),
+    Light {
+        link: ResourceLink,
+        initial_brightness: Option<f64>,
+    },
     GroupedLight(ResourceLink),
 }
 
@@ -127,10 +130,7 @@ pub fn select_targets<P: SelectionPolicy>(
         match resource {
             ResolvedResource::Light(light) => {
                 if let Some(effect) = policy.effect_for_light(light) {
-                    targets.push(ExecutionTarget {
-                        resource: TargetResource::Light(light.link),
-                        effect,
-                    });
+                    targets.push(select_light_target(light, effect));
                 }
             }
             ResolvedResource::Group(group) => {
@@ -161,13 +161,18 @@ fn select_group_targets<P: SelectionPolicy>(
     light_effects
         .into_iter()
         .zip(&group.lights)
-        .filter_map(|(effect, light)| {
-            effect.map(|effect| ExecutionTarget {
-                resource: TargetResource::Light(light.link),
-                effect,
-            })
-        })
+        .filter_map(|(effect, light)| effect.map(|effect| select_light_target(light, effect)))
         .collect()
+}
+
+fn select_light_target<E>(light: &ResolvedLight, effect: E) -> ExecutionTarget<E> {
+    ExecutionTarget {
+        resource: TargetResource::Light {
+            link: light.link,
+            initial_brightness: light.state.dimming.map(|d| d.brightness),
+        },
+        effect,
+    }
 }
 
 fn common_effect<E: Eq>(effects: &[Option<E>]) -> Option<&E> {
@@ -353,7 +358,7 @@ mod tests {
         let actual: BTreeMap<_, _> = selected
             .iter()
             .map(|target| {
-                let TargetResource::Light(link) = target.resource else {
+                let TargetResource::Light { link, .. } = target.resource else {
                     panic!("Expected an individual light resource");
                 };
                 (link, target.effect.clone())

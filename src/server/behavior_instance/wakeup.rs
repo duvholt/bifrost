@@ -126,7 +126,10 @@ impl ExecutionTarget<WakeupStyle> {
         const WAKEUP_FADE_MIREK: u16 = 447;
 
         let initial_backend_requests = match self.resource {
-            TargetResource::Light(resource_link) => {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let on_brightness = LightUpdate::default()
                     .with_on(On::new(true))
                     .with_brightness(Some(1.0));
@@ -156,7 +159,10 @@ impl ExecutionTarget<WakeupStyle> {
 
         // Start fade in to set brightness
         let fade_request = match self.resource {
-            TargetResource::Light(resource_link) => {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let brightness = LightUpdate::default()
                     .with_brightness(Some(config.end_brightness))
                     .with_dynamics(Some(
@@ -186,7 +192,10 @@ impl ExecutionTarget<WakeupStyle> {
         config: &WakeupConfiguration,
     ) -> ApiResult<()> {
         match self.resource {
-            TargetResource::Light(resource_link) => {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let mut payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
                     .with_brightness(Some(config.end_brightness));
@@ -207,7 +216,10 @@ impl ExecutionTarget<WakeupStyle> {
 
     async fn off(&self, res: &Mutex<Resources>) -> ApiResult<()> {
         let backend_request = match self.resource {
-            TargetResource::Light(resource_link) => {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let payload = LightUpdate::default().with_on(Some(On::new(false)));
                 BackendRequest::LightUpdate(resource_link, payload)
             }
