@@ -94,13 +94,17 @@ impl ScheduledBehavior for GoToSleepBehavior {
             },
             GoToSleepStyle::Sunset => match config.end_state {
                 GoToSleepEndState::TurnOff => target.off(ctx).await,
-                GoToSleepEndState::MinimumBrightness => target.minimum_brightness(ctx).await,
-                GoToSleepEndState::Nightlight => target.nightlight(ctx).await,
+                GoToSleepEndState::MinimumBrightness => {
+                    target.end_with_color(ctx, MINIMUM_LIGHT_COLOR).await
+                }
+                GoToSleepEndState::Nightlight => target.end_with_color(ctx, NIGHTLIGHT_COLOR).await,
             },
             GoToSleepStyle::HueSunset => match config.end_state {
                 GoToSleepEndState::TurnOff => Ok(()),
-                GoToSleepEndState::MinimumBrightness => target.minimum_brightness(ctx).await,
-                GoToSleepEndState::Nightlight => target.nightlight(ctx).await,
+                GoToSleepEndState::MinimumBrightness => {
+                    target.end_with_color(ctx, MINIMUM_LIGHT_COLOR).await
+                }
+                GoToSleepEndState::Nightlight => target.end_with_color(ctx, NIGHTLIGHT_COLOR).await,
             },
         }))
         .await?;
@@ -404,26 +408,38 @@ impl ExecutionTarget<GoToSleepStyle> {
         Ok(())
     }
 
-    async fn nightlight(&self, ctx: &BehaviorContext) -> ApiResult<()> {
+    async fn end_with_color(&self, ctx: &BehaviorContext, xy: XY) -> ApiResult<()> {
         let duration = Duration::from_millis(400);
-        let requests = vec![
-            self.on_request(true, None),
-            self.xy_request(NIGHTLIGHT_COLOR, duration),
-            self.brightness_request(100.0 * 4.0 / 254.0, duration),
-        ];
-        for request in requests {
-            ctx.res.lock().await.backend_request(request)?;
-        }
-        Ok(())
-    }
-
-    async fn minimum_brightness(&self, ctx: &BehaviorContext) -> ApiResult<()> {
-        let duration = Duration::from_millis(400);
-        let requests = vec![
-            self.on_request(true, None),
-            self.xy_request(MINIMUM_LIGHT_COLOR, duration),
-            self.brightness_request(100.0 * 4.0 / 254.0, duration),
-        ];
+        let requests = if self.effect == GoToSleepStyle::HueSunset
+            && let TargetResource::Light { link, .. } = self.resource
+        {
+            let brightness = 100.0 * (4.0 - 1.0) / 253.0;
+            vec![
+                BackendRequest::LightUpdate(
+                    link,
+                    LightUpdate {
+                        timed_effects: Some(LightTimedEffectsUpdate::no_effect()),
+                        ..Default::default()
+                    }
+                    .with_dynamics(Self::light_dynamics_duration(duration)),
+                ),
+                BackendRequest::LightUpdate(
+                    link,
+                    LightUpdate::default()
+                        .with_on(On::new(true))
+                        .with_color_xy(xy)
+                        .with_brightness(Some(brightness))
+                        .with_dynamics(Self::light_dynamics_duration(duration)),
+                ),
+            ]
+        } else {
+            let brightness = 100.0 * 4.0 / 254.0;
+            vec![
+                self.on_request(true, None),
+                self.xy_request(xy, duration),
+                self.brightness_request(brightness, duration),
+            ]
+        };
         for request in requests {
             ctx.res.lock().await.backend_request(request)?;
         }
