@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use bifrost::config::Memory2MqttConfig;
+use hue::zigbee::HueZigbeeUpdate;
 use memory2mqtt::service::{M2mMode, Memory2MqttService};
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio::{sync::broadcast, time::timeout};
 use z2m::api::RawMessage;
 
@@ -49,8 +50,49 @@ impl Z2mRequests {
             .await
     }
 
+    pub async fn expect_hue_command(
+        &mut self,
+        device: &(impl TestZ2mDeviceOrGroup + Sync),
+        update: HueZigbeeUpdate,
+    ) -> TestResult<()> {
+        let data = update.to_vec()?;
+        self.expect_set(
+            device,
+            json!({
+                "command": {"cluster": 0xFC03, "command": 0, "payload": {"data": data}},
+            }),
+        )
+        .await
+    }
+
     pub async fn expect_request(&mut self, topic: &str, payload: Value) -> TestResult<()> {
         self.expect_requests_unordered([(topic, payload)]).await
+    }
+
+    pub async fn expect_requests_ordered_per_topic(
+        &mut self,
+        chains: impl IntoIterator<Item = (String, Vec<Value>)>,
+    ) -> TestResult<()> {
+        let mut expected: BTreeMap<_, VecDeque<_>> = chains
+            .into_iter()
+            .map(|(topic, payloads)| (topic, payloads.into()))
+            .collect();
+        let request_count: usize = expected.values().map(VecDeque::len).sum();
+
+        for _ in 0..request_count {
+            let request = self.next_request().await?;
+            let payloads = expected
+                .get_mut(&request.topic)
+                .unwrap_or_else(|| panic!("unexpected request on {}", request.topic));
+
+            assert_eq!(
+                payloads.pop_front(),
+                Some(request.payload),
+                "unexpected payload or extra request on {}",
+                request.topic,
+            );
+        }
+        Ok(())
     }
 
     pub async fn expect_requests_unordered<I, S>(&mut self, expected: I) -> TestResult<()>

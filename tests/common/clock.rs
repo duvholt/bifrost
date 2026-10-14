@@ -61,6 +61,13 @@ impl TestClock {
         *now += chrono::Duration::from_std(duration).expect("test duration fits chrono");
     }
 
+    pub fn advance_and_release(&self, duration: Duration, sleeps: Vec<TestSleep>) {
+        self.advance(duration);
+        for sleep in sleeps {
+            sleep.release();
+        }
+    }
+
     pub async fn next_sleep(&mut self) -> TestResult<TestSleep> {
         timeout(Duration::from_secs(2), self.sleeps.recv())
             .await
@@ -75,6 +82,37 @@ impl TestClock {
             "unexpected behavior sleep duration"
         );
         Ok(sleep)
+    }
+
+    pub async fn expect_sleeps(
+        &mut self,
+        duration: Duration,
+        count: usize,
+    ) -> TestResult<Vec<TestSleep>> {
+        let mut sleeps = Vec::with_capacity(count);
+        for _ in 0..count {
+            sleeps.push(self.expect_sleep(duration).await?);
+        }
+        Ok(sleeps)
+    }
+
+    /// Collect sleeps in any arrival order, returning them in the requested duration order.
+    pub async fn expect_sleeps_unordered<const N: usize>(
+        &mut self,
+        durations: [Duration; N],
+    ) -> TestResult<[TestSleep; N]> {
+        let mut sleeps = Vec::with_capacity(N);
+        for _ in 0..N {
+            sleeps.push(self.next_sleep().await?);
+        }
+
+        Ok(durations.map(|duration| {
+            let index = sleeps
+                .iter()
+                .position(|sleep| sleep.duration == duration)
+                .unwrap_or_else(|| panic!("missing behavior sleep with duration {duration:?}"));
+            sleeps.remove(index)
+        }))
     }
 }
 
