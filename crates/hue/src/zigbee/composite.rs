@@ -95,7 +95,7 @@ bitflags! {
         const GRADIENT_PARAMS = 1 <<  6;
         const EFFECT_SPEED    = 1 <<  7;
         const GRADIENT_COLORS = 1 <<  8;
-        const UNUSED_9        = 1 <<  9;
+        const UNDEFINED_9     = 1 <<  9;
         const UNUSED_A        = 1 << 10;
         const UNUSED_B        = 1 << 11;
         const UNUSED_C        = 1 << 12;
@@ -319,6 +319,12 @@ impl HueZigbeeUpdate {
             });
         }
 
+        if flags.take(Flags::UNDEFINED_9) {
+            // No known use, but it can be reported from gradient lights
+            // The only observed value is 0.
+            rdr.read_u8()?;
+        }
+
         if flags.is_empty() {
             Ok(hz)
         } else {
@@ -407,7 +413,7 @@ impl From<HueZigbeeUpdate> for LightUpdate {
     fn from(hz: HueZigbeeUpdate) -> Self {
         let mut upd = Self::new()
             .with_on(hz.onoff.map(|o| On::new(o > 0)))
-            .with_brightness(hz.brightness.map(|b| (b as f64) / 254.0 * 100.0))
+            .with_brightness(hz.brightness.map(|b| f64::from(b) / 254.0 * 100.0))
             .with_color_temperature(hz.color_mirek)
             .with_color_xy(hz.color_xy);
 
@@ -425,7 +431,7 @@ impl From<HueZigbeeUpdate> for LightUpdate {
                     },
                 });
                 upd.effects_v2 = Some(LightEffectsV2Update {
-                    action: action,
+                    action,
                     status: None,
                 });
                 upd.timed_effects = Some(LightTimedEffectsUpdate::no_effect());
@@ -460,7 +466,7 @@ impl From<HueZigbeeUpdate> for LightUpdate {
                         color: ColorUpdate::new(point),
                     })
                     .collect(),
-            })
+            });
         }
 
         upd
@@ -770,6 +776,14 @@ mod tests {
             Ok(_) => panic!(),
             Err(err) => assert!(matches!(err, HueError::HueZigbeeUnknownFlags(_))),
         }
+    }
+
+    #[test]
+    fn hzb_parse_ignores_flag_9() {
+        let data = [0x00, 0x02, 0x00];
+        let mut cur = Cursor::new(data.as_slice());
+        let res = HueZigbeeUpdate::from_reader(&mut cur).unwrap();
+        assert!(res.is_empty());
     }
 
     #[test]
