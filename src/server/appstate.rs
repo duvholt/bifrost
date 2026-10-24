@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use camino::Utf8Path;
 use chrono::Utc;
-use tokio::sync::Mutex;
 use tokio::sync::broadcast::Sender;
+use tokio::sync::{Mutex, mpsc};
 
 use bifrost_api::backend::BackendRequest;
 use hue::legacy_api::{ApiConfig, ApiShortConfig, Whitelist};
@@ -15,8 +15,25 @@ use crate::config::AppConfig;
 use crate::error::ApiResult;
 use crate::model::state::{State, StateVersion};
 use crate::resource::Resources;
+use crate::server::behavior_instance::BehaviorTriggerRequest;
 use crate::server::certificate;
 use crate::server::updater::VersionUpdater;
+
+#[derive(Clone)]
+pub struct BehaviorInstanceClient {
+    tx: mpsc::Sender<BehaviorTriggerRequest>,
+}
+
+impl BehaviorInstanceClient {
+    #[must_use]
+    pub const fn new(tx: mpsc::Sender<BehaviorTriggerRequest>) -> Self {
+        Self { tx }
+    }
+
+    pub async fn trigger(&self, request: BehaviorTriggerRequest) -> ApiResult<()> {
+        Ok(self.tx.send(request).await?)
+    }
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -25,10 +42,15 @@ pub struct AppState {
     svm: SvmClient,
     pub res: Arc<Mutex<Resources>>,
     pub backend: Sender<Arc<BackendRequest>>,
+    behavior_instance_client: BehaviorInstanceClient,
 }
 
 impl AppState {
-    pub async fn from_config(config: AppConfig, svm: SvmClient) -> ApiResult<Self> {
+    pub async fn from_config(
+        config: AppConfig,
+        svm: SvmClient,
+        behavior_trigger: mpsc::Sender<BehaviorTriggerRequest>,
+    ) -> ApiResult<Self> {
         let certfile = &config.bifrost.cert_file;
 
         let certpath = Utf8Path::new(certfile);
@@ -87,6 +109,7 @@ impl AppState {
             svm,
             res,
             backend,
+            behavior_instance_client: BehaviorInstanceClient::new(behavior_trigger),
         })
     }
 
@@ -103,6 +126,11 @@ impl AppState {
     #[must_use]
     pub fn manager(&self) -> SvmClient {
         self.svm.clone()
+    }
+
+    #[must_use]
+    pub const fn behavior(&self) -> &BehaviorInstanceClient {
+        &self.behavior_instance_client
     }
 
     #[must_use]

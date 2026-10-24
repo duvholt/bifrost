@@ -1,19 +1,13 @@
+use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
-use chrono::{DateTime, Datelike, Days, Local, NaiveDate, NaiveTime, TimeZone};
+use chrono::{DateTime, Datelike, Days, NaiveDate, NaiveTime, TimeZone};
 
 use crate::error::{ApiError, ApiResult};
-use crate::server::behavior_instance::BehaviorContext;
-use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
+use crate::server::behavior_instance::BehaviorClock;
+use crate::server::behavior_instance::service::ScheduleType;
 
-#[async_trait]
-pub trait ScheduledBehavior: Send + Sync + 'static {
-    fn name(&self) -> &str;
-    fn schedule(&self) -> ApiResult<Schedule>;
-    async fn execute(&self, ctx: &BehaviorContext) -> ApiResult<()>;
-}
-
+#[derive(Debug)]
 pub struct Schedule {
     pub recurrence: ScheduleType,
     pub scheduled_time: NaiveTime,
@@ -65,78 +59,24 @@ impl Schedule {
             }
         })
     }
-}
 
-pub struct ScheduledJob<B: ScheduledBehavior> {
-    behavior: B,
-    context: BehaviorContext,
-    rid: uuid::Uuid,
-}
-
-impl<B: ScheduledBehavior> ScheduledJob<B> {
-    pub const fn new(context: BehaviorContext, behavior: B, rid: uuid::Uuid) -> Self {
-        Self {
-            behavior,
-            context,
-            rid,
-        }
-    }
-
-    pub async fn create(self) {
-        let now = self.context.clock.local_now();
-        let schedule = match self.behavior.schedule() {
-            Ok(schedule) => schedule,
-            Err(err) => {
-                log::error!("Failed to create schedule: {err}");
-                return;
-            }
-        };
-        let result = match &schedule.recurrence {
-            ScheduleType::Recurring(_) => self.run_recurring(&schedule).await,
-            ScheduleType::Once() => self.run_once(&schedule, now).await,
-        };
-        if let Err(err) = result {
-            log::error!("Failed to create schedule: {err}");
-        }
-    }
-
-    async fn wait_until_next_start(
-        &self,
-        schedule: &Schedule,
-        now: DateTime<Local>,
-    ) -> ApiResult<()> {
-        let start_at = schedule.next_start(&now)?;
+    pub async fn wait_until_next_start(&self, clock: Arc<dyn BehaviorClock>) -> ApiResult<()> {
+        let now = clock.local_now();
+        let start_at = self.next_start(&now)?;
         let time_until_start = (start_at - now).to_std()?;
-        log::debug!(
-            "Scheduled behavior {} {} ({:?}, alarm at {}) will run at {}",
-            self.behavior.name(),
-            self.rid,
-            schedule.recurrence,
-            schedule.scheduled_time,
-            start_at
-        );
-        self.context.clock.sleep(time_until_start).await;
+        clock.sleep(time_until_start).await;
         Ok(())
     }
+}
 
-    async fn run_recurring(&self, schedule: &Schedule) -> ApiResult<()> {
-        loop {
-            let now = self.context.clock.local_now();
-            self.wait_until_next_start(schedule, now).await?;
-            self.behavior.execute(&self.context).await?;
-        }
-    }
-
-    async fn run_once(self, schedule: &Schedule, now: DateTime<Local>) -> ApiResult<()> {
-        self.wait_until_next_start(schedule, now).await?;
-        tokio::spawn(async move {
-            if let Err(err) = self.behavior.execute(&self.context).await {
-                log::error!("Failed to execute job: {err}");
-            }
-            disable_behavior_instance(self.rid, self.context.res.clone()).await;
-        });
-
-        Ok(())
+pub async fn wait_for_schedule(schedule: Option<Schedule>, clock: Arc<dyn BehaviorClock>) {
+    let result = match &schedule {
+        Some(schedule) => schedule.wait_until_next_start(clock.clone()).await,
+        None => std::future::pending().await,
+    };
+    if let Err(err) = result {
+        log::error!("Wait until next schedule failed {err} for {schedule:?}");
+        std::future::pending::<()>().await;
     }
 }
 

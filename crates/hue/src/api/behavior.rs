@@ -335,14 +335,33 @@ pub struct BehaviorInstanceNew {
     pub script_id: Uuid,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum BehaviorInstanceUpdate {
+    Trigger(BehaviorInstanceTrigger),
+    Configuration(BehaviorInstanceConfigurationUpdate),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BehaviorInstanceTrigger {
+    pub trigger: BehaviorInstanceTriggerAction,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum BehaviorInstanceTriggerAction {
+    Start {},
+    Stop {},
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct BehaviorInstanceUpdate {
+pub struct BehaviorInstanceConfigurationUpdate {
     pub configuration: Option<Value>,
     pub enabled: Option<bool>,
     pub metadata: Option<BehaviorInstanceMetadata>,
 }
 
-impl BehaviorInstanceUpdate {
+impl BehaviorInstanceConfigurationUpdate {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -373,8 +392,8 @@ impl BehaviorInstanceUpdate {
     }
 }
 
-impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
-    fn add_assign(&mut self, upd: BehaviorInstanceUpdate) {
+impl AddAssign<BehaviorInstanceConfigurationUpdate> for BehaviorInstance {
+    fn add_assign(&mut self, upd: BehaviorInstanceConfigurationUpdate) {
         if let Some(md) = upd.metadata {
             self.metadata = md;
         }

@@ -1,41 +1,158 @@
+use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
 use futures::future::try_join_all;
 use hue::api::{
-    DimmingDeltaUpdate, GoToSleepConfiguration, GoToSleepEndState, GroupedLightDynamicsUpdate,
-    GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect, LightTimedEffectsUpdate,
-    LightUpdate, On,
+    BehaviorInstance, DimmingDeltaUpdate, GoToSleepConfiguration, GoToSleepEndState,
+    GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect,
+    LightTimedEffectsUpdate, LightUpdate, On,
 };
 use hue::xy::XY;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
-use crate::server::behavior_instance::schedule::{Schedule, ScheduledBehavior};
+use crate::server::behavior_instance::schedule::{Schedule, wait_for_schedule};
+use crate::server::behavior_instance::service::disable_behavior_instance;
 use crate::server::behavior_instance::target::{
     ExecutionTarget, ResolvedLight, SelectionPolicy, TargetResource, resolve_resources,
     select_targets,
 };
+use crate::server::behavior_instance::{BehaviorCommand, BehaviorTriggerAction};
 use crate::server::behavior_instance::{BehaviorContext, service::ScheduleType};
 
+#[derive(Debug)]
 pub struct GoToSleepBehavior {
-    pub configuration: GoToSleepConfiguration,
+    id: Uuid,
+    instance: BehaviorInstance,
+    configuration: GoToSleepConfiguration,
+    context: Arc<BehaviorContext>,
+    commands: mpsc::Receiver<BehaviorCommand>,
+    execution: Option<JoinHandle<ApiResult<()>>>,
 }
 
-const NIGHTLIGHT_COLOR: XY = XY::new(0.5610, 0.4042);
-const MINIMUM_LIGHT_COLOR: XY = XY::new(0.5018, 0.4152);
-const SUNSET_COLORS: [XY; 4] = [
-    XY::new(0.5056, 0.4141),
-    XY::new(0.51591, 0.41461),
-    XY::new(0.53781, 0.4111),
-    XY::new(0.58571, 0.39311),
-];
+impl Drop for GoToSleepBehavior {
+    fn drop(&mut self) {
+        self.stop_execution();
+    }
+}
 
-#[async_trait]
-impl ScheduledBehavior for GoToSleepBehavior {
-    fn name(&self) -> &'static str {
-        "go to sleep"
+impl GoToSleepBehavior {
+    pub fn new(
+        id: Uuid,
+        instance: BehaviorInstance,
+        context: Arc<BehaviorContext>,
+        commands: mpsc::Receiver<BehaviorCommand>,
+    ) -> ApiResult<Self> {
+        let config = parse_config(&instance)?;
+        Ok(Self {
+            id,
+            instance,
+            configuration: config,
+            context,
+            commands,
+            execution: None,
+        })
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            let schedule = self.schedule_if_idle();
+
+            tokio::select! {
+                command = self.commands.recv() => {
+                    match command {
+                        Some(BehaviorCommand::Update(instance)) => {
+                            self.handle_update(*instance);
+                        }
+                        Some(BehaviorCommand::Trigger(trigger)) => {
+                            self.handle_trigger(trigger).await;
+                        }
+                        Some(BehaviorCommand::Shutdown) | None => break,
+                    }
+                }
+
+                () = wait_for_schedule(schedule, self.context.clock.clone())  => {
+                    self.handle_trigger(BehaviorTriggerAction::ScheduledStart).await;
+                }
+
+                result = wait_for_execution(&mut self.execution) => {
+                    self.execution_finished(result).await;
+                }
+            }
+        }
+    }
+
+    fn schedule_if_idle(&self) -> Option<Schedule> {
+        if !self.instance.enabled || self.execution.is_some() {
+            return None;
+        }
+
+        self.schedule()
+            .inspect_err(|err| {
+                log::error!("Failed to create go-to-sleep schedule {}: {err}", self.id);
+            })
+            .ok()
+    }
+
+    fn handle_update(&mut self, instance: BehaviorInstance) {
+        let config = match parse_config(&instance) {
+            Ok(config) => config,
+            Err(err) => {
+                log::error!("Failed to parse go-to-sleep config {instance:?}: {err}");
+                return;
+            }
+        };
+        if self.configuration != config {
+            self.configuration = config;
+            self.stop_execution();
+        }
+        self.instance = instance;
+    }
+
+    async fn execution_finished(&mut self, result: ApiResult<()>) {
+        self.execution = None;
+
+        match result {
+            Ok(()) => {}
+            Err(ApiError::JoinError(err)) if err.is_cancelled() => {
+                return;
+            }
+            Err(err) => {
+                log::error!("Go-to-sleep {} task failed: {err}", self.id);
+                return;
+            }
+        }
+
+        let Ok(schedule) = self.schedule() else {
+            return;
+        };
+        match schedule.recurrence {
+            ScheduleType::Recurring(_) => {}
+            ScheduleType::Once() => {
+                disable_behavior_instance(self.id, self.context.res.clone()).await;
+            }
+        }
+    }
+
+    async fn handle_trigger(&mut self, trigger: BehaviorTriggerAction) {
+        match trigger {
+            BehaviorTriggerAction::ScheduledStart | BehaviorTriggerAction::ManualStart => {
+                self.start_execution().await;
+            }
+            BehaviorTriggerAction::Stop => {
+                self.stop_execution();
+            }
+        }
+    }
+
+    fn stop_execution(&mut self) {
+        if let Some(execution) = self.execution.take() {
+            execution.abort();
+        }
     }
 
     fn schedule(&self) -> ApiResult<Schedule> {
@@ -48,70 +165,102 @@ impl ScheduledBehavior for GoToSleepBehavior {
         };
 
         let job_time = self.configuration.when.time_point.time();
-        let scheduled_wakeup_time = NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0)
+        let scheduled_time = NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0)
             .ok_or(ApiError::InvalidNaiveTime)?;
 
         Ok(Schedule {
             recurrence: schedule_type,
-            scheduled_time: scheduled_wakeup_time,
+            scheduled_time,
             lead_time: Duration::ZERO,
         })
     }
 
-    async fn execute(&self, ctx: &BehaviorContext) -> ApiResult<()> {
-        let config = &self.configuration;
+    async fn start_execution(&mut self) {
+        if self.execution.is_some() {
+            return;
+        }
+        let config = self.configuration.clone();
+        let ctx = self.context.clone();
         log::debug!("Running scheduled behavior instance:, {config:#?}");
         let lock = ctx.res.lock().await;
         let resolved_resources = resolve_resources(&lock, &config.where_field);
         drop(lock);
         let targets = select_targets(&resolved_resources, self);
 
-        let duration = config.fade_out_duration.to_std();
-        try_join_all(
-            targets
-                .iter()
-                .map(
-                    async |target: &ExecutionTarget<GoToSleepStyle>| match target.effect {
-                        GoToSleepStyle::Basic => {
-                            let (xy, mirek) = match config.end_state {
-                                GoToSleepEndState::MinimumBrightness
-                                | GoToSleepEndState::TurnOff => (MINIMUM_LIGHT_COLOR, 447),
-                                GoToSleepEndState::Nightlight => (NIGHTLIGHT_COLOR, 454),
-                            };
-                            target.basic_transition(ctx, duration, xy, mirek).await
-                        }
-                        GoToSleepStyle::Sunset => target.sunset_transition(ctx, duration).await,
-                        GoToSleepStyle::HueSunset => target.sunset_hue_effect(ctx, duration).await,
-                    },
-                ),
-        )
-        .await?;
-
-        try_join_all(targets.iter().map(async |target| match target.effect {
-            GoToSleepStyle::Basic => match config.end_state {
-                GoToSleepEndState::TurnOff => target.off(ctx).await,
-                GoToSleepEndState::MinimumBrightness | GoToSleepEndState::Nightlight => Ok(()),
-            },
-            GoToSleepStyle::Sunset => match config.end_state {
-                GoToSleepEndState::TurnOff => target.off(ctx).await,
-                GoToSleepEndState::MinimumBrightness => {
-                    target.end_with_color(ctx, MINIMUM_LIGHT_COLOR).await
-                }
-                GoToSleepEndState::Nightlight => target.end_with_color(ctx, NIGHTLIGHT_COLOR).await,
-            },
-            GoToSleepStyle::HueSunset => match config.end_state {
-                GoToSleepEndState::TurnOff => Ok(()),
-                GoToSleepEndState::MinimumBrightness => {
-                    target.end_with_color(ctx, MINIMUM_LIGHT_COLOR).await
-                }
-                GoToSleepEndState::Nightlight => target.end_with_color(ctx, NIGHTLIGHT_COLOR).await,
-            },
-        }))
-        .await?;
-
-        Ok(())
+        let handle = tokio::spawn(async move { run_go_to_sleep(ctx, config, targets).await });
+        self.execution = Some(handle);
     }
 }
+
+async fn run_go_to_sleep(
+    ctx: Arc<BehaviorContext>,
+    config: GoToSleepConfiguration,
+    targets: Vec<ExecutionTarget<GoToSleepStyle>>,
+) -> ApiResult<()> {
+    let duration = config.fade_out_duration.to_std();
+    try_join_all(
+        targets.iter().map(
+            async |target: &ExecutionTarget<GoToSleepStyle>| match target.effect {
+                GoToSleepStyle::Basic => {
+                    let (xy, mirek) = match config.end_state {
+                        GoToSleepEndState::MinimumBrightness | GoToSleepEndState::TurnOff => {
+                            (MINIMUM_LIGHT_COLOR, 447)
+                        }
+                        GoToSleepEndState::Nightlight => (NIGHTLIGHT_COLOR, 454),
+                    };
+                    target.basic_transition(&ctx, duration, xy, mirek).await
+                }
+                GoToSleepStyle::Sunset => target.sunset_transition(&ctx, duration).await,
+                GoToSleepStyle::HueSunset => target.sunset_hue_effect(&ctx, duration).await,
+            },
+        ),
+    )
+    .await?;
+    try_join_all(targets.iter().map(async |target| match target.effect {
+        GoToSleepStyle::Basic => match config.end_state {
+            GoToSleepEndState::TurnOff => target.off(&ctx).await,
+            GoToSleepEndState::MinimumBrightness | GoToSleepEndState::Nightlight => Ok(()),
+        },
+        GoToSleepStyle::Sunset => match config.end_state {
+            GoToSleepEndState::TurnOff => target.off(&ctx).await,
+            GoToSleepEndState::MinimumBrightness => {
+                target.end_with_color(&ctx, MINIMUM_LIGHT_COLOR).await
+            }
+            GoToSleepEndState::Nightlight => target.end_with_color(&ctx, NIGHTLIGHT_COLOR).await,
+        },
+        GoToSleepStyle::HueSunset => match config.end_state {
+            GoToSleepEndState::TurnOff => Ok(()),
+            GoToSleepEndState::MinimumBrightness => {
+                target.end_with_color(&ctx, MINIMUM_LIGHT_COLOR).await
+            }
+            GoToSleepEndState::Nightlight => target.end_with_color(&ctx, NIGHTLIGHT_COLOR).await,
+        },
+    }))
+    .await?;
+    Ok(())
+}
+
+async fn wait_for_execution(execution: &mut Option<JoinHandle<ApiResult<()>>>) -> ApiResult<()> {
+    match execution {
+        Some(task) => task.await?,
+        None => std::future::pending().await,
+    }
+}
+
+fn parse_config(instance: &BehaviorInstance) -> ApiResult<GoToSleepConfiguration> {
+    Ok(serde_json::from_value::<GoToSleepConfiguration>(
+        instance.configuration.clone(),
+    )?)
+}
+
+const NIGHTLIGHT_COLOR: XY = XY::new(0.5610, 0.4042);
+const MINIMUM_LIGHT_COLOR: XY = XY::new(0.5018, 0.4152);
+const SUNSET_COLORS: [XY; 4] = [
+    XY::new(0.5056, 0.4141),
+    XY::new(0.51591, 0.41461),
+    XY::new(0.53781, 0.4111),
+    XY::new(0.58571, 0.39311),
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GoToSleepStyle {

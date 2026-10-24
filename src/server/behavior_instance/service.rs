@@ -5,41 +5,61 @@ use async_trait::async_trait;
 use chrono::Weekday;
 use hue::event::Event;
 use svc::traits::Service;
-use tokio::spawn;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
+use tokio::sync::{Mutex, mpsc};
 
 use hue::api::{
-    BehaviorInstance, BehaviorInstanceConfiguration, BehaviorInstanceUpdate, BehaviorScript,
-    GoToSleepConfiguration, HueAccessoriesConfiguration, RType, Resource, WakeupConfiguration,
+    BehaviorInstance, BehaviorInstanceConfigurationUpdate, BehaviorScript, RType, Resource,
 };
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
-use crate::server::behavior_instance::hue_accessories::HueAccessoriesJob;
-use crate::server::behavior_instance::schedule::ScheduledJob;
+use crate::server::behavior_instance::hue_accessories::HueAccessoriesBehavior;
 use crate::server::behavior_instance::sleep::GoToSleepBehavior;
 use crate::server::behavior_instance::wakeup::WakeupBehavior;
-use crate::server::behavior_instance::{BehaviorClock, BehaviorContext, SystemClock};
+use crate::server::behavior_instance::{
+    BehaviorClock, BehaviorCommand, BehaviorContext, BehaviorTriggerRequest, SystemClock,
+};
+
+#[derive(Debug)]
+struct BehaviorHandle {
+    commands: mpsc::Sender<BehaviorCommand>,
+    task: JoinHandle<()>,
+}
+
+impl Drop for BehaviorHandle {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
 
 #[derive(Debug)]
 pub struct BehaviorInstanceService {
     res: Arc<Mutex<Resources>>,
-    jobs: HashMap<Uuid, BehaviorInstanceJob>,
+    handles: HashMap<Uuid, BehaviorHandle>,
     clock: Arc<dyn BehaviorClock>,
+    behavior_trigger_rx: mpsc::Receiver<BehaviorTriggerRequest>,
 }
 
 impl BehaviorInstanceService {
-    pub fn new(res: Arc<Mutex<Resources>>) -> Self {
-        Self::with_clock(res, Arc::new(SystemClock))
+    pub fn new(
+        res: Arc<Mutex<Resources>>,
+        behavior_trigger_rx: mpsc::Receiver<BehaviorTriggerRequest>,
+    ) -> Self {
+        Self::with_clock(res, behavior_trigger_rx, Arc::new(SystemClock))
     }
 
-    pub fn with_clock(res: Arc<Mutex<Resources>>, clock: Arc<dyn BehaviorClock>) -> Self {
+    pub fn with_clock(
+        res: Arc<Mutex<Resources>>,
+        behavior_trigger_rx: mpsc::Receiver<BehaviorTriggerRequest>,
+        clock: Arc<dyn BehaviorClock>,
+    ) -> Self {
         Self {
-            jobs: HashMap::new(),
+            handles: HashMap::new(),
             res,
             clock,
+            behavior_trigger_rx,
         }
     }
 
@@ -56,67 +76,113 @@ impl BehaviorInstanceService {
             .collect()
     }
 
-    async fn get_behavior_configuration(
-        &self,
-        id: Uuid,
-    ) -> ApiResult<Option<BehaviorInstanceConfiguration>> {
+    async fn get_behavior_instance(&self, rid: Uuid) -> ApiResult<BehaviorInstance> {
         let bi = self
             .res
             .lock()
             .await
-            .get_id::<BehaviorInstance>(id)?
+            .get_id::<BehaviorInstance>(rid)?
             .clone();
-        if !bi.enabled {
-            return Ok(None);
-        }
-
-        match bi.script_id {
-            BehaviorScript::WAKE_UP_ID => {
-                let config = serde_json::from_value::<WakeupConfiguration>(bi.configuration)?;
-                Ok(Some(BehaviorInstanceConfiguration::Wakeup(config)))
-            }
-            BehaviorScript::GO_TO_SLEEP_ID => {
-                let config = serde_json::from_value::<GoToSleepConfiguration>(bi.configuration)?;
-                Ok(Some(BehaviorInstanceConfiguration::GoToSleep(config)))
-            }
-            BehaviorScript::HUE_ACCESSORIES_ID => {
-                let config =
-                    serde_json::from_value::<HueAccessoriesConfiguration>(bi.configuration)?;
-                Ok(Some(BehaviorInstanceConfiguration::HueAccessories(config)))
-            }
-            _ => Ok(None),
-        }
+        Ok(bi)
     }
 
     async fn new_job(&mut self, rid: Uuid) -> ApiResult<()> {
-        if let Some(configuration) = self.get_behavior_configuration(rid).await? {
-            self.jobs.insert(
-                rid,
-                BehaviorInstanceJob::new(rid, configuration, self.res.clone(), self.clock.clone()),
-            );
-        }
+        let bi = self.get_behavior_instance(rid).await?;
+        let (commands, receiver) = mpsc::channel(16);
+        let context = Arc::new(BehaviorContext::new(self.res.clone(), self.clock.clone()));
+
+        let job = match bi.script_id {
+            BehaviorScript::WAKE_UP_ID => {
+                let behavior = WakeupBehavior::new(rid, bi, context, receiver)?;
+                let task = tokio::spawn(async move { behavior.run().await });
+                BehaviorHandle { commands, task }
+            }
+            BehaviorScript::GO_TO_SLEEP_ID => {
+                let behavior = GoToSleepBehavior::new(rid, bi, context, receiver)?;
+                let task = tokio::spawn(async move { behavior.run().await });
+                BehaviorHandle { commands, task }
+            }
+            BehaviorScript::HUE_ACCESSORIES_ID => {
+                let behavior = HueAccessoriesBehavior::new(&bi, context, receiver)?;
+                let task = tokio::spawn(async move { behavior.run().await });
+                BehaviorHandle { commands, task }
+            }
+            _ => return Ok(()),
+        };
+
+        self.handles.insert(rid, job);
         Ok(())
     }
 
     async fn update_job(&mut self, rid: Uuid) -> ApiResult<()> {
-        let configuration = self.get_behavior_configuration(rid).await?;
-        match (self.jobs.get_mut(&rid), configuration) {
-            (Some(job), Some(configuration)) => {
-                job.update_configuration(configuration);
+        let bi = self.get_behavior_instance(rid).await?;
+        match self.handles.get_mut(&rid) {
+            Some(job) => {
+                job.commands
+                    .send(BehaviorCommand::Update(Box::new(bi)))
+                    .await?;
             }
-            (Some(_job), None) => {
-                self.delete_job(rid);
-            }
-            (None, Some(_configuration)) => {
+            None => {
                 self.new_job(rid).await?;
             }
-            (None, None) => {}
         }
         Ok(())
     }
 
     fn delete_job(&mut self, rid: Uuid) {
-        self.jobs.remove(&rid);
+        self.handles.remove(&rid);
+    }
+
+    async fn handle_hue_event(&mut self, event: Event) {
+        match event {
+            Event::Add(add) => {
+                for obj in add.data {
+                    if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
+                        log::debug!("Adding behavior instance job {}", obj.id);
+                        if let Err(err) = self.new_job(obj.id).await {
+                            log::error!(
+                                "Failed to create new behavior instance job {}: {}",
+                                obj.id,
+                                err
+                            );
+                        }
+                    }
+                }
+            }
+            Event::Update(update) => {
+                for obj in update.data {
+                    if RType::BehaviorInstance == obj.rtype {
+                        log::debug!("Updating behavior instance job {}", obj.id);
+                        if let Err(err) = self.update_job(obj.id).await {
+                            log::error!(
+                                "Failed to update behavior instance job {}: {}",
+                                obj.id,
+                                err
+                            );
+                        }
+                    }
+                }
+            }
+            Event::Delete(delete) => {
+                for obj in delete.data {
+                    if RType::BehaviorInstance == obj.rtype {
+                        log::debug!("Deleting behavior instance job {}", obj.id);
+                        self.delete_job(obj.id);
+                    }
+                }
+            }
+            Event::Error(_error) => {}
+        }
+    }
+
+    async fn handle_trigger(&mut self, request: BehaviorTriggerRequest) -> ApiResult<()> {
+        if let Some(handle) = self.handles.get_mut(&request.instance_id) {
+            handle
+                .commands
+                .send(BehaviorCommand::Trigger(request.action))
+                .await?;
+        }
+        Ok(())
     }
 }
 
@@ -136,150 +202,30 @@ impl Service for BehaviorInstanceService {
         let mut hue_events = self.res.lock().await.hue_event_stream().subscribe();
 
         loop {
-            let event = hue_events.recv().await;
-            match event {
-                Ok(event) => match event.block.event {
-                    Event::Add(add) => {
-                        for obj in add.data {
-                            if let Resource::BehaviorInstance(_behavior_instance) = obj.obj {
-                                log::debug!("Adding behavior instance job {}", obj.id);
-                                if let Err(err) = self.new_job(obj.id).await {
-                                    log::error!(
-                                        "Failed to create new behavior instance job {}: {}",
-                                        obj.id,
-                                        err
-                                    );
-                                }
-                            }
+            tokio::select! {
+                event = hue_events.recv() => {
+                    match event {
+                        Ok(event) => {
+                            self.handle_hue_event(event.block.event).await;
+                        }
+                        Err(err) => {
+                            log::error!("Failed to read event {err}");
                         }
                     }
-                    Event::Update(update) => {
-                        for obj in update.data {
-                            if RType::BehaviorInstance == obj.rtype {
-                                log::debug!("Updating behavior instance job {}", obj.id);
-                                if let Err(err) = self.update_job(obj.id).await {
-                                    log::error!(
-                                        "Failed to update behavior instance job {}: {}",
-                                        obj.id,
-                                        err
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    Event::Delete(delete) => {
-                        for obj in delete.data {
-                            if RType::BehaviorInstance == obj.rtype {
-                                log::debug!("Deleting behavior instance job {}", obj.id);
-                                self.delete_job(obj.id);
-                            }
-                        }
-                    }
-                    Event::Error(_error) => {}
-                },
-                Err(err) => {
-                    log::error!("Failed to read event {err}");
                 }
+                Some(request) = self.behavior_trigger_rx.recv() => {
+                    log::info!("Received behavior trigger {request:?}");
+                    self.handle_trigger(request).await?;
+                }
+                else => break,
             }
         }
-    }
-}
-
-#[derive(Debug)]
-struct BehaviorInstanceJob {
-    rid: Uuid,
-    configuration: BehaviorInstanceConfiguration,
-    res: Arc<Mutex<Resources>>,
-    clock: Arc<dyn BehaviorClock>,
-    task: Option<JoinHandle<()>>,
-}
-
-impl BehaviorInstanceJob {
-    pub fn new(
-        rid: Uuid,
-        configuration: BehaviorInstanceConfiguration,
-        res: Arc<Mutex<Resources>>,
-        clock: Arc<dyn BehaviorClock>,
-    ) -> Self {
-        let mut job = Self {
-            rid,
-            configuration,
-            res,
-            clock,
-            task: None,
-        };
-        job.update_task();
-        log::debug!("Created new behavior instance job: {:?}", job.configuration);
-        job
-    }
-
-    pub fn update_configuration(&mut self, configuration: BehaviorInstanceConfiguration) {
-        self.configuration = configuration;
-        self.update_task();
-    }
-
-    fn update_task(&mut self) {
-        if let Some(task) = &self.task {
-            task.abort();
-        }
-
-        let task = match &self.configuration {
-            BehaviorInstanceConfiguration::Wakeup(wakeup_configuration) => {
-                let job = self.create_wake_up_task(wakeup_configuration);
-                spawn(job.create())
-            }
-            BehaviorInstanceConfiguration::GoToSleep(go_to_sleep_configuration) => {
-                let job = self.create_go_to_sleep_task(go_to_sleep_configuration);
-                spawn(job.create())
-            }
-            BehaviorInstanceConfiguration::HueAccessories(hue_accessories_configuration) => {
-                let job = self.create_hue_accessories_task(hue_accessories_configuration);
-                spawn(job.create())
-            }
-        };
-        self.task = Some(task);
-    }
-
-    fn create_wake_up_task(
-        &self,
-        configuration: &WakeupConfiguration,
-    ) -> ScheduledJob<WakeupBehavior> {
-        let context = BehaviorContext::new(self.res.clone(), self.clock.clone());
-        let wakeup = WakeupBehavior {
-            configuration: configuration.clone(),
-        };
-        ScheduledJob::new(context, wakeup, self.rid)
-    }
-
-    fn create_hue_accessories_task(
-        &self,
-        configuration: &HueAccessoriesConfiguration,
-    ) -> HueAccessoriesJob {
-        HueAccessoriesJob::new(configuration.clone(), self.res.clone(), self.clock.clone())
-    }
-
-    fn create_go_to_sleep_task(
-        &self,
-        configuration: &GoToSleepConfiguration,
-    ) -> ScheduledJob<GoToSleepBehavior> {
-        let context = BehaviorContext::new(self.res.clone(), self.clock.clone());
-        let go_to_sleep = GoToSleepBehavior {
-            configuration: configuration.clone(),
-        };
-        ScheduledJob::new(context, go_to_sleep, self.rid)
-    }
-}
-
-impl Drop for BehaviorInstanceJob {
-    fn drop(&mut self) {
-        if let Some(task) = &self.task {
-            task.abort();
-        }
+        Ok(())
     }
 }
 
 pub async fn disable_behavior_instance(id: Uuid, res: Arc<Mutex<Resources>>) {
-    let upd = BehaviorInstanceUpdate::default().with_enabled(false);
+    let upd = BehaviorInstanceConfigurationUpdate::default().with_enabled(false);
     let upd_result = res
         .lock()
         .await

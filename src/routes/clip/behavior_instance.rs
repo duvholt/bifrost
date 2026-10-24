@@ -1,11 +1,12 @@
 use serde_json::Value;
 
-use hue::api::{BehaviorInstance, Resource, ResourceLink};
+use hue::api::{BehaviorInstance, BehaviorInstanceTriggerAction, Resource, ResourceLink};
 use hue::api::{BehaviorInstanceNew, BehaviorInstanceUpdate};
 use uuid::Uuid;
 
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
+use crate::server::behavior_instance::{BehaviorTriggerAction, BehaviorTriggerRequest};
 
 pub async fn post_behavior_instance(state: &AppState, post: Value) -> ApiV2Result {
     let new: BehaviorInstanceNew = serde_json::from_value(post)?;
@@ -36,11 +37,29 @@ pub async fn put_behavior_instance(
 ) -> ApiV2Result {
     let upd: BehaviorInstanceUpdate = serde_json::from_value(put)?;
 
-    state
-        .res
-        .lock()
-        .await
-        .update::<BehaviorInstance>(&rlink.rid, |bi| *bi += upd)?;
+    match upd {
+        BehaviorInstanceUpdate::Trigger(trigger) => {
+            state
+                .behavior()
+                .trigger(BehaviorTriggerRequest {
+                    instance_id: rlink.rid,
+                    action: match trigger.trigger {
+                        BehaviorInstanceTriggerAction::Start {} => {
+                            BehaviorTriggerAction::ManualStart
+                        }
+                        BehaviorInstanceTriggerAction::Stop {} => BehaviorTriggerAction::Stop,
+                    },
+                })
+                .await?;
+        }
+        BehaviorInstanceUpdate::Configuration(upd) => {
+            state
+                .res
+                .lock()
+                .await
+                .update::<BehaviorInstance>(&rlink.rid, |bi| *bi += upd)?;
+        }
+    }
 
     V2Reply::ok(rlink)
 }

@@ -1,31 +1,155 @@
-use async_trait::async_trait;
+use std::sync::Arc;
+
 use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, mpsc};
 
 use hue::api::{
-    GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect,
-    LightTimedEffectsUpdate, LightUpdate, On, WakeupConfiguration, WakeupStyle,
+    BehaviorInstance, GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate,
+    LightTimedEffect, LightTimedEffectsUpdate, LightUpdate, On, WakeupConfiguration, WakeupStyle,
 };
+use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::error::ApiError;
-use crate::server::behavior_instance::BehaviorContext;
-use crate::server::behavior_instance::schedule::{Schedule, ScheduledBehavior};
-use crate::server::behavior_instance::service::ScheduleType;
+use crate::server::behavior_instance::schedule::{Schedule, wait_for_schedule};
+use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
 use crate::server::behavior_instance::target::{
     ExecutionTarget, ResolvedLight, SelectionPolicy, TargetResource, resolve_resources,
     select_targets,
 };
+use crate::server::behavior_instance::{BehaviorCommand, BehaviorContext, BehaviorTriggerAction};
 use crate::{error::ApiResult, resource::Resources};
 
+#[derive(Debug)]
 pub struct WakeupBehavior {
-    pub configuration: WakeupConfiguration,
+    id: Uuid,
+    instance: BehaviorInstance,
+    configuration: WakeupConfiguration,
+    context: Arc<BehaviorContext>,
+    commands: mpsc::Receiver<BehaviorCommand>,
+    execution: Option<JoinHandle<ApiResult<()>>>,
 }
 
-#[async_trait]
-impl ScheduledBehavior for WakeupBehavior {
-    fn name(&self) -> &'static str {
-        "wake up"
+impl Drop for WakeupBehavior {
+    fn drop(&mut self) {
+        self.stop_execution();
+    }
+}
+
+impl WakeupBehavior {
+    pub fn new(
+        id: Uuid,
+        instance: BehaviorInstance,
+        context: Arc<BehaviorContext>,
+        commands: mpsc::Receiver<BehaviorCommand>,
+    ) -> ApiResult<Self> {
+        let config = parse_config(&instance)?;
+        Ok(Self {
+            id,
+            instance,
+            configuration: config,
+            context,
+            commands,
+            execution: None,
+        })
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            let schedule = self.schedule_if_idle();
+
+            tokio::select! {
+                command = self.commands.recv() => {
+                    match command {
+                        Some(BehaviorCommand::Update(instance)) => {
+                            self.handle_update(*instance);
+                        }
+                        Some(BehaviorCommand::Trigger(trigger)) => {
+                            self.handle_trigger(trigger).await;
+                        }
+                        Some(BehaviorCommand::Shutdown) | None => break,
+                    }
+                }
+
+                () = wait_for_schedule(schedule, self.context.clock.clone())  => {
+                    self.handle_trigger(BehaviorTriggerAction::ScheduledStart).await;
+                }
+
+                result = wait_for_execution(&mut self.execution) => {
+                    self.execution_finished(result).await;
+                }
+            }
+        }
+    }
+
+    fn schedule_if_idle(&self) -> Option<Schedule> {
+        if !self.instance.enabled || self.execution.is_some() {
+            return None;
+        }
+
+        self.schedule()
+            .inspect_err(|err| {
+                log::error!("Failed to create wakeup schedule {}: {err}", self.id);
+            })
+            .ok()
+    }
+
+    fn handle_update(&mut self, instance: BehaviorInstance) {
+        let config = match parse_config(&instance) {
+            Ok(config) => config,
+            Err(err) => {
+                log::error!("Failed to parse wakeup config {instance:?}: {err}");
+                return;
+            }
+        };
+        if self.configuration != config {
+            self.configuration = config;
+            self.stop_execution();
+        }
+        self.instance = instance;
+    }
+
+    async fn execution_finished(&mut self, result: ApiResult<()>) {
+        self.execution = None;
+
+        match result {
+            Ok(()) => {}
+            Err(ApiError::JoinError(err)) if err.is_cancelled() => {
+                return;
+            }
+            Err(err) => {
+                log::error!("Wakeup {} task failed: {err}", self.id);
+                return;
+            }
+        }
+
+        let Ok(schedule) = self.schedule() else {
+            return;
+        };
+        match schedule.recurrence {
+            ScheduleType::Recurring(_) => {}
+            ScheduleType::Once() => {
+                disable_behavior_instance(self.id, self.context.res.clone()).await;
+            }
+        }
+    }
+
+    async fn handle_trigger(&mut self, trigger: BehaviorTriggerAction) {
+        match trigger {
+            BehaviorTriggerAction::ScheduledStart | BehaviorTriggerAction::ManualStart => {
+                self.start_execution().await;
+            }
+            BehaviorTriggerAction::Stop => {
+                self.stop_execution();
+            }
+        }
+    }
+
+    fn stop_execution(&mut self) {
+        if let Some(execution) = self.execution.take() {
+            execution.abort();
+        }
     }
 
     fn schedule(&self) -> ApiResult<Schedule> {
@@ -50,35 +174,61 @@ impl ScheduledBehavior for WakeupBehavior {
         })
     }
 
-    async fn execute(&self, ctx: &BehaviorContext) -> ApiResult<()> {
-        let config = &self.configuration;
+    async fn start_execution(&mut self) {
+        if self.execution.is_some() {
+            return;
+        }
+        let config = self.configuration.clone();
+        let ctx = self.context.clone();
         log::debug!("Running scheduled behavior instance:, {config:#?}");
         let lock = ctx.res.lock().await;
         let resolved_resources = resolve_resources(&lock, &config.where_field);
         drop(lock);
         let targets = select_targets(&resolved_resources, self);
 
+        let handle = tokio::spawn(async move { run_wakeup(ctx, config, targets).await });
+        self.execution = Some(handle);
+    }
+}
+
+async fn run_wakeup(
+    ctx: Arc<BehaviorContext>,
+    config: WakeupConfiguration,
+    targets: Vec<ExecutionTarget<WakeupStyle>>,
+) -> ApiResult<()> {
+    for target in &targets {
+        target.on(&ctx.res, &config).await.inspect_err(|err| {
+            log::warn!("Failed to turn on wake up light: {err}");
+        })?;
+    }
+
+    // wait until fade in has completed
+    // otherwise the behavior instance can be disabled before it has actually finished
+    ctx.clock.sleep(config.fade_in_duration.to_std()).await;
+
+    if let Some(duration) = &config.turn_lights_off_after {
+        ctx.clock.sleep(duration.to_std()).await;
+
         for target in &targets {
-            target.on(&ctx.res, config).await.inspect_err(|err| {
-                log::warn!("Failed to turn on wake up light: {err}");
+            target.off(&ctx.res).await.inspect_err(|err| {
+                log::warn!("Failed to turn off wake up light: {err}");
             })?;
         }
-
-        // wait until fade in has completed
-        // otherwise the behavior instance can be disabled before it has actually finished
-        ctx.clock.sleep(config.fade_in_duration.to_std()).await;
-
-        if let Some(duration) = &config.turn_lights_off_after {
-            ctx.clock.sleep(duration.to_std()).await;
-
-            for target in &targets {
-                target.off(&ctx.res).await.inspect_err(|err| {
-                    log::warn!("Failed to turn off wake up light: {err}");
-                })?;
-            }
-        }
-        Ok(())
     }
+    Ok(())
+}
+
+async fn wait_for_execution(execution: &mut Option<JoinHandle<ApiResult<()>>>) -> ApiResult<()> {
+    match execution {
+        Some(task) => task.await?,
+        None => std::future::pending().await,
+    }
+}
+
+fn parse_config(instance: &BehaviorInstance) -> ApiResult<WakeupConfiguration> {
+    Ok(serde_json::from_value::<WakeupConfiguration>(
+        instance.configuration.clone(),
+    )?)
 }
 
 impl SelectionPolicy for WakeupBehavior {

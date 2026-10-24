@@ -439,6 +439,70 @@ fn hue_sunset_effect_encodes_ending_commands() {
 }
 
 #[tokio::test]
+async fn sleep_start_trigger_runs_immediately() -> TestResult<()> {
+    let (mut test, bedroom, _light) =
+        SleepFixture::single_light(&LAMP, color_light(&LAMP, true, 128)).await?;
+    let config = configuration(
+        GoToSleepStyle::Basic,
+        GoToSleepEndState::TurnOff,
+        5,
+        vec![select_room(&bedroom)],
+    );
+    let instance = test.schedule(&config).await?;
+    let _scheduled_start = test.bridge.clock.expect_sleep(minutes(60)).await?;
+    test.bridge
+        .hue_client
+        .put(
+            &format!("/clip/v2/resource/behavior_instance/{}", instance.rid),
+            &json!({"trigger": {"start": {}}}),
+        )
+        .await?;
+
+    test.expect_basic_transition(&[&bedroom], 128.0, 447, BASIC_WHITE, minutes(1))
+        .await?;
+    test.wait(minutes(1)).await?;
+    test.expect_basic_transition(&[&bedroom], 4.0, 447, BASIC_WHITE, minutes(4))
+        .await?;
+    test.wait(minutes(4)).await?;
+    test.requests
+        .expect_set(&bedroom, json!({"state": "OFF", "transition": 0.4}))
+        .await?;
+    test.finish(instance).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn sleep_stop_trigger_cancels_active_routine() -> TestResult<()> {
+    let (mut test, bedroom, _light) =
+        SleepFixture::single_light(&LAMP, color_light(&LAMP, true, 128)).await?;
+    let config = configuration(
+        GoToSleepStyle::Basic,
+        GoToSleepEndState::TurnOff,
+        5,
+        vec![select_room(&bedroom)],
+    );
+    let instance = test.schedule(&config).await?;
+    let _scheduled_start = test.bridge.clock.expect_sleep(minutes(60)).await?;
+    let path = format!("/clip/v2/resource/behavior_instance/{}", instance.rid);
+    test.bridge
+        .hue_client
+        .put(&path, &json!({"trigger": {"start": {}}}))
+        .await?;
+    test.expect_basic_transition(&[&bedroom], 128.0, 447, BASIC_WHITE, minutes(1))
+        .await?;
+    let fade = test.bridge.clock.expect_sleep(minutes(1)).await?;
+
+    test.bridge
+        .hue_client
+        .put(&path, &json!({"trigger": {"stop": {}}}))
+        .await?;
+    fade.expect_cancelled().await;
+    test.bridge.clock.advance(minutes(6));
+    test.requests.expect_quiet().await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn basic_sleep_fades_then_turns_off_and_disables_itself() -> TestResult<()> {
     let (mut test, bedroom, _light) =
         SleepFixture::single_light(&LAMP, color_light(&LAMP, true, 128)).await?;

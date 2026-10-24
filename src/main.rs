@@ -4,6 +4,7 @@ use bifrost::backend;
 use bifrost::config;
 use bifrost::error::ApiResult;
 use bifrost::server::appstate::AppState;
+use bifrost::server::behavior_instance::BehaviorTriggerRequest;
 use bifrost::server::http::HttpServer;
 use bifrost::server::mdns::MdnsService;
 use bifrost::server::{self, Protocol};
@@ -13,6 +14,7 @@ use svc::manager::SvmClient;
 use svc::serviceid::ServiceId;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
+use tokio::sync::mpsc;
 
 /*
  * Formatter function to output in syslog format. This makes sense when running
@@ -65,7 +67,10 @@ fn init_logging() -> ApiResult<()> {
 }
 
 #[allow(clippy::similar_names)]
-async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
+async fn build_tasks(
+    appstate: &AppState,
+    behavior_trigger_rx: mpsc::Receiver<BehaviorTriggerRequest>,
+) -> ApiResult<()> {
     let bconf = &appstate.config().bridge;
     let bind_ipaddress = bconf.bind_ipaddress.unwrap_or(bconf.ipaddress);
 
@@ -125,7 +130,10 @@ async fn build_tasks(appstate: &AppState) -> ApiResult<()> {
     let svc = server::entertainment::EntertainmentWatcherService::new(appstate.res.clone());
     mgr.register_service("entertainment-watcher", svc).await?;
 
-    let svc = server::behavior_instance::BehaviorInstanceService::new(appstate.res.clone());
+    let svc = server::behavior_instance::BehaviorInstanceService::new(
+        appstate.res.clone(),
+        behavior_trigger_rx,
+    );
     mgr.register_service("behavior-instance", svc).await?;
 
     // register z2m in memory emulator
@@ -186,12 +194,13 @@ async fn run() -> ApiResult<()> {
     log::debug!("Configuration loaded successfully");
 
     let (client, future) = ServiceManager::spawn();
+    let (behavior_trigger_tx, behavior_trigger_rx) = mpsc::channel(16);
 
-    let appstate = AppState::from_config(config, client).await?;
+    let appstate = AppState::from_config(config, client, behavior_trigger_tx).await?;
 
     install_signal_handlers(&appstate)?;
 
-    build_tasks(&appstate).await?;
+    build_tasks(&appstate, behavior_trigger_rx).await?;
 
     future.await??;
 

@@ -17,7 +17,7 @@ use svc::error::SvcResult;
 use svc::manager::{ServiceManager, SvmClient};
 use svc::serviceid::ServiceId;
 use tokio::sync::broadcast::{self, Receiver};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::timeout;
 use url::Url;
@@ -144,7 +144,8 @@ impl TestBridge {
         let config = Self::create_appconfig(http_address, z2m_addresses, &workdir)?;
 
         let (svc_manager, manager_future) = ServiceManager::spawn();
-        let appstate = AppState::from_config(config, svc_manager).await?;
+        let (behavior_trigger_tx, behavior_trigger_rx) = mpsc::channel(16);
+        let appstate = AppState::from_config(config, svc_manager, behavior_trigger_tx).await?;
         {
             let mut resources = appstate.res.lock().await;
             seed(&mut resources)?;
@@ -155,6 +156,7 @@ impl TestBridge {
         let clock = TestClock::new();
         let svc = server::behavior_instance::BehaviorInstanceService::with_clock(
             appstate.res.clone(),
+            behavior_trigger_rx,
             clock.behavior_clock(),
         );
         mgr.register_service("behavior-instance", svc).await?;
