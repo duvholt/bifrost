@@ -107,11 +107,11 @@ pub enum TargetResource {
     GroupedLight(ResourceLink),
 }
 
-pub trait SelectionPolicy {
+pub trait SelectionPolicy<C> {
     type Effect: Clone + Eq;
 
     /// None means skip the light
-    fn effect_for_light(&self, light: &ResolvedLight) -> Option<Self::Effect>;
+    fn effect_for_light(&self, light: &ResolvedLight, configuration: &C) -> Option<Self::Effect>;
     /// If all lights in a group share the same effect we can issue a grouped light request instead of indivial light requests
     fn supports_grouped_light(&self, effect: &Self::Effect) -> bool;
 }
@@ -121,34 +121,36 @@ pub struct ExecutionTarget<E> {
     pub effect: E,
 }
 
-pub fn select_targets<P: SelectionPolicy>(
+pub fn select_targets<C, P: SelectionPolicy<C>>(
     resources: &[ResolvedResource],
     policy: &P,
+    configuration: &C,
 ) -> Vec<ExecutionTarget<P::Effect>> {
     let mut targets = Vec::new();
     for resource in resources {
         match resource {
             ResolvedResource::Light(light) => {
-                if let Some(effect) = policy.effect_for_light(light) {
+                if let Some(effect) = policy.effect_for_light(light, configuration) {
                     targets.push(select_light_target(light, effect));
                 }
             }
             ResolvedResource::Group(group) => {
-                targets.extend(select_group_targets(group, policy));
+                targets.extend(select_group_targets(group, policy, configuration));
             }
         }
     }
     targets
 }
 
-fn select_group_targets<P: SelectionPolicy>(
+fn select_group_targets<C, P: SelectionPolicy<C>>(
     group: &ResolvedGroup,
     policy: &P,
+    configuration: &C,
 ) -> Vec<ExecutionTarget<P::Effect>> {
     let light_effects: Vec<_> = group
         .lights
         .iter()
-        .map(|light| policy.effect_for_light(light))
+        .map(|light| policy.effect_for_light(light, configuration))
         .collect();
     if let Some(effect) = common_effect(&light_effects)
         && policy.supports_grouped_light(effect)
@@ -307,10 +309,14 @@ mod tests {
         allow_group: bool,
     }
 
-    impl SelectionPolicy for TestPolicy {
+    impl SelectionPolicy<()> for TestPolicy {
         type Effect = TestEffect;
 
-        fn effect_for_light(&self, light: &ResolvedLight) -> Option<Self::Effect> {
+        fn effect_for_light(
+            &self,
+            light: &ResolvedLight,
+            _configuration: &(),
+        ) -> Option<Self::Effect> {
             self.effects.get(&light.link).cloned()
         }
 
@@ -373,7 +379,7 @@ mod tests {
         let (resources, grouped_light_link, _, policy) =
             selection_group(&[Some(TestEffect::Basic), Some(TestEffect::Basic)]);
 
-        let selected = select_targets(&resources, &policy);
+        let selected = select_targets(&resources, &policy, &());
 
         assert_eq!(selected.len(), 1);
         let TargetResource::GroupedLight(link) = selected[0].resource else {
@@ -389,7 +395,7 @@ mod tests {
             selection_group(&[Some(TestEffect::Sunrise), Some(TestEffect::Sunrise)]);
         policy.allow_group = false;
 
-        let selected = select_targets(&resources, &policy);
+        let selected = select_targets(&resources, &policy, &());
 
         assert_selected_lights(
             &selected,
@@ -405,7 +411,7 @@ mod tests {
         let (resources, _, lights, policy) =
             selection_group(&[Some(TestEffect::Basic), Some(TestEffect::Sunrise)]);
 
-        let selected = select_targets(&resources, &policy);
+        let selected = select_targets(&resources, &policy, &());
 
         assert_selected_lights(
             &selected,
@@ -420,7 +426,7 @@ mod tests {
     fn skipped_member_prevents_group_selection() {
         let (resources, _, lights, policy) = selection_group(&[Some(TestEffect::Basic), None]);
 
-        let selected = select_targets(&resources, &policy);
+        let selected = select_targets(&resources, &policy, &());
 
         assert_selected_lights(&selected, &[(lights[0], TestEffect::Basic)]);
     }
@@ -437,7 +443,7 @@ mod tests {
             .map(ResolvedResource::Light)
             .collect();
 
-        let selected = select_targets(&individual_resources, &policy);
+        let selected = select_targets(&individual_resources, &policy, &());
 
         assert_selected_lights(&selected, &[(lights[0], TestEffect::Sunrise)]);
     }
@@ -446,8 +452,8 @@ mod tests {
     fn selects_nothing_for_empty_or_entirely_skipped_targets() {
         for effects in [vec![], vec![None, None]] {
             let (resources, _, _, policy) = selection_group(&effects);
-            assert!(select_targets(&resources, &policy).is_empty());
-            assert!(select_targets(&[], &policy).is_empty());
+            assert!(select_targets(&resources, &policy, &()).is_empty());
+            assert!(select_targets(&[], &policy, &()).is_empty());
         }
     }
 

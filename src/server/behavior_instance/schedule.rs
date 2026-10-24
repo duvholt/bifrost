@@ -2,10 +2,203 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Datelike, Days, NaiveDate, NaiveTime, TimeZone};
+use hue::api::BehaviorInstance;
+use serde::de::DeserializeOwned;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
-use crate::server::behavior_instance::BehaviorClock;
-use crate::server::behavior_instance::service::ScheduleType;
+use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
+use crate::server::behavior_instance::{
+    BehaviorClock, BehaviorCommand, BehaviorContext, BehaviorTriggerAction,
+};
+
+pub trait ScheduledBehavior {
+    type Configuration: DeserializeOwned + PartialEq + Clone;
+
+    fn schedule(&self, configuration: &Self::Configuration) -> ApiResult<Schedule>;
+
+    async fn execute(
+        &self,
+        context: Arc<BehaviorContext>,
+        configuration: &Self::Configuration,
+    ) -> impl Future<Output = ApiResult<()>> + Send + 'static;
+}
+
+pub struct ScheduledBehaviorRunner<B: ScheduledBehavior> {
+    id: Uuid,
+    instance: BehaviorInstance,
+    configuration: B::Configuration,
+    behavior: B,
+    context: Arc<BehaviorContext>,
+    commands: mpsc::Receiver<BehaviorCommand>,
+    execution: Option<JoinHandle<ApiResult<()>>>,
+}
+
+impl<B: ScheduledBehavior> Drop for ScheduledBehaviorRunner<B> {
+    fn drop(&mut self) {
+        self.stop_execution();
+    }
+}
+
+impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
+    pub fn new(
+        id: Uuid,
+        instance: BehaviorInstance,
+        behavior: B,
+        context: Arc<BehaviorContext>,
+        commands: mpsc::Receiver<BehaviorCommand>,
+    ) -> ApiResult<Self> {
+        let config = Self::parse_config(&instance)?;
+        Ok(Self {
+            id,
+            instance,
+            configuration: config,
+            behavior,
+            context,
+            commands,
+            execution: None,
+        })
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            let schedule = self.schedule_if_idle();
+
+            tokio::select! {
+                command = self.commands.recv() => {
+                    match command {
+                        Some(BehaviorCommand::Update(instance)) => {
+                            self.handle_update(*instance);
+                        }
+                        Some(BehaviorCommand::Trigger(trigger)) => {
+                            self.handle_trigger(trigger).await;
+                        }
+                        Some(BehaviorCommand::Shutdown) | None => break,
+                    }
+                }
+
+                () = wait_for_schedule(schedule, self.context.clock.clone())  => {
+                    self.handle_trigger(BehaviorTriggerAction::ScheduledStart).await;
+                }
+
+                result = wait_for_execution(&mut self.execution) => {
+                    self.execution_finished(result).await;
+                }
+            }
+        }
+    }
+
+    fn schedule_if_idle(&self) -> Option<Schedule> {
+        if !self.instance.enabled || self.execution.is_some() {
+            return None;
+        }
+
+        self.behavior
+            .schedule(&self.configuration)
+            .inspect_err(|err| {
+                log::error!("Failed to create schedule {}: {err}", self.id);
+            })
+            .ok()
+    }
+
+    fn handle_update(&mut self, instance: BehaviorInstance) {
+        let config = match Self::parse_config(&instance) {
+            Ok(config) => config,
+            Err(err) => {
+                log::error!("Failed to parse behavior config {instance:?}: {err}");
+                return;
+            }
+        };
+        if self.configuration != config {
+            self.configuration = config;
+            self.stop_execution();
+        }
+        self.instance = instance;
+    }
+
+    async fn execution_finished(&mut self, result: ApiResult<()>) {
+        self.execution = None;
+
+        match result {
+            Ok(()) => {}
+            Err(ApiError::JoinError(err)) if err.is_cancelled() => {
+                return;
+            }
+            Err(err) => {
+                log::error!("Behavior {} task failed: {err}", self.id);
+                return;
+            }
+        }
+
+        let Ok(schedule) = self.behavior.schedule(&self.configuration) else {
+            return;
+        };
+        match schedule.recurrence {
+            ScheduleType::Recurring(_) => {}
+            ScheduleType::Once() => {
+                disable_behavior_instance(self.id, self.context.res.clone()).await;
+            }
+        }
+    }
+
+    async fn handle_trigger(&mut self, trigger: BehaviorTriggerAction) {
+        match trigger {
+            BehaviorTriggerAction::ScheduledStart | BehaviorTriggerAction::ManualStart => {
+                self.start_execution().await;
+            }
+            BehaviorTriggerAction::Stop => {
+                self.stop_execution();
+            }
+        }
+    }
+
+    fn stop_execution(&mut self) {
+        if let Some(execution) = self.execution.take() {
+            execution.abort();
+        }
+    }
+
+    async fn start_execution(&mut self) {
+        if self.execution.is_some() {
+            return;
+        }
+        log::debug!("Running scheduled behavior instance");
+
+        let future = self
+            .behavior
+            .execute(self.context.clone(), &self.configuration)
+            .await;
+
+        let handle = tokio::spawn(future);
+        self.execution = Some(handle);
+    }
+
+    fn parse_config(instance: &BehaviorInstance) -> ApiResult<B::Configuration> {
+        Ok(serde_json::from_value::<B::Configuration>(
+            instance.configuration.clone(),
+        )?)
+    }
+}
+
+async fn wait_for_execution(execution: &mut Option<JoinHandle<ApiResult<()>>>) -> ApiResult<()> {
+    match execution {
+        Some(task) => task.await?,
+        None => std::future::pending().await,
+    }
+}
+
+pub async fn wait_for_schedule(schedule: Option<Schedule>, clock: Arc<dyn BehaviorClock>) {
+    let result = match &schedule {
+        Some(schedule) => schedule.wait_until_next_start(clock.clone()).await,
+        None => std::future::pending().await,
+    };
+    if let Err(err) = result {
+        log::error!("Wait until next schedule failed {err} for {schedule:?}");
+        std::future::pending::<()>().await;
+    }
+}
 
 #[derive(Debug)]
 pub struct Schedule {
@@ -66,17 +259,6 @@ impl Schedule {
         let time_until_start = (start_at - now).to_std()?;
         clock.sleep(time_until_start).await;
         Ok(())
-    }
-}
-
-pub async fn wait_for_schedule(schedule: Option<Schedule>, clock: Arc<dyn BehaviorClock>) {
-    let result = match &schedule {
-        Some(schedule) => schedule.wait_until_next_start(clock.clone()).await,
-        None => std::future::pending().await,
-    };
-    if let Err(err) = result {
-        log::error!("Wait until next schedule failed {err} for {schedule:?}");
-        std::future::pending::<()>().await;
     }
 }
 

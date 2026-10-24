@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::server::behavior_instance::hue_accessories::HueAccessoriesBehavior;
+use crate::server::behavior_instance::schedule::ScheduledBehaviorRunner;
 use crate::server::behavior_instance::sleep::GoToSleepBehavior;
 use crate::server::behavior_instance::wakeup::WakeupBehavior;
 use crate::server::behavior_instance::{
@@ -93,12 +94,14 @@ impl BehaviorInstanceService {
 
         let job = match bi.script_id {
             BehaviorScript::WAKE_UP_ID => {
-                let behavior = WakeupBehavior::new(rid, bi, context, receiver)?;
+                let behavior =
+                    ScheduledBehaviorRunner::new(rid, bi, WakeupBehavior, context, receiver)?;
                 let task = tokio::spawn(async move { behavior.run().await });
                 BehaviorHandle { commands, task }
             }
             BehaviorScript::GO_TO_SLEEP_ID => {
-                let behavior = GoToSleepBehavior::new(rid, bi, context, receiver)?;
+                let behavior =
+                    ScheduledBehaviorRunner::new(rid, bi, GoToSleepBehavior, context, receiver)?;
                 let task = tokio::spawn(async move { behavior.run().await });
                 BehaviorHandle { commands, task }
             }
