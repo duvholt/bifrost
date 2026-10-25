@@ -121,10 +121,15 @@ impl BehaviorInstanceService {
         let bi = self.get_behavior_instance(rid).await?;
         match self.handles.get_mut(&rid) {
             Some(handle) => {
-                handle
+                if handle
                     .commands
                     .send(BehaviorCommand::Update(Box::new(bi)))
-                    .await?;
+                    .await
+                    .is_err()
+                {
+                    // a failed send likely means the behavior has crashed so let's recreate it instead
+                    self.new_job(rid).await?;
+                }
             }
             None => {
                 self.new_job(rid).await?;
