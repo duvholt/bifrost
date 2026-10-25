@@ -19,6 +19,7 @@ use crate::server::hueevents::HueEventRecord;
 
 #[derive(Debug)]
 pub struct HueAccessoriesBehavior {
+    enabled: bool,
     configuration: HueAccessoriesConfiguration,
     context: Arc<BehaviorContext>,
     commands: mpsc::Receiver<BehaviorCommand>,
@@ -35,6 +36,7 @@ impl HueAccessoriesBehavior {
     ) -> ApiResult<Self> {
         let configuration = parse_config(instance)?;
         Ok(Self {
+            enabled: instance.enabled,
             configuration,
             context,
             commands,
@@ -56,13 +58,16 @@ impl HueAccessoriesBehavior {
                     }
                 },
                 event = hue_events.recv() => {
-                    self.handle_hue_event(event).await;
+                    if self.enabled {
+                        self.handle_hue_event(event).await;
+                    }
                 }
             }
         }
     }
 
     fn handle_update(&mut self, instance: &BehaviorInstance) {
+        self.enabled = instance.enabled;
         match parse_config(instance) {
             Ok(configuration) => {
                 self.configuration = configuration;
