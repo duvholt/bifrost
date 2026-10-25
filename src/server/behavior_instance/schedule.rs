@@ -124,8 +124,10 @@ impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
         let config = match Self::parse_config(&instance) {
             Ok(config) => config,
             Err(err) => {
-                log::error!("Failed to parse behavior config {instance:?}: {err}");
-                return false;
+                log::error!(
+                    "Failed to parse behavior config {instance:?}: {err}. Reusing old config"
+                );
+                self.configuration.clone()
             }
         };
         let changed = self.configuration != config || self.instance.enabled != instance.enabled;
