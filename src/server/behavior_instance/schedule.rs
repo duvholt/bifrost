@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Days, NaiveDate, NaiveTime, TimeZone};
+use futures::future::BoxFuture;
 use hue::api::BehaviorInstance;
 use serde::de::DeserializeOwned;
 use tokio::sync::mpsc;
@@ -14,8 +16,9 @@ use crate::server::behavior_instance::{
     BehaviorClock, BehaviorCommand, BehaviorContext, BehaviorTriggerAction,
 };
 
-pub trait ScheduledBehavior {
-    type Configuration: DeserializeOwned + PartialEq + Clone;
+#[async_trait]
+pub trait ScheduledBehavior: Send + Sync {
+    type Configuration: DeserializeOwned + PartialEq + Clone + Send + Sync;
 
     fn schedule(&self, configuration: &Self::Configuration) -> ApiResult<Schedule>;
 
@@ -24,7 +27,7 @@ pub trait ScheduledBehavior {
         id: Uuid,
         context: Arc<BehaviorContext>,
         configuration: &Self::Configuration,
-    ) -> impl Future<Output = ApiResult<()>> + Send + 'static;
+    ) -> BoxFuture<'static, ApiResult<()>>;
 
     async fn on_stop(&self, id: Uuid, context: &BehaviorContext);
 }

@@ -8,9 +8,11 @@ use crate::server::behavior_instance::target::{
     select_targets,
 };
 use crate::server::behavior_instance::{BehaviorContext, service::ScheduleType};
+use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
-use futures::future::try_join_all;
+use futures::FutureExt;
+use futures::future::{BoxFuture, try_join_all};
 use hue::api::{
     BehaviorInstance, DimmingDeltaUpdate, GoToSleepConfiguration, GoToSleepEndState,
     GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect,
@@ -87,6 +89,7 @@ impl GoToSleepBehavior {
     }
 }
 
+#[async_trait]
 impl ScheduledBehavior for GoToSleepBehavior {
     type Configuration = GoToSleepConfiguration;
 
@@ -115,14 +118,14 @@ impl ScheduledBehavior for GoToSleepBehavior {
         id: Uuid,
         context: Arc<BehaviorContext>,
         configuration: &Self::Configuration,
-    ) -> impl Future<Output = ApiResult<()>> + Send + 'static {
+    ) -> BoxFuture<'static, ApiResult<()>> {
         let lock = context.res.lock().await;
         let resolved_resources = resolve_resources(&lock, &configuration.where_field);
         drop(lock);
         let targets = select_targets(&resolved_resources, self, configuration);
 
         let configuration = configuration.clone();
-        Self::run_go_to_sleep(id, context, configuration, targets)
+        Self::run_go_to_sleep(id, context, configuration, targets).boxed()
     }
 
     async fn on_stop(&self, id: Uuid, context: &BehaviorContext) {

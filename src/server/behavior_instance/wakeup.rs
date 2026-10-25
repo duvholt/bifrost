@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -51,6 +54,7 @@ impl WakeupBehavior {
     }
 }
 
+#[async_trait]
 impl ScheduledBehavior for WakeupBehavior {
     type Configuration = WakeupConfiguration;
 
@@ -81,14 +85,14 @@ impl ScheduledBehavior for WakeupBehavior {
         _id: Uuid,
         context: Arc<BehaviorContext>,
         configuration: &Self::Configuration,
-    ) -> impl Future<Output = ApiResult<()>> + Send + 'static {
+    ) -> BoxFuture<'static, ApiResult<()>> {
         let lock = context.res.lock().await;
         let resolved_resources = resolve_resources(&lock, &configuration.where_field);
         drop(lock);
         let targets = select_targets(&resolved_resources, self, configuration);
 
         let configuration = configuration.clone();
-        Self::run_wakeup(context, configuration, targets)
+        Self::run_wakeup(context, configuration, targets).boxed()
     }
 
     async fn on_stop(&self, _id: Uuid, _context: &BehaviorContext) {}
