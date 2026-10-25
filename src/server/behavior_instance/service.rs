@@ -92,7 +92,7 @@ impl BehaviorInstanceService {
         let (commands, receiver) = mpsc::channel(16);
         let context = Arc::new(BehaviorContext::new(self.res.clone(), self.clock.clone()));
 
-        let job = match bi.script_id {
+        let handle = match bi.script_id {
             BehaviorScript::WAKE_UP_ID => {
                 let behavior =
                     ScheduledBehaviorRunner::new(rid, bi, WakeupBehavior, context, receiver)?;
@@ -113,15 +113,16 @@ impl BehaviorInstanceService {
             _ => return Ok(()),
         };
 
-        self.handles.insert(rid, job);
+        self.handles.insert(rid, handle);
         Ok(())
     }
 
     async fn update_job(&mut self, rid: Uuid) -> ApiResult<()> {
         let bi = self.get_behavior_instance(rid).await?;
         match self.handles.get_mut(&rid) {
-            Some(job) => {
-                job.commands
+            Some(handle) => {
+                handle
+                    .commands
                     .send(BehaviorCommand::Update(Box::new(bi)))
                     .await?;
             }
@@ -195,7 +196,9 @@ impl Service for BehaviorInstanceService {
 
     async fn configure(&mut self) -> Result<(), Self::Error> {
         for rid in self.get_all_behavior_instances().await {
-            self.new_job(rid).await?;
+            if let Err(err) = self.new_job(rid).await {
+                log::error!("Failed to create behavior instance for: {rid}: {err}");
+            }
         }
 
         Ok(())
