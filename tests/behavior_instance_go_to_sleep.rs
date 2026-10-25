@@ -148,6 +148,22 @@ impl SleepFixture {
             .await
     }
 
+    async fn expect_sleep_state(
+        &self,
+        instance: ResourceLink,
+        enabled: bool,
+        state: serde_json::Value,
+    ) -> TestResult<()> {
+        let behavior = self
+            .bridge
+            .hue_client
+            .get_behavior_instance(instance)
+            .await?;
+        assert_eq!(behavior.enabled, enabled);
+        assert_eq!(behavior.state, Some(state));
+        Ok(())
+    }
+
     async fn wait(&mut self, duration: Duration) -> TestResult<()> {
         self.wait_for_targets(duration, 1).await
     }
@@ -450,6 +466,11 @@ async fn sleep_start_trigger_runs_immediately() -> TestResult<()> {
     );
     let instance = test.schedule(&config).await?;
     let _scheduled_start = test.bridge.clock.expect_sleep(minutes(60)).await?;
+    test.expect_sleep_state(instance, true, json!({"gts_state": "stopped"}))
+        .await?;
+    test.bridge.clock.advance(Duration::from_millis(895));
+    let fade_end_time = test.bridge.clock.behavior_clock().now()
+        + chrono::Duration::seconds(i64::from(config.fade_out_duration.seconds));
     test.bridge
         .hue_client
         .put(
@@ -460,6 +481,12 @@ async fn sleep_start_trigger_runs_immediately() -> TestResult<()> {
 
     test.expect_basic_transition(&[&bedroom], 128.0, 447, BASIC_WHITE, minutes(1))
         .await?;
+    test.expect_sleep_state(
+        instance,
+        true,
+        json!({"gts_state": "started", "fade_end_time": fade_end_time}),
+    )
+    .await?;
     test.wait(minutes(1)).await?;
     test.expect_basic_transition(&[&bedroom], 4.0, 447, BASIC_WHITE, minutes(4))
         .await?;
@@ -473,14 +500,24 @@ async fn sleep_start_trigger_runs_immediately() -> TestResult<()> {
 
 #[tokio::test]
 async fn sleep_stop_trigger_cancels_active_routine() -> TestResult<()> {
+    check_sleep_stop(None).await
+}
+
+#[tokio::test]
+async fn recurring_sleep_stop_stays_enabled() -> TestResult<()> {
+    check_sleep_stop(Some(vec![Weekday::Wed])).await
+}
+
+async fn check_sleep_stop(recurrence_days: Option<Vec<Weekday>>) -> TestResult<()> {
     let (mut test, bedroom, _light) =
         SleepFixture::single_light(&LAMP, color_light(&LAMP, true, 128)).await?;
-    let config = configuration(
+    let mut config = configuration(
         GoToSleepStyle::Basic,
         GoToSleepEndState::TurnOff,
         5,
         vec![select_room(&bedroom)],
     );
+    config.when.recurrence_days = recurrence_days;
     let instance = test.schedule(&config).await?;
     let _scheduled_start = test.bridge.clock.expect_sleep(minutes(60)).await?;
     let path = format!("/clip/v2/resource/behavior_instance/{}", instance.rid);
@@ -499,7 +536,12 @@ async fn sleep_stop_trigger_cancels_active_routine() -> TestResult<()> {
     fade.expect_cancelled().await;
     test.bridge.clock.advance(minutes(6));
     test.requests.expect_quiet().await?;
-    Ok(())
+    test.expect_sleep_state(
+        instance,
+        config.when.recurrence_days.is_some(),
+        json!({"gts_state": "stopped"}),
+    )
+    .await
 }
 
 #[tokio::test]

@@ -12,21 +12,32 @@ use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
 use futures::future::try_join_all;
 use hue::api::{
-    DimmingDeltaUpdate, GoToSleepConfiguration, GoToSleepEndState, GroupedLightDynamicsUpdate,
-    GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect, LightTimedEffectsUpdate,
-    LightUpdate, On,
+    BehaviorInstance, DimmingDeltaUpdate, GoToSleepConfiguration, GoToSleepEndState,
+    GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect,
+    LightTimedEffectsUpdate, LightUpdate, On,
 };
 use hue::xy::XY;
+use serde_json::json;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct GoToSleepBehavior;
 
 impl GoToSleepBehavior {
     async fn run_go_to_sleep(
+        id: Uuid,
         ctx: Arc<BehaviorContext>,
         config: GoToSleepConfiguration,
         targets: Vec<ExecutionTarget<GoToSleepStyle>>,
     ) -> ApiResult<()> {
+        ctx.res.lock().await.update::<BehaviorInstance>(&id, |bi| {
+            let end_time = ctx.clock.now() + config.fade_out_duration.to_std();
+            bi.state = Some(json!({
+              "gts_state": "started",
+              "fade_end_time": end_time
+            }));
+        })?;
+
         let duration = config.fade_out_duration.to_std();
         try_join_all(
             targets
@@ -101,6 +112,7 @@ impl ScheduledBehavior for GoToSleepBehavior {
 
     async fn execute(
         &self,
+        id: Uuid,
         context: Arc<BehaviorContext>,
         configuration: &Self::Configuration,
     ) -> impl Future<Output = ApiResult<()>> + Send + 'static {
@@ -110,7 +122,22 @@ impl ScheduledBehavior for GoToSleepBehavior {
         let targets = select_targets(&resolved_resources, self, configuration);
 
         let configuration = configuration.clone();
-        Self::run_go_to_sleep(context, configuration, targets)
+        Self::run_go_to_sleep(id, context, configuration, targets)
+    }
+
+    async fn on_stop(&self, id: Uuid, context: &BehaviorContext) {
+        let result = context
+            .res
+            .lock()
+            .await
+            .update::<BehaviorInstance>(&id, |bi| {
+                bi.state = Some(json!({
+                  "gts_state": "stopped"
+                }));
+            });
+        if let Err(err) = result {
+            log::error!("Failed to set stopped state: {err}");
+        }
     }
 }
 

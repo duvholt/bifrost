@@ -21,9 +21,12 @@ pub trait ScheduledBehavior {
 
     async fn execute(
         &self,
+        id: Uuid,
         context: Arc<BehaviorContext>,
         configuration: &Self::Configuration,
     ) -> impl Future<Output = ApiResult<()>> + Send + 'static;
+
+    async fn on_stop(&self, id: Uuid, context: &BehaviorContext);
 }
 
 pub struct ScheduledBehaviorRunner<B: ScheduledBehavior> {
@@ -63,29 +66,43 @@ impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
     }
 
     pub async fn run(mut self) {
-        loop {
-            let schedule = self.schedule_if_idle();
+        self.behavior.on_stop(self.id, &self.context).await;
 
-            tokio::select! {
+        let mut schedule_wait = Box::pin(wait_for_schedule(
+            self.schedule_if_idle(),
+            self.context.clock.clone(),
+        ));
+
+        loop {
+            let reschedule = tokio::select! {
                 command = self.commands.recv() => {
                     match command {
                         Some(BehaviorCommand::Update(instance)) => {
-                            self.handle_update(*instance);
+                            self.handle_update(*instance).await
                         }
                         Some(BehaviorCommand::Trigger(trigger)) => {
                             self.handle_trigger(trigger).await;
+                            true
                         }
                         Some(BehaviorCommand::Shutdown) | None => break,
                     }
                 }
 
-                () = wait_for_schedule(schedule, self.context.clock.clone())  => {
+                () = &mut schedule_wait => {
                     self.handle_trigger(BehaviorTriggerAction::ScheduledStart).await;
+                    true
                 }
 
                 result = wait_for_execution(&mut self.execution) => {
                     self.execution_finished(result).await;
+                    true
                 }
+            };
+            if reschedule {
+                schedule_wait = Box::pin(wait_for_schedule(
+                    self.schedule_if_idle(),
+                    self.context.clock.clone(),
+                ));
             }
         }
     }
@@ -103,23 +120,27 @@ impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
             .ok()
     }
 
-    fn handle_update(&mut self, instance: BehaviorInstance) {
+    async fn handle_update(&mut self, instance: BehaviorInstance) -> bool {
         let config = match Self::parse_config(&instance) {
             Ok(config) => config,
             Err(err) => {
                 log::error!("Failed to parse behavior config {instance:?}: {err}");
-                return;
+                return false;
             }
         };
+        let changed = self.configuration != config || self.instance.enabled != instance.enabled;
         if self.configuration != config {
             self.configuration = config;
             self.stop_execution();
+            self.behavior.on_stop(self.id, &self.context).await;
         }
         self.instance = instance;
+        changed
     }
 
     async fn execution_finished(&mut self, result: ApiResult<()>) {
         self.execution = None;
+        self.behavior.on_stop(self.id, &self.context).await;
 
         match result {
             Ok(()) => {}
@@ -132,6 +153,10 @@ impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
             }
         }
 
+        self.disable_once_instance().await;
+    }
+
+    async fn disable_once_instance(&self) {
         let Ok(schedule) = self.behavior.schedule(&self.configuration) else {
             return;
         };
@@ -150,6 +175,8 @@ impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
             }
             BehaviorTriggerAction::Stop => {
                 self.stop_execution();
+                self.disable_once_instance().await;
+                self.behavior.on_stop(self.id, &self.context).await;
             }
         }
     }
@@ -168,7 +195,7 @@ impl<B: ScheduledBehavior> ScheduledBehaviorRunner<B> {
 
         let future = self
             .behavior
-            .execute(self.context.clone(), &self.configuration)
+            .execute(self.id, self.context.clone(), &self.configuration)
             .await;
 
         let handle = tokio::spawn(future);

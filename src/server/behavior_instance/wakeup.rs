@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::server::behavior_instance::BehaviorContext;
@@ -77,6 +78,7 @@ impl ScheduledBehavior for WakeupBehavior {
 
     async fn execute(
         &self,
+        _id: Uuid,
         context: Arc<BehaviorContext>,
         configuration: &Self::Configuration,
     ) -> impl Future<Output = ApiResult<()>> + Send + 'static {
@@ -88,6 +90,8 @@ impl ScheduledBehavior for WakeupBehavior {
         let configuration = configuration.clone();
         Self::run_wakeup(context, configuration, targets)
     }
+
+    async fn on_stop(&self, _id: Uuid, _context: &BehaviorContext) {}
 }
 
 impl SelectionPolicy<WakeupConfiguration> for WakeupBehavior {
