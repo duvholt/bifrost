@@ -4,69 +4,106 @@ use std::sync::Arc;
 use bifrost_api::backend::BackendRequest;
 use chrono::NaiveTime;
 use hue::api::{
-    Action, BridgeHome, Button, ButtonAction, ButtonConfiguration, ButtonEvent, DimmingDeltaAction,
-    DimmingDeltaUpdate, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate,
+    Action, BehaviorInstance, BridgeHome, Button, ButtonAction, ButtonConfiguration, ButtonEvent,
+    DimmingDeltaAction, DimmingDeltaUpdate, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate,
     HueAccessoriesConfiguration, On, RType, Resource, ResourceLink, SceneActive, SceneStatus,
     SceneUpdate, TimeBasedExtendedSlot, configuration,
 };
 use hue::event::Event;
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, mpsc};
 use uuid::Uuid;
 
-use crate::error::ApiError;
-use crate::resource::Resources;
-use crate::server::behavior_instance::BehaviorClock;
+use crate::error::{ApiError, ApiResult};
+use crate::server::behavior_instance::{BehaviorCommand, BehaviorContext};
+use crate::server::hueevents::HueEventRecord;
 
-pub struct HueAccessoriesJob {
-    pub configuration: HueAccessoriesConfiguration,
-    pub res: Arc<Mutex<Resources>>,
-    clock: Arc<dyn BehaviorClock>,
+#[derive(Debug)]
+pub struct HueAccessoriesBehavior {
+    enabled: bool,
+    configuration: HueAccessoriesConfiguration,
+    context: Arc<BehaviorContext>,
+    commands: mpsc::Receiver<BehaviorCommand>,
     next_scene_slots: HashMap<Uuid, usize>,
 }
 
-impl HueAccessoriesJob {
+impl HueAccessoriesBehavior {
     const BRIGHTNESS_DELTA: f64 = 20.0;
 
     pub fn new(
-        configuration: HueAccessoriesConfiguration,
-        res: Arc<Mutex<Resources>>,
-        clock: Arc<dyn BehaviorClock>,
-    ) -> Self {
-        Self {
+        instance: &BehaviorInstance,
+        context: Arc<BehaviorContext>,
+        commands: mpsc::Receiver<BehaviorCommand>,
+    ) -> ApiResult<Self> {
+        let configuration = parse_config(instance)?;
+        Ok(Self {
+            enabled: instance.enabled,
             configuration,
-            res,
-            clock,
+            context,
+            commands,
             next_scene_slots: HashMap::new(),
+        })
+    }
+
+    pub async fn run(mut self) {
+        let mut hue_events = self.context.res.lock().await.hue_event_stream().subscribe();
+        loop {
+            tokio::select! {
+                command = self.commands.recv() => {
+                    match command {
+                        Some(BehaviorCommand::Update(instance)) => {
+                            self.handle_update(&instance);
+                        }
+                        Some(BehaviorCommand::Trigger(_)) => {}
+                        Some(BehaviorCommand::Shutdown) | None => break,
+                    }
+                },
+                event = hue_events.recv() => {
+                    if self.enabled {
+                        self.handle_hue_event(event).await;
+                    }
+                }
+            }
         }
     }
 
-    pub async fn create(mut self) {
-        let mut hue_events = self.res.lock().await.hue_event_stream().subscribe();
+    fn handle_update(&mut self, instance: &BehaviorInstance) {
+        self.enabled = instance.enabled;
+        match parse_config(instance) {
+            Ok(configuration) => {
+                self.configuration = configuration;
+                self.next_scene_slots = HashMap::new();
+            }
+            Err(err) => {
+                log::error!("Failed to parse Hue accessories {err}. Keeping previous config");
+            }
+        }
+    }
 
-        loop {
-            let event = hue_events.recv().await;
-            match event {
-                Ok(event) => match event.block.event {
-                    Event::Add(_add) => {}
-                    Event::Update(update) => {
-                        for obj in update.data {
-                            if RType::Button == obj.rtype
-                                && let Some(button_configuration) =
-                                    self.configuration.buttons.get(&obj.id)
-                                && let Err(err) = self
-                                    .handle_button_update(obj.id, button_configuration.clone())
-                                    .await
-                            {
-                                log::error!("Error while handling button update {err}");
-                            }
+    async fn handle_hue_event(
+        &mut self,
+        event: Result<HueEventRecord, broadcast::error::RecvError>,
+    ) {
+        match event {
+            Ok(event) => match event.block.event {
+                Event::Add(_add) => {}
+                Event::Update(update) => {
+                    for obj in update.data {
+                        if RType::Button == obj.rtype
+                            && let Some(button_configuration) =
+                                self.configuration.buttons.get(&obj.id)
+                            && let Err(err) = self
+                                .handle_button_update(obj.id, button_configuration.clone())
+                                .await
+                        {
+                            log::error!("Error while handling button update {err}");
                         }
                     }
-                    Event::Delete(_delete) => {}
-                    Event::Error(_error) => {}
-                },
-                Err(err) => {
-                    log::error!("Failed to read event {err}");
                 }
+                Event::Delete(_delete) => {}
+                Event::Error(_error) => {}
+            },
+            Err(err) => {
+                log::error!("Failed to read event {err}");
             }
         }
     }
@@ -75,8 +112,8 @@ impl HueAccessoriesJob {
         &mut self,
         rid: Uuid,
         button_configuration: ButtonConfiguration,
-    ) -> Result<(), ApiError> {
-        let button_update = self.res.lock().await.get_id::<Button>(rid)?.clone();
+    ) -> ApiResult<()> {
+        let button_update = self.context.res.lock().await.get_id::<Button>(rid)?.clone();
         let Some(button_report) = button_update.button.button_report else {
             return Ok(());
         };
@@ -128,11 +165,11 @@ impl HueAccessoriesJob {
         rid: Uuid,
         button_action: &ButtonAction,
         where_field: &[configuration::Where],
-    ) -> Result<(), ApiError> {
+    ) -> ApiResult<()> {
         let actions: Vec<&Action> = match button_action {
             ButtonAction::TimeBasedExtended(time_based_extended) => {
                 // todo: implement WithOff
-                let current_time = self.clock.local_now().time();
+                let current_time = self.context.clock.local_now().time();
 
                 let Some(current_slot) =
                     find_current_time_slot(&time_based_extended.slots, current_time)
@@ -168,13 +205,13 @@ impl HueAccessoriesJob {
         &self,
         actions: &[&Action],
         where_configs: &[configuration::Where],
-    ) -> Result<(), ApiError> {
+    ) -> ApiResult<()> {
         for (i, action) in actions.iter().enumerate() {
             let where_config = where_configs.get(i);
             match action {
                 Action::DoNothing => {}
                 Action::HomeOff => {
-                    let lock = self.res.lock().await;
+                    let lock = self.context.res.lock().await;
                     for bridge_home in lock.get_resources_by_type(RType::BridgeHome) {
                         let bridge_home: BridgeHome = bridge_home.obj.try_into()?;
                         if let Some(grouped_light_link) = bridge_home.grouped_light_service() {
@@ -195,7 +232,7 @@ impl HueAccessoriesJob {
                             grouped_light_link,
                             GroupedLightUpdate::new().with_on(On::new(false)),
                         );
-                        self.res.lock().await.backend_request(request)?;
+                        self.context.res.lock().await.backend_request(request)?;
                     }
                 }
                 Action::LastOn => {
@@ -206,7 +243,7 @@ impl HueAccessoriesJob {
                             grouped_light_link,
                             GroupedLightUpdate::new().with_on(On::new(true)),
                         );
-                        self.res.lock().await.backend_request(request)?;
+                        self.context.res.lock().await.backend_request(request)?;
                     }
                 }
                 Action::DimDown => {
@@ -228,7 +265,7 @@ impl HueAccessoriesJob {
                             last_recall: None,
                         })),
                     );
-                    self.res.lock().await.backend_request(request)?;
+                    self.context.res.lock().await.backend_request(request)?;
                 }
             }
         }
@@ -239,7 +276,7 @@ impl HueAccessoriesJob {
         &self,
         where_config: Option<&configuration::Where>,
         dimming_delta_action: DimmingDeltaAction,
-    ) -> Result<(), ApiError> {
+    ) -> ApiResult<()> {
         if let Some(grouped_light) = self.get_grouped_light_link(where_config).await? {
             let request = BackendRequest::GroupedLightUpdate(
                 grouped_light,
@@ -252,7 +289,7 @@ impl HueAccessoriesJob {
                         GroupedLightDynamicsUpdate::new().with_duration(Some(1000u32)),
                     )),
             );
-            self.res.lock().await.backend_request(request)?;
+            self.context.res.lock().await.backend_request(request)?;
         }
         Ok(())
     }
@@ -264,13 +301,24 @@ impl HueAccessoriesJob {
         let Some(where_config) = where_config else {
             return Ok(None);
         };
-        let resource = self.res.lock().await.get_resource(&where_config.group)?;
+        let resource = self
+            .context
+            .res
+            .lock()
+            .await
+            .get_resource(&where_config.group)?;
         match resource.obj {
             Resource::Room(room) => Ok(room.grouped_light_service().copied()),
             Resource::Zone(zone) => Ok(zone.grouped_light_service().copied()),
             _ => Ok(None),
         }
     }
+}
+
+fn parse_config(instance: &BehaviorInstance) -> ApiResult<HueAccessoriesConfiguration> {
+    Ok(serde_json::from_value::<HueAccessoriesConfiguration>(
+        instance.configuration.clone(),
+    )?)
 }
 
 fn find_current_time_slot(

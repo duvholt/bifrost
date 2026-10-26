@@ -257,7 +257,7 @@ async fn wakeup_fades_multiple_rooms_and_selected_lights_then_turns_them_off() -
         },
     ];
 
-    // Two whole rooms, plus two selected lights in a third room.
+    // One already-on room, one eligible room, plus selected lights in a third room.
     let [
         bedroom_light,
         guest_light,
@@ -267,7 +267,7 @@ async fn wakeup_fades_multiple_rooms_and_selected_lights_then_turns_them_off() -
         already_on_light,
     ] = LIGHTS
         .map(|device| fixture::ikea::tradfri_color(&device).with_state(json!({"state": "OFF"})));
-    // Basic whole-room fades include already-on members in the group commands.
+    // Already-on lights receive neither fade nor off commands
     let bedroom_light = bedroom_light.with_state(json!({"state": "ON"}));
     let already_on_light = already_on_light.with_state(json!({"state": "ON"}));
     let bedroom = Z2mGroupFixture::new(&ROOMS[0])
@@ -338,9 +338,7 @@ async fn wakeup_fades_multiple_rooms_and_selected_lights_then_turns_them_off() -
 
     expect_quiet_sleep_and_advance(&mut test, &mut requests, Duration::from_mins(50)).await?;
 
-    for room in [&bedroom, &guest_room] {
-        expect_grouped_fade(&mut requests, room, 80.0, Duration::from_mins(10)).await?;
-    }
+    expect_grouped_fade(&mut requests, &guest_room, 80.0, Duration::from_mins(10)).await?;
     for light in selected_lights {
         expect_individual_fade(&mut requests, light, 80.0, Duration::from_mins(10)).await?;
     }
@@ -356,9 +354,9 @@ async fn wakeup_fades_multiple_rooms_and_selected_lights_then_turns_them_off() -
     test.clock.advance(Duration::from_mins(5));
     delay.release();
 
-    for room in [&bedroom, &guest_room] {
-        requests.expect_set(room, json!({"state": "OFF"})).await?;
-    }
+    requests
+        .expect_set(&guest_room, json!({"state": "OFF"}))
+        .await?;
     for light in selected_lights {
         requests.expect_set(light, json!({"state": "OFF"})).await?;
     }
@@ -372,7 +370,26 @@ async fn wakeup_fades_multiple_rooms_and_selected_lights_then_turns_them_off() -
 
 #[tokio::test]
 async fn recurring_wakeup_stays_enabled_and_runs_on_next_selected_weekday() -> TestResult<()> {
-    let WakeupFixture { mut test, room, .. } = wakeup_fixture(wednesday_at_six()).await?;
+    const ALREADY_ON: FixtureDevice = FixtureDevice {
+        id: 2,
+        friendly_name: "already_on",
+    };
+    let basic = fixture::ikea::tradfri_color(&BASIC_LIGHT).with_state(json!({"state": "OFF"}));
+    let already_on = fixture::ikea::tradfri_color(&ALREADY_ON).with_state(json!({"state": "ON"}));
+    let room = Z2mGroupFixture::new(&BEDROOM)
+        .with_member(&basic)
+        .with_member(&already_on)
+        .with_state(json!({"state": "OFF"}));
+    let state = Z2mFixture::new()
+        .with_device(basic)
+        .with_device(already_on)
+        .with_group(room)
+        .into_state();
+    let mut test = TestBridge::start(state).await?;
+    test.clock.set_now(wednesday_at_six());
+    let basic = test.wait_for_light(BASIC_LIGHT).await?;
+    test.wait_for_light(ALREADY_ON).await?;
+    let room = test.wait_for_room(&BEDROOM).await?;
     // January 1, 2020 is Wednesday. Thursday must be skipped.
     let mut config = one_time_basic_wakeup_configuration(
         80.0,
@@ -392,7 +409,8 @@ async fn recurring_wakeup_stays_enabled_and_runs_on_next_selected_weekday() -> T
         .await?;
 
     expect_quiet_sleep_and_advance(&mut test, &mut requests, Duration::from_mins(50)).await?;
-    expect_grouped_fade(&mut requests, &room, 80.0, Duration::from_mins(10)).await?;
+    // The already-on member prevents grouping; only the off light participates.
+    expect_individual_fade(&mut requests, &basic, 80.0, Duration::from_mins(10)).await?;
     expect_quiet_sleep_and_advance(&mut test, &mut requests, Duration::from_mins(10)).await?;
 
     let until_friday = Duration::from_mins(2 * 24 * 60 - 10);
@@ -404,7 +422,7 @@ async fn recurring_wakeup_stays_enabled_and_runs_on_next_selected_weekday() -> T
     test.clock.advance(until_friday);
     next.release();
 
-    expect_grouped_fade(&mut requests, &room, 80.0, Duration::from_mins(10)).await?;
+    expect_individual_fade(&mut requests, &basic, 80.0, Duration::from_mins(10)).await?;
     expect_quiet_sleep_and_advance(&mut test, &mut requests, Duration::from_mins(10)).await?;
     let _next = test
         .clock
@@ -459,7 +477,7 @@ async fn sunrise_wakeup_uses_individual_effect_and_basic_fallback_in_mixed_room(
                     0xB3, 0x00, // Flags: on/off, brightness, fade speed, effect, effect speed
                     0x01,       // On
                     203,        // 80% brightness
-                    0x01, 0x00, // Fade speed
+                    0x04, 0x00, // 400 ms fade
                     0x09,       // Sunrise effect
                     125         // Ten-minute effect duration
                 ]}
@@ -484,7 +502,7 @@ async fn sunrise_wakeup_uses_individual_effect_and_basic_fallback_in_mixed_room(
                 format!("{}/set", hue.topic()),
                 json!({"command": {
                     "cluster": 0xFC03, "command": 0,
-                    "payload": {"data": [0x11, 0x00, 0x00, 0x01, 0x00]}
+                    "payload": {"data": [0x11, 0x00, 0x00, 0x04, 0x00]}
                 }}),
             ),
             (format!("{}/get", hue.topic()), json!({"state": ""})),

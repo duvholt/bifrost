@@ -46,6 +46,31 @@ impl BehaviorScript {
         }
     }
 
+    pub const GO_TO_SLEEP_ID: Uuid = uuid!("7e571ac6-f363-42e1-809a-4cbf6523ed72");
+
+    #[must_use]
+    pub fn go_to_sleep() -> Self {
+        Self {
+            configuration_schema: DollarRef {
+                dref: Some("goto_sleep_config.json#".to_string()),
+            },
+            description: "Get ready for nice sleep.".to_string(),
+            max_number_instances: None,
+            metadata: BehaviorScriptMetadata {
+                name: "Go to sleep routines".to_string(),
+                category: "automation".to_string(),
+            },
+            state_schema: DollarRef {
+                dref: Some("goto_sleep_state.json#".to_string()),
+            },
+            supported_features: vec!["style_sunset_gts".to_string()],
+            trigger_schema: DollarRef {
+                dref: Some("trigger.json#".to_string()),
+            },
+            version: "0.0.1".to_string(),
+        }
+    }
+
     pub const HUE_ACCESSORIES_ID: Uuid = uuid!("67d9395b-4403-42cc-b5f0-740b699d67c6");
 
     #[must_use]
@@ -106,6 +131,7 @@ pub struct BehaviorInstance {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum BehaviorInstanceConfiguration {
     Wakeup(WakeupConfiguration),
+    GoToSleep(GoToSleepConfiguration),
     HueAccessories(HueAccessoriesConfiguration),
 }
 
@@ -127,6 +153,31 @@ pub struct WakeupConfiguration {
 pub enum WakeupStyle {
     Sunrise,
     Basic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GoToSleepConfiguration {
+    pub end_state: GoToSleepEndState,
+    pub fade_out_duration: configuration::Duration,
+    pub style: GoToSleepStyle,
+    pub when: configuration::When,
+    #[serde(rename = "where")]
+    pub where_field: Vec<configuration::Where>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GoToSleepStyle {
+    Basic,
+    Sunset,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GoToSleepEndState {
+    TurnOff,
+    MinimumBrightness,
+    Nightlight,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -284,14 +335,33 @@ pub struct BehaviorInstanceNew {
     pub script_id: Uuid,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum BehaviorInstanceUpdate {
+    Trigger(BehaviorInstanceTrigger),
+    Configuration(BehaviorInstanceConfigurationUpdate),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BehaviorInstanceTrigger {
+    pub trigger: BehaviorInstanceTriggerAction,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum BehaviorInstanceTriggerAction {
+    Start {},
+    Stop {},
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct BehaviorInstanceUpdate {
+pub struct BehaviorInstanceConfigurationUpdate {
     pub configuration: Option<Value>,
     pub enabled: Option<bool>,
     pub metadata: Option<BehaviorInstanceMetadata>,
 }
 
-impl BehaviorInstanceUpdate {
+impl BehaviorInstanceConfigurationUpdate {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -322,8 +392,8 @@ impl BehaviorInstanceUpdate {
     }
 }
 
-impl AddAssign<BehaviorInstanceUpdate> for BehaviorInstance {
-    fn add_assign(&mut self, upd: BehaviorInstanceUpdate) {
+impl AddAssign<BehaviorInstanceConfigurationUpdate> for BehaviorInstance {
+    fn add_assign(&mut self, upd: BehaviorInstanceConfigurationUpdate) {
         if let Some(md) = upd.metadata {
             self.metadata = md;
         }

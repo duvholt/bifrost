@@ -1,305 +1,156 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bifrost_api::backend::BackendRequest;
-use chrono::offset::LocalResult;
-use chrono::{DateTime, Datelike, Days, Local, NaiveTime, TimeZone, Weekday};
-use itertools::Itertools;
-use tokio::spawn;
+use chrono::NaiveTime;
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use tokio::sync::Mutex;
-
-use hue::api::{
-    Device, Group, GroupedLightDynamicsUpdate, GroupedLightUpdate, Light, LightDynamicsUpdate,
-    LightTimedEffect, LightTimedEffectsUpdate, LightUpdate, On, RType, Resource, ResourceLink,
-    WakeupConfiguration, WakeupStyle,
-};
 use uuid::Uuid;
 
 use crate::error::ApiError;
-use crate::server::behavior_instance::BehaviorClock;
-use crate::server::behavior_instance::service::{ScheduleType, disable_behavior_instance};
+use crate::server::behavior_instance::BehaviorContext;
+use crate::server::behavior_instance::schedule::{Schedule, ScheduledBehavior};
+use crate::server::behavior_instance::service::ScheduleType;
+use crate::server::behavior_instance::target::{
+    ExecutionTarget, ResolvedLight, SelectionPolicy, TargetResource, resolve_resources,
+    select_targets,
+};
 use crate::{error::ApiResult, resource::Resources};
+use hue::api::{
+    GroupedLightDynamicsUpdate, GroupedLightUpdate, LightDynamicsUpdate, LightTimedEffect,
+    LightTimedEffectsUpdate, LightUpdate, On, WakeupConfiguration, WakeupStyle,
+};
 
-pub struct WakeupJob {
-    pub rid: Uuid,
-    pub schedule_type: ScheduleType,
-    pub configuration: WakeupConfiguration,
-    pub res: Arc<Mutex<Resources>>,
-    pub clock: Arc<dyn BehaviorClock>,
+#[derive(Debug)]
+pub struct WakeupBehavior;
+
+impl WakeupBehavior {
+    async fn run_wakeup(
+        ctx: Arc<BehaviorContext>,
+        config: WakeupConfiguration,
+        targets: Vec<ExecutionTarget<WakeupStyle>>,
+    ) -> ApiResult<()> {
+        for target in &targets {
+            target.on(&ctx.res, &config).await.inspect_err(|err| {
+                log::warn!("Failed to turn on wake up light: {err}");
+            })?;
+        }
+
+        // wait until fade in has completed
+        // otherwise the behavior instance can be disabled before it has actually finished
+        ctx.clock.sleep(config.fade_in_duration.to_std()).await;
+
+        if let Some(duration) = &config.turn_lights_off_after {
+            ctx.clock.sleep(duration.to_std()).await;
+
+            for target in &targets {
+                target.off(&ctx.res).await.inspect_err(|err| {
+                    log::warn!("Failed to turn off wake up light: {err}");
+                })?;
+            }
+        }
+        Ok(())
+    }
 }
 
-impl WakeupJob {
-    fn start_datetime(&self, now: DateTime<Local>) -> ApiResult<DateTime<Local>> {
-        let start_time = self.start_time()?;
-        let next = match now.with_time(start_time) {
-            LocalResult::Single(time) => time,
-            LocalResult::Ambiguous(_, latest) => latest,
-            LocalResult::None => {
-                return Err(ApiError::InvalidDateTimeConversion(now));
-            }
-        };
-        let wakeup_datetime = if next < now {
-            next.checked_add_days(Days::new(1))
-                .ok_or(ApiError::InvalidDateTimeConversion(next))?
-        } else {
-            next
-        };
-        Ok(wakeup_datetime)
-    }
+#[async_trait]
+impl ScheduledBehavior for WakeupBehavior {
+    type Configuration = WakeupConfiguration;
 
-    fn start_time(&self) -> ApiResult<NaiveTime> {
-        let job_time = self.configuration.when.time_point.time();
+    fn schedule(&self, configuration: &Self::Configuration) -> ApiResult<Schedule> {
+        let weekdays = configuration.when.recurrence_days.as_ref();
+
+        #[allow(clippy::option_if_let_else)]
+        let schedule_type = match weekdays {
+            Some(weekdays) => ScheduleType::Recurring(weekdays.iter().copied().collect()),
+            None => ScheduleType::Once(),
+        };
+
+        let job_time = configuration.when.time_point.time();
         let scheduled_wakeup_time = NaiveTime::from_hms_opt(job_time.hour, job_time.minute, 0)
             .ok_or(ApiError::InvalidNaiveTime)?;
-        // although the scheduled time in the Hue app is the time when lights are at full brightness
-        // the job start time is considered to be when the fade in effects starts
-        let fade_in_duration = self.configuration.fade_in_duration.to_std();
-        Ok(scheduled_wakeup_time - fade_in_duration)
-    }
 
-    #[allow(clippy::needless_continue)]
-    fn next_weekday_occurrence(
-        weekdays: &HashSet<Weekday>,
-        time: NaiveTime,
-        now: &DateTime<Local>,
-    ) -> ApiResult<DateTime<Local>> {
-        let now_date = now.date_naive();
+        let fade_in_duration = configuration.fade_in_duration.to_std();
 
-        // In most cases we shouldn't need to iterate more than 7 days,
-        // but in edge cases like leap years we might have to check further into the future.
-        // In case of any bugs we don't want to loop forever so it should be safe to just check the next 3 weeks
-        for days_to_add in 0..21 {
-            let Some(next_date) = now_date.checked_add_days(Days::new(days_to_add)) else {
-                // unlikely to happen as we're dealing with a naive date, but let's skip if something weird happens
-                continue;
-            };
-            if !weekdays.contains(&next_date.weekday()) {
-                continue;
-            }
-            let datetime = next_date.and_time(time);
-            match Local.from_local_datetime(&datetime) {
-                LocalResult::Single(candidate) | LocalResult::Ambiguous(_, candidate) => {
-                    if &candidate >= now {
-                        return Ok(candidate);
-                    }
-                }
-                LocalResult::None => {
-                    // Time does not exist on this day (e.g. DST jump forward).
-                    continue;
-                }
-            }
-        }
-        Err(ApiError::NoNextWeekdayOccurence(time, weekdays.clone()))
-    }
-
-    pub async fn create(self) {
-        let now = self.clock.local_now();
-        let config = self.configuration.clone();
-        let result = match &self.schedule_type {
-            ScheduleType::Recurring(weekdays) => self.create_recurring(weekdays.clone()).await,
-            ScheduleType::Once() => self.run_once(now).await,
-        };
-        if let Err(err) = result {
-            log::error!("Failed to create wake up job: {err}, using configuration {config:?}");
-        }
-    }
-
-    async fn create_recurring(&self, weekdays: HashSet<Weekday>) -> ApiResult<()> {
-        let fade_in_start = self.start_time()?;
-        loop {
-            let now = self.clock.local_now();
-            let fade_in_datetime = Self::next_weekday_occurrence(&weekdays, fade_in_start, &now)?;
-            log::debug!(
-                "Recurring wakeup task for {:?}, {} will run at {}",
-                &weekdays,
-                &fade_in_start,
-                &fade_in_datetime
-            );
-            let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-            self.clock.sleep(time_until_fade_in).await;
-            run_wake_up(
-                self.configuration.clone(),
-                self.res.clone(),
-                self.clock.clone(),
-            )
-            .await;
-        }
-    }
-
-    async fn run_once(self, now: DateTime<Local>) -> ApiResult<()> {
-        let start_time = self.start_time()?;
-        let fade_in_datetime = self.start_datetime(now)?;
-        let time_until_fade_in = (fade_in_datetime - now).to_std()?;
-        log::debug!("Wakeup once task for {start_time} will run at {fade_in_datetime}");
-
-        self.clock.sleep(time_until_fade_in).await;
-        spawn(async move {
-            run_wake_up(
-                self.configuration.clone(),
-                self.res.clone(),
-                self.clock.clone(),
-            )
-            .await;
-            disable_behavior_instance(self.rid, self.res.clone()).await;
-        });
-
-        Ok(())
-    }
-}
-
-fn wakeup_requests_for_group(
-    config: &WakeupConfiguration,
-    lock: &Resources,
-    group: &impl Group,
-) -> Vec<WakeupRequest> {
-    let lights_in_room: Vec<_> = group
-        .children()
-        .filter_map(|rl| match rl.rtype {
-            RType::Device => lock.get::<Device>(rl).ok().and_then(Device::light_service),
-            RType::Light => Some(rl),
-            _ => None,
+        Ok(Schedule {
+            recurrence: schedule_type,
+            scheduled_time: scheduled_wakeup_time,
+            lead_time: fade_in_duration,
         })
-        .filter_map(|light_rl| lock.get::<Light>(light_rl).ok().map(|l| (light_rl, l)))
-        .collect();
-    if config.style == Some(WakeupStyle::Sunrise)
-        && lights_in_room
-            .iter()
-            .any(|(_, light)| light.effects.is_some())
-    {
-        // Hue effects do not support grouped lights so we need to send indivial requests to each light
-        lights_in_room
-            .into_iter()
-            .filter_map(|(resource_link, light)| {
-                if light.on.on {
-                    None
-                } else {
-                    Some(WakeupRequest::Light(*resource_link))
-                }
-            })
-            .collect()
-    } else {
-        group
-            .grouped_light_service()
-            .map_or_else(Vec::new, |grouped_light| {
-                vec![WakeupRequest::Group(*grouped_light)]
-            })
-    }
-}
-
-async fn run_wake_up(
-    config: WakeupConfiguration,
-    res: Arc<Mutex<Resources>>,
-    clock: Arc<dyn BehaviorClock>,
-) {
-    log::debug!("Running scheduled behavior instance:, {config:#?}");
-    #[allow(clippy::option_if_let_else)]
-    let resource_links = config.where_field.iter().flat_map(|room| {
-        if let Some(items) = &room.items {
-            items.clone()
-        } else {
-            vec![room.group]
-        }
-    });
-
-    let requests = {
-        let lock = res.lock().await;
-        resource_links
-            .into_iter()
-            .filter_map(|resource_link| {
-                let resource = lock.get_resource(&resource_link);
-                match resource {
-                    Ok(resource) => Some((resource_link, resource)),
-                    Err(err) => {
-                        log::warn!("Failed to get resource: {err}");
-                        None
-                    }
-                }
-            })
-            .flat_map(|(resource_link, resource)| match resource.obj {
-                Resource::Room(room) => wakeup_requests_for_group(&config, &lock, &room),
-                Resource::Zone(zone) => wakeup_requests_for_group(&config, &lock, &zone),
-                Resource::Light(light) => {
-                    if light.on.on {
-                        vec![]
-                    } else {
-                        vec![WakeupRequest::Light(resource_link)]
-                    }
-                }
-                Resource::BridgeHome(_bridge_home) => {
-                    let all_rooms = lock.get_resources_by_type(RType::Room);
-                    all_rooms
-                        .into_iter()
-                        .filter_map(|room_resource| match room_resource.obj {
-                            Resource::Room(room) => {
-                                Some(wakeup_requests_for_group(&config, &lock, &room))
-                            }
-                            _ => None,
-                        })
-                        .concat()
-                }
-                _ => Vec::new(),
-            })
-            .collect::<Vec<_>>()
-    };
-
-    for request in &requests {
-        if let Err(err) = request.on(res.clone(), config.clone()).await {
-            log::warn!("Failed to turn on wake up light: {err}");
-        }
     }
 
-    // wait until fade in has completed
-    // otherwise the behavior instance can be disabled before it has actually finished
-    clock.sleep(config.fade_in_duration.to_std()).await;
-
-    if let Some(duration) = config.turn_lights_off_after {
-        clock.sleep(duration.to_std()).await;
-
-        for request in &requests {
-            if let Err(err) = request.off(res.clone()).await {
-                log::warn!("Failed to turn off wake up light: {err}");
-            }
-        }
-    }
-}
-
-enum WakeupRequest {
-    Light(ResourceLink),
-    Group(ResourceLink),
-}
-
-impl WakeupRequest {
-    async fn on(&self, res: Arc<Mutex<Resources>>, config: WakeupConfiguration) -> ApiResult<()> {
-        let light_supports_effects = match self {
-            Self::Light(resource_link) => res
-                .lock()
-                .await
-                .get::<Light>(resource_link)?
-                .effects
-                .is_some(),
-            Self::Group(_) => false,
-        };
-        let use_sunrise_effect =
-            light_supports_effects && config.style == Some(WakeupStyle::Sunrise);
-
-        if use_sunrise_effect {
-            self.sunrise_on(&res, &config).await?;
-        } else {
-            self.transition_to_bright_on(res, &config).await?;
-        }
-        Ok(())
-    }
-
-    async fn transition_to_bright_on(
+    async fn execute(
         &self,
-        res: Arc<Mutex<Resources>>,
+        _id: Uuid,
+        context: Arc<BehaviorContext>,
+        configuration: &Self::Configuration,
+    ) -> BoxFuture<'static, ApiResult<()>> {
+        let lock = context.res.lock().await;
+        let resolved_resources = resolve_resources(&lock, &configuration.where_field);
+        drop(lock);
+        let targets = select_targets(&resolved_resources, self, configuration);
+
+        let configuration = configuration.clone();
+        Self::run_wakeup(context, configuration, targets).boxed()
+    }
+
+    async fn on_stop(&self, _id: Uuid, _context: &BehaviorContext) {}
+}
+
+impl SelectionPolicy<WakeupConfiguration> for WakeupBehavior {
+    type Effect = WakeupStyle;
+
+    fn effect_for_light(
+        &self,
+        light: &ResolvedLight,
+        configuration: &WakeupConfiguration,
+    ) -> Option<Self::Effect> {
+        if light.state.on.on {
+            return None;
+        }
+        let style = &configuration.style;
+        match style {
+            Some(WakeupStyle::Sunrise) => {
+                if light.state.effects.is_some() {
+                    Some(WakeupStyle::Sunrise)
+                } else {
+                    Some(WakeupStyle::Basic)
+                }
+            }
+            Some(WakeupStyle::Basic) | None => Some(WakeupStyle::Basic),
+        }
+    }
+
+    fn supports_grouped_light(&self, effect: &Self::Effect) -> bool {
+        match effect {
+            WakeupStyle::Sunrise => false,
+            WakeupStyle::Basic => true,
+        }
+    }
+}
+
+impl ExecutionTarget<WakeupStyle> {
+    async fn on(&self, res: &Mutex<Resources>, config: &WakeupConfiguration) -> ApiResult<()> {
+        match self.effect {
+            WakeupStyle::Sunrise => self.sunrise_on(res, config).await,
+            WakeupStyle::Basic => self.basic_on(res, config).await,
+        }
+    }
+
+    async fn basic_on(
+        &self,
+        res: &Mutex<Resources>,
         config: &WakeupConfiguration,
-    ) -> Result<(), ApiError> {
+    ) -> ApiResult<()> {
         // As reported by the Hue bridge
         const WAKEUP_FADE_MIREK: u16 = 447;
 
-        let initial_backend_requests = match self {
-            Self::Light(resource_link) => {
+        let initial_backend_requests = match self.resource {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let on_brightness = LightUpdate::default()
                     .with_on(On::new(true))
                     .with_brightness(Some(1.0));
@@ -307,19 +158,19 @@ impl WakeupRequest {
                     LightUpdate::default().with_color_temperature(WAKEUP_FADE_MIREK);
 
                 vec![
-                    BackendRequest::LightUpdate(*resource_link, on_brightness),
-                    BackendRequest::LightUpdate(*resource_link, color_temperature),
+                    BackendRequest::LightUpdate(resource_link, on_brightness),
+                    BackendRequest::LightUpdate(resource_link, color_temperature),
                 ]
             }
-            Self::Group(resource_link) => {
+            TargetResource::GroupedLight(resource_link) => {
                 let brightness = GroupedLightUpdate::default()
                     .with_on(On::new(true))
                     .with_brightness(Some(1.0));
                 let color_temperature =
                     GroupedLightUpdate::default().with_color_temperature(WAKEUP_FADE_MIREK);
                 vec![
-                    BackendRequest::GroupedLightUpdate(*resource_link, brightness),
-                    BackendRequest::GroupedLightUpdate(*resource_link, color_temperature),
+                    BackendRequest::GroupedLightUpdate(resource_link, brightness),
+                    BackendRequest::GroupedLightUpdate(resource_link, color_temperature),
                 ]
             }
         };
@@ -328,42 +179,44 @@ impl WakeupRequest {
         }
 
         // Start fade in to set brightness
-        let on_backend_requests = match self {
-            Self::Light(resource_link) => {
+        let fade_request = match self.resource {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let brightness = LightUpdate::default()
                     .with_brightness(Some(config.end_brightness))
                     .with_dynamics(Some(
                         LightDynamicsUpdate::new()
                             .with_duration(Some((config.fade_in_duration.seconds) * 1000)),
                     ));
-                vec![BackendRequest::LightUpdate(*resource_link, brightness)]
+                BackendRequest::LightUpdate(resource_link, brightness)
             }
-            Self::Group(resource_link) => {
+            TargetResource::GroupedLight(resource_link) => {
                 let brightness = GroupedLightUpdate::default()
                     .with_brightness(Some(config.end_brightness))
                     .with_dynamics(Some(
                         GroupedLightDynamicsUpdate::new()
                             .with_duration(Some((config.fade_in_duration.seconds) * 1000)),
                     ));
-                vec![BackendRequest::GroupedLightUpdate(
-                    *resource_link,
-                    brightness,
-                )]
+                BackendRequest::GroupedLightUpdate(resource_link, brightness)
             }
         };
-        for request in on_backend_requests {
-            res.lock().await.backend_request(request)?;
-        }
+        res.lock().await.backend_request(fade_request)?;
+
         Ok(())
     }
 
     async fn sunrise_on(
         &self,
-        res: &Arc<Mutex<Resources>>,
+        res: &Mutex<Resources>,
         config: &WakeupConfiguration,
-    ) -> Result<(), ApiError> {
-        match self {
-            Self::Light(resource_link) => {
+    ) -> ApiResult<()> {
+        match self.resource {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let mut payload = LightUpdate::default()
                     .with_on(Some(On::new(true)))
                     .with_brightness(Some(config.end_brightness));
@@ -373,22 +226,27 @@ impl WakeupRequest {
                 });
                 res.lock()
                     .await
-                    .backend_request(BackendRequest::LightUpdate(*resource_link, payload))?;
+                    .backend_request(BackendRequest::LightUpdate(resource_link, payload))?;
             }
-            Self::Group(_resource_link) => {}
+            TargetResource::GroupedLight(_resource_link) => {
+                // The sunrise effect does not support grouped light requests
+            }
         }
         Ok(())
     }
 
-    async fn off(&self, res: Arc<Mutex<Resources>>) -> ApiResult<()> {
-        let backend_request = match self {
-            Self::Light(resource_link) => {
+    async fn off(&self, res: &Mutex<Resources>) -> ApiResult<()> {
+        let backend_request = match self.resource {
+            TargetResource::Light {
+                link: resource_link,
+                ..
+            } => {
                 let payload = LightUpdate::default().with_on(Some(On::new(false)));
-                BackendRequest::LightUpdate(*resource_link, payload)
+                BackendRequest::LightUpdate(resource_link, payload)
             }
-            Self::Group(resource_link) => {
+            TargetResource::GroupedLight(resource_link) => {
                 let payload = GroupedLightUpdate::default().with_on(Some(On::new(false)));
-                BackendRequest::GroupedLightUpdate(*resource_link, payload)
+                BackendRequest::GroupedLightUpdate(resource_link, payload)
             }
         };
 

@@ -601,7 +601,7 @@ async fn hue_effects_v2() -> TestResult<()> {
                     "command": {
                         "cluster": 0xFC03,
                         "command": 0,
-                        "payload": {"data": vec![184, 0, 153, 25, 204, 76, 1, 0, 11, 102]}
+                        "payload": {"data": vec![184, 0, 153, 25, 204, 76, 4, 0, 11, 102]}
                     }
                 }
             ),
@@ -695,7 +695,7 @@ async fn hue_timed_effects() -> TestResult<()> {
                     "command": {
                         "cluster": 0xFC03,
                         "command": 0,
-                        "payload": {"data": vec![177, 0, 1, 1, 0, 9, 249]}
+                        "payload": {"data": vec![177, 0, 1, 4, 0, 9, 249]}
                     }
                 }
             ),
@@ -828,7 +828,7 @@ async fn gradient() -> TestResult<()> {
                     "command": {
                         "cluster": 0xFC03,
                         "command": 0,
-                        "payload": {"data": vec![81,1,1,1,0,19,80,0,0,0,104,213,32,183,105,62,104,110,100,128,26,138,151,24,157,40,0]}
+                        "payload": {"data": vec![81,1,1,4,0,19,80,0,0,0,104,213,32,183,105,62,104,110,100,128,26,138,151,24,157,40,0]}
                     }
                 }
             ),

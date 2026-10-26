@@ -88,6 +88,15 @@ impl Z2mBackend {
             }
         }
 
+        if !hz.is_empty() {
+            let duration_ms = upd
+                .dynamics
+                .as_ref()
+                .and_then(|d| d.duration)
+                .unwrap_or(400);
+            let fade_speed = u16::try_from((duration_ms + 50) / 100)?;
+            hz = hz.with_fade_speed(fade_speed);
+        }
         Ok(hz)
     }
 
@@ -175,11 +184,9 @@ impl Z2mBackend {
 
         /* if supported send hue-specific effects update */
         if hue_effects {
-            let mut hz = Self::make_hue_specific_update(upd)?;
+            let hz = Self::make_hue_specific_update(upd)?;
 
             if !hz.is_empty() {
-                hz = hz.with_fade_speed(0x0001);
-
                 let read_payload = DeviceRead::default().with_state(true);
                 z2mws.send_hue_effects(topic, hz).await?;
 

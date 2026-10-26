@@ -12,6 +12,8 @@ use bifrost_api::backend::BackendRequest;
 use hue::event::EventBlock;
 use svc::error::SvcError;
 
+use crate::server::behavior_instance::{BehaviorCommand, BehaviorTriggerRequest};
+
 #[derive(Error, Debug)]
 pub enum ApiError {
     /* mapped errors */
@@ -59,6 +61,12 @@ pub enum ApiError {
 
     #[error(transparent)]
     SendErrorZ2m(#[from] tokio::sync::broadcast::error::SendError<Arc<BackendRequest>>),
+
+    #[error(transparent)]
+    SendErrorBehaviorTrigger(#[from] tokio::sync::mpsc::error::SendError<BehaviorTriggerRequest>),
+
+    #[error(transparent)]
+    SendErrorBehaviorCommand(#[from] tokio::sync::mpsc::error::SendError<BehaviorCommand>),
 
     #[error(transparent)]
     SetLoggerError(#[from] log::SetLoggerError),
@@ -184,8 +192,14 @@ pub enum ApiError {
     #[error("Invalid naive time")]
     InvalidNaiveTime,
 
+    #[error("Invalid duration")]
+    InvalidDuration,
+
     #[error("No next weekday occurence {0:?} {0:?}")]
     NoNextWeekdayOccurence(NaiveTime, HashSet<Weekday>),
+
+    #[error("No start time found for the {0} alarm in the next 21 days")]
+    NoNextScheduleStart(NaiveTime),
 
     #[error("Backend request timeout")]
     BackendRequestTimeout,
