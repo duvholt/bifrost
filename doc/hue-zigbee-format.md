@@ -264,6 +264,7 @@ pub enum GradientStyle {
     Linear = 0x00,
     Scattered = 0x02,
     Mirrored = 0x04,
+    Segmented = 0x06,
 }
 ```
 
