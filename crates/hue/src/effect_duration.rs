@@ -10,37 +10,27 @@ impl EffectDuration {
     const RESOLUTION_01M: u32 = 60; // 1min.
     const RESOLUTION_05M: u32 = 5 * 60; // 5min.
 
-    pub const fn from_ms(milliseconds: u32) -> HueResult<Self> {
+    pub fn from_ms(milliseconds: u32) -> HueResult<Self> {
         let rounded_seconds = (milliseconds + 500) / 1000;
         Self::from_seconds(rounded_seconds)
     }
 
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_sign_loss)]
-    pub const fn from_seconds(seconds: u32) -> HueResult<Self> {
-        let (base, resolution) = match seconds {
-            0..1 => return Ok(Self(251)),
-            1..60 => (252, Self::RESOLUTION_01S),
-            60..293 => (204, Self::RESOLUTION_05S),
-            293..295 => {
-                return Ok(Self(146));
-            }
-            295..878 => (165, Self::RESOLUTION_15S),
-            878..885 => {
-                return Ok(Self(107));
-            }
-            885..3510 => (121, Self::RESOLUTION_01M),
-            3510..3540 => {
-                return Ok(Self(63));
-            }
-            3540..=21600 => (74, Self::RESOLUTION_05M),
+    pub fn from_seconds(seconds: u32) -> HueResult<Self> {
+        let seconds = seconds.max(1);
+        let (base, resolution, minimum) = match seconds {
+            0..60 => (252, Self::RESOLUTION_01S, 0),
+            60..295 => (204, Self::RESOLUTION_05S, 146),
+            295..885 => (165, Self::RESOLUTION_15S, 107),
+            885..3540 => (121, Self::RESOLUTION_01M, 63),
+            3540..=21600 => (74, Self::RESOLUTION_05M, 2),
             _ => {
                 return Err(HueError::EffectDurationOutOfRange(seconds));
             }
         };
-        Ok(Self(
-            base - ((seconds + (resolution / 2)) / resolution) as u8,
-        ))
+        let encoded = base - ((seconds + (resolution / 2)) / resolution) as u8;
+        Ok(Self(encoded.max(minimum)))
     }
 }
 
