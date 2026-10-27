@@ -347,6 +347,8 @@ to `0.8264`.
 
 Size: 1 byte
 
+#### Effects
+
 This property controls the animation speed for effects (see `EFFECT_TYPE`).
 
 All values in the range `0`..`255` seem to be allowed, with `0` being the
@@ -356,6 +358,22 @@ Curiously, the Hue app does not use the full range for all effects, and at high
 values, some animations are rendered so quickly that they start to break down.
 
 A good starting point seems to be 128 (representing 0.5).
+
+#### Timed effects
+
+`EFFECT_SPEED` is also used for timed effects like `Sunrise` and `Sunset`. Here the value determines the duration of the timed effect.
+
+Round the duration to whole seconds before encoding, treating zero as one second.
+
+| Duration d (seconds) | Byte range | Resolution | Encoding formula                |
+|----------------------|------------|------------|---------------------------------|
+| 1-59                 | 0xfb-0xc1  | 1 second   | 0xfc - d                        |
+| 60-294               | 0xc0-0x92  | 5 seconds  | max(0x92, 0xcc - round(d / 5))  |
+| 295-884              | 0x91-0x6b  | 15 seconds | max(0x6b, 0xa5 - round(d / 15)) |
+| 885-3539             | 0x6a-0x3f  | 1 minute   | max(0x3f, 0x79 - round(d / 60)) |
+| 3540-21600           | 0x3e-0x02  | 5 minutes  | 0x4a - round(d / 300)           |
+
+For example a timed effect that lasts for 5 minutes would be encoded as `max(0x6b, 0xa5 - round(300 / 15)) => 0x91`.
 
 ### Property: `GRADIENT_PARAMS`
 
