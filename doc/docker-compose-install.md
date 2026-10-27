@@ -3,7 +3,7 @@
 When you have these things available, you can install Bifrost by running these commands:
 
 ```sh
-git clone https://github.com/chrivers/bifrost
+git clone https://github.com/duvholt/bifrost
 cd bifrost
 ```
 

@@ -19,10 +19,10 @@ async fn hardcoded() -> Json<Value> {
             "GPL-3.0"
         ],
         "SourceLinks": [
-            "https://github.com/chrivers/bifrost",
+            "https://github.com/duvholt/bifrost",
         ],
         "Version": "0.9",
-        "Website": "https://github.com/chrivers/bifrost",
+        "Website": "https://github.com/duvholt/bifrost",
         "licenses": {
             "GPL-3.0": "gpl-3.0.txt",
         }

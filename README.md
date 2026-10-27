@@ -19,7 +19,7 @@ There are currently three ways you can install Bifrost:
 1.  [Install manually](#manual) from source (recommended)
 2.  [Install it via Docker](#docker) for container-based deployment.
 3.  Install as Home Assistant Add-on. Please see the
-    [bifrost-hassio](https://github.com/chrivers/bifrost-hassio) project for
+    [bifrost-hassio](https://github.com/duvholt/bifrost-hassio) project for
     more information.
 
 ### Manual
@@ -40,7 +40,7 @@ sudo apt install build-essential pkg-config libssl3 libssl-dev
 When you have these things available, install bifrost:
 
 ```sh
-cargo install --git https://github.com/chrivers/bifrost.git
+cargo install --git https://github.com/duvholt/bifrost.git
 ```
 
 After Cargo has finished downloading, compiling, and installing Bifrost, you
@@ -150,6 +150,6 @@ Consider joining us on discord:
 [![Join Valhalla on Discord](https://discordapp.com/api/guilds/1276604041727578144/widget.png?style=banner2)](https://discord.gg/YvBKjHBJpA)
 
 If you have any problems, questions or suggestions, feel free to [create an
-issue](https://github.com/chrivers/bifrost/issues) on this project.
+issue](https://github.com/duvholt/bifrost/issues) on this project.
 
 Also, pull requests are always welcome!
