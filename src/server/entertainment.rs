@@ -14,7 +14,7 @@ use nix::sys::socket;
 use nix::sys::socket::sockopt::RcvBuf;
 use openssl::rand::rand_bytes;
 use openssl::ssl::{Ssl, SslContext, SslMethod, SslOptions};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, mpsc};
@@ -35,6 +35,7 @@ use svc::traits::Service;
 use crate::error::{ApiError, ApiResult};
 use crate::resource::Resources;
 use crate::routes::auth::STANDARD_CLIENT_KEY;
+use crate::routes::clip::entertainment_configuration::active_area;
 
 struct EntertainmentSocket {
     res: Arc<Mutex<Resources>>,
@@ -88,7 +89,13 @@ impl EntertainmentSocket {
         let mut best_excluded = 0;
         let mut best_area = None;
 
-        for uuid in res.get_resource_ids_by_type(RType::EntertainmentConfiguration) {
+        // v1 frames only name lights, so prefer the streaming area
+        let areas = active_area(res).map_or_else(
+            || res.get_resource_ids_by_type(RType::EntertainmentConfiguration),
+            |area| vec![area],
+        );
+
+        for uuid in areas {
             let entconf = res.get_id::<EntertainmentConfiguration>(uuid)?;
 
             let ent_light_ids: BTreeSet<Uuid> =
@@ -238,6 +245,13 @@ impl EntertainmentSocket {
             if pkt.area != header.area {
                 log::error!("Entertainment Mode area changed mid-stream.");
                 return Err(ApiError::EntStreamDesync);
+            }
+
+            // a real bridge closes the session when its area stops
+            if active_area(&*self.res.lock().await) != Some(pkt.area) {
+                log::info!("Entertainment area {} is not streaming, closing", pkt.area);
+                timeout(Duration::from_secs(1), sess.shutdown()).await.ok();
+                break;
             }
 
             let ts = Utc::now().timestamp();
