@@ -309,9 +309,10 @@ impl Service for EntertainmentService {
 
     async fn start(&mut self) -> Result<(), Self::Error> {
         let socket = UdpSocket::bind(self.addr).await?;
-        // We need a very small receive buffer, since we deliberately want to
-        // drop packets if we can't keep up with the sync mode packets
-        socket::setsockopt(&socket.as_fd(), RcvBuf, &512)?;
+        // We need a small receive buffer, since we deliberately want to drop
+        // packets if we can't keep up with the sync mode packets. It still has
+        // to hold a client's final handshake flight, which can be 3 datagrams
+        socket::setsockopt(&socket.as_fd(), RcvBuf, &4096)?;
 
         let listener = UdpListenBuilder::new(socket)
             .with_buffer_size(512)
