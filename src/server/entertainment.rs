@@ -11,7 +11,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use nix::sys::socket;
 use nix::sys::socket::sockopt::RcvBuf;
-use openssl::ssl::{Ssl, SslContext, SslMethod};
+use openssl::rand::rand_bytes;
+use openssl::ssl::{Ssl, SslContext, SslMethod, SslOptions};
 use tokio::io::AsyncReadExt;
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast::Sender;
@@ -253,6 +254,7 @@ impl EntertainmentSocket {
 
 pub struct EntertainmentService {
     addr: SocketAddr,
+    cookie_exchange: bool,
     udp: Option<Arc<UdpListener>>,
     ctx: Option<SslContext>,
     res: Arc<Mutex<Resources>>,
@@ -263,11 +265,13 @@ impl EntertainmentService {
     pub fn new(
         addr: Ipv4Addr,
         port: u16,
+        cookie_exchange: bool,
         res: Arc<Mutex<Resources>>,
         backend_updates: Sender<Arc<BackendRequest>>,
     ) -> ApiResult<Self> {
         let res = Self {
             addr: SocketAddr::new(addr.into(), port),
+            cookie_exchange,
             udp: None,
             ctx: None,
             res,
@@ -293,6 +297,17 @@ impl Service for EntertainmentService {
             log::trace!("psk: {}", hex::encode(&psk[..16]));
             Ok(16)
         });
+
+        if self.cookie_exchange {
+            let mut cookie = [0u8; 16];
+            rand_bytes(&mut cookie)?;
+            bldr.set_options(SslOptions::COOKIE_EXCHANGE);
+            bldr.set_cookie_generate_cb(move |_sslref, buf| {
+                buf[..cookie.len()].copy_from_slice(&cookie);
+                Ok(cookie.len())
+            });
+            bldr.set_cookie_verify_cb(move |_sslref, peer_cookie| peer_cookie == cookie);
+        }
 
         self.ctx = Some(bldr.build());
         Ok(())
