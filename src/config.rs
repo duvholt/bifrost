@@ -10,6 +10,7 @@ pub fn parse(filename: &Utf8Path) -> Result<AppConfig, ConfigError> {
         .set_default("bridge.http_port", 80)?
         .set_default("bridge.https_port", 443)?
         .set_default("bridge.entm_port", 2100)?
+        .set_default("bridge.entm_cookie_exchange", true)?
         .add_source(config::File::with_name(filename.as_str()))
         .build()?;
 

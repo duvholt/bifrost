@@ -249,6 +249,7 @@ impl TestBridge {
                 "http_port": http_address.port(),
                 "https_port": 0,
                 "entm_port": 0,
+                "entm_cookie_exchange": true,
                 "netmask": "255.0.0.0",
                 "gateway": http_address.ip(),
                 "timezone": "Etc/UTC"
