@@ -42,6 +42,7 @@
 | Feature             | GET | POST | PUT          | DELETE |
 |---------------------|-----|------|--------------|--------|
 | Lights              | ✅  | -    | ✅ (partial) | -      |
-| Groups              | ✅  | ❌   | ✅ (partial) | ❌     |
+| Rooms               | ✅  | ✅   | ✅           | ✅     |
+| Zones               | ✅  | ✅   | ✅           | ✅     |
 | Scenes              | ✅  | ✅   | ✅ (partial) | ✅     |
-| Entertainment Zones | ✅  | ✅   | ✅           | ❌     |
+| Entertainment Zones | ✅  | ✅   | ✅           | ✅     |
