@@ -14,11 +14,14 @@ keywords.workspace = true
 
 [workspace.package]
 edition = "2024"
-authors = ["Christian Iversen <ci@iversenit.dk>"]
+authors = [
+    "Christian Iversen <ci@iversenit.dk>",
+    "Christian Duvholt <christian@duvholt.net>",
+]
 rust-version = "1.88"
 description = "A Philips Hue bridge emulator backed by zigbee2mqtt"
 readme = "README.md"
-repository = "https://github.com/chrivers/bifrost"
+repository = "https://github.com/duvholt/bifrost"
 license = "GPL-3.0-only"
 categories = ["api-bindings", "simulation", "network-programming"]
 keywords = [

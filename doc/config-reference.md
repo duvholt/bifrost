@@ -55,8 +55,9 @@ bridge:
 #
 # Make a sub-section for each zigbee2mqtt server you want to connect
 #
-# The server names ("some-server", "other-with-tls") are used for logging,
-# but have no functional impact.
+# Server names ("some-server", "other-with-tls") identify Z2M backends.
+# These names are stored with imported groups and devices, so keep them stable.
+# Renaming a server can cause ownership mismatches and duplicate Hue resources.
 #
 # NOTE: Be sure to use DIFFERENT names for different servers.
 # Otherwise the yaml parser will consider it the same server!

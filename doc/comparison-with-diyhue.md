@@ -50,16 +50,30 @@ In any case, feedback always welcome.
 | Recall Zigbee2MQTT scenes            | ❌                                      | ✅                                        |
 | Learn Zigbee2MQTT scenes             | ❌                                      | ✅                                        |
 | Delete Zigbee2MQTT scenes            | ❌                                      | ✅                                        |
-| Join new zigbee lights               | ✅                                      | ❌                                        |
-| Add/remove lights to rooms           | ❌                                      | ✅                                        |
-| Live state of lights in Hue app      | ❌ [^1]                                 | ✅                                        |
+| Join new zigbee lights               | ✅                                      | ✅                                        |
+| Add/remove lights to rooms           | ✅                                      | ✅                                        |
+| Live state of lights in Hue app      | ⚠️ [^1]                                 | ✅                                        |
 | Multiple type of backends            | ✅                                      | ❌ (only Zigbee2MQTT)                     |
 | Entertainment zones                  | ✅                                      | ✅                                        |
 | Zigbee Entertainment mode support    | ❌                                      | ✅                                        |
 | Hue effects (fireplace, candle, etc) | (✅) (partial)                          | ✅                                        |
-| Routines / Wake up / Go to sleep     | ✅                                      | ❌ (planned)                              |
+| Wake up automation                   | (✅) (basic fade only)                  | ✅ (Basic and Sunrise styles)             |
+| Go to sleep automation               | (✅) (basic fade only)                  | ✅ (Basic and Sunset styles)              |
+| Coming home automation               | ❌ (blocked by Hue account login)       | ❌ (blocked by Hue account login)         |
+| Leaving home automation              | ❌ (blocked by Hue account login)       | ❌ (blocked by Hue account login)         |
+| Mimic presence automation            | ❌                                      | ❌                                        |
+| Timer automation                     | ✅                                      | ❌                                        |
+| Lighting schedule automation         | ✅                                      | ❌                                        |
 | Remote services                      | (✅) (only with Hue essentials)         | ❌                                        |
 | Add custom lights and switches       | ✅                                      | ❌                                        |
+| Home Assistant as a backend          | ✅                                      | ❌                                        |
+| Create/edit Hue zones                | ✅                                      | ✅                                        |
+| Manage Z2M groups with Hue room/zone | ❌                                      | ✅                                        |
+| Dynamic palette scenes               | ✅                                      | ❌                                        |
+| Smart scenes                         | ✅                                      | ❌                                        |
+| Sensors                              | ✅                                      | ❌                                        |
+| Smart light switches                 | ✅ Multiple models                      | ⚠️ (Hue dimmers and Friends of Hue)       |
+| Gradient light strips                | ✅ (backend/model dependent)            | ✅ (model dependent + segment detection)  |
 
 [^1]: Light state synchronization (i.e. consistency between hue emulator, hue
     app and reality) seems to be, unfortunately, somewhat brittle in diyHue. See

@@ -24,7 +24,7 @@ async fn description_xml(State(state): State<AppState>) -> ApiResult<impl IntoRe
     let udn = Uuid::new_v5(&Uuid::NAMESPACE_OID, &mac.bytes());
 
     let device = upnp::Device::new(friendly_name, manufacturer, model_name, udn)
-        .with_manufacturer_url(Url::parse("http://github.com/chrivers/bifrost")?)
+        .with_manufacturer_url(Url::parse("http://github.com/duvholt/bifrost")?)
         .with_model_description("Bifrost Hue Bridge Emulator")
         .with_model_number(hue::HUE_BRIDGE_V2_MODEL_ID)
         .with_model_url(Url::parse("http://www.philips-hue.com")?)
