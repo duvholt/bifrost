@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::future::poll_fn;
 use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::os::fd::AsFd;
@@ -16,7 +17,7 @@ use tokio::io::AsyncReadExt;
 use tokio::net::UdpSocket;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, mpsc};
-use tokio::time::timeout;
+use tokio::time::{interval, timeout};
 use tokio_openssl::SslStream;
 use udp_stream::{UdpListenBuilder, UdpListener, UdpStream};
 use uuid::Uuid;
@@ -190,7 +191,15 @@ impl EntertainmentSocket {
     pub async fn listen(&self, mut sess: SslStream<UdpStream>) -> ApiResult<()> {
         let mut buf = [0u8; 1024];
 
-        timeout(Duration::from_secs(5), Pin::new(&mut sess).accept())
+        // OpenSSL only retransmits a handshake flight when polled after its
+        // DTLS timer expires, so keep polling while waiting for the client
+        let mut tick = interval(Duration::from_millis(100));
+        let handshake = poll_fn(|cx| {
+            while tick.poll_tick(cx).is_ready() {}
+            Pin::new(&mut sess).poll_accept(cx)
+        });
+
+        timeout(Duration::from_secs(5), handshake)
             .await
             .map_err(|_| ApiError::EntStreamTimeout)??;
 
@@ -300,9 +309,10 @@ impl Service for EntertainmentService {
 
     async fn start(&mut self) -> Result<(), Self::Error> {
         let socket = UdpSocket::bind(self.addr).await?;
-        // We need a very small receive buffer, since we deliberately want to
-        // drop packets if we can't keep up with the sync mode packets
-        socket::setsockopt(&socket.as_fd(), RcvBuf, &512)?;
+        // We need a small receive buffer, since we deliberately want to drop
+        // packets if we can't keep up with the sync mode packets. It still has
+        // to hold a client's final handshake flight, which can be 3 datagrams
+        socket::setsockopt(&socket.as_fd(), RcvBuf, &4096)?;
 
         let listener = UdpListenBuilder::new(socket)
             .with_buffer_size(512)
