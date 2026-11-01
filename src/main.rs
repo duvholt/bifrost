@@ -123,6 +123,7 @@ async fn build_tasks(
     let svc = server::entertainment::EntertainmentService::new(
         bind_ipaddress,
         bconf.entm_port,
+        bconf.entm_cookie_exchange,
         appstate.res.clone(),
         appstate.backend.clone(),
     )?;

@@ -22,6 +22,7 @@ pub struct BridgeConfig {
     pub http_port: u16,
     pub https_port: u16,
     pub entm_port: u16,
+    pub entm_cookie_exchange: bool,
     pub netmask: Ipv4Addr,
     pub gateway: Ipv4Addr,
     pub timezone: String,

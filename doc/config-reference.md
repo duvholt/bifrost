@@ -51,6 +51,12 @@ bridge:
   # For advanced users (e.g. bifrost behind a port forwarded firewall)
   entm_port: 2100
 
+  # Send a DTLS HelloVerifyRequest (cookie exchange) on the entertainment
+  # port, like a real Hue bridge. Some clients expect it.
+  #
+  # Set to false to skip the cookie exchange, as older versions did.
+  entm_cookie_exchange: true
+
 # Zigbee2mqtt section
 #
 # Make a sub-section for each zigbee2mqtt server you want to connect
