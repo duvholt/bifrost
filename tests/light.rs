@@ -177,7 +177,7 @@ fn add_gradient(light: &mut Light) {
         ]),
         points_capable: 5,
         points: vec![],
-        pixel_count: 18,
+        pixel_count: vec![],
     });
 }
 
