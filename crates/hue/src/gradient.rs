@@ -8,6 +8,83 @@ pub struct GradientProductData {
     pub entertainment_segments: &'static [EntertainmentSegment],
 }
 
+// Interestingly Hue CLIP API lists maximum segments as 10, but only assigns when setup via hue.
+pub const GRADIENT_LCX002: GradientProductData = GradientProductData {
+    pixel_count: 20,
+    points_capable: 5,
+    entertainment_channel_positions: POSITIONS_LCX002,
+    entertainment_segments: &[
+        EntertainmentSegment {
+            start: 0,
+            length: 2,
+        },
+        EntertainmentSegment {
+            start: 2,
+            length: 2,
+        },
+        EntertainmentSegment {
+            start: 4,
+            length: 4,
+        },
+        EntertainmentSegment {
+            start: 8,
+            length: 4,
+        },
+        EntertainmentSegment {
+            start: 12,
+            length: 4,
+        },
+        EntertainmentSegment {
+            start: 16,
+            length: 2,
+        },
+        EntertainmentSegment {
+            start: 18,
+            length: 2,
+        },
+    ],
+};
+
+// These hardcoded channel positions are likely used by all light strips made for TVs
+// Looks like |‾| (like the led strip attached to the back of a TV)
+const POSITIONS_LCX002: &[Position] = &[
+    Position {
+        x: -0.4,
+        y: 0.8,
+        z: -0.4,
+    },
+    Position {
+        x: -0.4,
+        y: 0.8,
+        z: 0.0,
+    },
+    Position {
+        x: -0.4,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.0,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.4,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.4,
+        y: 0.8,
+        z: 0.0,
+    },
+    Position {
+        x: 0.4,
+        y: 0.8,
+        z: -0.4,
+    },
+];
+
 // These values are just guessed based on chrivers' commit 35e66660c8fa1e39242583e0443745ad0a8d96c3
 pub const GRADIENT_LCX005: GradientProductData = GradientProductData {
     pixel_count: 18,
@@ -45,7 +122,7 @@ pub const GRADIENT_LCX005: GradientProductData = GradientProductData {
     ],
 };
 
-// These hardcoded channel positions are likely used by all light strips made for monitors or TVs
+// These hardcoded channel positions are likely used by all light strips made for monitors
 // Looks like |‾| (like the led strip attached to the back of a TV)
 const POSITIONS_LCX005: &[Position] = &[
     Position {
