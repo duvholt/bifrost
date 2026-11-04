@@ -154,7 +154,7 @@ fn add_hue_effects(light: &mut Light) {
     });
 }
 
-fn add_gradient(light: &mut Light) {
+fn add_gradient(light: &mut Light, pixel_count: u32) {
     light.content_configuration = Some(ContentConfiguration {
         orientation: Some(ContentConfigurationOrientation {
             configurable: true,
@@ -177,7 +177,7 @@ fn add_gradient(light: &mut Light) {
         ]),
         points_capable: 5,
         points: vec![],
-        pixel_count: vec![],
+        pixel_count,
     });
 }
 
@@ -270,7 +270,7 @@ async fn get_lights() -> TestResult<()> {
     );
     hue_flux_lightstrip.color = Some(color());
     hue_flux_lightstrip.color_temperature = Some(color_temperature(50, 1000));
-    add_gradient(&mut hue_flux_lightstrip);
+    add_gradient(&mut hue_flux_lightstrip, 18);
     add_hue_effects(&mut hue_flux_lightstrip);
 
     let mut hue_play_gradient_lightstrip = expected_dimmable_light(
@@ -282,7 +282,7 @@ async fn get_lights() -> TestResult<()> {
     );
     hue_play_gradient_lightstrip.color = Some(color());
     hue_play_gradient_lightstrip.color_temperature = Some(color_temperature(153, 500));
-    add_gradient(&mut hue_play_gradient_lightstrip);
+    add_gradient(&mut hue_play_gradient_lightstrip, 20);
     add_hue_effects(&mut hue_play_gradient_lightstrip);
 
     let mut hue_white_ambiance = expected_dimmable_light(
