@@ -24,15 +24,27 @@ pub const GRADIENT_LCX002: GradientProductData = GradientProductData {
         },
         EntertainmentSegment {
             start: 4,
-            length: 4,
+            length: 2,
+        },
+        EntertainmentSegment {
+            start: 6,
+            length: 2,
         },
         EntertainmentSegment {
             start: 8,
-            length: 4,
+            length: 2,
+        },
+        EntertainmentSegment {
+            start: 10,
+            length: 2,
         },
         EntertainmentSegment {
             start: 12,
-            length: 4,
+            length: 2,
+        },
+        EntertainmentSegment {
+            start: 14,
+            length: 2,
         },
         EntertainmentSegment {
             start: 16,
@@ -64,7 +76,22 @@ const POSITIONS_LCX002: &[Position] = &[
         z: 0.4,
     },
     Position {
-        x: 0.0,
+        x: -0.24,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: -0.08,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.08,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.24,
         y: 0.8,
         z: 0.4,
     },
