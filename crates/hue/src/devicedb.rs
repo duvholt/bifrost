@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use crate::api::{DeviceArchetype, DeviceProductData};
-use crate::gradient::{GRADIENT_929004610402, GRADIENT_LCX005, GradientProductData};
+use crate::gradient::{
+    GRADIENT_929004610402, GRADIENT_LCX001, GRADIENT_LCX002, GRADIENT_LCX003, GRADIENT_LCX005,
+    GradientProductData,
+};
 
 // This file contains discovered product data from multiple sources,
 // including data samples from the community, and various open source or public
@@ -72,9 +75,9 @@ fn make_product_data() -> BTreeMap<&'static str, SimpleProductData<'static>> {
         "LCT014" => SPD::signify("Hue color lamp", SultanBulb, "100b-10c"),
         "LCT015" => SPD::signify("Hue color lamp", SultanBulb, "100b-10c"),
         "LCT016" => SPD::signify("Hue color lamp", SultanBulb, "100b-10c"),
-        "LCX001" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
-        "LCX002" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
-        "LCX003" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
+        "LCX001" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX001.clone()),
+        "LCX002" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX002.clone()),
+        "LCX003" => SPD::signify("Hue play gradient lightstrip", HueLightstripTv, "100b-118").with_gradient(GRADIENT_LCX003.clone()),
         "LCX005" => SPD::signify("Hue play gradient lightstrip", HueLightstripPc, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
         "LCX006" => SPD::signify("Hue play gradient lightstrip", HueLightstripPc, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
         "LCX007" => SPD::signify("Hue play gradient lightstrip", HueLightstripPc, "100b-118").with_gradient(GRADIENT_LCX005.clone()),
