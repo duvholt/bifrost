@@ -3,7 +3,12 @@ use std::sync::LazyLock;
 
 use crate::api::{DeviceArchetype, DeviceProductData};
 use crate::gradient::{
-    GRADIENT_929004610402, GRADIENT_LCX001, GRADIENT_LCX002, GRADIENT_LCX003, GRADIENT_LCX005, GradientProductData,
+    GRADIENT_929004610402,
+    GRADIENT_LCX001,
+    GRADIENT_LCX002,
+    GRADIENT_LCX003,
+    GRADIENT_LCX005,
+    GradientProductData,
 };
 
 // This file contains discovered product data from multiple sources,
