@@ -159,10 +159,29 @@ fn find_bridge_entertainment(lock: &Resources) -> ApiResult<ResourceLink> {
     Ok(bridge_ent)
 }
 
+#[must_use]
+pub fn active_area(res: &Resources) -> Option<Uuid> {
+    res.get_resource_ids_by_type(RType::EntertainmentConfiguration)
+        .into_iter()
+        .find(|id| {
+            res.get_id::<EntertainmentConfiguration>(*id)
+                .is_ok_and(|ec| ec.status == EntertainmentConfigurationStatus::Active)
+        })
+}
+
 pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) -> ApiV2Result {
     let upd: EntertainmentConfigurationUpdate = serde_json::from_value(put)?;
 
     let mut lock = state.res.lock().await;
+
+    // A real bridge streams one area at a time. It accepts a start for another
+    // area while one is streaming, or a stop for an area that isn't, and
+    // ignores both
+    let streaming = active_area(&lock);
+    let action = upd.action.clone().filter(|action| match action {
+        EntertainmentConfigurationAction::Start => streaming.is_none_or(|id| id == rlink.rid),
+        EntertainmentConfigurationAction::Stop => streaming == Some(rlink.rid),
+    });
 
     let mut locations = None;
     let mut channels = vec![];
@@ -182,7 +201,7 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
         locations = Some(newlocs);
     }
 
-    if let Some(action) = &upd.action {
+    if let Some(action) = &action {
         let rids: Vec<_> = lock
             .get::<EntertainmentConfiguration>(&rlink)?
             .light_services
@@ -232,7 +251,7 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
             ec.metadata = md.clone();
         }
 
-        if let Some(action) = &upd.action {
+        if let Some(action) = &action {
             match action {
                 EntertainmentConfigurationAction::Start => {
                     ec.active_streamer =
@@ -247,7 +266,7 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
         }
     })?;
 
-    match upd.action {
+    match action {
         Some(EntertainmentConfigurationAction::Start) => {
             lock.backend_request(BackendRequest::EntertainmentStart(rlink.rid))?;
         }
