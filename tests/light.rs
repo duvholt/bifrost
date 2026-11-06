@@ -282,7 +282,7 @@ async fn get_lights() -> TestResult<()> {
     );
     hue_play_gradient_lightstrip.color = Some(color());
     hue_play_gradient_lightstrip.color_temperature = Some(color_temperature(153, 500));
-    add_gradient(&mut hue_play_gradient_lightstrip, 20);
+    add_gradient(&mut hue_play_gradient_lightstrip, 17);
     add_hue_effects(&mut hue_play_gradient_lightstrip);
 
     let mut hue_white_ambiance = expected_dimmable_light(
