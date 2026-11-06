@@ -27,7 +27,22 @@ const POSITIONS_LCX001: &[Position] = &[
         z: 0.4,
     },
     Position {
-        x: 0.0,
+        x: -0.24,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: -0.08,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.08,
+        y: 0.8,
+        z: 0.4,
+    },
+    Position {
+        x: 0.24,
         y: 0.8,
         z: 0.4,
     },
