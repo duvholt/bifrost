@@ -1,5 +1,5 @@
 use bifrost_api::backend::BackendRequest;
-use hue::devicedb::gradient_product_data;
+use hue::devicedb::{gradient_product_data, product_data};
 use hue::error::HueError;
 use serde_json::Value;
 use uuid::{Uuid, uuid};
@@ -11,7 +11,7 @@ use hue::api::{
     EntertainmentConfigurationStatus, EntertainmentConfigurationStreamMembers,
     EntertainmentConfigurationStreamProxy, EntertainmentConfigurationStreamProxyMode,
     EntertainmentConfigurationStreamProxyUpdate, EntertainmentConfigurationUpdate, Light,
-    LightMode, RType, Resource, ResourceLink,
+    LightMode, Position, RType, Resource, ResourceLink,
 };
 
 use crate::error::ApiResult;
@@ -77,6 +77,25 @@ pub async fn post_resource(state: &AppState, req: Value) -> ApiV2Result {
     V2Reply::ok(rlink)
 }
 
+/// Positions of the `count` segments of a light, spread evenly between the
+/// first and the last of the `points` given by the Hue app
+///
+/// Returns `None` if the existing positions should be used instead: when the
+/// light has segment positions of its own, or when the app gave less than two
+/// points.
+fn segment_line(
+    points: &[Position],
+    count: usize,
+    has_own_gradient_data: bool,
+) -> Option<Vec<Position>> {
+    match (points.first(), points.last()) {
+        (Some(start), Some(end)) if points.len() >= 2 && !has_own_gradient_data => {
+            Some(Position::spread(start, end, count))
+        }
+        _ => None,
+    }
+}
+
 fn make_channels(
     lock: &Resources,
     locations: &[EntertainmentConfigurationServiceLocations],
@@ -93,14 +112,33 @@ fn make_channels(
         let device = lock.get::<Device>(&ent.owner)?;
 
         let gradient = gradient_product_data(&device.product_data.model_id);
+        let has_own_gradient_data =
+            product_data(&device.product_data.model_id).is_some_and(|pd| pd.gradient.is_some());
 
         let positions = gradient.entertainment_channel_positions;
         if let Some(segs) = &ent.segments {
             if segs.segments.len() > 1 {
+                // For lights that we have no segment positions for (e.g. the
+                // Hue Signe), the Hue app tells us where the first and the
+                // last segment are, with a start and an end point. Spread the
+                // segments evenly between them. Flipping the light in the app
+                // swaps the two points, which reverses the order of the
+                // segments.
+                let line = segment_line(
+                    &location.positions,
+                    segs.segments.len(),
+                    has_own_gradient_data,
+                );
+
                 for index in 0..segs.segments.len() {
+                    let position = line.as_ref().map_or_else(
+                        || positions[index % positions.len()].clone(),
+                        |line| line[index].clone(),
+                    );
+
                     channels.push(EntertainmentConfigurationChannels {
                         channel_id,
-                        position: positions[index % positions.len()].clone(),
+                        position,
                         members: vec![EntertainmentConfigurationStreamMembers {
                             service: location.service,
                             index: u16::try_from(index)?,
@@ -279,4 +317,69 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
     drop(lock);
 
     V2Reply::ok(rlink)
+}
+
+#[cfg(test)]
+mod tests {
+    use hue::api::Position;
+
+    use super::segment_line;
+
+    fn assert_z(line: &[Position], want: &[f64]) {
+        assert_eq!(line.len(), want.len());
+        for (p, w) in line.iter().zip(want) {
+            assert!((p.z - w).abs() < 1e-9, "{} != {w}", p.z);
+        }
+    }
+
+    #[test]
+    fn segments_are_spread_between_the_two_points() {
+        let points = [Position::new(0.0, 0.0, -1.0), Position::new(0.0, 0.0, 1.0)];
+
+        let line = segment_line(&points, 5, false).expect("two points spread the segments");
+
+        assert_z(&line, &[-1.0, -0.5, 0.0, 0.5, 1.0]);
+    }
+
+    #[test]
+    fn flipping_the_light_reverses_the_segments() {
+        let points = [Position::new(0.0, 0.0, -1.0), Position::new(0.0, 0.0, 1.0)];
+        let flipped = [points[1].clone(), points[0].clone()];
+
+        let forward = segment_line(&points, 7, false).unwrap();
+        let backward = segment_line(&flipped, 7, false).unwrap();
+
+        let mut reversed: Vec<f64> = backward.iter().map(|p| p.z).collect();
+        reversed.reverse();
+        assert_z(&forward, &reversed);
+    }
+
+    #[test]
+    fn the_first_and_the_last_point_are_used() {
+        // more than two points: only the ends count
+        let points = [
+            Position::new(0.0, 0.0, -1.0),
+            Position::new(5.0, 5.0, 5.0),
+            Position::new(0.0, 0.0, 1.0),
+        ];
+
+        let line = segment_line(&points, 3, false).unwrap();
+
+        assert_z(&line, &[-1.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn lights_with_their_own_segment_data_keep_their_positions() {
+        let points = [Position::new(0.0, 0.0, -1.0), Position::new(0.0, 0.0, 1.0)];
+
+        assert!(segment_line(&points, 5, true).is_none());
+    }
+
+    #[test]
+    fn a_single_point_keeps_the_existing_positions() {
+        let points = [Position::new(0.0, 0.0, 0.0)];
+
+        assert!(segment_line(&points, 5, false).is_none());
+        assert!(segment_line(&[], 5, false).is_none());
+    }
 }
