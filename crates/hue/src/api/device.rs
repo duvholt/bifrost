@@ -16,7 +16,7 @@ impl Device {
 
     #[must_use]
     pub fn bridge_resource_link(bridge: uuid::Uuid) -> ResourceLink {
-        RType::Device.deterministic(bridge)
+        RType::Device.deterministic(bridge.as_bytes())
     }
 }
 

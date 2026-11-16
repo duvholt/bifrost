@@ -10,7 +10,7 @@ use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink}
 impl Zone {
     #[must_use]
     pub fn resource_link(grouped_light: uuid::Uuid) -> ResourceLink {
-        RType::Zone.deterministic(grouped_light)
+        RType::Zone.deterministic(grouped_light.as_bytes())
     }
 }
 

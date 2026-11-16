@@ -40,7 +40,7 @@ pub enum SceneStatusEnum {
 impl Scene {
     #[must_use]
     pub fn resource_link(owner: uuid::Uuid, scene_id: u32) -> ResourceLink {
-        RType::Scene.deterministic((owner, scene_id))
+        RType::Scene.deterministic((owner.as_bytes(), scene_id))
     }
 }
 

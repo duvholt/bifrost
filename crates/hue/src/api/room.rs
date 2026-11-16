@@ -8,7 +8,7 @@ use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink}
 impl Room {
     #[must_use]
     pub fn resource_link(grouped_light: uuid::Uuid) -> ResourceLink {
-        RType::Room.deterministic(grouped_light)
+        RType::Room.deterministic(grouped_light.as_bytes())
     }
 
     #[must_use]

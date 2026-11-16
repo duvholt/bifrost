@@ -169,7 +169,7 @@ impl ZigbeeConnectivity {
 
     #[must_use]
     pub fn bridge_resource_link(bridge: uuid::Uuid) -> ResourceLink {
-        RType::ZigbeeConnectivity.deterministic(bridge)
+        RType::ZigbeeConnectivity.deterministic(bridge.as_bytes())
     }
 }
 

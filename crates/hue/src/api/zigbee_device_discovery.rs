@@ -28,7 +28,7 @@ impl ZigbeeDeviceDiscoveryAction {
 impl ZigbeeDeviceDiscovery {
     #[must_use]
     pub fn resource_link(bridge: Uuid) -> ResourceLink {
-        RType::ZigbeeDeviceDiscovery.deterministic(bridge)
+        RType::ZigbeeDeviceDiscovery.deterministic(bridge.as_bytes())
     }
 }
 

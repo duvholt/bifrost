@@ -18,12 +18,12 @@ impl GroupedLight {
 
     #[must_use]
     pub fn bridge_home_resource_link(bridge_home: uuid::Uuid) -> ResourceLink {
-        RType::GroupedLight.deterministic(bridge_home)
+        RType::GroupedLight.deterministic(bridge_home.as_bytes())
     }
 
     #[must_use]
     pub fn legacy_resource_link(room: uuid::Uuid, group_id: u32) -> ResourceLink {
-        RType::GroupedLight.deterministic((room, group_id))
+        RType::GroupedLight.deterministic((room.as_bytes(), group_id))
     }
 }
 

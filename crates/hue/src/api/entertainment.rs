@@ -10,7 +10,7 @@ impl Entertainment {
 
     #[must_use]
     pub fn bridge_resource_link(bridge: uuid::Uuid) -> ResourceLink {
-        RType::Entertainment.deterministic(bridge)
+        RType::Entertainment.deterministic(bridge.as_bytes())
     }
 }
 
