@@ -172,3 +172,166 @@ pub fn check_certificate(certpath: &Utf8Path, mac: MacAddress) -> ApiResult<()> 
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use der::DecodePem;
+    use openssl::pkey::PKey;
+    use openssl::x509::X509;
+
+    const MAC: [u8; 6] = [0x00, 0x17, 0x88, 0x01, 0x02, 0x03];
+    // generated using x509-cert 0.2.5
+    const CERTIFICATE: &[u8] = br"-----BEGIN CERTIFICATE-----
+MIICODCCAd6gAwIBAgIHF4j//gECAzAKBggqhkjOPQQDAjA+MQswCQYDVQQGEwJO
+TDEUMBIGA1UECgwLUGhpbGlwcyBIdWUxGTAXBgNVBAMMEDAwMTc4OGZmZmUwMTAy
+MDMwHhcNMTcwMTAxMDAwMDAwWhcNMzgwMTE5MDMxNDA3WjA+MQswCQYDVQQGEwJO
+TDEUMBIGA1UECgwLUGhpbGlwcyBIdWUxGTAXBgNVBAMMEDAwMTc4OGZmZmUwMTAy
+MDMwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARv8DuUkkHOHa3UNRnmlg4KhbQa
+aaBcMoEDqivOFZTKFjxPdTpVvwHcU/bAsMfu54tAxv99JaluIoK5ic73HBRKo4HG
+MIHDMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMBYGA1UdJQEB/wQMMAoG
+CCsGAQUFBwMBMB0GA1UdDgQWBBQuBix5Zl580sMuRht8V8MsAPQUMDBsBgNVHSME
+ZTBjgBQuBix5Zl580sMuRht8V8MsAPQUMKFCpEAwPjELMAkGA1UEBhMCTkwxFDAS
+BgNVBAoMC1BoaWxpcHMgSHVlMRkwFwYDVQQDDBAwMDE3ODhmZmZlMDEwMjAzggcX
+iP/+AQIDMAoGCCqGSM49BAMCA0gAMEUCIQCBqon5HAJrHVMu8COTbch4uzlaZqnU
+Ve86cp9QOSbntQIge8PLkHjPf0up9c/A+JFe42SVYBpD21lLgltlgE8J/KM=
+-----END CERTIFICATE-----
+";
+
+    #[test]
+    fn certificate_contents() -> ApiResult<()> {
+        let key = p256::SecretKey::from_slice(&[1; 32]).unwrap();
+        let expected = Certificate::from_pem(CERTIFICATE)?;
+        let actual = generate(&key, MacAddress::new(MAC))?;
+
+        // ECDSA signatures can vary with the same input so we compare the data before signing instead
+        assert_eq!(
+            actual.tbs_certificate.to_der()?,
+            expected.tbs_certificate.to_der()?
+        );
+        assert_eq!(actual.signature_algorithm, expected.signature_algorithm);
+        Ok(())
+    }
+
+    #[test]
+    fn certificate_fields() -> ApiResult<()> {
+        let key = p256::SecretKey::from_slice(&[1; 32]).unwrap();
+        let mac = MacAddress::new([0xec, 0xb5, 0xfa, 0x2b, 0xce, 0x8c]);
+        let cert = generate(&key, mac)?;
+        let tbs = &cert.tbs_certificate;
+
+        assert_eq!(tbs.version, x509_cert::certificate::Version::V3);
+        assert_eq!(
+            tbs.subject,
+            Name::from_str("CN=ecb5fafffe2bce8c,O=Philips Hue,C=NL")?
+        );
+        assert_eq!(tbs.issuer, tbs.subject);
+        // DER INTEGER with nine content bytes: a leading zero plus the eight-byte bridge ID
+        assert_eq!(
+            tbs.serial_number.to_der()?,
+            [
+                0x02, 0x09, 0x00, 0xec, 0xb5, 0xfa, 0xff, 0xfe, 0x2b, 0xce, 0x8c
+            ]
+        );
+        let aki = tbs.get::<pkix::AuthorityKeyIdentifier>()?.unwrap().1;
+        assert_eq!(
+            aki.authority_cert_serial_number.as_ref(),
+            Some(&tbs.serial_number)
+        );
+        assert_eq!(
+            tbs.validity.not_before.to_date_time(),
+            DateTime::new(2017, 1, 1, 0, 0, 0)?
+        );
+        assert_eq!(
+            tbs.validity.not_after.to_date_time(),
+            DateTime::new(2038, 1, 19, 3, 14, 7)?
+        );
+        //  ECDSA with SHA-256
+        assert_eq!(tbs.signature.oid.to_string(), "1.2.840.10045.4.3.2");
+        assert_eq!(tbs.signature.parameters, None);
+        assert_eq!(cert.signature_algorithm, tbs.signature);
+        Ok(())
+    }
+
+    #[test]
+    fn certificate_extensions() -> ApiResult<()> {
+        let key = p256::SecretKey::from_slice(&[1; 32]).unwrap();
+        let cert = generate(&key, MacAddress::new(MAC))?;
+        let tbs = &cert.tbs_certificate;
+        let extensions = tbs.extensions.as_ref().unwrap();
+        let order: Vec<_> = extensions
+            .iter()
+            .map(|ext| (ext.extn_id.to_string(), ext.critical))
+            .collect();
+        assert_eq!(
+            order,
+            [
+                // Basic Constraints
+                ("2.5.29.19".into(), true),
+                // Key Usage
+                ("2.5.29.15".into(), true),
+                // Extended key usage
+                ("2.5.29.37".into(), true),
+                // Subject Key Identifier
+                ("2.5.29.14".into(), false),
+                // Authority Key Identifier
+                ("2.5.29.35".into(), false),
+            ]
+        );
+        assert_eq!(
+            tbs.get::<pkix::BasicConstraints>()?.unwrap().1,
+            pkix::BasicConstraints {
+                ca: false,
+                path_len_constraint: None,
+            }
+        );
+        assert_eq!(
+            tbs.get::<pkix::KeyUsage>()?.unwrap().1,
+            pkix::KeyUsage(pkix::KeyUsages::DigitalSignature.into())
+        );
+        assert_eq!(
+            tbs.get::<ExtendedKeyUsage>()?.unwrap().1,
+            ExtendedKeyUsage(vec![ID_KP_SERVER_AUTH])
+        );
+
+        let ski = tbs.get::<pkix::SubjectKeyIdentifier>()?.unwrap().1;
+        assert_eq!(
+            hex::encode(ski.0.as_bytes()),
+            "2e062c79665e7cd2c32e461b7c57c32c00f41430"
+        );
+        let aki = tbs.get::<pkix::AuthorityKeyIdentifier>()?.unwrap().1;
+        assert_eq!(aki.key_identifier, Some(ski.0));
+        assert_eq!(
+            aki.authority_cert_issuer,
+            Some(vec![GeneralName::DirectoryName(tbs.issuer.clone())])
+        );
+        assert_eq!(
+            aki.authority_cert_serial_number,
+            Some(tbs.serial_number.clone())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn certificate_is_signed_by_supplied_key() -> ApiResult<()> {
+        let key = p256::SecretKey::from_slice(&[2; 32]).unwrap();
+        let cert = X509::from_der(&generate(&key, MacAddress::new(MAC))?.to_der()?)?;
+        let key = PKey::private_key_from_pem(key.to_pkcs8_pem(LineEnding::LF)?.as_bytes())?;
+
+        assert!(cert.public_key()?.public_eq(&key));
+        assert!(cert.verify(&key)?);
+        Ok(())
+    }
+
+    #[test]
+    fn common_name() -> ApiResult<()> {
+        let key = p256::SecretKey::from_slice(&[1; 32]).unwrap();
+        let mac = MacAddress::new([0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]);
+        let pem = generate(&key, mac)?.to_pem(LineEnding::LF)?;
+        assert_eq!(
+            extract_common_name(pem.as_bytes())?.as_deref(),
+            Some("aabbccfffeddeeff")
+        );
+        Ok(())
+    }
+}
