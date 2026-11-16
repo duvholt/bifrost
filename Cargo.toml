@@ -110,13 +110,12 @@ tracing = "0.1.44"
 uuid = { version = "=1.16.0", features = ["serde", "v4", "v5"] }
 pretty_env_logger = "0.5.0"
 camino = { version = "1.2.6", features = ["serde1"] }
-x509-cert = { version = "0.2.5", features = ["builder", "hazmat", "pem"], default-features = false }
-rsa = "0.9.10"
-sha2 = { version = "0.10.9", features = ["oid"] }
-p256 = "0.13.2"
-ecdsa = { version = "0.16.9", features = ["der"] }
-der = { version = "0.7.10", features = ["oid"] }
-sha1 = "0.10.7"
+x509-cert = { version = "0.3.0", features = ["builder", "hazmat", "pem"], default-features = false }
+sha2 = { version = "0.11.1", features = ["oid"] }
+p256 = "0.14.0"
+ecdsa = { version = "0.17.0", features = ["der"] }
+der = { version = "0.8.3", features = ["oid"] }
+sha1 = "0.11.0"
 rustls-pemfile = "2.2.0"
 termcolor = { version = "1.4.1", optional = true }
 itertools = "0.15.0"

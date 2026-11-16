@@ -3,8 +3,8 @@ use std::io::{Write, stdout};
 use clap::Parser;
 use der::{EncodePem, pem::LineEnding};
 use mac_address::MacAddress;
+use p256::elliptic_curve::Generate;
 use p256::pkcs8::EncodePrivateKey;
-use rsa::rand_core::OsRng;
 
 use bifrost::{error::ApiResult, server::certificate};
 
@@ -16,7 +16,7 @@ struct Cli {
 fn main() -> ApiResult<()> {
     let args = Cli::parse();
 
-    let secret_key = p256::SecretKey::random(&mut OsRng);
+    let secret_key = p256::SecretKey::generate();
     let cert = certificate::generate(&secret_key, args.mac)?;
 
     let mut out = stdout().lock();
