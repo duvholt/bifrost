@@ -872,9 +872,9 @@ async fn handle_z2m_group_changes() -> TestResult<()> {
 async fn handle_z2m_group_change_for_legacy_room() -> TestResult<()> {
     init();
 
-    let legacy_room_link = RType::Room.deterministic(KITCHEN_GROUP.friendly_name);
+    let legacy_room_link = Room::legacy_resource_link(KITCHEN_GROUP.friendly_name);
     let legacy_grouped_light_link =
-        RType::GroupedLight.deterministic((legacy_room_link.rid, KITCHEN_GROUP.id));
+        GroupedLight::legacy_resource_link(legacy_room_link.rid, KITCHEN_GROUP.id);
 
     let mut test = TestBridge::start_with_seed(z2m_state(), |resources| {
         resources.add(

@@ -307,13 +307,13 @@ impl Resources {
     }
 
     pub fn add_bridge(&mut self, bridge_id: String) -> ApiResult<()> {
-        let link_bridge = RType::Bridge.deterministic(&bridge_id);
-        let link_bridge_home = RType::BridgeHome.deterministic(format!("{bridge_id}HOME"));
-        let link_bridge_dev = RType::Device.deterministic(link_bridge.rid);
-        let link_bridge_ent = RType::Entertainment.deterministic(link_bridge.rid);
-        let link_zbdd = RType::ZigbeeDeviceDiscovery.deterministic(link_bridge.rid);
-        let link_zbc = RType::ZigbeeConnectivity.deterministic(link_bridge.rid);
-        let link_bhome_glight = RType::GroupedLight.deterministic(link_bridge_home.rid);
+        let link_bridge = Bridge::resource_link(&bridge_id);
+        let link_bridge_home = BridgeHome::resource_link(&bridge_id);
+        let link_bridge_dev = Device::bridge_resource_link(link_bridge.rid);
+        let link_bridge_ent = Entertainment::bridge_resource_link(link_bridge.rid);
+        let link_zbdd = ZigbeeDeviceDiscovery::resource_link(link_bridge.rid);
+        let link_zbc = ZigbeeConnectivity::bridge_resource_link(link_bridge.rid);
+        let link_bhome_glight = GroupedLight::bridge_home_resource_link(link_bridge_home.rid);
 
         let bridge_dev = Device {
             product_data: DeviceProductData::hue_bridge_v2(&self.version),

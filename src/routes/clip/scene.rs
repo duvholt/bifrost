@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use bifrost_api::backend::BackendRequest;
-use hue::api::{RType, ResourceLink, Scene, SceneUpdate};
+use hue::api::{ResourceLink, Scene, SceneUpdate};
 
 use crate::routes::clip::{ApiV2Result, V2Reply};
 use crate::server::appstate::AppState;
@@ -13,7 +13,7 @@ pub async fn post_scene(state: &AppState, req: Value) -> ApiV2Result {
 
     let sid = lock.get_next_scene_id(&scene.group)?;
 
-    let link_scene = RType::Scene.deterministic((scene.group.rid, sid));
+    let link_scene = Scene::resource_link(scene.group.rid, sid);
 
     lock.backend_request(BackendRequest::SceneCreate(link_scene, sid, scene))?;
 

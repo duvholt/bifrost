@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::{RType, ResourceLink};
 
+impl BridgeHome {
+    #[must_use]
+    pub fn resource_link(bridge_id: &str) -> ResourceLink {
+        RType::BridgeHome.deterministic(format!("{bridge_id}HOME"))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BridgeHome {
     pub children: BTreeSet<ResourceLink>,
