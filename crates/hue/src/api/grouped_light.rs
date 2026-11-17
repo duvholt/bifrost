@@ -5,10 +5,27 @@ use serde_json::Value;
 
 use crate::api::{
     ColorTemperatureUpdate, ColorUpdate, DimmingDeltaUpdate, DimmingUpdate, LightAlert,
-    LightSignal, LightSignaling, On, ResourceLink, Stub,
+    LightSignal, LightSignaling, On, RType, ResourceLink, Stub,
 };
 use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
+
+impl GroupedLight {
+    #[must_use]
+    pub fn resource_link(backend: &str, group_id: u32) -> ResourceLink {
+        RType::GroupedLight.deterministic((backend, group_id))
+    }
+
+    #[must_use]
+    pub fn bridge_home_resource_link(bridge_home: uuid::Uuid) -> ResourceLink {
+        RType::GroupedLight.deterministic(bridge_home.as_bytes())
+    }
+
+    #[must_use]
+    pub fn legacy_resource_link(room: uuid::Uuid, group_id: u32) -> ResourceLink {
+        RType::GroupedLight.deterministic((room.as_bytes(), group_id))
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct GroupedLight {

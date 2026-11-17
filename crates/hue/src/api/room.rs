@@ -5,6 +5,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
+impl Room {
+    #[must_use]
+    pub fn resource_link(grouped_light: uuid::Uuid) -> ResourceLink {
+        RType::Room.deterministic(grouped_light.as_bytes())
+    }
+
+    #[must_use]
+    pub fn legacy_resource_link(friendly_name: &str) -> ResourceLink {
+        RType::Room.deterministic(friendly_name)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Room {
     pub children: BTreeSet<ResourceLink>,

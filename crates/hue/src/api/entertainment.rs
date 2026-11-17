@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 
-use crate::api::ResourceLink;
+use crate::api::{RType, ResourceLink};
+
+impl Entertainment {
+    #[must_use]
+    pub fn zigbee_resource_link(ieee_address: u64) -> ResourceLink {
+        RType::Entertainment.deterministic(ieee_address)
+    }
+
+    #[must_use]
+    pub fn bridge_resource_link(bridge: uuid::Uuid) -> ResourceLink {
+        RType::Entertainment.deterministic(bridge.as_bytes())
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Entertainment {

@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use hue::api::{
     BridgeHome, Button, ContentConfiguration, ContentConfigurationOrder,
-    ContentConfigurationOrientation, ContentConfigurationStatusType, DeviceArchetype,
+    ContentConfigurationOrientation, ContentConfigurationStatusType, Device, DeviceArchetype,
     DeviceProductData, Entertainment, EntertainmentSegment, EntertainmentSegments, GroupArchetype,
     GroupMetadata, GroupedLight, Light, LightEffects, LightEffectsV2, LightMetadata,
     LightTimedEffect, LightTimedEffects, Metadata, OrderType, OrientationType, RType, Resource,
@@ -35,11 +35,11 @@ impl Z2mBackend {
     ) -> ApiResult<()> {
         let name = &apidev.friendly_name;
 
-        let link_device = RType::Device.deterministic(&apidev.ieee_address);
-        let link_light = RType::Light.deterministic(&apidev.ieee_address);
-        let link_enttm = RType::Entertainment.deterministic(&apidev.ieee_address);
-        let link_taurus = RType::Taurus.deterministic(&apidev.ieee_address);
-        let link_zigcon = RType::ZigbeeConnectivity.deterministic(&apidev.ieee_address);
+        let link_device = Device::zigbee_resource_link(apidev.ieee_address.as_u64());
+        let link_light = Light::resource_link(apidev.ieee_address.as_u64());
+        let link_enttm = Entertainment::zigbee_resource_link(apidev.ieee_address.as_u64());
+        let link_taurus = Taurus::resource_link(apidev.ieee_address.as_u64());
+        let link_zigcon = ZigbeeConnectivity::zigbee_resource_link(apidev.ieee_address.as_u64());
 
         let product_data = DeviceProductData::guess_from_device(apidev);
         let metadata = LightMetadata::new(product_data.product_archetype.clone(), name);
@@ -49,7 +49,7 @@ impl Z2mBackend {
         let gradient = apidev.expose_gradient();
         let gradient_product_data = gradient_product_data(&product_data.model_id);
 
-        let dev = hue::api::Device {
+        let dev = Device {
             product_data,
             metadata: metadata.clone().into(),
             services: btreeset![link_zigcon, link_light, link_enttm, link_taurus],
@@ -175,12 +175,12 @@ impl Z2mBackend {
     pub async fn add_switch(&mut self, apidev: &z2m::api::Device) -> ApiResult<Option<()>> {
         let name = &apidev.friendly_name;
 
-        let link_device = RType::Device.deterministic(&apidev.ieee_address);
+        let link_device = Device::zigbee_resource_link(apidev.ieee_address.as_u64());
 
         self.map.insert(name.to_owned(), link_device);
         self.rmap.insert(link_device, name.to_owned());
 
-        let link_zbc = RType::ZigbeeConnectivity.deterministic(&apidev.ieee_address);
+        let link_zbc = ZigbeeConnectivity::zigbee_resource_link(apidev.ieee_address.as_u64());
 
         // missing services:
         // device_power
@@ -198,7 +198,7 @@ impl Z2mBackend {
         };
 
         for button in &button_device.buttons {
-            let link_button = RType::Button.deterministic((&apidev.ieee_address, &button.name));
+            let link_button = Button::resource_link(apidev.ieee_address.as_u64(), &button.name);
             let button = Button {
                 owner: link_device,
                 metadata: button.metadata.clone(),
@@ -208,7 +208,7 @@ impl Z2mBackend {
             services.insert(link_button);
         }
 
-        let dev = hue::api::Device {
+        let dev = Device {
             product_data: DeviceProductData::guess_from_device(apidev),
             metadata: Metadata::new(DeviceArchetype::UnknownArchetype, name),
             services,
@@ -264,12 +264,12 @@ impl Z2mBackend {
         let mut lock = self.state.lock().await;
         let link_glight = self
             .find_grouped_light(&lock, grp.id, &topic)?
-            .unwrap_or_else(|| RType::GroupedLight.deterministic((&self.name, grp.id)));
+            .unwrap_or_else(|| GroupedLight::resource_link(&self.name, grp.id));
 
         let glight = if let Ok(glight) = lock.get::<GroupedLight>(&link_glight).cloned() {
             glight
         } else {
-            let link_room = RType::Room.deterministic(link_glight.rid);
+            let link_room = Room::resource_link(link_glight.rid);
             let glight = GroupedLight::new(link_room);
             lock.add(&link_glight, Resource::GroupedLight(glight.clone()))?;
             glight
@@ -282,8 +282,8 @@ impl Z2mBackend {
             .members
             .iter()
             .map(|f| match owner_link.rtype {
-                RType::Zone => RType::Light.deterministic(&f.ieee_address),
-                _ => RType::Device.deterministic(&f.ieee_address),
+                RType::Zone => Light::resource_link(f.ieee_address.as_u64()),
+                _ => Device::zigbee_resource_link(f.ieee_address.as_u64()),
             })
             .collect();
 
@@ -319,7 +319,7 @@ impl Z2mBackend {
                 }),
             };
 
-            let link_scene = RType::Scene.deterministic((owner_link.rid, scn.id));
+            let link_scene = Scene::resource_link(owner_link.rid, scn.id);
 
             res.aux_set(
                 &link_scene,
@@ -451,8 +451,8 @@ impl Z2mBackend {
                 }
                 Err(ApiError::AuxNotFound(_)) => {
                     // match rooms that haven't been migrated yet
-                    let link_room = RType::Room.deterministic(friendly_name);
-                    let link_glight = RType::GroupedLight.deterministic((link_room.rid, group_id));
+                    let link_room = Room::legacy_resource_link(friendly_name);
+                    let link_glight = GroupedLight::legacy_resource_link(link_room.rid, group_id);
                     if link_glight == link {
                         return Ok(Some(link_glight));
                     }

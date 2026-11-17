@@ -12,18 +12,18 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-log = "0.4.33"
-serde = "1.0.228"
-serde_json = "1.0.150"
+log = "0.4.35"
+serde = "1.0.229"
+serde_json = "1.0.154"
 z2m = { version = "0.1.0", path = "../z2m", default-features = false }
 svc = { version = "0.1.0", path = "../svc", default-features = false }
 bifrost-api = { version = "0.1.0", path = "../bifrost-api", default-features = false }
-tokio = "1.52.3"
+tokio = "1.54.1"
 tungstenite = "0.30.0"
 tokio-tungstenite = "0.30.0"
-futures = "0.3.32"
-thiserror = "2.0.18"
-async-trait = "0.1.89"
+futures = "0.3.34"
+thiserror = "2.0.21"
+async-trait = "0.1.92"
 hex = "0.4.3"
 
 [lints]
