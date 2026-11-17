@@ -120,6 +120,9 @@ pub enum ApiError {
     NativeTlsError(#[from] native_tls::Error),
 
     #[error(transparent)]
+    PemError(#[from] rustls_pki_types::pem::Error),
+
+    #[error(transparent)]
     ChronoOutOfRangeError(#[from] chrono::OutOfRangeError),
 
     #[error("Service error: {0}")]

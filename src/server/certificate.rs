@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::str::FromStr;
 
 use camino::Utf8Path;
@@ -12,6 +12,8 @@ use mac_address::MacAddress;
 use p256::ecdsa::DerSignature;
 use p256::elliptic_curve::Generate;
 use p256::pkcs8::EncodePrivateKey;
+use rustls_pki_types::CertificateDer;
+use rustls_pki_types::pem::PemObject;
 use sha1::Sha1;
 use sha2::Digest;
 use x509_cert::Certificate;
@@ -142,9 +144,7 @@ pub fn generate(secret_key: &p256::SecretKey, mac: MacAddress) -> ApiResult<Cert
 }
 
 pub fn extract_common_name(rdr: impl Read) -> ApiResult<Option<String>> {
-    let bufread = &mut BufReader::new(rdr);
-
-    for chunk in rustls_pemfile::certs(bufread) {
+    for chunk in CertificateDer::pem_reader_iter(rdr) {
         let cert = Certificate::from_der(&chunk?)?;
 
         for name in cert.tbs_certificate().subject().iter_rdn() {
