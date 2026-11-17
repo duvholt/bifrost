@@ -4,6 +4,13 @@ use serde_json::Value;
 use crate::api::{DeviceArchetype, LightFunction, RType, ResourceLink, SceneMetadata};
 use crate::best_guess_timezone;
 
+impl Bridge {
+    #[must_use]
+    pub fn resource_link(bridge_id: &str) -> ResourceLink {
+        RType::Bridge.deterministic(bridge_id)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Bridge {
     pub bridge_id: String,
@@ -134,6 +141,13 @@ pub struct SmartScene {
     pub week_timeslots: Value,
 }
 
+impl Taurus {
+    #[must_use]
+    pub fn resource_link(ieee_address: u64) -> ResourceLink {
+        RType::Taurus.deterministic(ieee_address)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Taurus {
     pub capabilities: Vec<String>,
@@ -145,6 +159,18 @@ pub struct Taurus {
 pub enum ZigbeeConnectivityStatus {
     Connected,
     ConnectivityIssue,
+}
+
+impl ZigbeeConnectivity {
+    #[must_use]
+    pub fn zigbee_resource_link(ieee_address: u64) -> ResourceLink {
+        RType::ZigbeeConnectivity.deterministic(ieee_address)
+    }
+
+    #[must_use]
+    pub fn bridge_resource_link(bridge: uuid::Uuid) -> ResourceLink {
+        RType::ZigbeeConnectivity.deterministic(bridge.as_bytes())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

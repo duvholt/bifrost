@@ -246,6 +246,11 @@ pub struct IeeeAddress(#[serde(deserialize_with = "ieee_address")] u64);
 
 impl IeeeAddress {
     #[must_use]
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
     // Format as hex MAC address (00:11::22:AA etc)
     pub fn as_mac(&self) -> String {
         self.0

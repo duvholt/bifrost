@@ -7,6 +7,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::{Group, GroupMetadata, GroupMetadataUpdate, RType, ResourceLink};
 
+impl Zone {
+    #[must_use]
+    pub fn resource_link(grouped_light: uuid::Uuid) -> ResourceLink {
+        RType::Zone.deterministic(grouped_light.as_bytes())
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Zone {
     pub children: BTreeSet<ResourceLink>,

@@ -16,23 +16,23 @@ keywords.workspace = true
 workspace = true
 
 [dependencies]
-bitflags = "2.8.0"
+bitflags = "2.13.2"
 byteorder = "1.5.0"
-chrono = { version = "0.4.39", default-features = false, features = [
+chrono = { version = "0.4.45", default-features = false, features = [
     "clock",
     "serde",
     "std",
 ] }
 hex = "0.4.3"
-iana-time-zone = "0.1.61"
-packed_struct = "0.10.1"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.140"
-siphasher = "1.0.1"
-thiserror = "2.0.11"
-uuid = { version = "1.13.1", features = ["serde", "v4", "v5"] }
+iana-time-zone = "0.1.65"
+packed_struct = "0.12.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+siphasher = "1.0.4"
+thiserror = "2.0.21"
+uuid = { version = "1.29.2", features = ["serde", "v4", "v5"] }
 
-mac_address = { version = "1.1.8", features = ["serde"], optional = true }
+mac_address = { version = "1.2.1", features = ["serde"], optional = true }
 maplit = "1.0.2"
 
 [features]
@@ -44,4 +44,3 @@ mac = ["dep:mac_address"]
 
 [dev-dependencies]
 hex = "0.4.3"
-uuid = { version = "1.13.1", features = ["v4"] }

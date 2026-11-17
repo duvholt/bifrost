@@ -5,10 +5,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::api::device::DeviceIdentifyUpdate;
-use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, ResourceLink, Stub};
+use crate::api::{DeviceArchetype, Identify, Metadata, MetadataUpdate, RType, ResourceLink, Stub};
 use crate::hs::HS;
 use crate::legacy_api::ApiLightStateUpdate;
 use crate::xy::XY;
+
+impl Light {
+    #[must_use]
+    pub fn resource_link(ieee_address: u64) -> ResourceLink {
+        RType::Light.deterministic(ieee_address)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Light {

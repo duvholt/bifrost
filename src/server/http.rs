@@ -20,11 +20,11 @@ use crate::error::{ApiError, ApiResult};
 
 pub struct HttpServer<S, A, F, E = ()> {
     addr: SocketAddr,
-    bind: fn(&Self) -> ApiResult<Server<A>>,
+    bind: fn(&Self) -> ApiResult<Server<SocketAddr, A>>,
     server: Option<F>,
     svc: S,
     extra: E,
-    handle: Handle,
+    handle: Handle<SocketAddr>,
 }
 
 #[async_trait]
@@ -100,7 +100,7 @@ where
     pub fn http_listener(addr: SocketAddr, listener: TcpListener, svc: S) -> Self {
         Self {
             addr,
-            bind: |slf| Ok(axum_server::from_tcp(slf.extra.try_clone()?)),
+            bind: |slf| Ok(axum_server::from_tcp(slf.extra.try_clone()?)?),
             server: None,
             svc,
             extra: listener,
@@ -111,7 +111,7 @@ where
 
 impl<S, F> HttpServer<S, OpenSSLAcceptor, F, OpenSSLConfig>
 where
-    Server<DefaultAcceptor>: Send,
+    Server<SocketAddr, DefaultAcceptor>: Send,
     Self: Service,
     S: Send + Unpin,
 {

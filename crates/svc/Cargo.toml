@@ -12,13 +12,13 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-async-trait = "0.1.86"
-futures = { version = "0.3.31", default-features = false, features = ["alloc"] }
-log = { version = "0.4.26", optional = true }
-serde = { version = "1.0.218", features = ["derive"] }
-thiserror = "2.0.11"
-tokio = { version = "1.43.0", features = ["io-util", "macros", "process", "rt", "rt-multi-thread", "sync", "time", "tokio-macros"], optional = true }
-uuid = { version = "1.14.0", features = [] }
+async-trait = "0.1.92"
+futures = { version = "0.3.34", default-features = false, features = ["alloc"] }
+log = { version = "0.4.35", optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["io-util", "macros", "process", "rt", "rt-multi-thread", "sync", "time", "tokio-macros"], optional = true }
+uuid = { version = "1.29.2", features = [] }
 
 [features]
 default = ["manager"]

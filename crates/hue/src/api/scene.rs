@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::api::{
-    ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, LightGradientUpdate, On, ResourceLink,
+    ColorTemperatureUpdate, ColorUpdate, DimmingUpdate, LightGradientUpdate, On, RType,
+    ResourceLink,
 };
 use crate::date_format;
 
@@ -34,6 +35,13 @@ pub enum SceneStatusEnum {
     Active,
     Static,
     DynamicPalette,
+}
+
+impl Scene {
+    #[must_use]
+    pub fn resource_link(owner: uuid::Uuid, scene_id: u32) -> ResourceLink {
+        RType::Scene.deterministic((owner.as_bytes(), scene_id))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

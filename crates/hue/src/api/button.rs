@@ -3,8 +3,15 @@ use std::ops::AddAssign;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::api::ResourceLink;
+use crate::api::{RType, ResourceLink};
 use crate::date_format;
+
+impl Button {
+    #[must_use]
+    pub fn resource_link(ieee_address: u64, button_name: &str) -> ResourceLink {
+        RType::Button.deterministic((ieee_address, button_name))
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Button {

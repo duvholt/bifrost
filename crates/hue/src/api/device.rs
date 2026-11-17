@@ -8,6 +8,18 @@ use crate::HUE_BRIDGE_V2_MODEL_ID;
 use crate::api::{Metadata, MetadataUpdate, RType, ResourceLink, Stub};
 use crate::version::SwVersion;
 
+impl Device {
+    #[must_use]
+    pub fn zigbee_resource_link(ieee_address: u64) -> ResourceLink {
+        RType::Device.deterministic(ieee_address)
+    }
+
+    #[must_use]
+    pub fn bridge_resource_link(bridge: uuid::Uuid) -> ResourceLink {
+        RType::Device.deterministic(bridge.as_bytes())
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Device {
     pub product_data: DeviceProductData,
