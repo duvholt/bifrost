@@ -24,7 +24,7 @@ pub enum ApiError {
     SerdeJson(#[from] serde_json::Error),
 
     #[error(transparent)]
-    SerdeYaml(#[from] serde_yml::Error),
+    SerdeYaml(#[from] yaml_serde::Error),
 
     #[error(transparent)]
     IOError(#[from] std::io::Error),

@@ -83,11 +83,11 @@ impl Resources {
     }
 
     pub fn write(&self, wr: impl Write) -> ApiResult<()> {
-        Ok(serde_yml::to_writer(wr, &self.state)?)
+        Ok(yaml_serde::to_writer(wr, &self.state)?)
     }
 
     pub fn serialize(&self) -> ApiResult<String> {
-        Ok(serde_yml::to_string(&self.state)?)
+        Ok(yaml_serde::to_string(&self.state)?)
     }
 
     pub fn init(&mut self, bridge_id: &str) -> ApiResult<()> {

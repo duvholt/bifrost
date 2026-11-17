@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::io::Read;
 
 use serde::{Deserialize, Serialize};
-use serde_yml::Value;
 use uuid::Uuid;
+use yaml_serde::Value;
 
 use hue::api::{DeviceArchetype, Resource};
 use hue::error::{HueError, HueResult};
@@ -181,8 +181,8 @@ impl State {
     }
 
     pub fn from_v0(state: Value) -> ApiResult<Self> {
-        let (v0res, v0aux): (serde_yml::Mapping, serde_yml::Mapping) =
-            serde_yml::from_value(state)?;
+        let (v0res, v0aux): (yaml_serde::Mapping, yaml_serde::Mapping) =
+            yaml_serde::from_value(state)?;
 
         let mut aux = BTreeMap::new();
         let mut res = BTreeMap::new();
@@ -190,13 +190,13 @@ impl State {
         log::debug!("Importing aux data from old v0 state..");
         for (key, value) in v0aux {
             log::debug!("  {key:?}: {value:?}");
-            aux.insert(serde_yml::from_value(key)?, serde_yml::from_value(value)?);
+            aux.insert(yaml_serde::from_value(key)?, yaml_serde::from_value(value)?);
         }
 
         log::debug!("Importing res data from old v0 state..");
         for (key, value) in v0res {
             log::debug!("  {key:?}: {value:?}");
-            res.insert(serde_yml::from_value(key)?, serde_yml::from_value(value)?);
+            res.insert(yaml_serde::from_value(key)?, yaml_serde::from_value(value)?);
         }
 
         /* generate all missing id_v1 entries */
@@ -216,7 +216,7 @@ impl State {
     }
 
     pub fn from_v1(state: Value) -> ApiResult<Self> {
-        let mut v1_state: State = serde_yml::from_value(state)?;
+        let mut v1_state: Self = yaml_serde::from_value(state)?;
 
         log::debug!("Migrate ZigbeeConnectivity mac address");
         for resource in v1_state.res.values_mut() {
@@ -244,11 +244,11 @@ impl State {
     }
 
     pub fn from_v2(state: Value) -> ApiResult<Self> {
-        Ok(serde_yml::from_value(state)?)
+        Ok(yaml_serde::from_value(state)?)
     }
 
     pub fn from_reader(rdr: impl Read) -> ApiResult<Self> {
-        let state = serde_yml::from_reader(rdr)?;
+        let state = yaml_serde::from_reader(rdr)?;
         match Self::version(&state)? {
             StateVersion::V0 => Self::from_v0(state),
             StateVersion::V1 => Self::from_v1(state),
