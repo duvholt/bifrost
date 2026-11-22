@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::api::ResourceLink;
+use crate::api::{RType, ResourceLink};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -22,6 +22,13 @@ impl ZigbeeDeviceDiscoveryAction {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.action_type_values.is_empty()
+    }
+}
+
+impl ZigbeeDeviceDiscovery {
+    #[must_use]
+    pub fn resource_link(bridge: Uuid) -> ResourceLink {
+        RType::ZigbeeDeviceDiscovery.deterministic(bridge.as_bytes())
     }
 }
 

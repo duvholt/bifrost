@@ -374,11 +374,11 @@ impl Z2mBackend {
             services: BTreeSet::new(),
         };
         let group_id = self.get_next_group_id();
-        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
-        let link = existing_link.unwrap_or_else(|| RType::Room.deterministic(link_glight.rid));
+        let link_glight = GroupedLight::resource_link(&self.name, group_id);
+        let link = existing_link.unwrap_or_else(|| Room::resource_link(link_glight.rid));
 
         lock.add(&link, Resource::Room(room.clone()))?;
-        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        let link_glight = GroupedLight::resource_link(&self.name, group_id);
         lock.add(
             &link_glight,
             Resource::GroupedLight(GroupedLight::new(link)),
@@ -479,11 +479,11 @@ impl Z2mBackend {
             services: BTreeSet::new(),
         };
         let group_id = self.get_next_group_id();
-        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
-        let link = existing_link.unwrap_or_else(|| RType::Zone.deterministic(link_glight.rid));
+        let link_glight = GroupedLight::resource_link(&self.name, group_id);
+        let link = existing_link.unwrap_or_else(|| Zone::resource_link(link_glight.rid));
 
         lock.add(&link, Resource::Zone(zone.clone()))?;
-        let link_glight = RType::GroupedLight.deterministic((&self.name, group_id));
+        let link_glight = GroupedLight::resource_link(&self.name, group_id);
         lock.add(
             &link_glight,
             Resource::GroupedLight(GroupedLight::new(link)),

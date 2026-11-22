@@ -193,7 +193,108 @@ impl Debug for ResourceLink {
 mod tests {
     use uuid::uuid;
 
-    use crate::api::RType;
+    use crate::api::{
+        Bridge, BridgeHome, Button, Device, Entertainment, GroupedLight, Light, RType, Room, Scene,
+        Taurus, ZigbeeConnectivity, ZigbeeDeviceDiscovery, Zone,
+    };
+
+    #[test]
+    fn bridge_resource_links_preserve_stable_ids() {
+        let bridge = uuid!("2fd1b4c0-ebf6-534b-9bde-fca6b1d7f84d");
+        let home = uuid!("e1e7f958-59ab-5eec-b4c8-54d08798055b");
+        assert_eq!(
+            Bridge::resource_link("112233fffe445566"),
+            RType::Bridge.link_to(bridge)
+        );
+        assert_eq!(
+            BridgeHome::resource_link("112233fffe445566"),
+            RType::BridgeHome.link_to(home)
+        );
+        assert_eq!(
+            Device::bridge_resource_link(bridge),
+            RType::Device.link_to(uuid!("7a16c640-6be0-583f-a3f3-5c5d941bada5"))
+        );
+        assert_eq!(
+            Entertainment::bridge_resource_link(bridge),
+            RType::Entertainment.link_to(uuid!("75069e57-3629-55b5-9d38-ee7333a034ee"))
+        );
+        assert_eq!(
+            ZigbeeDeviceDiscovery::resource_link(bridge),
+            RType::ZigbeeDeviceDiscovery.link_to(uuid!("030642bd-5d16-5809-a2ad-cc537922e376"))
+        );
+        assert_eq!(
+            ZigbeeConnectivity::bridge_resource_link(bridge),
+            RType::ZigbeeConnectivity.link_to(uuid!("6ef36268-e134-5378-a0a0-218ba71dbf0e"))
+        );
+        assert_eq!(
+            GroupedLight::bridge_home_resource_link(home),
+            RType::GroupedLight.link_to(uuid!("ced15305-322e-5306-a292-a7cb66f7dc8a"))
+        );
+    }
+
+    #[test]
+    fn zigbee_resource_links_preserve_stable_ids() {
+        let address = 0x0200_0000_0000_0001;
+        assert_eq!(
+            Device::zigbee_resource_link(address),
+            RType::Device.link_to(uuid!("d17a66ce-6d22-5694-8aaa-a41fb736cc1a"))
+        );
+        assert_eq!(
+            Light::resource_link(address),
+            RType::Light.link_to(uuid!("bc09377d-6daf-57b5-8ca9-7e0b3a11de90"))
+        );
+        assert_eq!(
+            Entertainment::zigbee_resource_link(address),
+            RType::Entertainment.link_to(uuid!("bb4650d2-3777-5153-be4d-1fa578abcd41"))
+        );
+        assert_eq!(
+            Taurus::resource_link(address),
+            RType::Taurus.link_to(uuid!("250b35ab-ac8d-50fb-b4a2-08dd489b28a7"))
+        );
+        assert_eq!(
+            ZigbeeConnectivity::zigbee_resource_link(address),
+            RType::ZigbeeConnectivity.link_to(uuid!("16bea22e-a1db-5c06-89df-ac7caa767213"))
+        );
+        assert_eq!(
+            Button::resource_link(address, "on"),
+            RType::Button.link_to(uuid!("4096c255-a79e-5365-884d-f427840148da"))
+        );
+    }
+
+    #[test]
+    fn group_resource_links_preserve_stable_ids() {
+        let grouped_light = uuid!("86191eb2-b8b4-5e5a-a6be-8656531e84f0");
+        let room = uuid!("cd560bfe-d970-5a89-82a8-77ec0f2a4e27");
+        assert_eq!(
+            GroupedLight::resource_link("test", 2),
+            RType::GroupedLight.link_to(grouped_light)
+        );
+        assert_eq!(
+            Room::resource_link(grouped_light),
+            RType::Room.link_to(room)
+        );
+        assert_eq!(
+            Zone::resource_link(grouped_light),
+            RType::Zone.link_to(uuid!("2184ffaf-f16d-5866-9712-727fa80a9761"))
+        );
+        assert_eq!(
+            Scene::resource_link(room, 1),
+            RType::Scene.link_to(uuid!("cb335f3b-2e5f-5a24-abcb-be6397fe30b5"))
+        );
+    }
+
+    #[test]
+    fn legacy_room_resource_links_preserve_ids() {
+        let room = uuid!("f53c2dfd-0e0d-5e61-a6b1-94b4510d0ada");
+        assert_eq!(
+            Room::legacy_resource_link("kitchen"),
+            RType::Room.link_to(room)
+        );
+        assert_eq!(
+            GroupedLight::legacy_resource_link(room, 2),
+            RType::GroupedLight.link_to(uuid!("0236cf62-ed50-5ed3-b638-c93c970fd410"))
+        );
+    }
 
     #[test]
     fn rlink_hash_uses_input() {
