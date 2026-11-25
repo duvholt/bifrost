@@ -78,6 +78,97 @@ impl Position {
     pub const fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
     }
+
+    /// `count` positions, evenly spaced on the line from `start` to `end`
+    /// (both points included)
+    ///
+    /// A single position is placed at `start`.
+    #[must_use]
+    pub fn spread(start: &Self, end: &Self, count: usize) -> Vec<Self> {
+        let last = count.saturating_sub(1);
+
+        (0..count)
+            .map(|index| {
+                if last == 0 {
+                    return start.clone();
+                }
+
+                let t = f64::from(u32::try_from(index).unwrap_or(u32::MAX))
+                    / f64::from(u32::try_from(last).unwrap_or(u32::MAX));
+
+                Self {
+                    x: (end.x - start.x).mul_add(t, start.x),
+                    y: (end.y - start.y).mul_add(t, start.y),
+                    z: (end.z - start.z).mul_add(t, start.z),
+                }
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Position;
+
+    fn assert_close(a: &Position, b: &Position) {
+        assert!((a.x - b.x).abs() < 1e-9, "x: {} != {}", a.x, b.x);
+        assert!((a.y - b.y).abs() < 1e-9, "y: {} != {}", a.y, b.y);
+        assert!((a.z - b.z).abs() < 1e-9, "z: {} != {}", a.z, b.z);
+    }
+
+    #[test]
+    fn spread_includes_both_end_points() {
+        let start = Position::new(1.0, 1.0, -0.77);
+        let end = Position::new(1.0, 1.0, 0.77);
+
+        let res = Position::spread(&start, &end, 7);
+
+        assert_eq!(res.len(), 7);
+        assert_close(&res[0], &start);
+        assert_close(&res[6], &end);
+    }
+
+    #[test]
+    fn spread_is_evenly_spaced() {
+        let start = Position::new(0.0, 0.0, -1.0);
+        let end = Position::new(0.0, 0.0, 1.0);
+
+        let res = Position::spread(&start, &end, 5);
+
+        let z: Vec<f64> = res.iter().map(|p| p.z).collect();
+        for (got, want) in z.iter().zip([-1.0, -0.5, 0.0, 0.5, 1.0]) {
+            assert!((got - want).abs() < 1e-9, "{got} != {want}");
+        }
+    }
+
+    #[test]
+    fn swapping_the_end_points_reverses_the_order() {
+        let a = Position::new(-1.0, 1.0, 0.54);
+        let b = Position::new(-1.0, 1.0, -1.0);
+
+        let forward = Position::spread(&a, &b, 7);
+        let flipped = Position::spread(&b, &a, 7);
+
+        for (f, r) in forward.iter().zip(flipped.iter().rev()) {
+            assert_close(f, r);
+        }
+    }
+
+    #[test]
+    fn spread_handles_small_counts() {
+        let start = Position::new(1.0, 2.0, 3.0);
+        let end = Position::new(4.0, 5.0, 6.0);
+
+        assert!(Position::spread(&start, &end, 0).is_empty());
+
+        let one = Position::spread(&start, &end, 1);
+        assert_eq!(one.len(), 1);
+        assert_close(&one[0], &start);
+
+        let two = Position::spread(&start, &end, 2);
+        assert_close(&two[0], &start);
+        assert_close(&two[1], &end);
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
