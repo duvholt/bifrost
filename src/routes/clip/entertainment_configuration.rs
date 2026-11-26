@@ -77,6 +77,40 @@ pub async fn post_resource(state: &AppState, req: Value) -> ApiV2Result {
     V2Reply::ok(rlink)
 }
 
+/// The services of an area, in the order of their channels
+fn service_order(channels: &[EntertainmentConfigurationChannels]) -> Vec<ResourceLink> {
+    let mut channels: Vec<_> = channels.iter().collect();
+    channels.sort_by_key(|channel| channel.channel_id);
+
+    let mut order = vec![];
+    for member in channels.iter().flat_map(|channel| &channel.members) {
+        if !order.contains(&member.service) {
+            order.push(member.service);
+        }
+    }
+
+    order
+}
+
+/// Sort `items` in the order given by `current`
+///
+/// Items whose key is not in `current` go last, in their original order.
+fn keep_order<T>(
+    mut items: Vec<T>,
+    current: &[ResourceLink],
+    key: impl Fn(&T) -> ResourceLink,
+) -> Vec<T> {
+    items.sort_by_key(|item| {
+        let key = key(item);
+        current
+            .iter()
+            .position(|link| *link == key)
+            .unwrap_or(usize::MAX)
+    });
+
+    items
+}
+
 fn make_channels(
     lock: &Resources,
     locations: &[EntertainmentConfigurationServiceLocations],
@@ -188,13 +222,22 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
     let mut light_services = vec![];
 
     if let Some(locs) = &upd.locations {
+        // The channels are numbered in the order of the services, but the
+        // Hue app does not send them in a stable order. Keep the numbering of
+        // the lights that are already in the area, so that clients that
+        // refer to the channels by number (e.g. a layout in HyperHDR) are not
+        // broken when the area is edited. New lights are added at the end.
+        let current = service_order(&lock.get::<EntertainmentConfiguration>(&rlink)?.channels);
+
+        let service_locations: Vec<EntertainmentConfigurationServiceLocations> = locs
+            .service_locations
+            .clone()
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
         let newlocs = EntertainmentConfigurationLocations {
-            service_locations: locs
-                .service_locations
-                .clone()
-                .into_iter()
-                .map(Into::into)
-                .collect(),
+            service_locations: keep_order(service_locations, &current, |loc| loc.service),
         };
         channels = make_channels(&lock, &newlocs.service_locations)?;
         light_services = make_services(&lock, &newlocs.service_locations)?;
@@ -279,4 +322,82 @@ pub async fn put_resource_id(state: &AppState, rlink: ResourceLink, put: Value) 
     drop(lock);
 
     V2Reply::ok(rlink)
+}
+
+#[cfg(test)]
+mod tests {
+    use hue::api::{
+        EntertainmentConfigurationChannels, EntertainmentConfigurationStreamMembers, Position,
+        RType, ResourceLink,
+    };
+    use uuid::Uuid;
+
+    use super::{keep_order, service_order};
+
+    fn link(n: u128) -> ResourceLink {
+        RType::Entertainment.link_to(Uuid::from_u128(n))
+    }
+
+    fn channel(
+        channel_id: u32,
+        service: ResourceLink,
+        index: u16,
+    ) -> EntertainmentConfigurationChannels {
+        EntertainmentConfigurationChannels {
+            channel_id,
+            position: Position::default(),
+            members: vec![EntertainmentConfigurationStreamMembers { service, index }],
+        }
+    }
+
+    #[test]
+    fn service_order_follows_the_channel_numbers() {
+        let (a, b) = (link(1), link(2));
+
+        // channels listed out of order, the services have several channels
+        let channels = [
+            channel(2, b, 0),
+            channel(0, a, 0),
+            channel(3, b, 1),
+            channel(1, a, 1),
+        ];
+
+        assert_eq!(service_order(&channels), [a, b]);
+    }
+
+    #[test]
+    fn service_order_of_an_empty_area_is_empty() {
+        assert_eq!(service_order(&[]), Vec::<ResourceLink>::new());
+    }
+
+    #[test]
+    fn existing_services_keep_their_place() {
+        let (a, b) = (link(1), link(2));
+
+        // the app sends the services in a different order than before
+        assert_eq!(keep_order(vec![b, a], &[a, b], |l| *l), [a, b]);
+        assert_eq!(keep_order(vec![a, b], &[a, b], |l| *l), [a, b]);
+    }
+
+    #[test]
+    fn new_services_are_added_at_the_end_in_the_order_they_came() {
+        let (a, b, c, d) = (link(1), link(2), link(3), link(4));
+
+        // c and d are new, in the order d, c
+        assert_eq!(keep_order(vec![d, b, c, a], &[a, b], |l| *l), [a, b, d, c]);
+    }
+
+    #[test]
+    fn removed_services_leave_the_others_in_order() {
+        let (a, b, c) = (link(1), link(2), link(3));
+
+        assert_eq!(keep_order(vec![c, a], &[a, b, c], |l| *l), [a, c]);
+    }
+
+    #[test]
+    fn a_new_area_keeps_the_order_it_was_given() {
+        let (a, b, c) = (link(1), link(2), link(3));
+
+        assert_eq!(keep_order(vec![c, a, b], &[], |l| *l), [c, a, b]);
+    }
 }
